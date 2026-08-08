@@ -4,8 +4,8 @@ from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication
 
-from gameforge.controllers import AppController, CouchNavigationController
-from gameforge.models import (
+from game_optimization_linux.controllers import AppController, CouchNavigationController
+from game_optimization_linux.models import (
     AppSettings,
     ControllerMode,
     GamepadAction,
@@ -15,8 +15,8 @@ from gameforge.models import (
     PostLaunchBehavior,
     button_hints,
 )
-from gameforge.providers import DemoGameProvider, FakeGamepadProvider, UnavailableGamepadProvider
-from gameforge.services import GamepadInputMapper, GamepadService, SettingsStore, UiSoundService
+from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider, UnavailableGamepadProvider
+from game_optimization_linux.services import GamepadInputMapper, GamepadService, SettingsStore, UiSoundService
 
 
 _APPLICATION = QCoreApplication.instance() or QCoreApplication([])

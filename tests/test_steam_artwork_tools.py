@@ -6,10 +6,10 @@ from pathlib import Path
 from PySide6.QtCore import QCoreApplication, QUrl
 import pytest
 
-import gameforge.controllers.app_controller as app_controller_module
-from gameforge.controllers import AppController
-from gameforge.controllers.presenters import game_to_qml
-from gameforge.models import (
+import game_optimization_linux.controllers.app_controller as app_controller_module
+from game_optimization_linux.controllers import AppController
+from game_optimization_linux.controllers.presenters import game_to_qml
+from game_optimization_linux.models import (
     CapabilityStatus,
     FilesystemInfo,
     FilesystemType,
@@ -18,13 +18,13 @@ from gameforge.models import (
     SessionType,
     SystemInfo,
 )
-from gameforge.providers import (
+from game_optimization_linux.providers import (
     SteamGameProvider,
     find_local_steam_artwork,
     find_local_steam_cover,
     is_steam_tool_name,
 )
-from gameforge.services import LibraryCache, SettingsStore
+from game_optimization_linux.services import LibraryCache, SettingsStore
 
 
 _QT_APPLICATION = QCoreApplication.instance() or QCoreApplication([])
@@ -359,7 +359,7 @@ def test_library_cache_round_trips_shape_specific_artwork(tmp_path: Path) -> Non
 
 
 def test_qml_artwork_components_clip_and_keep_fallbacks() -> None:
-    qml_root = Path(__file__).parents[1] / "src" / "gameforge" / "qml"
+    qml_root = Path(__file__).parents[1] / "src" / "game_optimization_linux" / "qml"
     cover_qml = (qml_root / "components" / "GameArtwork.qml").read_text(encoding="utf-8")
     grid_qml = (qml_root / "components" / "GameGridCard.qml").read_text(encoding="utf-8")
     list_qml = (qml_root / "components" / "GameListRow.qml").read_text(encoding="utf-8")
@@ -473,7 +473,7 @@ def test_normal_mode_has_no_demo_services_or_records(
 def test_demo_environment_keeps_explicit_demo_records(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv("GAMEFORGE_DEMO", "1")
+    monkeypatch.setenv("GAME_OPTIMIZATION_DEMO", "1")
     controller = AppController(
         settings_store=SettingsStore(tmp_path / "settings.json"),
         auto_refresh=False,

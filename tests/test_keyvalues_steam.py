@@ -6,20 +6,20 @@ from pathlib import Path
 
 import pytest
 
-from gameforge.models.enums import (
+from game_optimization_linux.models.enums import (
     FilesystemType,
     GameStatus,
     SizeScanStatus,
 )
-from gameforge.models.game import Game
-from gameforge.models.system import FilesystemInfo
-from gameforge.providers.base import FilesystemProvider
-from gameforge.providers.keyvalues import (
+from game_optimization_linux.models.game import Game
+from game_optimization_linux.models.system import FilesystemInfo
+from game_optimization_linux.providers.base import FilesystemProvider
+from game_optimization_linux.providers.keyvalues import (
     VDFParseError,
     load_keyvalues,
     parse_keyvalues,
 )
-from gameforge.providers.steam import SteamGameProvider
+from game_optimization_linux.providers.steam import SteamGameProvider
 
 
 GIB = 1024**3

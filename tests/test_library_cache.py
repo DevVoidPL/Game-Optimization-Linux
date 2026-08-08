@@ -4,9 +4,9 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from gameforge.models import GameStatus, SizeScanStatus
-from gameforge.providers import DemoGameProvider
-from gameforge.services.library_cache import (
+from game_optimization_linux.models import GameStatus, SizeScanStatus
+from game_optimization_linux.providers import DemoGameProvider
+from game_optimization_linux.services.library_cache import (
     CACHE_FORMAT_VERSION,
     LibraryCache,
 )

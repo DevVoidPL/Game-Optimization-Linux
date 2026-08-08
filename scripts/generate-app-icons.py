@@ -14,12 +14,12 @@ from PySide6.QtCore import QRectF, QSize, Qt
 from PySide6.QtGui import QColor, QFont, QGuiApplication, QImage, QPainter, QPen
 
 
-APP_ID = "io.github.gameforge_linux.GameForge"
+APP_ID = "io.github.DevVoidPL.GameOptimizationLinux"
 PROJECT = Path(__file__).resolve().parent.parent
-FULL_ICON = PROJECT / "src" / "gameforge" / "resources" / "GameForgeIcon.png"
-RESOURCE_DIR = PROJECT / "src" / "gameforge" / "resources" / "app-icons"
+FULL_ICON = PROJECT / "src" / "game_optimization_linux" / "resources" / "GameOptimizationLinuxIcon.png"
+RESOURCE_DIR = PROJECT / "src" / "game_optimization_linux" / "resources" / "app-icons"
 HICOLOR_DIR = PROJECT / "data" / "icons" / "hicolor"
-CONTACT_SHEET = PROJECT / "reports" / "ui" / "gameforge-icon-contact-sheet.png"
+CONTACT_SHEET = PROJECT / "reports" / "ui" / "game-optimization-icon-contact-sheet.png"
 
 # Each small size has its own final-pixel geometry.  These are not reductions
 # of the detailed sidebar logo.
@@ -84,7 +84,7 @@ def make_contact_sheet(sizes: tuple[int, ...]) -> None:
     painter.setPen(QColor("#e9eef6"))
     title_font = QFont("Sans Serif", 15, QFont.Bold)
     painter.setFont(title_font)
-    painter.drawText(QRectF(0, 8, sheet.width(), 28), Qt.AlignCenter, "GameForge App Icon Mark · native and pixel zoom")
+    painter.drawText(QRectF(0, 8, sheet.width(), 28), Qt.AlignCenter, "Game Optimization App Icon Mark · native and pixel zoom")
     label_font = QFont("Sans Serif", 11, QFont.Bold)
     painter.setFont(label_font)
     for index, size in enumerate(sizes):

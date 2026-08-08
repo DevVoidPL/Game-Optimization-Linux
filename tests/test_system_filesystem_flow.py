@@ -3,9 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Sequence
 
-from gameforge.controllers import AppController
-from gameforge.models import FilesystemInfo, FilesystemType, SessionType, SystemInfo
-from gameforge.services import SettingsStore
+from game_optimization_linux.controllers import AppController
+from game_optimization_linux.models import FilesystemInfo, FilesystemType, SessionType, SystemInfo
+from game_optimization_linux.services import SettingsStore
 
 
 class _EmptyGameProvider:

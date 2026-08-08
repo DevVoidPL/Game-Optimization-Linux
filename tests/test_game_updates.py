@@ -9,19 +9,19 @@ from threading import Event
 
 import pytest
 
-from gameforge.controllers.presenters import game_to_qml, settings_to_qml
-from gameforge.models.enums import (
+from game_optimization_linux.controllers.presenters import game_to_qml, settings_to_qml
+from game_optimization_linux.models.enums import (
     AutomaticCompressionMode,
     CompressionProfile,
     FilesystemType,
     GameStatus,
     Launcher,
 )
-from gameforge.models.game import Game
-from gameforge.models.settings import AppSettings
-from gameforge.models.system import FilesystemInfo
-from gameforge.providers.steam import SteamGameProvider
-from gameforge.services.game_updates import (
+from game_optimization_linux.models.game import Game
+from game_optimization_linux.models.settings import AppSettings
+from game_optimization_linux.models.system import FilesystemInfo
+from game_optimization_linux.providers.steam import SteamGameProvider
+from game_optimization_linux.services.game_updates import (
     UPDATE_STATE_FORMAT_VERSION,
     FileFingerprint,
     FingerprintSnapshot,
@@ -33,7 +33,7 @@ from gameforge.services.game_updates import (
     UpdateStateDatabase,
     diff_fingerprints,
 )
-from gameforge.services.library_cache import CACHE_FORMAT_VERSION, LibraryCache
+from game_optimization_linux.services.library_cache import CACHE_FORMAT_VERSION, LibraryCache
 
 
 class _Filesystem:
@@ -234,7 +234,7 @@ def test_manifest_replaced_during_read_is_not_published(
             replacement.replace(manifest)
         return chunk
 
-    monkeypatch.setattr("gameforge.providers.steam.os.read", replacing_read)
+    monkeypatch.setattr("game_optimization_linux.providers.steam.os.read", replacing_read)
     provider = SteamGameProvider(_Filesystem(), roots=[root])
 
     assert provider.refresh() == ()
@@ -462,7 +462,7 @@ def test_tracker_rejects_manifest_replaced_while_reading(
         return chunk
 
     monkeypatch.setattr(
-        "gameforge.services.game_updates.os.read",
+        "game_optimization_linux.services.game_updates.os.read",
         replacing_read,
     )
     snapshot = _snapshot(game.install_path, {"payload.bin": (1, 1, 1)})

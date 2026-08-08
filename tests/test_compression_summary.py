@@ -4,9 +4,9 @@ from pathlib import Path
 
 import pytest
 
-from gameforge.controllers.presenters import game_to_qml
-from gameforge.models import FilesystemType, Game, Launcher
-from gameforge.services.compression_summary import (
+from game_optimization_linux.controllers.presenters import game_to_qml
+from game_optimization_linux.models import FilesystemType, Game, Launcher
+from game_optimization_linux.services.compression_summary import (
     LOW_COMPRESSION_EFFECT_FRACTION,
     MODERATE_COMPRESSION_EFFECT_FRACTION,
     STRONG_COMPRESSION_EFFECT_FRACTION,

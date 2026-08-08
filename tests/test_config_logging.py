@@ -9,22 +9,22 @@ import sys
 
 from PySide6.QtGui import QGuiApplication, QImage
 
-from gameforge import config
-from gameforge.app import (
+from game_optimization_linux import config
+from game_optimization_linux.app import (
     _application_icon,
     _extract_runtime_options,
     _set_application_metadata,
 )
-from gameforge.desktop_entry import render_desktop_entry
-from gameforge.logging_config import configure_logging, parse_log_level
+from game_optimization_linux.desktop_entry import render_desktop_entry
+from game_optimization_linux.logging_config import configure_logging, parse_log_level
 
 
 def test_runtime_metadata_is_centralized() -> None:
-    assert config.APP_NAME == "GameForge Linux"
+    assert config.APP_NAME == "Game Optimization Linux"
     assert config.APP_VERSION
     assert config.MAIN_QML.name == "Main.qml"
     assert config.MAIN_QML.parent == config.QML_DIR
-    assert config.APP_ICON.name == "GameForgeIcon.png"
+    assert config.APP_ICON.name == "GameOptimizationLinuxIcon.png"
     assert config.APP_ICON.is_file()
     assert tuple(config.APP_ICON_VARIANTS) == (16, 22, 24, 32, 48, 64, 128, 256)
     desktop_entry = render_desktop_entry()
@@ -71,7 +71,7 @@ def test_desktop_installer_uses_a_working_launcher_in_temporary_xdg_home(
     installer = project_root / "scripts" / "install-desktop-entry.sh"
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
-    launcher = fake_bin / "gameforge-linux"
+    launcher = fake_bin / "game-optimization-linux"
     launcher.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     launcher.chmod(0o755)
     data_home = tmp_path / "share"
@@ -118,7 +118,7 @@ def test_desktop_installer_dev_mode_prefers_project_virtual_environment(
     project = tmp_path / "checkout"
     (project / "scripts").mkdir(parents=True)
     (project / "data").mkdir()
-    (project / "src" / "gameforge" / "resources").mkdir(parents=True)
+    (project / "src" / "game_optimization_linux" / "resources").mkdir(parents=True)
     (project / ".venv" / "bin").mkdir(parents=True)
     shutil.copy2(source_root / "scripts" / "install-desktop-entry.sh", project / "scripts")
     shutil.copy2(
@@ -130,7 +130,7 @@ def test_desktop_installer_dev_mode_prefers_project_virtual_environment(
         project / "data",
     )
     shutil.copytree(source_root / "data" / "icons", project / "data" / "icons")
-    launcher = project / ".venv" / "bin" / "gameforge-linux"
+    launcher = project / ".venv" / "bin" / "game-optimization-linux"
     launcher.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     launcher.chmod(0o755)
     data_home = tmp_path / "dev-share"
@@ -190,7 +190,7 @@ def test_hicolor_icons_are_square_native_variants_and_appstream_id_matches() -> 
 def test_small_icon_mark_variants_and_multi_size_qicon_are_diagnostic_ready() -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     application = QGuiApplication.instance() or QGuiApplication(
-        ["gameforge-icon-test"]
+        ["game-optimization-icon-test"]
     )
     small_bytes: list[bytes] = []
     for size in (16, 22, 24, 32, 48):
@@ -212,16 +212,16 @@ def test_small_icon_mark_variants_and_multi_size_qicon_are_diagnostic_ready() ->
 
 def test_emergency_ui_arguments_are_removed_before_qt_parsing() -> None:
     qt_args, desktop, reset = _extract_runtime_options(
-        ["gameforge-linux", "--desktop", "-platform", "offscreen"]
+        ["game-optimization-linux", "--desktop", "-platform", "offscreen"]
     )
-    assert qt_args == ["gameforge-linux", "-platform", "offscreen"]
+    assert qt_args == ["game-optimization-linux", "-platform", "offscreen"]
     assert desktop is True
     assert reset is False
 
     qt_args, desktop, reset = _extract_runtime_options(
-        ["gameforge-linux", "--reset-ui-mode"]
+        ["game-optimization-linux", "--reset-ui-mode"]
     )
-    assert qt_args == ["gameforge-linux"]
+    assert qt_args == ["game-optimization-linux"]
     assert desktop is False
     assert reset is True
 
@@ -235,12 +235,12 @@ def test_parse_log_level_accepts_names_and_falls_back() -> None:
 def test_logging_setup_is_idempotent_and_writes_to_requested_file(
     tmp_path: Path,
 ) -> None:
-    log_file = tmp_path / "logs" / "gameforge.log"
+    log_file = tmp_path / "logs" / "game-optimization-linux.log"
 
     assert configure_logging("DEBUG", log_file=log_file) == log_file
     assert configure_logging("INFO", log_file=log_file) == log_file
 
-    logging.getLogger("gameforge.test").warning("demo warning")
+    logging.getLogger("game_optimization_linux.test").warning("demo warning")
     for handler in logging.getLogger().handlers:
         handler.flush()
 

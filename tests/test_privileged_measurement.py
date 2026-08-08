@@ -12,7 +12,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from gameforge.models import (
+from game_optimization_linux.models import (
     CompressionMeasurement,
     CompressionProfile,
     CompressionResult,
@@ -20,8 +20,8 @@ from gameforge.models import (
     Game,
     Launcher,
 )
-from gameforge.providers import BtrfsCompressionProvider
-from gameforge.services import (
+from game_optimization_linux.providers import BtrfsCompressionProvider
+from game_optimization_linux.services import (
     BtrfsAnalysisTaskService,
     PrivilegedMeasurementClient,
     PrivilegedMeasurementError,
@@ -89,7 +89,7 @@ def test_polkit_client_uses_fixed_argv_without_shell(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     game = _game(tmp_path)
-    helper = tmp_path / "gameforge-linux-measure-helper"
+    helper = tmp_path / "game-optimization-linux-measure-helper"
     pkexec = tmp_path / "pkexec"
     helper.write_text("#!/bin/sh\n", encoding="utf-8")
     pkexec.write_text("#!/bin/sh\n", encoding="utf-8")
@@ -365,8 +365,8 @@ def test_verification_task_is_read_only_and_reaches_history(tmp_path: Path) -> N
 
 
 def test_installed_helper_parses_only_read_only_measurement_outputs() -> None:
-    path = ROOT / "libexec" / "gameforge-linux-measure-helper"
-    loader = importlib.machinery.SourceFileLoader("gameforge_measure_helper", str(path))
+    path = ROOT / "libexec" / "game-optimization-linux-measure-helper"
+    loader = importlib.machinery.SourceFileLoader("game_optimization_measure_helper", str(path))
     spec = importlib.util.spec_from_loader(loader.name, loader)
     assert spec is not None
     module = importlib.util.module_from_spec(spec)
@@ -399,9 +399,9 @@ def test_helper_passes_game_path_with_space_as_one_compsize_argument(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    path = ROOT / "libexec" / "gameforge-linux-measure-helper"
+    path = ROOT / "libexec" / "game-optimization-linux-measure-helper"
     loader = importlib.machinery.SourceFileLoader(
-        "gameforge_measure_helper_space",
+        "game_optimization_measure_helper_space",
         str(path),
     )
     spec = importlib.util.spec_from_loader(loader.name, loader)
@@ -474,15 +474,15 @@ def test_polkit_policy_targets_only_the_fixed_measurement_helper() -> None:
     policy = ET.parse(
         ROOT
         / "data"
-        / "io.github.gameforge_linux.GameForge.measure.policy"
+        / "io.github.DevVoidPL.GameOptimizationLinux.measure.policy"
     ).getroot()
     action = policy.find("./action")
     assert action is not None
-    assert action.get("id") == "io.github.gameforge_linux.GameForge.measure"
+    assert action.get("id") == "io.github.DevVoidPL.GameOptimizationLinux.measure"
     assert action.findtext("./defaults/allow_active") == "auth_admin_keep"
     annotations = {
         item.get("key"): item.text for item in action.findall("./annotate")
     }
     assert annotations["org.freedesktop.policykit.exec.path"] == (
-        "/usr/libexec/gameforge-linux-measure-helper"
+        "/usr/libexec/game-optimization-linux-measure-helper"
     )

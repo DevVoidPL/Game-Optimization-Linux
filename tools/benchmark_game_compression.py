@@ -1728,7 +1728,7 @@ def benchmark_game(
         )
 
     with tempfile.NamedTemporaryFile(
-        prefix="gameforge-compression-sample-",
+        prefix="game-optimization-compression-sample-",
         suffix=".bin",
         dir=safe_temp_directory,
     ) as sample:
@@ -1855,7 +1855,7 @@ def benchmark_game(
                     for key, quota in reference_quotas.items():
                         token.check()
                         reference_copy = tempfile.NamedTemporaryFile(
-                            prefix="gameforge-reference-sample-",
+                            prefix="game-optimization-reference-sample-",
                             suffix=".bin",
                             dir=safe_temp_directory,
                         )
@@ -2299,7 +2299,7 @@ def format_text_report(report: dict[str, Any]) -> str:
     sampling = report["sampling"]
     findings = report["findings"]
     lines = [
-        "GameForge read-only compression benchmark",
+        "Game Optimization read-only compression benchmark",
         f"Game: {game['name']}",
         f"Path: {game['path']}",
         (
@@ -2369,7 +2369,7 @@ def format_text_report(report: dict[str, Any]) -> str:
             ),
             (
                 "These are total-payload estimates from an uncompressed "
-                "baseline, not additional space GameForge can reclaim now. "
+                "baseline, not additional space Game Optimization can reclaim now. "
                 "Only before/after compsize, shared/exclusive and filesystem "
                 "measurements can establish incremental disk savings."
             ),

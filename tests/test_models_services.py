@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from gameforge.models import (
+from game_optimization_linux.models import (
     AnalysisReport,
     AppSettings,
     BackupStatus,
@@ -18,14 +18,14 @@ from gameforge.models import (
     TaskStatus,
     ThemeMode,
 )
-from gameforge.providers import (
+from game_optimization_linux.providers import (
     DemoCompressionProvider,
     DemoFilesystemProvider,
     DemoGameProvider,
     DemoOptimizationProvider,
     DemoSystemProvider,
 )
-from gameforge.services import (
+from game_optimization_linux.services import (
     DemoBackupService,
     DemoTaskService,
     InvalidTaskTransitionError,

@@ -5,20 +5,20 @@ import inspect
 
 import pytest
 
-from gameforge.services.host_bootstrap import (
+from game_optimization_linux.services.host_bootstrap import (
     HostBootstrapError,
     bootstrap_flatpak_host_components,
 )
-import gameforge.services.host_service as host_service_module
+import game_optimization_linux.services.host_service as host_service_module
 
 
-APP_ID = "io.github.gameforge_linux.GameForge"
+APP_ID = "io.github.DevVoidPL.GameOptimizationLinux"
 
 
 def _bundled_components(root: Path, *, runner: bytes = b"runner-v1") -> None:
     libexec = root / "libexec"
     libexec.mkdir(parents=True)
-    (libexec / "gameforge-run-host").write_bytes(runner)
+    (libexec / "game-optimization-run-host").write_bytes(runner)
 
 
 def test_clean_flatpak_bootstrap_installs_only_python_free_runner(tmp_path: Path) -> None:
@@ -28,11 +28,11 @@ def test_clean_flatpak_bootstrap_installs_only_python_free_runner(tmp_path: Path
     result = bootstrap_flatpak_host_components(
         {"FLATPAK_ID": APP_ID}, app_prefix=app, target_home=home
     )
-    assert result.changed == ("gameforge-run",)
-    target = home / ".local/share/gameforge-linux/bin"
-    assert (target / "gameforge-run").read_bytes() == b"runner-v1"
-    assert (target / "gameforge-run").stat().st_mode & 0o111
-    assert not (target / "gameforge-host").exists()
+    assert result.changed == ("game-optimization-run",)
+    target = home / ".local/share/game-optimization-linux/bin"
+    assert (target / "game-optimization-run").read_bytes() == b"runner-v1"
+    assert (target / "game-optimization-run").stat().st_mode & 0o111
+    assert not (target / "game-optimization-host").exists()
 
 
 def test_bootstrap_is_idempotent_and_updates_only_changed_component(tmp_path: Path) -> None:
@@ -47,13 +47,13 @@ def test_bootstrap_is_idempotent_and_updates_only_changed_component(tmp_path: Pa
         {"FLATPAK_ID": APP_ID}, app_prefix=app, target_home=home
     )
     assert second.changed == ()
-    (app / "libexec/gameforge-run-host").write_bytes(b"runner-v2")
+    (app / "libexec/game-optimization-run-host").write_bytes(b"runner-v2")
     third = bootstrap_flatpak_host_components(
         {"FLATPAK_ID": APP_ID}, app_prefix=app, target_home=home
     )
-    assert third.changed == ("gameforge-run",)
-    target = home / ".local/share/gameforge-linux/bin"
-    assert (target / "gameforge-run").read_bytes() == b"runner-v2"
+    assert third.changed == ("game-optimization-run",)
+    target = home / ".local/share/game-optimization-linux/bin"
+    assert (target / "game-optimization-run").read_bytes() == b"runner-v2"
 
 
 def test_non_flatpak_does_not_install_components(tmp_path: Path) -> None:
@@ -76,13 +76,13 @@ def test_missing_bundled_component_is_a_clear_error(tmp_path: Path) -> None:
 
 def test_normal_flatpak_host_path_has_no_python_or_legacy_host_helper() -> None:
     root = Path(__file__).resolve().parents[1]
-    runner = (root / "libexec/gameforge-run-host").read_text(encoding="utf-8")
+    runner = (root / "libexec/game-optimization-run-host").read_text(encoding="utf-8")
     manifest = (
-        root / "flatpak/io.github.gameforge_linux.GameForge.yml"
+        root / "flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml"
     ).read_text(encoding="utf-8")
     bootstrap_source = inspect.getsource(bootstrap_flatpak_host_components)
     diagnostics_source = inspect.getsource(host_service_module.HostServiceClient)
     assert "python" not in runner.casefold()
-    assert "gameforge-host" not in manifest
-    assert "gameforge-host" not in bootstrap_source
+    assert "game-optimization-host" not in manifest
+    assert "game-optimization-host" not in bootstrap_source
     assert "host_component" not in diagnostics_source

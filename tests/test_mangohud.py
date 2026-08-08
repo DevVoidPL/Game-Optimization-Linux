@@ -8,10 +8,10 @@ from types import SimpleNamespace
 import pytest
 from PySide6.QtCore import QCoreApplication
 
-from gameforge.controllers.app_controller import AppController
-from gameforge.models import FilesystemType, Game, GameStatus, Launcher, MangoHudProfile
-from gameforge.providers import DemoSystemProvider
-from gameforge.services import (
+from game_optimization_linux.controllers.app_controller import AppController
+from game_optimization_linux.models import FilesystemType, Game, GameStatus, Launcher, MangoHudProfile
+from game_optimization_linux.providers import DemoSystemProvider
+from game_optimization_linux.services import (
     KNOWN_CONFIG_KEYS,
     GameExecutableResolver,
     MangoHudAvailability,
@@ -26,7 +26,7 @@ from gameforge.services import (
     SteamLaunchError,
     build_steam_launch_plan,
 )
-from gameforge.services import mangohud as mangohud_module
+from game_optimization_linux.services import mangohud as mangohud_module
 
 
 _APPLICATION = QCoreApplication.instance() or QCoreApplication([])
@@ -202,7 +202,7 @@ def test_integral_qml_numbers_are_accepted_but_fractional_integers_are_not() -> 
         MangoHudProfile.from_dict(values)
 
 
-def test_reset_removes_only_gameforge_profile_and_config(tmp_path: Path) -> None:
+def test_reset_removes_only_game_optimization_profile_and_config(tmp_path: Path) -> None:
     repository = MangoHudProfileRepository(tmp_path / "games", log_root=tmp_path / "logs")
     profile = repository.default("242550").apply_preset("basic")
     repository.save(profile)
@@ -218,7 +218,7 @@ def test_reset_removes_only_gameforge_profile_and_config(tmp_path: Path) -> None
     assert unrelated.read_text(encoding="utf-8") == "user config"
 
 
-def test_reset_removes_only_gameforge_flatpak_mirror(tmp_path: Path) -> None:
+def test_reset_removes_only_game_optimization_flatpak_mirror(tmp_path: Path) -> None:
     game = _game(tmp_path / "game", source="Steam Flatpak")
     repository = MangoHudProfileRepository(tmp_path / "games", log_root=tmp_path / "logs")
     integration = MangoHudLaunchIntegration(
@@ -366,9 +366,9 @@ def test_running_native_steam_with_different_environment_blocks_false_success(
         available=True,
         environment={
             "MANGOHUD": "1",
-            "MANGOHUD_CONFIGFILE": "/home/user/.config/gameforge/242550/MangoHud.conf",
+            "MANGOHUD_CONFIGFILE": "/home/user/.config/game_optimization_linux/242550/MangoHud.conf",
         },
-        config_path=Path("/home/user/.config/gameforge/242550/MangoHud.conf"),
+        config_path=Path("/home/user/.config/game_optimization_linux/242550/MangoHud.conf"),
         steam_type="native",
     )
 
@@ -380,7 +380,7 @@ def test_running_native_steam_with_different_environment_blocks_false_success(
 
 def test_running_native_steam_with_matching_environment_can_launch(tmp_path: Path) -> None:
     game = _game(tmp_path / "game")
-    config = "/home/user/.config/gameforge/242550/MangoHud.conf"
+    config = "/home/user/.config/game_optimization_linux/242550/MangoHud.conf"
     calls: list[object] = []
     launcher = SteamLauncher(
         which=lambda _name: "/usr/bin/steam",
@@ -526,6 +526,51 @@ def test_executable_resolver_prefers_unreal_shipping_binary(tmp_path: Path) -> N
     assert result.selected.relative_path.endswith("ExampleGame-Win64-Shipping.exe")
 
 
+def test_executable_resolver_prefers_game_wingdk_over_engine_shipping(
+    tmp_path: Path,
+) -> None:
+    game = _proton_game(tmp_path, name="Example Game")
+    game_shipping = (
+        game.install_path
+        / "ExampleGame/Binaries/WinGDK/ExampleGame-Win64-Shipping.exe"
+    )
+    engine_shipping = (
+        game.install_path
+        / "Engine/Binaries/Win64/UnrealGame-Win64-Shipping.exe"
+    )
+    game_shipping.parent.mkdir(parents=True)
+    engine_shipping.parent.mkdir(parents=True)
+    game_shipping.write_bytes(b"MZ")
+    engine_shipping.write_bytes(b"MZ")
+
+    result = GameExecutableResolver().resolve(game)
+
+    assert result.status == "confident"
+    assert result.selected is not None
+    assert result.selected.relative_path == (
+        "ExampleGame/Binaries/WinGDK/ExampleGame-Win64-Shipping.exe"
+    )
+
+
+def test_two_equally_likely_shipping_executables_require_selection(
+    tmp_path: Path,
+) -> None:
+    game = _proton_game(tmp_path, name="Unknown Title")
+    for directory in ("First", "Second"):
+        executable = (
+            game.install_path
+            / directory
+            / "Binaries/Win64/Game-Win64-Shipping.exe"
+        )
+        executable.parent.mkdir(parents=True)
+        executable.write_bytes(b"MZ")
+
+    result = GameExecutableResolver().resolve(game)
+
+    assert result.status == "ambiguous"
+    assert result.selected is None
+
+
 def test_ambiguous_executable_requires_and_remembers_manual_selection(
     tmp_path: Path,
 ) -> None:
@@ -542,6 +587,22 @@ def test_ambiguous_executable_requires_and_remembers_manual_selection(
     assert selected.status == "selected"
     assert selected.selected is not None
     assert selected.selected.relative_path == "beta.exe"
+
+
+def test_saved_executable_remains_valid_outside_display_candidate_limit(
+    tmp_path: Path,
+) -> None:
+    game = _proton_game(tmp_path, name="Unknown Title")
+    for index in range(40):
+        (game.install_path / f"candidate-{index:02d}.exe").write_bytes(b"MZ")
+    selected_path = "zz-manual-choice.exe"
+    (game.install_path / selected_path).write_bytes(b"MZ")
+
+    result = GameExecutableResolver().resolve(game, selected_path)
+
+    assert result.status == "selected"
+    assert result.selected is not None
+    assert result.selected.relative_path == selected_path
 
 
 def test_executable_path_validation_rejects_escape_from_game() -> None:
@@ -589,7 +650,7 @@ def test_active_mangohud_uses_wine_application_config_without_steam_restart(
     assert activation.config_path == target
     assert target.is_file()
     assert target.read_text(encoding="utf-8").startswith(
-        "# Managed by GameForge Linux\n# Steam AppID: 239350\n"
+        "# Managed by Game Optimization Linux\n# Steam AppID: 239350\n"
     )
 
 

@@ -1,4 +1,4 @@
-# Walidacja backendu kompresji GameForge Linux
+# Walidacja backendu kompresji Game Optimization Linux
 
 Stan dokumentu: audyt techniczny i rzeczywista walidacja tylko do odczytu,
 2026-07-27  
@@ -89,7 +89,7 @@ analyzer, kolejkę zadań, zapis historii oraz rzeczywistą historię XDG. W
 - odmowę `compsize` bez podniesionych uprawnień:
   `SEARCH_V2: Operation not permitted`;
 - historyczne wpisy Metro zapisane w
-  `~/.local/state/gameforge-linux/compression-history-v2.json`.
+  `~/.local/state/game-optimization-linux/compression-history-v2.json`.
 
 W kontrolowanym teście rekompresowano wyłącznie kopie w wydzielonym zakresie
 testowym. Potwierdzono obecność encoded extents po operacji, zgodność
@@ -141,21 +141,21 @@ StorageTab.qml
 
 Pliki i punkty wejścia:
 
-- `src/gameforge/qml/pages/details/StorageTab.qml`:
+- `src/game_optimization_linux/qml/pages/details/StorageTab.qml`:
   `prepareCompressionPlan()`, dialog potwierdzenia i wywołanie
   `startCompression`;
-- `src/gameforge/controllers/app_controller.py`:
+- `src/game_optimization_linux/controllers/app_controller.py`:
   `prepareCompression()`, `startCompression()` i
   `_start_compression_plan()`;
-- `src/gameforge/services/compression.py`:
+- `src/game_optimization_linux/services/compression.py`:
   `prepare()` i `execute()`;
-- `src/gameforge/services/analysis_tasks.py`:
+- `src/game_optimization_linux/services/analysis_tasks.py`:
   `enqueue_compression_plan()` i `_run_compression()`;
-- `src/gameforge/providers/btrfs_compression.py`:
+- `src/game_optimization_linux/providers/btrfs_compression.py`:
   `create_plan()`, `execute_plan()` i funkcje uruchamiające polecenia;
-- `src/gameforge/services/btrfs_analysis.py`:
+- `src/game_optimization_linux/services/btrfs_analysis.py`:
   pomiary przed i po;
-- `src/gameforge/services/compression_history.py`:
+- `src/game_optimization_linux/services/compression_history.py`:
   trwały marker rozpoczęcia i wynik.
 
 Utworzenie planu jest tylko odczytowe. Pierwsza zamierzona modyfikacja następuje
@@ -385,7 +385,7 @@ Dlatego po operacji możliwe są trzy różne obserwacje:
    stare extenty.
 
 To nie jest uszkodzenie danych, ale może być niepożądanym wynikiem
-przestrzennym. GameForge nie powinien usuwać ani zmieniać snapshotów
+przestrzennym. Game Optimization nie powinien usuwać ani zmieniać snapshotów
 użytkownika.
 
 ### 7.2. Polityka bezpieczeństwa
@@ -469,9 +469,9 @@ granicą uprzywilejowania jest jego wąskie API.
 
 Proponowane akcje Polkit:
 
-- `io.github.gameforge_linux.measure-steam-game-compression` - tylko odczyt:
+- `io.github.DevVoidPL.GameOptimizationLinux.measure-steam-game-compression` - tylko odczyt:
   `compsize`, `btrfs filesystem du`, property get i statvfs;
-- `io.github.gameforge_linux.recompress-steam-game` - dokładnie jedna
+- `io.github.DevVoidPL.GameOptimizationLinux.recompress-steam-game` - dokładnie jedna
   zatwierdzona operacja: opcjonalny property set, per-file kontrola sharingu,
   per-file rekompresja, sync i pomiar;
 - anulowanie nie wymaga nowej autoryzacji, ale jest dostępne wyłącznie dla
@@ -779,7 +779,7 @@ wszystkich algorytmach.
 Poniższe liczby to GiB szacowanej redukcji całego payloadu względem
 nieskompresowanej bazy. `Z1…Z15` oznacza Btrfs ZSTD, a `zl1…zl9` Btrfs zlib.
 ZSTD-19 i XZ-9 są zewnętrznymi punktami odniesienia. Poziom ZSTD-15 jest
-obsługiwany przez badany kernel, ale produkcyjny profil Maximum GameForge
+obsługiwany przez badany kernel, ale produkcyjny profil Maximum Game Optimization
 pozostaje na poziomie 9.
 
 | Gra | Z1 | Z3 | Z6 | Z9 | Z15 | zl1 | zl3 | zl6 | zl9 | ref Z19 | ref XZ9 |
@@ -920,7 +920,7 @@ Tak, co najmniej w sensie zmniejszenia disk usage bieżących extentów jest to
 wiarygodne dla Metro: backend wykonuje realną rekompresję, a późniejszy
 `sudo compsize` pokazał około 0,8 GiB różnicy. Nie ma jednak pary
 uprzywilejowanych pomiarów bezpośrednio przed i po, więc skali nie można
-formalnie przypisać pojedynczej operacji GameForge. Dla każdej gry odpowiedź
+formalnie przypisać pojedynczej operacji Game Optimization. Dla każdej gry odpowiedź
 musi wynikać z nowego pomiaru.
 
 ### 2. Dlaczego miejsce na dysku nie wzrosło po operacjach na kilku grach?
@@ -1007,7 +1007,7 @@ fsync. Zapisy gry zwykle są poza katalogiem instalacji, ale nie wolno tego
 zakładać dla każdej gry. Każdy backend wymaga macierzy testów tytułów,
 Protona, antycheatów i awarii zasilania.
 
-### 11. Czy GameForge ma sens jako program odzyskujący miejsce?
+### 11. Czy Game Optimization ma sens jako program odzyskujący miejsce?
 
 Tak, jeśli raportuje twarde wyniki i dobiera metodę do danych zamiast obiecywać
 jedną stałą redukcję. Wartość programu może łączyć bezpieczną rekompresję,

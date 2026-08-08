@@ -1,0 +1,12 @@
+# Generated from game_optimization_linux.config; do not edit the name here.
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Game Optimization Linux
+Comment=Manage and inspect local Linux game libraries
+Exec=game-optimization-linux
+Icon=io.github.DevVoidPL.GameOptimizationLinux
+Terminal=false
+Categories=Game;
+StartupNotify=true
+StartupWMClass=io.github.DevVoidPL.GameOptimizationLinux

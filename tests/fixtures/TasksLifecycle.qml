@@ -1,7 +1,7 @@
 import QtQuick
 import QtQuick.Layouts
-import "../../src/gameforge/qml/pages" as Pages
-import "../../src/gameforge/qml/pages/details" as Details
+import "../../src/game_optimization_linux/qml/pages" as Pages
+import "../../src/game_optimization_linux/qml/pages/details" as Details
 
 Item {
     id: root

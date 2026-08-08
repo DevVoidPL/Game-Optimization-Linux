@@ -8,8 +8,8 @@ from unittest.mock import patch
 
 import pytest
 
-from gameforge.models.enums import FilesystemType
-from gameforge.providers.linux_filesystem import LinuxFilesystemProvider
+from game_optimization_linux.models.enums import FilesystemType
+from game_optimization_linux.providers.linux_filesystem import LinuxFilesystemProvider
 
 
 def _completed_findmnt(filesystems: list[dict[str, object]]) -> subprocess.CompletedProcess[str]:
@@ -44,7 +44,7 @@ def test_findmnt_uses_argument_list_json_and_longest_mount(tmp_path: Path) -> No
     )
 
     with patch(
-        "gameforge.providers.linux_filesystem.subprocess.run", return_value=response
+        "game_optimization_linux.providers.linux_filesystem.subprocess.run", return_value=response
     ) as run:
         info = LinuxFilesystemProvider(timeout=1.25).inspect(game_path)
 
@@ -87,11 +87,11 @@ def test_mountinfo_fallback_decodes_paths_and_uses_existing_parent(
 
     with (
         patch(
-            "gameforge.providers.linux_filesystem.subprocess.run",
+            "game_optimization_linux.providers.linux_filesystem.subprocess.run",
             side_effect=FileNotFoundError("findmnt"),
         ),
         patch(
-            "gameforge.providers.linux_filesystem.os.access", return_value=False
+            "game_optimization_linux.providers.linux_filesystem.os.access", return_value=False
         ) as access,
     ):
         info = LinuxFilesystemProvider(mountinfo).inspect(missing_game)
@@ -131,7 +131,7 @@ def test_only_btrfs_is_compression_compatible(
         ]
     )
     with patch(
-        "gameforge.providers.linux_filesystem.subprocess.run", return_value=response
+        "game_optimization_linux.providers.linux_filesystem.subprocess.run", return_value=response
     ):
         info = LinuxFilesystemProvider().inspect(tmp_path)
 
@@ -146,7 +146,7 @@ def test_findmnt_and_mountinfo_failures_return_unknown(tmp_path: Path) -> None:
     )
 
     with patch(
-        "gameforge.providers.linux_filesystem.subprocess.run", return_value=response
+        "game_optimization_linux.providers.linux_filesystem.subprocess.run", return_value=response
     ):
         info = LinuxFilesystemProvider(missing_mountinfo).inspect(tmp_path)
 
@@ -169,7 +169,7 @@ def test_list_filesystems_uses_mountinfo_when_findmnt_json_is_invalid(
     )
 
     with patch(
-        "gameforge.providers.linux_filesystem.subprocess.run",
+        "game_optimization_linux.providers.linux_filesystem.subprocess.run",
         return_value=invalid_json,
     ):
         filesystems = LinuxFilesystemProvider(mountinfo).list_filesystems()
@@ -236,7 +236,7 @@ def test_findmnt_sizes_and_default_mount_filtering() -> None:
     )
 
     with patch(
-        "gameforge.providers.linux_filesystem.subprocess.run", return_value=response
+        "game_optimization_linux.providers.linux_filesystem.subprocess.run", return_value=response
     ):
         filesystems = LinuxFilesystemProvider().list_filesystems(
             game_paths=(Path("/network/steam/steamapps/common/Test"),)
@@ -283,7 +283,7 @@ def test_show_system_mounts_exposes_filtered_pseudo_filesystems() -> None:
     )
 
     with patch(
-        "gameforge.providers.linux_filesystem.subprocess.run", return_value=response
+        "game_optimization_linux.providers.linux_filesystem.subprocess.run", return_value=response
     ):
         provider = LinuxFilesystemProvider()
         default_mounts = provider.list_filesystems()
@@ -310,11 +310,11 @@ def test_mountinfo_fallback_populates_space_with_statvfs(tmp_path: Path) -> None
     fake_statvfs = os.statvfs_result((4096, 4096, 100, 40, 30, 0, 0, 0, 0, 255))
     with (
         patch(
-            "gameforge.providers.linux_filesystem.subprocess.run",
+            "game_optimization_linux.providers.linux_filesystem.subprocess.run",
             return_value=invalid_json,
         ),
         patch(
-            "gameforge.providers.linux_filesystem.os.statvfs",
+            "game_optimization_linux.providers.linux_filesystem.os.statvfs",
             return_value=fake_statvfs,
         ),
     ):

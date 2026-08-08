@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.DevVoidPL.GameOptimizationLinux</id>
+  <name>Game Optimization Linux</name>
+  <summary>Inspect and manage local Linux game libraries</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.devvoidpl">
+    <name>Game Optimization Linux contributors</name>
+  </developer>
+  <url type="homepage">https://github.com/DevVoidPL/GameOptimizationLinux</url>
+  <description>
+    <p>Game Optimization Linux presents local Steam installations, storage information, and guarded optimization workflows.</p>
+  </description>
+  <launchable type="desktop-id">io.github.DevVoidPL.GameOptimizationLinux.desktop</launchable>
+  <icon type="stock">io.github.DevVoidPL.GameOptimizationLinux</icon>
+  <categories>
+    <category>Game</category>
+  </categories>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.2-alpha" date="2026-08-08">
+      <description>
+        <p>Flatpak host integration no longer requires a host Python runtime.</p>
+      </description>
+    </release>
+  </releases>
+</component>

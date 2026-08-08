@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from gameforge.formatting import bytes_to_gib, format_bytes
+from game_optimization_linux.formatting import bytes_to_gib, format_bytes
 
 
 @pytest.mark.parametrize(

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from gameforge.controllers.presenters import game_to_qml
-from gameforge.models import FilesystemType, Game, Launcher
-from gameforge.services import (
+from game_optimization_linux.controllers.presenters import game_to_qml
+from game_optimization_linux.models import FilesystemType, Game, Launcher
+from game_optimization_linux.services import (
     current_compression_saving,
     normalized_benchmark_projection,
 )

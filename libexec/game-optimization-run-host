@@ -1,0 +1,3 @@
+#!/bin/sh
+# Stable host-side Steam Launch Options wrapper installed by Game Optimization.
+exec flatpak run --command=game-optimization-run io.github.DevVoidPL.GameOptimizationLinux "$@"

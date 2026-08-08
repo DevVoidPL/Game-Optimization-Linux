@@ -6,9 +6,9 @@ import subprocess
 
 import pytest
 
-from gameforge.models import FilesystemInfo, FilesystemType, Game, Launcher
-from gameforge.providers import LinuxSystemProvider
-from gameforge.services import (
+from game_optimization_linux.models import FilesystemInfo, FilesystemType, Game, Launcher
+from game_optimization_linux.providers import LinuxSystemProvider
+from game_optimization_linux.services import (
     AnalysisLimits,
     BtrfsAnalysisTaskService,
     BtrfsCompressionAnalyzer,
@@ -77,7 +77,7 @@ def test_sandbox_diagnostics_uses_fixed_path_probes_without_host_python() -> Non
     def runner(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         calls.append((argv, dict(kwargs)))
         command = argv[2]
-        if command == "/usr/libexec/gameforge-linux-measure-helper":
+        if command == "/usr/libexec/game-optimization-linux-measure-helper":
             return subprocess.CompletedProcess(argv, 127, "", "No such file or directory")
         if command == "flatpak" and "info" in argv:
             return subprocess.CompletedProcess(argv, 1, "", "not installed")
@@ -95,7 +95,7 @@ def test_sandbox_diagnostics_uses_fixed_path_probes_without_host_python() -> Non
 
     client = HostServiceClient(
         flatpak_spawn="flatpak-spawn",
-        environment={"FLATPAK_ID": "io.github.gameforge_linux.GameForge"},
+        environment={"FLATPAK_ID": "io.github.DevVoidPL.GameOptimizationLinux"},
         command_runner=runner,
         which=lambda _name: None,
     )
@@ -117,7 +117,7 @@ def test_each_missing_or_broken_host_tool_has_an_independent_result() -> None:
             return subprocess.CompletedProcess(argv, 127, "", "command not found")
         if command == "gamescope":
             raise subprocess.TimeoutExpired(argv, 1)
-        if command == "/usr/libexec/gameforge-linux-measure-helper":
+        if command == "/usr/libexec/game-optimization-linux-measure-helper":
             return subprocess.CompletedProcess(argv, 127, "", "not found")
         if command == "flatpak" and "info" in argv:
             return subprocess.CompletedProcess(argv, 1, "", "not installed")

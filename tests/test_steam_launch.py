@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from gameforge.models import FilesystemType, Game, Launcher
-from gameforge.services import (
+from game_optimization_linux.models import FilesystemType, Game, Launcher
+from game_optimization_linux.services import (
     SteamLaunchError,
     SteamLauncher,
     build_steam_launch_command,
@@ -92,7 +92,7 @@ def test_flatpak_launcher_resolves_steam_on_host_path_and_uses_spawn(tmp_path: P
         which=lambda name: "/app/bin/flatpak-spawn" if name == "flatpak-spawn" else None,
         popen=popen,
         host_service=Host(),
-        environment={"FLATPAK_ID": "io.github.gameforge_linux.GameForge"},
+        environment={"FLATPAK_ID": "io.github.DevVoidPL.GameOptimizationLinux"},
     )
     command = launcher.launch(game)
     assert command == [

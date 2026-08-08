@@ -1,0 +1,174 @@
+app-id: io.github.DevVoidPL.GameOptimizationLinux
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
+command: game-optimization-linux
+
+finish-args:
+  - --share=ipc
+  # Required only for the built-in client of the official OptiScaler GitHub
+  # releases.  The client itself rejects non-official metadata and asset URLs.
+  - --share=network
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --socket=pulseaudio
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=/run/media
+  - --filesystem=/media
+  - --filesystem=/mnt
+  - --talk-name=org.freedesktop.Flatpak
+
+modules:
+  # py7zr validates and handles ordinary 7z releases. Official OptiScaler
+  # archives may additionally use the BCJ2 filter, which py7zr deliberately
+  # does not implement. Bundle the upstream standalone decoder at a fixed
+  # private path; ArchiveReader invokes it only after validating every member.
+  - name: sevenzip-bcj2-decoder
+    buildsystem: simple
+    build-commands:
+      - cd CPP/7zip/Bundles/Alone2 && make -f ../../cmpl_gcc.mak -j${FLATPAK_BUILDER_N_JOBS}
+      - install -Dm755 CPP/7zip/Bundles/Alone2/b/g/7zz ${FLATPAK_DEST}/libexec/game-optimization-7zz
+    sources:
+      - type: archive
+        url: https://www.7-zip.org/a/7z2602-src.tar.xz
+        sha256: cf967c98bca02a4b8b16375f441825a8e141362f14be1969bbec8e1ca0bff9dd
+        strip-components: 0
+
+  # Btrfs write operations run inside the sandbox against user-authorized
+  # filesystem paths.  compsize remains on the narrow host measurement bridge.
+  - name: btrfs-progs
+    buildsystem: autotools
+    config-opts:
+      - --disable-documentation
+      - --disable-python
+      - --disable-convert
+      - --disable-zoned
+    cleanup:
+      - /include
+      - /lib/pkgconfig
+      - /share/man
+      - /share/bash-completion
+      - /share/zsh
+    sources:
+      - type: git
+        url: https://kernel.googlesource.com/pub/scm/linux/kernel/git/kdave/btrfs-progs
+        tag: v6.17.1
+        commit: 06981428c08f78f019a2f4956407fd84b495e21e
+
+  # The official PySide6 wheel links QtNetwork against GSSAPI. The Freedesktop
+  # runtime intentionally does not ship MIT Kerberos, so provide the exact
+  # runtime library instead of borrowing host libraries through the sandbox.
+  - name: mit-krb5
+    buildsystem: simple
+    build-commands:
+      - tar -xf krb5-1.22.2.tar
+      - cd krb5-1.22.2/src && ./configure --prefix=${FLATPAK_DEST} --disable-static --disable-rpath --without-system-verto
+      - make -C krb5-1.22.2/src -j${FLATPAK_BUILDER_N_JOBS}
+      - make -C krb5-1.22.2/src install
+    cleanup:
+      - /bin
+      - /include
+      - /lib/pkgconfig
+      - /share
+    sources:
+      - type: file
+        url: https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz
+        # MIT serves this object with HTTP Content-Encoding: gzip. libcurl in
+        # flatpak-builder verifies the decoded tar stream.
+        sha256: 074de0ecf72199f091c88812d46090c27724fd36a1284b5f44bc35b8dd31a59e
+        dest-filename: krb5-1.22.2.tar
+
+  - name: python-runtime-dependencies
+    buildsystem: simple
+    build-commands:
+      - python3 -m pip install --no-index --find-links=file://${PWD}/wheels --prefix=${FLATPAK_DEST} PySide6==6.11.1 py7zr==1.1.3
+    sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/d8/de/af89d71410c83b10654d86ff9aff2a4f87c30163658f1cc145242e222526/pyside6-6.11.1-cp310-abi3-manylinux_2_34_x86_64.whl
+        sha256: b1fc521ba2bb5109425ab8add06bddbdd524abcad06cfa012cc39a22a189feb2
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/dd/62/fb1428a523b2a4541e232aab50d9e789e6b4526f37fd9593452a7ea5b6b3/pyside6_addons-6.11.1-cp310-abi3-manylinux_2_34_x86_64.whl
+        sha256: 8e6c65fbd73a512d6f72cda8d8277444a85a34dc99dd1dae9c21d35b8671bb1f
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/5c/49/0e1237c4400bec7e335d2c4eeb49bc40d9fd88a9ac44ca9083ce1abdc308/pyside6_essentials-6.11.1-cp310-abi3-manylinux_2_34_x86_64.whl
+        sha256: e3ef7027b41e4e55fadb56e3b3257dc8ee92154b639fe67fc4c8e05e9d976c60
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/c7/9b/e0355d8897b5c150770f1d95718aad17d432fcc9c035c04f3f58427d4693/shiboken6-6.11.1-cp310-abi3-manylinux_2_34_x86_64.whl
+        sha256: 9a8bccfafc8805254cabcfa1edfaf55cd52889f4998c91ad0d9a4433fb1bcdbe
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/88/40/dc7f804abd0ea167ea8d4d9b3f5455321aaf671d040fcef647e9e952e714/py7zr-1.1.3-py3-none-any.whl
+        sha256: 17934a35089e026dec6c72ee275d9b841e646881ef822d618e805c3006661d9a
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/38/26/ce90e9eed6f25aaa4a4fa305a2aaf2d2ad81fd69de8eb248ddd91c80d1e0/backports_zstd-1.6.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+        sha256: e39258a09b1c7ca70b5e94a5c5ccfe4700b4250b8077cfeab31d0f79565d4c9b
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/5f/16/a1b22cbea436642e071adcaf8d4b350a2ad02f5e0ad0da879a1be16188a0/brotli-1.2.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+        sha256: 67a91c5187e1eec76a61625c77a6c8c785650f5b576ca732bd33ef58b0dff49c
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/c0/c5/038dc2593bbc4272d87eac8c9f75692267d47f834ced888f6d81995df606/inflate64-1.0.4-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+        sha256: f62a13d0327631778fa2a47c308ae2b07b2659b7bb8564783259ac65949f8c0c
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/22/31/ec5f46fd4c83185b806aa9c736e228cb780f13990a9cf4da0beb70025fcc/multivolumefile-0.2.3-py3-none-any.whl
+        sha256: 237f4353b60af1703087cf7725755a1f6fcaeeea48421e1896940cd1c920d678
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/4b/cf/c4b0248051cdb7af7f38223db63427175e755db1f1a7905e781e923f6d53/pybcj-1.0.8-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+        sha256: e5e67ec32176985bbf941185319a3fe385527b6826d457a8ec67dd43b5f0b5fa
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/c8/a9/8862616a85cf450d2822dbd4fff1fcaba90877907a6ff5bc2672cafe42f8/pycryptodomex-3.23.0-cp37-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+        sha256: f489c4765093fb60e2edafdf223397bc716491b2b69fe74367b70d6999257a5c
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/64/fd/673d429df719affa1445611288aab6111c0bc87e51eb4677fe2421a1dd64/pyppmd-1.3.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+        sha256: bd00522ddfcc292304577386b6c217758c0c10e1fb9ce7877ad7d3b7b821a808
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/3d/3c/b56076bb35303d0733fc47b110a1c9cce081a05ae2e886575a3587c1ee76/psutil-7.1.1-cp36-abi3-manylinux_2_12_x86_64.manylinux2010_x86_64.manylinux_2_17_x86_64.manylinux2014_x86_64.whl
+        sha256: 92ebc58030fb054fa0f26c3206ef01c31c29d67aee1367e3483c16665c25c8d2
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/24/99/4772b8e00a136f3e01236de33b0efda31ee7077203ba5967fcc76da94d65/texttable-1.7.0-py2.py3-none-any.whl
+        sha256: 72227d592c82b3d7f672731ae73e4d1f88cd8e2ef5b075a7a7f01a23a3743917
+        dest: wheels
+
+  - name: game-optimization-linux
+    buildsystem: simple
+    build-commands:
+      - python3 -m pip install --no-index --no-deps --no-build-isolation --prefix=${FLATPAK_DEST} .
+      - install -Dm644 data/io.github.DevVoidPL.GameOptimizationLinux.desktop ${FLATPAK_DEST}/share/applications/io.github.DevVoidPL.GameOptimizationLinux.desktop
+      - install -Dm644 data/io.github.DevVoidPL.GameOptimizationLinux.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.DevVoidPL.GameOptimizationLinux.metainfo.xml
+      - install -Dm755 scripts/install-game-optimization-runner.sh ${FLATPAK_DEST}/bin/game-optimization-install-runner
+      - install -Dm755 libexec/game-optimization-run-host ${FLATPAK_DEST}/libexec/game-optimization-run-host
+      - install -Dm644 data/icons/hicolor/256x256/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/io.github.DevVoidPL.GameOptimizationLinux.png
+      - install -Dm644 data/icons/hicolor/128x128/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/128x128/apps/io.github.DevVoidPL.GameOptimizationLinux.png
+      - install -Dm644 data/icons/hicolor/64x64/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/64x64/apps/io.github.DevVoidPL.GameOptimizationLinux.png
+      - install -Dm644 data/icons/hicolor/48x48/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/48x48/apps/io.github.DevVoidPL.GameOptimizationLinux.png
+      - install -Dm644 data/icons/hicolor/32x32/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/32x32/apps/io.github.DevVoidPL.GameOptimizationLinux.png
+      - install -Dm644 data/icons/hicolor/24x24/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/24x24/apps/io.github.DevVoidPL.GameOptimizationLinux.png
+      - install -Dm644 data/icons/hicolor/22x22/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/22x22/apps/io.github.DevVoidPL.GameOptimizationLinux.png
+      - install -Dm644 data/icons/hicolor/16x16/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/16x16/apps/io.github.DevVoidPL.GameOptimizationLinux.png
+    sources:
+      - type: dir
+        path: ..
+        skip:
+          - .git
+          - .venv
+          - .pytest_cache
+          - .flatpak-builder
+          - .flatpak-build-*
+          - .flatpak-repo-*
+          - build-flatpak
+          - dist
+          - reports
+          - tests
+          - '**/__pycache__'

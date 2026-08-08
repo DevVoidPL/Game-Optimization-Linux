@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 from threading import Event
 
-from gameforge.services.directory_size import DirectorySizeScanner
+from game_optimization_linux.services.directory_size import DirectorySizeScanner
 
 
 def _allocated_size(path: Path) -> int:

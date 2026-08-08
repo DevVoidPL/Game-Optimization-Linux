@@ -13,7 +13,7 @@ from typing import Any, Mapping
 
 import pytest
 
-from gameforge.models import (
+from game_optimization_linux.models import (
     CompressionFile,
     CompressionMeasurement,
     CompressionPlan,
@@ -27,7 +27,7 @@ from gameforge.models import (
     Task,
     TaskType,
 )
-from gameforge.providers import (
+from game_optimization_linux.providers import (
     BtrfsCompressionProvider,
     CompressionCancelled,
     CompressionPlanRejected,
@@ -35,7 +35,7 @@ from gameforge.providers import (
     FakeCompressionProvider,
     UnavailableCompressionProvider,
 )
-from gameforge.services import (
+from game_optimization_linux.services import (
     BtrfsAnalysisReport,
     BtrfsAnalysisTaskService,
     BtrfsCompressionAnalyzer,
@@ -1472,7 +1472,7 @@ def test_descriptor_walk_blocks_directory_swapped_for_external_symlink(
 ) -> None:
     """A raced ancestor symlink must never reach the Btrfs command runner."""
 
-    from gameforge.providers import btrfs_compression as provider_module
+    from game_optimization_linux.providers import btrfs_compression as provider_module
 
     game_root = tmp_path / "library" / "steamapps" / "common" / "Fixture"
     original_directory = game_root / "data"

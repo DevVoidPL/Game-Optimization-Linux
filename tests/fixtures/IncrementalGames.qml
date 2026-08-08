@@ -1,7 +1,7 @@
 pragma ComponentBehavior: Bound
 
 import QtQuick
-import "../../src/gameforge/qml/components"
+import "../../src/game_optimization_linux/qml/components"
 
 Item {
     id: root

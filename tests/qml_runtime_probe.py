@@ -13,6 +13,7 @@ import math
 import os
 from pathlib import Path
 import signal
+import subprocess
 import sys
 import tempfile
 import time
@@ -37,15 +38,15 @@ from PySide6.QtGui import QColor, QGuiApplication, QImage, QKeyEvent, QWheelEven
 from PySide6.QtQuick import QQuickItem, QQuickView
 from PySide6.QtQml import QQmlApplicationEngine
 
-from gameforge.controllers.presenters import game_to_qml
-from gameforge.models import FilesystemType, Game, Launcher
+from game_optimization_linux.controllers.presenters import game_to_qml
+from game_optimization_linux.models import FilesystemType, Game, Launcher
 
 
 ROOT = Path(__file__).resolve().parents[1]
 QML_ROOT = Path(
     os.environ.get(
-        "GAMEFORGE_QML_ROOT",
-        str(ROOT / "src" / "gameforge" / "qml"),
+        "GAME_OPTIMIZATION_QML_ROOT",
+        str(ROOT / "src" / "game_optimization_linux" / "qml"),
     )
 )
 MESSAGES: list[str] = []
@@ -185,8 +186,8 @@ def _view(
     view = QQuickView()
     view.engine().addImportPath(str(QML_ROOT))
     view.engine().rootContext().setContextProperty(
-        "gameforgeDebugArtwork",
-        os.environ.get("GAMEFORGE_DEBUG_ARTWORK", "").strip() == "1",
+        "gameOptimizationDebugArtwork",
+        os.environ.get("GAME_OPTIMIZATION_DEBUG_ARTWORK", "").strip() == "1",
     )
     view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
     view.resize(width, height)
@@ -616,7 +617,7 @@ def probe_storage(application: QGuiApplication) -> dict[str, Any]:
             root, "compressionClassification"
         ).property("value"),
         "lastOperationReclaimed": _item(
-            root, "lastGameForgeOperationReclaimed"
+            root, "lastGameOptimizationOperationReclaimed"
         ).property("value"),
         "profitability": _item(root, "profitabilityMetric").property("value"),
         "rewrite": _item(root, "estimatedRewriteMetric").property("value"),
@@ -993,7 +994,7 @@ def probe_cards(
     theme_mode: str,
 ) -> dict[str, Any]:
     view, root = _view(application, "pages/GamesPage.qml", width, height)
-    theme = view.engine().singletonInstance("GameForge", "Theme")
+    theme = view.engine().singletonInstance("Game Optimization", "Theme")
     if isinstance(theme, QObject):
         theme.setProperty("mode", theme_mode)
     root.setProperty("gamesData", [_card_game(index) for index in range(24)])
@@ -1147,7 +1148,7 @@ def probe_cards(
         raise AssertionError("Mouse wheel was intercepted over empty page space")
     wheel_results["emptySpace"] = before_empty_wheel - after_empty_wheel
 
-    from gameforge.translations import TranslationManager
+    from game_optimization_linux.translations import TranslationManager
 
     translation_manager = TranslationManager(application)
     translation_manager.attach_engine(view.engine())
@@ -1403,7 +1404,7 @@ def probe_game_popups(application: QGuiApplication) -> dict[str, Any]:
 
 def probe_artwork_reuse(application: QGuiApplication) -> dict[str, Any]:
     lifecycle_message_start = len(MESSAGES)
-    with tempfile.TemporaryDirectory(prefix="gameforge-artwork-reuse-") as raw_dir:
+    with tempfile.TemporaryDirectory(prefix="game-optimization-artwork-reuse-") as raw_dir:
         directory = Path(raw_dir)
         games: list[dict[str, Any]] = []
         for index in range(36):
@@ -1426,8 +1427,8 @@ def probe_artwork_reuse(application: QGuiApplication) -> dict[str, Any]:
         view = QQuickView()
         view.engine().addImportPath(str(QML_ROOT))
         view.engine().rootContext().setContextProperty(
-            "gameforgeDebugArtwork",
-            os.environ.get("GAMEFORGE_DEBUG_ARTWORK", "").strip() == "1",
+            "gameOptimizationDebugArtwork",
+            os.environ.get("GAME_OPTIMIZATION_DEBUG_ARTWORK", "").strip() == "1",
         )
         view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
         view.resize(720, 420)
@@ -1531,7 +1532,7 @@ def probe_artwork_reuse(application: QGuiApplication) -> dict[str, Any]:
 def probe_artwork_refresh(application: QGuiApplication) -> dict[str, Any]:
     """Exercise the production artwork URL through refresh, scroll and filtering."""
     lifecycle_message_start = len(MESSAGES)
-    with tempfile.TemporaryDirectory(prefix="gameforge-artwork-refresh-") as raw_dir:
+    with tempfile.TemporaryDirectory(prefix="game-optimization-artwork-refresh-") as raw_dir:
         directory = Path(raw_dir) / "Steam artwork with spaces"
         directory.mkdir()
         app_ids = ("242550", "204360", *(str(300000 + index) for index in range(28)))
@@ -1580,8 +1581,8 @@ def probe_artwork_refresh(application: QGuiApplication) -> dict[str, Any]:
         view = QQuickView()
         view.engine().addImportPath(str(QML_ROOT))
         view.engine().rootContext().setContextProperty(
-            "gameforgeDebugArtwork",
-            os.environ.get("GAMEFORGE_DEBUG_ARTWORK", "").strip() == "1",
+            "gameOptimizationDebugArtwork",
+            os.environ.get("GAME_OPTIMIZATION_DEBUG_ARTWORK", "").strip() == "1",
         )
         view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
         view.resize(720, 420)
@@ -1816,8 +1817,8 @@ def probe_artwork_refresh(application: QGuiApplication) -> dict[str, Any]:
         restart_view = QQuickView()
         restart_view.engine().addImportPath(str(QML_ROOT))
         restart_view.engine().rootContext().setContextProperty(
-            "gameforgeDebugArtwork",
-            os.environ.get("GAMEFORGE_DEBUG_ARTWORK", "").strip() == "1",
+            "gameOptimizationDebugArtwork",
+            os.environ.get("GAME_OPTIMIZATION_DEBUG_ARTWORK", "").strip() == "1",
         )
         restart_view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
         restart_view.resize(720, 420)
@@ -1836,7 +1837,7 @@ def probe_artwork_refresh(application: QGuiApplication) -> dict[str, Any]:
         lifecycle_messages = [
             message
             for message in MESSAGES[lifecycle_message_start:]
-            if "GameForge GameArtwork lifecycle" in message
+            if "Game Optimization GameArtwork lifecycle" in message
             and (
                 "gameId=steam-242550 " in message
                 or "gameId=steam-204360 " in message
@@ -1898,10 +1899,10 @@ def probe_artwork_refresh(application: QGuiApplication) -> dict[str, Any]:
 
 def probe_incremental_games_model(application: QGuiApplication) -> dict[str, Any]:
     """Prove unchanged and one-row updates retain existing QML delegates."""
-    from gameforge.controllers.games_model import GamesListModel
+    from game_optimization_linux.controllers.games_model import GamesListModel
 
     lifecycle_start = len(MESSAGES)
-    with tempfile.TemporaryDirectory(prefix="gameforge-incremental-model-") as raw_dir:
+    with tempfile.TemporaryDirectory(prefix="game-optimization-incremental-model-") as raw_dir:
         directory = Path(raw_dir)
 
         def row(index: int) -> dict[str, Any]:
@@ -1938,8 +1939,8 @@ def probe_incremental_games_model(application: QGuiApplication) -> dict[str, Any
         view = QQuickView()
         view.engine().addImportPath(str(QML_ROOT))
         view.engine().rootContext().setContextProperty(
-            "gameforgeDebugArtwork",
-            os.environ.get("GAMEFORGE_DEBUG_ARTWORK", "").strip() == "1",
+            "gameOptimizationDebugArtwork",
+            os.environ.get("GAME_OPTIMIZATION_DEBUG_ARTWORK", "").strip() == "1",
         )
         view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
         view.resize(720, 420)
@@ -2042,12 +2043,12 @@ def probe_breeze(application: QGuiApplication) -> dict[str, Any]:
 def probe_signal_shutdown(application: QGuiApplication) -> dict[str, Any]:
     from threading import Event
 
-    from gameforge.app import _install_termination_handlers, _restore_termination_handlers
-    from gameforge.controllers import AppController
-    from gameforge.models import FilesystemType, Game, Launcher
-    from gameforge.services import AnalysisCancelled, BtrfsAnalysisTaskService, SettingsStore
+    from game_optimization_linux.app import _install_termination_handlers, _restore_termination_handlers
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.models import FilesystemType, Game, Launcher
+    from game_optimization_linux.services import AnalysisCancelled, BtrfsAnalysisTaskService, SettingsStore
 
-    temporary_root = Path(tempfile.mkdtemp(prefix="gameforge-signal-probe-"))
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-signal-probe-"))
     game_path = temporary_root / "game"
     game_path.mkdir()
     game = Game(
@@ -2128,13 +2129,13 @@ def probe_close_during_compression(
 ) -> dict[str, Any]:
     from dataclasses import replace
 
-    from gameforge.app import _prepare_qml_shutdown
-    from gameforge.controllers import AppController
-    from gameforge.models import Task, TaskStatus, TaskType
-    from gameforge.providers import DemoGameProvider, FakeGamepadProvider
-    from gameforge.services import GamepadService, SettingsStore
+    from game_optimization_linux.app import _prepare_qml_shutdown
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.models import Task, TaskStatus, TaskType
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.services import GamepadService, SettingsStore
 
-    temporary_root = Path(tempfile.mkdtemp(prefix="gameforge-close-probe-"))
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-close-probe-"))
 
     class ActiveCompressionTasks:
         def __init__(self) -> None:
@@ -2232,11 +2233,11 @@ def probe_close_during_compression(
 
 
 def probe_tasks_lifecycle(application: QGuiApplication) -> dict[str, Any]:
-    from gameforge.controllers import AppController
-    from gameforge.providers import DemoGameProvider, FakeGamepadProvider
-    from gameforge.services import GamepadService, SettingsStore
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.services import GamepadService, SettingsStore
 
-    temporary_root = Path(tempfile.mkdtemp(prefix="gameforge-tasks-probe-"))
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-tasks-probe-"))
     controller = AppController(
         parent=application,
         game_provider=DemoGameProvider(),
@@ -2292,10 +2293,10 @@ def probe_tasks_lifecycle(application: QGuiApplication) -> dict[str, Any]:
 def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     """Exercise the rendered Desktop editor against an isolated real controller."""
 
-    from gameforge.controllers import AppController
-    from gameforge.providers import DemoGameProvider, FakeGamepadProvider
-    from gameforge.providers.demo import demo_games
-    from gameforge.services import (
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import (
         GamepadService,
         MangoHudDetector,
         MangoHudLaunchIntegration,
@@ -2303,7 +2304,7 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
         SettingsStore,
     )
 
-    temporary_root = Path(tempfile.mkdtemp(prefix="gameforge-mangohud-qml-"))
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-mangohud-qml-"))
     install_path = temporary_root / "SteamLibrary" / "steamapps" / "common" / "Spelunky"
     install_path.mkdir(parents=True)
     (install_path / "Spelunky.exe").write_bytes(b"MZ")
@@ -2318,7 +2319,15 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
         temporary_root / "config" / "games",
         log_root=temporary_root / "state" / "mangohud-logs",
     )
-    detector = MangoHudDetector()
+    fake_layer = temporary_root / "MangoHud.x86_64.json"
+    fake_layer.write_text("{}\n", encoding="utf-8")
+    detector = MangoHudDetector(
+        which=lambda name: "/app/bin/mangohud-probe" if name == "mangohud" else None,
+        command_runner=lambda args, **_kwargs: subprocess.CompletedProcess(
+            args, 0, "MangoHud 0.8.0\n", ""
+        ),
+        layer_paths=(fake_layer,),
+    )
     controller = AppController(
         parent=application,
         game_provider=DemoGameProvider((game,)),
@@ -2388,7 +2397,7 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
         "application_config": str(application_config),
         "application_config_managed": application_config.read_text(
             encoding="utf-8"
-        ).startswith("# Managed by GameForge Linux\n# Steam AppID: 239140\n"),
+        ).startswith("# Managed by Game Optimization Linux\n# Steam AppID: 239140\n"),
         "save_button_inside": True,
         "screenshot_size": screenshot.stat().st_size,
     }
@@ -2398,20 +2407,22 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
 
 
 def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
-    from gameforge.controllers import AppController
-    from gameforge.providers import DemoGameProvider, FakeGamepadProvider
-    from gameforge.providers.demo import demo_games
-    from gameforge.services import (
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import (
         GameOptimizationProfileRepository,
         GamepadService,
         OptiScalerProfileRepository,
+        OptiScalerReleaseClient,
         OptiScalerService,
+        ProtonTweaksRepository,
         RunnerIntegration,
         RuntimeToolAvailability,
         SettingsStore,
     )
 
-    temporary_root = Path(tempfile.mkdtemp(prefix="gameforge-optimization-qml-"))
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-optimization-qml-"))
     game_root = temporary_root / "game"
     executable = game_root / "Binaries" / "Win64" / "Probe-Win64-Shipping.exe"
     executable.parent.mkdir(parents=True)
@@ -2421,6 +2432,50 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     with py7zr.SevenZipFile(archive, "w") as handle:
         handle.writestr(b"proxy", "release/OptiScaler.dll")
         handle.writestr(b"[OptiScaler]\n", "release/OptiScaler.ini")
+    from hashlib import sha256
+    from io import BytesIO
+
+    online_archive = archive.read_bytes()
+    online_url = (
+        "https://github.com/optiscaler/OptiScaler/releases/download/"
+        "v0.7.7/OptiScaler_v0.7.7.7z"
+    )
+    metadata = json.dumps([
+        {
+            "tag_name": "v0.7.7",
+            "html_url": "https://github.com/optiscaler/OptiScaler/releases/tag/v0.7.7",
+            "published_at": "2026-01-01T00:00:00Z",
+            "draft": False,
+            "prerelease": False,
+            "assets": [{
+                "name": "OptiScaler_v0.7.7.7z",
+                "browser_download_url": online_url,
+                "size": len(online_archive),
+                "digest": "sha256:" + sha256(online_archive).hexdigest(),
+            }],
+        }
+    ]).encode()
+
+    class OnlineResponse(BytesIO):
+        status = 200
+        def __init__(self, payload: bytes, url: str) -> None:
+            super().__init__(payload)
+            self._url = url
+        def geturl(self) -> str:
+            return self._url
+
+    def online_open(request, **_kwargs):
+        if request.full_url.endswith("/releases"):
+            return OnlineResponse(metadata, request.full_url)
+        return OnlineResponse(
+            online_archive,
+            "https://release-assets.githubusercontent.com/optiscaler-probe",
+        )
+
+    online_client = OptiScalerReleaseClient(
+        temporary_root / "cache" / "optiscaler-online",
+        opener=online_open,
+    )
     game = replace(
         demo_games()[0], steam_app_id="224760", install_path=game_root
     )
@@ -2431,6 +2486,9 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
         ),
         data_root=temporary_root / "data" / "games",
         process_detector=lambda _path: (),
+    )
+    proton_repository = ProtonTweaksRepository(
+        temporary_root / "config" / "games"
     )
 
     class ToolDetector:
@@ -2450,9 +2508,11 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
         settings_store=SettingsStore(temporary_root / "settings.json"),
         gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
         optimization_profile_repository=repository,
-        runner_integration=RunnerIntegration(temporary_root / "bin" / "gameforge-run"),
+        runner_integration=RunnerIntegration(temporary_root / "bin" / "game-optimization-run"),
         runtime_tool_detector=ToolDetector(),  # type: ignore[arg-type]
         optiscaler_service=optiscaler_service,
+        optiscaler_release_client=online_client,
+        proton_tweaks_repository=proton_repository,
         auto_refresh=False,
     )
     view, root = _view(application, "pages/details/OptimizationTab.qml", 1600, 1000)
@@ -2477,6 +2537,16 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     _invoke_qml(root, "applyResult", gamescope_preview)
     _settle(application, 6)
     optiscaler_section = _item(root, "optiScalerSection")
+    if not controller.refreshOptiScalerRelease(game.id, True):
+        raise AssertionError("Online OptiScaler check did not start")
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline and controller._optiscaler_jobs:
+        controller._poll_tasks()
+        _settle(application, 1)
+    _settle(application, 8)
+    _invoke_qml(optiscaler_section, "inspectOnline")
+    _settle(application, 8)
+    online_plan = _variant(optiscaler_section.property("planData")) or {}
     optiscaler_section.setProperty("archiveUrl", QUrl.fromLocalFile(str(archive)).toString())
     _invoke_qml(optiscaler_section, "inspectArchive")
     _settle(application, 8)
@@ -2484,6 +2554,23 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     optiscaler_picker_filters = _variant(
         optiscaler_section.property("archiveNameFilters")
     ) or []
+    proton_saved = controller.saveProtonTweaks(
+        game.id,
+        {
+            "toggles": {"proton_log": True, "no_fsync": True},
+            "optiscalerFsr4Update": False,
+        },
+    )
+    _settle(application, 8)
+    gamescope_preview = controller.previewOptimizationProfile(game.id, {
+        "gamescopeEnabled": True,
+        "gamescopeMode": "native",
+        "targetFpsMode": "manual",
+        "targetFps": 72,
+    })
+    _invoke_qml(root, "applyResult", gamescope_preview)
+    _settle(application, 6)
+    proton_section = _item(root, "protonTweaksSection")
     scroll = _item(root, "optimizationScroll")
     flickable = scroll.property("contentItem")
     if isinstance(flickable, QQuickItem):
@@ -2514,6 +2601,14 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
         ],
         "optiscaler_install_directory": str(optiscaler_plan.get("installDirectory", "")),
         "optiscaler_proxy": str(optiscaler_plan.get("injectionDll", "")),
+        "optiscaler_online_ready": bool(online_plan.get("officialRelease")),
+        "optiscaler_available_version": str(
+            (_variant(optiscaler_section.property("statusData")) or {}).get(
+                "availableVersion", ""
+            )
+        ),
+        "proton_environment": dict(proton_saved.get("environment", {})),
+        "proton_entries": len(_variant(proton_section.property("entries")) or []),
         "save_button_inside": True,
         "screenshot": str(screenshot),
         "screenshot_size": screenshot.stat().st_size,
@@ -2530,10 +2625,10 @@ def probe_couch(
     scenario: str,
     theme_mode: str,
 ) -> dict[str, Any]:
-    from gameforge.controllers import AppController
-    from gameforge.providers import DemoGameProvider, FakeGamepadProvider
-    from gameforge.providers.demo import demo_games
-    from gameforge.services import (
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import (
         GamepadService,
         GameOptimizationProfileRepository,
         MangoHudDetector,
@@ -2542,12 +2637,20 @@ def probe_couch(
         SettingsStore,
     )
 
-    temporary_root = Path(tempfile.mkdtemp(prefix="gameforge-couch-probe-"))
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-couch-probe-"))
     mangohud_repository = MangoHudProfileRepository(
         temporary_root / "config" / "games",
         log_root=temporary_root / "state" / "mangohud-logs",
     )
-    mangohud_detector = MangoHudDetector()
+    fake_layer = temporary_root / "MangoHud.x86_64.json"
+    fake_layer.write_text("{}\n", encoding="utf-8")
+    mangohud_detector = MangoHudDetector(
+        which=lambda name: "/app/bin/mangohud-probe" if name == "mangohud" else None,
+        command_runner=lambda args, **_kwargs: subprocess.CompletedProcess(
+            args, 0, "MangoHud 0.8.0\n", ""
+        ),
+        layer_paths=(fake_layer,),
+    )
     optimization_repository = GameOptimizationProfileRepository(
         temporary_root / "config" / "games"
     )
@@ -2573,7 +2676,7 @@ def probe_couch(
         auto_refresh=False,
     )
     view, root = _view(application, "couch/CouchMain.qml", width, height)
-    theme = view.engine().singletonInstance("GameForge", "Theme")
+    theme = view.engine().singletonInstance("Game Optimization", "Theme")
     if isinstance(theme, QObject):
         theme.setProperty("mode", theme_mode)
     root.setProperty("controller", controller)
@@ -2913,7 +3016,7 @@ def _probe_desktop_updates(
 
     summary = _item(root, "updatesSummaryGrid")
     updates_list = _item(root, "updatesList")
-    application_section = _item(root, "gameForgeUpdateSection")
+    application_section = _item(root, "gameOptimizationUpdateSection")
     _assert_inside(summary, root)
     _assert_inside(updates_list, root)
     _assert_inside(application_section, root)

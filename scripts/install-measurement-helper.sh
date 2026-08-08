@@ -3,10 +3,10 @@ set -eu
 
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 project_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
-helper_source="$project_dir/libexec/gameforge-linux-measure-helper"
-policy_source="$project_dir/data/io.github.gameforge_linux.GameForge.measure.policy"
-helper_target="/usr/libexec/gameforge-linux-measure-helper"
-policy_target="/usr/share/polkit-1/actions/io.github.gameforge_linux.GameForge.measure.policy"
+helper_source="$project_dir/libexec/game-optimization-linux-measure-helper"
+policy_source="$project_dir/data/io.github.DevVoidPL.GameOptimizationLinux.measure.policy"
+helper_target="/usr/libexec/game-optimization-linux-measure-helper"
+policy_target="/usr/share/polkit-1/actions/io.github.DevVoidPL.GameOptimizationLinux.measure.policy"
 
 if [ "$(id -u)" -ne 0 ]; then
     echo "Run this installer through Polkit:" >&2
@@ -15,7 +15,7 @@ if [ "$(id -u)" -ne 0 ]; then
 fi
 
 if [ ! -f "$helper_source" ] || [ ! -f "$policy_source" ]; then
-    echo "GameForge measurement helper sources were not found." >&2
+    echo "Game Optimization measurement helper sources were not found." >&2
     exit 1
 fi
 

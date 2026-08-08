@@ -11,8 +11,8 @@ from types import SimpleNamespace
 
 import pytest
 
-from gameforge.models import FilesystemInfo, FilesystemType, Game, Launcher
-from gameforge.services import (
+from game_optimization_linux.models import FilesystemInfo, FilesystemType, Game, Launcher
+from game_optimization_linux.services import (
     ANALYZER_VERSION,
     AnalysisCache,
     AnalysisCancelled,
@@ -278,7 +278,7 @@ def test_btrfs_du_helper_is_cancelled_and_reaped(
         return process
 
     monkeypatch.setattr(
-        "gameforge.services.btrfs_analysis.subprocess.Popen",
+        "game_optimization_linux.services.btrfs_analysis.subprocess.Popen",
         recording_popen,
     )
     analyzer = _analyzer(finder=lambda name: str(helper) if name == "btrfs" else None)
@@ -382,7 +382,7 @@ def test_shared_extent_analysis_never_opens_game_data_for_write(
         )
 
     monkeypatch.setattr(
-        "gameforge.services.btrfs_analysis.os.open",
+        "game_optimization_linux.services.btrfs_analysis.os.open",
         recording_open,
     )
     report = _analyzer(
@@ -421,7 +421,7 @@ def test_real_reflink_is_detected_before_any_defragmentation(
     source = game_path / "original.bin"
     clone = game_path / "reflink.bin"
     with source.open("wb") as handle:
-        handle.write((b"GameForge reflink integration fixture\n" * 131072)[:4 * 1024 * 1024])
+        handle.write((b"Game Optimization reflink integration fixture\n" * 131072)[:4 * 1024 * 1024])
         handle.flush()
         os.fsync(handle.fileno())
     copied = subprocess.run(
