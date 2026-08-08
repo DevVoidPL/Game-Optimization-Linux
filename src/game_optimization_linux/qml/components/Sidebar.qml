@@ -11,7 +11,7 @@ Rectangle {
     property bool collapsed: false
     property string currentPage: "games"
     property string appName: qsTr("Application")
-    property string appVersion: "0.1.2-alpha"
+    property string appVersion: "0.1.4-alpha"
     property string updateStatus: "Up to date"
     property url logoSource: ""
     property int updatesPendingCount: 0
@@ -228,7 +228,7 @@ Rectangle {
                 }
 
                 Label {
-                    text: qsTr("Version %1").arg(App.Theme.display(sidebar.appVersion, "0.1.2-alpha"))
+                    text: qsTr("Version %1").arg(App.Theme.display(sidebar.appVersion, "0.1.4-alpha"))
                     color: App.Theme.textMuted
                     font.pixelSize: 10
                 }
