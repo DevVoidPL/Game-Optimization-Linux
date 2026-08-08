@@ -174,7 +174,11 @@ def main(argv: list[str]) -> int:
                 "scan_complete": report.scan_complete,
                 "compsize_available": report.compsize.available,
                 "profiles_unlocked": report.profiles_unlocked,
-                "source": "provider_boundary" if provider_only else "privileged_host",
+                "source": (
+                    "provider_boundary"
+                    if provider_only
+                    else "host_service_with_graceful_fallback"
+                ),
             },
             "plan": {
                 "eligible": plan.eligible,

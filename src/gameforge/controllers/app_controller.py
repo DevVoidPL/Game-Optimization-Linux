@@ -4498,8 +4498,18 @@ class AppController(QObject):
                 capabilities["hostBtrfsAvailable"] = host_btrfs.get("available") is True
                 capabilities["hostBtrfsVersion"] = str(host_btrfs.get("version") or "")
             if isinstance(host_compsize, Mapping):
-                capabilities["compsizeAvailable"] = host_compsize.get("available") is True
-                capabilities["compsizeVersion"] = str(host_compsize.get("version") or "")
+                capabilities["hostCompsizeAvailable"] = (
+                    host_compsize.get("available") is True
+                )
+                if (
+                    self._host_service is not None
+                    and self._host_service.measurement_available
+                    and host_compsize.get("available") is True
+                ):
+                    capabilities["compsizeAvailable"] = True
+                    capabilities["compsizeVersion"] = str(
+                        host_compsize.get("version") or ""
+                    )
             if self._host_service is not None:
                 capabilities["measurementSource"] = (
                     "optional_host_component"

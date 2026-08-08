@@ -10,6 +10,7 @@ import logging
 import os
 from pathlib import Path
 import signal
+import shutil
 import subprocess
 from threading import RLock
 from typing import Any
@@ -19,7 +20,7 @@ from gameforge.models.game import Game
 
 
 DEFAULT_HELPER_PATH = Path("/usr/libexec/gameforge-linux-measure-helper")
-DEFAULT_PKEXEC_PATH = Path("/usr/bin/pkexec")
+DEFAULT_PKEXEC_PATH = Path(shutil.which("pkexec") or "/nonexistent/pkexec")
 logger = logging.getLogger(__name__)
 
 

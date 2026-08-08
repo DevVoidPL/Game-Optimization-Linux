@@ -62,6 +62,7 @@ _HOST_EXECUTABLES = frozenset(
         "lspci",
         "xrandr",
         "pkexec",
+        "true",
     }
 )
 _TOOL_SPECS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
@@ -87,9 +88,9 @@ _VERSION_ARGUMENTS: dict[str, tuple[str, ...]] = {
     "steam": ("--version",),
     "flatpak": ("--version",),
     "gamescope": ("--version",),
-    # gamemoderun interprets --version as the wrapped program.  A no-argument
-    # invocation prints its own usage and proves that the executable started.
-    "gamemode": (),
+    # Execute only the fixed no-op program; gamemoderun has no version flag of
+    # its own and a no-argument call may dump environment details.
+    "gamemode": ("true",),
     "mangohud": ("--version",),
     "vulkan": ("--summary",),
     "btrfs-progs": ("--version",),
@@ -135,11 +136,7 @@ class HostServiceClient:
         which: Callable[[str], str | None] = shutil.which,
         timeout_seconds: float = 150.0,
         measurement_helper: Path = OPTIONAL_MEASUREMENT_HELPER,
-        # Retained only for source compatibility with older callers.  Normal
-        # diagnostics never execute this user-writable path.
-        host_component: Path | None = None,
     ) -> None:
-        del host_component
         self._environment = os.environ if environment is None else environment
         self._which = which
         discovered_spawn = which("flatpak-spawn")
@@ -274,6 +271,12 @@ class HostServiceClient:
                     if option in help_text
                 )
         elif normalized == "gamemode" and selected:
+            runtime_available = bool(result is not None and result.returncode == 0)
+            daemon_version = self._run_fixed("gamemoded", ("--version",), timeout=8.0)
+            if daemon_version is not None and not self._missing_command(daemon_version):
+                version = self._one_line(
+                    daemon_version.stdout or daemon_version.stderr
+                )
             daemon = self._run_fixed("gamemoded", ("--status",), timeout=8.0)
             if daemon is None or self._missing_command(daemon):
                 runtime_available = False
@@ -317,6 +320,13 @@ class HostServiceClient:
                         "native" if selected else "flatpak" if flatpak_id else "unavailable"
                     ),
                     "host_launch_available": available,
+                }
+            )
+        elif normalized == "mangohud":
+            payload.update(
+                {
+                    "layer_available": bool(selected),
+                    "flatpak_layer_available": bool(flatpak_id),
                 }
             )
         self._tool_cache[normalized] = dict(payload)

@@ -39,6 +39,14 @@ def _run_probe(
     )
     if style is not None:
         environment["QT_QUICK_CONTROLS_STYLE"] = style
+        system_qml = Path("/usr/lib/qt6/qml")
+        if system_qml.is_dir():
+            existing_imports = environment.get("QML2_IMPORT_PATH", "")
+            environment["QML2_IMPORT_PATH"] = os.pathsep.join(
+                part
+                for part in (str(system_qml), existing_imports)
+                if part
+            )
     completed = subprocess.run(
         [sys.executable, str(PROBE), mode, *arguments],
         cwd=ROOT,

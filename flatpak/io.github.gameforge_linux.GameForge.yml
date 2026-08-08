@@ -147,6 +147,8 @@ modules:
           - .venv
           - .pytest_cache
           - .flatpak-builder
+          - .flatpak-build-*
+          - .flatpak-repo-*
           - build-flatpak
           - dist
           - reports

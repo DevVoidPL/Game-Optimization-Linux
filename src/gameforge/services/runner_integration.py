@@ -53,7 +53,7 @@ class RunnerIntegration:
         status = self.status()
         if not status.installed:
             return {"success": False, "exitCode": -1, **status.to_dict()}
-        true_command = shutil.which("true") or "/usr/bin/true"
+        true_command = shutil.which("true") or "true"
         try:
             result = self._run(
                 [str(self.path), "--appid", normalized, "--plan-only", "--", true_command],
