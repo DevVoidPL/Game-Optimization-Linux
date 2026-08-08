@@ -19,7 +19,7 @@
   </categories>
   <content_rating type="oars-1.1" />
   <releases>
-    <release version="0.1.2-alpha" date="2026-08-08">
+    <release version="0.1.4-alpha" date="2026-08-08">
       <description>
         <p>Flatpak host integration no longer requires a host Python runtime.</p>
       </description>

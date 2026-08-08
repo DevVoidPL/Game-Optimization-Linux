@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 APP_NAME = "Game Optimization Linux"
-APP_VERSION = "0.1.2-alpha"
+APP_VERSION = "0.1.4-alpha"
 APP_ID = "io.github.DevVoidPL.GameOptimizationLinux"
 ORGANIZATION_NAME = APP_NAME
 ORGANIZATION_DOMAIN = "game-optimization-linux.local"

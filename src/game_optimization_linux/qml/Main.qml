@@ -173,7 +173,7 @@ ApplicationWindow {
             currentPage: window.activePage
             appName: window.applicationName
             appVersion: window.controller && window.controller.appVersion
-                        ? String(window.controller.appVersion) : "0.1.2-alpha"
+                        ? String(window.controller.appVersion) : "0.1.4-alpha"
             logoSource: window.controller && window.controller.appLogoUrl
                         ? String(window.controller.appLogoUrl) : ""
             updatesPendingCount: window.updatesPendingCount()

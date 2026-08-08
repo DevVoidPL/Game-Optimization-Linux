@@ -5,7 +5,7 @@ APP_ID="io.github.DevVoidPL.GameOptimizationLinux"
 MANIFEST="flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml"
 BUILD_DIR=".flatpak-build-dir"
 REPO_DIR=".flatpak-repo"
-OUTPUT="dist/Game-Optimization-Linux-0.1.2-alpha-x86_64.flatpak"
+OUTPUT="dist/Game-Optimization-Linux-0.1.4-alpha-x86_64.flatpak"
 
 if [[ ! -f "$MANIFEST" ]]; then
     echo "Brakuje manifestu: $MANIFEST"
