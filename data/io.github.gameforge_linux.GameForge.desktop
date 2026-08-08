@@ -1,0 +1,12 @@
+# Generated from gameforge.config; do not edit the name here.
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=GameForge Linux
+Comment=Manage and inspect local Linux game libraries
+Exec=gameforge-linux
+Icon=io.github.gameforge_linux.GameForge
+Terminal=false
+Categories=Game;
+StartupNotify=true
+StartupWMClass=io.github.gameforge_linux.GameForge
