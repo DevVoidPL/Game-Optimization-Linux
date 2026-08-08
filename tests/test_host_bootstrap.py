@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import inspect
 
 import pytest
 
@@ -8,6 +9,7 @@ from gameforge.services.host_bootstrap import (
     HostBootstrapError,
     bootstrap_flatpak_host_components,
 )
+import gameforge.services.host_service as host_service_module
 
 
 APP_ID = "io.github.gameforge_linux.GameForge"
@@ -70,3 +72,17 @@ def test_missing_bundled_component_is_a_clear_error(tmp_path: Path) -> None:
         bootstrap_flatpak_host_components(
             {"FLATPAK_ID": APP_ID}, app_prefix=app, target_home=tmp_path / "home"
         )
+
+
+def test_normal_flatpak_host_path_has_no_python_or_legacy_host_helper() -> None:
+    root = Path(__file__).resolve().parents[1]
+    runner = (root / "libexec/gameforge-run-host").read_text(encoding="utf-8")
+    manifest = (
+        root / "flatpak/io.github.gameforge_linux.GameForge.yml"
+    ).read_text(encoding="utf-8")
+    bootstrap_source = inspect.getsource(bootstrap_flatpak_host_components)
+    diagnostics_source = inspect.getsource(host_service_module.HostServiceClient)
+    assert "python" not in runner.casefold()
+    assert "gameforge-host" not in manifest
+    assert "gameforge-host" not in bootstrap_source
+    assert "host_component" not in diagnostics_source

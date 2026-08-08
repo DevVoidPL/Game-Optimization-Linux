@@ -17,6 +17,7 @@ from gameforge.config import GAMES_CONFIG_DIR, MANGOHUD_LOG_DIR
 from gameforge.models import Game, MangoHudProfile, validate_app_id
 
 from .game_executable import ExecutableResolution, GameExecutableResolver
+from .host_bootstrap import host_home_directory
 from .steam_launch import running_native_steam_environment, uses_flatpak_steam
 
 
@@ -363,9 +364,24 @@ class MangoHudDetector:
             if host_info
             else any(path.is_file() for path in self.layer_paths)
         )
-        flatpak_layer = self._flatpak_layer_available() if normalized_type == "flatpak" else False
+        flatpak_layer = (
+            host_info.get("flatpak_layer_available") is True
+            if host_info and normalized_type == "flatpak"
+            else self._flatpak_layer_available() if normalized_type == "flatpak" else False
+        )
         if normalized_type == "flatpak":
-            available = bool(self._which("flatpak")) and flatpak_layer
+            if host_info:
+                try:
+                    flatpak_tool = self._host_service.tool_info("flatpak")
+                except Exception:
+                    flatpak_tool = {}
+                flatpak_available = bool(
+                    isinstance(flatpak_tool, Mapping)
+                    and flatpak_tool.get("available") is True
+                )
+            else:
+                flatpak_available = bool(self._which("flatpak"))
+            available = flatpak_available and flatpak_layer
             message = (
                 "MangoHud Flatpak layer detected"
                 if available
@@ -465,7 +481,11 @@ class MangoHudLaunchIntegration:
             / "gameforge-linux"
             / "games"
         )
-        config_home = Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        config_home = (
+            host_home_directory(os.environ) / ".config"
+            if os.environ.get("FLATPAK_ID", "").strip()
+            else Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config"))
+        )
         self.application_config_root = (
             Path(application_config_root)
             if application_config_root is not None

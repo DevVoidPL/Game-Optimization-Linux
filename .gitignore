@@ -20,3 +20,12 @@ reports/compression_benchmarks/
 .flatpak-builder/
 dist/
 .venv/
+
+# Flatpak generated/test artifacts
+.flatpak-builder/
+.flatpak-build*/
+.flatpak-repo*/
+.flatpak-stage*/
+.flatpak-couch-probe*/
+dist/
+.venv/

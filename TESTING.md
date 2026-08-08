@@ -27,7 +27,7 @@ katalog docelowy, konflikty i listę plików. Nie testuj na ważnej instalacji g
 
 ```bash
 flatpak run --command=gameforge-install-runner io.github.gameforge_linux.GameForge
-~/.local/share/gameforge-linux/bin/gameforge-run --appid 480 --plan-only -- /usr/bin/true
+~/.local/share/gameforge-linux/bin/gameforge-run --appid 480 --plan-only -- true
 ```
 
 Pierwsze polecenie instaluje tylko mały wrapper użytkownika. Nie wymaga `sudo`.

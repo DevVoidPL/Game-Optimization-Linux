@@ -1434,7 +1434,7 @@ class BtrfsCompressionProvider:
             raise CompressionProviderError("A forbidden command was rejected")
         logger.info("Starting compression helper argv=%r", argv)
         environment = {
-            "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+            "PATH": os.environ.get("PATH", ""),
             "LANG": "C",
             "LC_ALL": "C",
         }
@@ -1540,7 +1540,7 @@ class BtrfsCompressionProvider:
                 timeout=2.0,
                 shell=False,
                 env={
-                    "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                    "PATH": os.environ.get("PATH", ""),
                     "LANG": "C",
                     "LC_ALL": "C",
                 },
@@ -1561,7 +1561,7 @@ class BtrfsCompressionProvider:
                 timeout=2.0,
                 shell=False,
                 env={
-                    "PATH": os.environ.get("PATH", "/usr/bin:/bin"),
+                    "PATH": os.environ.get("PATH", ""),
                     "LANG": "C",
                     "LC_ALL": "C",
                 },
