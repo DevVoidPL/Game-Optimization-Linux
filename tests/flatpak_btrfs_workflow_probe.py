@@ -11,9 +11,9 @@ import shutil
 import sys
 import tempfile
 
-from gameforge.models import CompressionProfile, FilesystemType, Game, Launcher
-from gameforge.providers import BtrfsCompressionProvider, LinuxFilesystemProvider
-from gameforge.services import (
+from game_optimization_linux.models import CompressionProfile, FilesystemType, Game, Launcher
+from game_optimization_linux.providers import BtrfsCompressionProvider, LinuxFilesystemProvider
+from game_optimization_linux.services import (
     BtrfsAnalysisReport,
     BtrfsCompressionAnalyzer,
     HostServiceClient,
@@ -107,14 +107,14 @@ def main(argv: list[str]) -> int:
         )
         return 2
     parent = Path(positional[0]).resolve(strict=True)
-    fixture = Path(tempfile.mkdtemp(prefix=".gameforge-flatpak-probe-", dir=parent))
+    fixture = Path(tempfile.mkdtemp(prefix=".game-optimization-flatpak-probe-", dir=parent))
     try:
         library = fixture / "SteamLibrary"
         game_path = library / "steamapps/common/Flatpak Fixture"
         game_path.mkdir(parents=True)
         payload = game_path / "payload.bin"
         with payload.open("wb") as stream:
-            block = (b"GAMEFORGE-FLATPAK-BTRFS-PROBE\0" * 4096)[:128 * 1024]
+            block = (b"GAME-OPTIMIZATION-FLATPAK-BTRFS-PROBE\0" * 4096)[:128 * 1024]
             for _ in range(64):
                 stream.write(block)
         manifest = library / "steamapps/appmanifest_424242.acf"

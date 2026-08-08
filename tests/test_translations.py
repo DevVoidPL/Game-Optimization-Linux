@@ -6,11 +6,11 @@ from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication
 
-from gameforge.config import TRANSLATIONS_DIR
-from gameforge.controllers import AppController
-from gameforge.providers import DemoGameProvider
-from gameforge.services import SettingsStore
-from gameforge.translations import TranslationManager
+from game_optimization_linux.config import TRANSLATIONS_DIR
+from game_optimization_linux.controllers import AppController
+from game_optimization_linux.providers import DemoGameProvider
+from game_optimization_linux.services import SettingsStore
+from game_optimization_linux.translations import TranslationManager
 
 
 _APPLICATION = QCoreApplication.instance() or QCoreApplication([])
@@ -21,8 +21,8 @@ def test_translation_manager_loads_all_supported_languages() -> None:
 
     assert [entry["code"] for entry in manager.availableLanguages] == ["en", "pl", "es"]
     for code in ("en", "pl", "es"):
-        assert (TRANSLATIONS_DIR / f"gameforge_{code}.ts").is_file()
-        assert (TRANSLATIONS_DIR / f"gameforge_{code}.qm").is_file()
+        assert (TRANSLATIONS_DIR / f"game_optimization_{code}.ts").is_file()
+        assert (TRANSLATIONS_DIR / f"game_optimization_{code}.qm").is_file()
         assert manager.set_language(code) is True
         assert manager.currentLanguage == code
 
@@ -47,9 +47,8 @@ def test_core_interface_texts_are_translated_in_every_language() -> None:
             ("OverviewTab", "Game information"): "Game information",
             ("StorageTab", "Btrfs compression analysis"): "Btrfs compression analysis",
             ("GraphicsTab", "Graphics Remaster"): "Graphics Remaster",
-            ("OptimizationTab", "GameForge recommendation"): "GameForge recommendation",
+            ("OptimizationTab", "Game Optimization recommendation"): "Game Optimization recommendation",
             ("I18n", "GameMode is installed, but its service is unavailable"): "GameMode is installed, but its service is unavailable",
-            ("BackupsTab", "Backups"): "Backups",
             ("SystemPage", "System"): "System",
             ("SettingsPage", "Settings"): "Settings",
             ("SettingsPage", "Fast"): "Fast",
@@ -78,9 +77,8 @@ def test_core_interface_texts_are_translated_in_every_language() -> None:
             ("OverviewTab", "Game information"): "Informacje o grze",
             ("StorageTab", "Btrfs compression analysis"): "Analiza kompresji Btrfs",
             ("GraphicsTab", "Graphics Remaster"): "Remaster grafiki",
-            ("OptimizationTab", "GameForge recommendation"): "Rekomendacja GameForge",
+            ("OptimizationTab", "Game Optimization recommendation"): "Rekomendacja Game Optimization",
             ("I18n", "GameMode is installed, but its service is unavailable"): "GameMode jest zainstalowany, ale jego usługa jest niedostępna",
-            ("BackupsTab", "Backups"): "Kopie zapasowe",
             ("SystemPage", "System"): "System",
             ("SettingsPage", "Settings"): "Ustawienia",
             ("SettingsPage", "Fast"): "Szybki",
@@ -109,9 +107,8 @@ def test_core_interface_texts_are_translated_in_every_language() -> None:
             ("OverviewTab", "Game information"): "Información del juego",
             ("StorageTab", "Btrfs compression analysis"): "Análisis de compresión Btrfs",
             ("GraphicsTab", "Graphics Remaster"): "Remasterización gráfica",
-            ("OptimizationTab", "GameForge recommendation"): "Recomendación de GameForge",
+            ("OptimizationTab", "Game Optimization recommendation"): "Recomendación de Game Optimization",
             ("I18n", "GameMode is installed, but its service is unavailable"): "GameMode está instalado, pero su servicio no está disponible",
-            ("BackupsTab", "Backups"): "Copias de seguridad",
             ("SystemPage", "System"): "Sistema",
             ("SettingsPage", "Settings"): "Ajustes",
             ("SettingsPage", "Fast"): "Rápido",
@@ -142,7 +139,7 @@ def test_core_interface_texts_are_translated_in_every_language() -> None:
 
 def test_catalogs_have_no_empty_or_unfinished_messages() -> None:
     for code in ("en", "pl", "es"):
-        root = ET.parse(TRANSLATIONS_DIR / f"gameforge_{code}.ts").getroot()
+        root = ET.parse(TRANSLATIONS_DIR / f"game_optimization_{code}.ts").getroot()
         messages = root.findall(".//message")
 
         assert len(messages) >= 400
@@ -277,11 +274,31 @@ def test_optiscaler_texts_are_translated() -> None:
         ) == translated[3]
 
 
+def test_online_optiscaler_and_proton_tweaks_are_translated() -> None:
+    manager = TranslationManager(_APPLICATION)
+    expected = {
+        "en": ("Check online", "Proton Tweaks", "Compatibility"),
+        "pl": ("Sprawdź online", "Modyfikacje Protona", "Zgodność"),
+        "es": ("Comprobar en línea", "Ajustes de Proton", "Compatibilidad"),
+    }
+    for code, translated in expected.items():
+        assert manager.set_language(code)
+        assert QCoreApplication.translate(
+            "OptiScalerSection", "Check online"
+        ) == translated[0]
+        assert QCoreApplication.translate(
+            "ProtonTweaksSection", "Proton Tweaks"
+        ) == translated[1]
+        assert QCoreApplication.translate(
+            "ProtonTweaksSection", "Compatibility"
+        ) == translated[2]
+
+
 def test_interface_sources_and_finished_translations_use_plain_hyphens() -> None:
     checked = [
-        *Path("src/gameforge").rglob("*.qml"),
-        *Path("src/gameforge").rglob("*.py"),
-        *Path("src/gameforge/translations").glob("*.ts"),
+        *Path("src/game_optimization_linux").rglob("*.qml"),
+        *Path("src/game_optimization_linux").rglob("*.py"),
+        *Path("src/game_optimization_linux/translations").glob("*.ts"),
         *Path("data").glob("*.xml"),
     ]
     testing_guide = Path("TESTING.md")

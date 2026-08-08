@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-app_id="io.github.gameforge_linux.GameForge"
+app_id="io.github.DevVoidPL.GameOptimizationLinux"
 script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 project_dir=$(CDPATH= cd -- "$script_dir/.." && pwd)
 data_home=${XDG_DATA_HOME:-"$HOME/.local/share"}
@@ -28,15 +28,15 @@ if [ "$#" -eq 1 ]; then
 fi
 
 if [ ! -f "$desktop_source" ] || [ ! -f "$metainfo_source" ]; then
-    echo "GameForge desktop assets were not found in $project_dir" >&2
+    echo "Game Optimization desktop assets were not found in $project_dir" >&2
     exit 1
 fi
 
 launcher=""
-if [ "$development" = true ] && [ -x "$project_dir/.venv/bin/gameforge-linux" ]; then
-    launcher="$project_dir/.venv/bin/gameforge-linux"
-elif command -v gameforge-linux >/dev/null 2>&1; then
-    launcher=$(command -v gameforge-linux)
+if [ "$development" = true ] && [ -x "$project_dir/.venv/bin/game-optimization-linux" ]; then
+    launcher="$project_dir/.venv/bin/game-optimization-linux"
+elif command -v game-optimization-linux >/dev/null 2>&1; then
+    launcher=$(command -v game-optimization-linux)
 fi
 
 if [ -z "$launcher" ]; then
@@ -44,13 +44,13 @@ if [ -z "$launcher" ]; then
         echo "No launcher found. Create the project virtual environment and install the package:" >&2
         echo "  python -m venv .venv && .venv/bin/pip install -e ." >&2
     else
-        echo "The gameforge-linux command is not available in PATH; install the package first." >&2
+        echo "The game-optimization-linux command is not available in PATH; install the package first." >&2
         echo "For a local checkout, run: $0 --dev" >&2
     fi
     exit 1
 fi
 
-temporary_desktop=$(mktemp "${TMPDIR:-/tmp}/gameforge-desktop.XXXXXX.desktop")
+temporary_desktop=$(mktemp "${TMPDIR:-/tmp}/game-optimization-desktop.XXXXXX.desktop")
 trap 'rm -f "$temporary_desktop"' EXIT HUP INT TERM
 escaped_launcher=$(printf '%s' "$launcher" | sed 's/[\\"]/\\&/g; s/`/\\`/g; s/\$/\\$/g')
 while IFS= read -r line || [ -n "$line" ]; do
@@ -69,7 +69,7 @@ for size in 16 22 24 32 48 64 128 256; do
     icon_source="$project_dir/data/icons/hicolor/${size}x${size}/apps/$app_id.png"
     icon_target="$data_home/icons/hicolor/${size}x${size}/apps/$app_id.png"
     if [ ! -f "$icon_source" ]; then
-        echo "GameForge icon asset is missing: $icon_source" >&2
+        echo "Game Optimization icon asset is missing: $icon_source" >&2
         exit 1
     fi
     install -Dm644 "$icon_source" "$icon_target"

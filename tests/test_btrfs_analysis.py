@@ -12,8 +12,8 @@ from types import SimpleNamespace
 import pytest
 from PySide6.QtCore import QCoreApplication
 
-from gameforge.controllers import AppController
-from gameforge.models import (
+from game_optimization_linux.controllers import AppController
+from game_optimization_linux.models import (
     CapabilityStatus,
     FilesystemInfo,
     FilesystemType,
@@ -23,7 +23,7 @@ from gameforge.models import (
     SystemInfo,
     TaskStatus,
 )
-from gameforge.services import (
+from game_optimization_linux.services import (
     AnalysisCache,
     AnalysisCancelled,
     AnalysisLimits,
@@ -565,7 +565,7 @@ def test_analyzer_opens_game_data_read_only(tmp_path: Path, monkeypatch: pytest.
         opened_flags.append(flags)
         return real_open(path, flags, *args, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr("gameforge.services.btrfs_analysis.os.open", recording_open)
+    monkeypatch.setattr("game_optimization_linux.services.btrfs_analysis.os.open", recording_open)
 
     report = _analyzer().analyze(_game(tmp_path))
 
@@ -596,7 +596,7 @@ def test_read_only_helper_process_honors_cancellation(
         return process
 
     monkeypatch.setattr(
-        "gameforge.services.btrfs_analysis.subprocess.Popen",
+        "game_optimization_linux.services.btrfs_analysis.subprocess.Popen",
         recording_popen,
     )
 

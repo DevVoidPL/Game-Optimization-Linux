@@ -5,8 +5,8 @@ import subprocess
 
 import pytest
 
-from gameforge.models import CapabilityStatus, SessionType
-from gameforge.providers import LinuxSystemProvider
+from game_optimization_linux.models import CapabilityStatus, SessionType
+from game_optimization_linux.providers import LinuxSystemProvider
 
 
 def _completed(arguments: list[str], output: str, returncode: int = 0) -> subprocess.CompletedProcess[str]:
@@ -53,7 +53,7 @@ def test_linux_system_provider_reads_real_sources_and_mocked_commands(
         )
 
     monkeypatch.setattr(
-        "gameforge.providers.linux_system.platform.release", lambda: "6.99-test"
+        "game_optimization_linux.providers.linux_system.platform.release", lambda: "6.99-test"
     )
     provider = LinuxSystemProvider(
         os_release_path=os_release,

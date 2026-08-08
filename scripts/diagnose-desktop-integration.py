@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only diagnostics for the GameForge desktop identity and icon assets."""
+"""Read-only diagnostics for the Game Optimization desktop identity and icon assets."""
 
 from __future__ import annotations
 
@@ -15,8 +15,8 @@ if str(SOURCE_ROOT) not in sys.path:
 
 from PySide6.QtGui import QGuiApplication, QImage  # noqa: E402
 
-from gameforge.app import _set_application_metadata  # noqa: E402
-from gameforge.config import APP_ID  # noqa: E402
+from game_optimization_linux.app import _set_application_metadata  # noqa: E402
+from game_optimization_linux.config import APP_ID  # noqa: E402
 
 
 ICON_SIZES = (16, 22, 24, 32, 48, 64, 128, 256)
@@ -73,9 +73,9 @@ def main() -> int:
         else:
             print(f"icon {size}x{size}: {installed} ({alpha_bounds(installed)})")
 
-    source_icon = PROJECT_ROOT / "src/gameforge/resources/GameForgeIcon.png"
+    source_icon = PROJECT_ROOT / "src/game_optimization_linux/resources/GameOptimizationLinuxIcon.png"
     print(f"source icon: {source_icon} ({alpha_bounds(source_icon)})")
-    contact_sheet = PROJECT_ROOT / "reports/ui/gameforge-icon-contact-sheet.png"
+    contact_sheet = PROJECT_ROOT / "reports/ui/game-optimization-icon-contact-sheet.png"
     print(f"contact sheet: {contact_sheet} ({alpha_bounds(contact_sheet)})")
     return 0
 

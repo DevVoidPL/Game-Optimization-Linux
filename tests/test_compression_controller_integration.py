@@ -9,8 +9,8 @@ from typing import Any, Sequence
 import pytest
 from PySide6.QtCore import QCoreApplication
 
-from gameforge.controllers import AppController
-from gameforge.models import (
+from game_optimization_linux.controllers import AppController
+from game_optimization_linux.models import (
     AppSettings,
     AutomaticCompressionMode,
     CompressionFile,
@@ -29,7 +29,7 @@ from gameforge.models import (
     TaskStatus,
     TaskType,
 )
-from gameforge.services import (
+from game_optimization_linux.services import (
     GameChangeSet,
     GameUpdateRecord,
     GameUpdateStatus,

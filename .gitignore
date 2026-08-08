@@ -13,14 +13,6 @@ dist/
 .vscode/
 reports/compression_benchmarks/
 
-# Local Flatpak repositories
-.flatpak-repo/
-.flatpak-repo-test/
-.flatpak-build*/
-.flatpak-builder/
-dist/
-.venv/
-
 # Flatpak generated/test artifacts
 .flatpak-builder/
 .flatpak-build*/

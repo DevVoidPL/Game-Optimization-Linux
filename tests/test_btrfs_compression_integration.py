@@ -1,6 +1,6 @@
 """Opt-in integration checks against a disposable directory on real Btrfs.
 
-These tests are skipped unless ``GAMEFORGE_BTRFS_TEST_ROOT`` points at an
+These tests are skipped unless ``GAME_OPTIMIZATION_BTRFS_TEST_ROOT`` points at an
 existing Btrfs directory.  They never inspect or modify a Steam library.  Every
 fixture is created below a unique temporary ``library/steamapps/common`` tree
 and removed after the test.
@@ -20,9 +20,9 @@ from typing import Iterator
 
 import pytest
 
-from gameforge.models import CompressionProfile, FilesystemType, Game, Launcher
-from gameforge.providers import BtrfsCompressionProvider, LinuxFilesystemProvider
-from gameforge.services import (
+from game_optimization_linux.models import CompressionProfile, FilesystemType, Game, Launcher
+from game_optimization_linux.providers import BtrfsCompressionProvider, LinuxFilesystemProvider
+from game_optimization_linux.services import (
     AnalysisLimits,
     BtrfsCompressionAnalyzer,
     CompressionHistoryStore,
@@ -36,15 +36,15 @@ _MIB = 1024 * 1024
 
 @contextmanager
 def _real_btrfs_sandbox() -> Iterator[Path]:
-    configured = os.environ.get("GAMEFORGE_BTRFS_TEST_ROOT", "").strip()
+    configured = os.environ.get("GAME_OPTIMIZATION_BTRFS_TEST_ROOT", "").strip()
     if not configured:
         pytest.skip(
-            "set GAMEFORGE_BTRFS_TEST_ROOT to an owned disposable-capable "
+            "set GAME_OPTIMIZATION_BTRFS_TEST_ROOT to an owned disposable-capable "
             "directory on Btrfs"
         )
     root = Path(configured).expanduser().resolve()
     if not root.is_dir() or root == Path("/"):
-        pytest.skip("GAMEFORGE_BTRFS_TEST_ROOT is not a safe existing directory")
+        pytest.skip("GAME_OPTIMIZATION_BTRFS_TEST_ROOT is not a safe existing directory")
     findmnt = shutil.which("findmnt")
     btrfs = shutil.which("btrfs")
     if findmnt is None or btrfs is None:
@@ -58,8 +58,8 @@ def _real_btrfs_sandbox() -> Iterator[Path]:
         shell=False,
     )
     if mounted.returncode != 0 or mounted.stdout.strip().casefold() != "btrfs":
-        pytest.skip("GAMEFORGE_BTRFS_TEST_ROOT is not on Btrfs")
-    with TemporaryDirectory(prefix=".gameforge-btrfs-test-", dir=root) as temporary:
+        pytest.skip("GAME_OPTIMIZATION_BTRFS_TEST_ROOT is not on Btrfs")
+    with TemporaryDirectory(prefix=".game-optimization-btrfs-test-", dir=root) as temporary:
         yield Path(temporary)
 
 
@@ -147,7 +147,7 @@ def test_real_reflinks_surface_measured_risk_before_defragmentation() -> None:
         game = _game(sandbox, "SharedGame")
         source = game.install_path / "original.bin"
         clone = game.install_path / "clone.bin"
-        source.write_bytes((b"GameForge shared extent fixture\n" * 262_144)[:8 * _MIB])
+        source.write_bytes((b"Game Optimization shared extent fixture\n" * 262_144)[:8 * _MIB])
         copy = shutil.which("cp")
         if copy is None:
             pytest.skip("cp with reflink support is required")

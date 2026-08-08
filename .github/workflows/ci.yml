@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      QT_QPA_PLATFORM: offscreen
+      XDG_CONFIG_HOME: /tmp/game-optimization-linux/config
+      XDG_CACHE_HOME: /tmp/game-optimization-linux/cache
+      XDG_STATE_HOME: /tmp/game-optimization-linux/state
+      XDG_DATA_HOME: /tmp/game-optimization-linux/data
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install test dependencies
+        run: python -m pip install -e '.[dev]'
+
+      - name: Compile Python sources
+        run: python -m compileall -q src tests
+
+      - name: Check QML
+        run: find src/game_optimization_linux/qml -name '*.qml' -print0 | xargs -0 -n1 pyside6-qmllint
+
+      - name: Run tests
+        run: python -m pytest

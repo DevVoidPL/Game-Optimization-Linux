@@ -25,10 +25,10 @@ from typing import Any, Sequence
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC_ROOT = Path(
-    os.environ.get("GAMEFORGE_SRC_ROOT", str(ROOT / "src"))
+    os.environ.get("GAME_OPTIMIZATION_SRC_ROOT", str(ROOT / "src"))
 )
 QML_ROOT = Path(
-    os.environ.get("GAMEFORGE_QML_ROOT", str(SRC_ROOT / "gameforge" / "qml"))
+    os.environ.get("GAME_OPTIMIZATION_QML_ROOT", str(SRC_ROOT / "game_optimization_linux" / "qml"))
 )
 if str(SRC_ROOT) not in sys.path:
     sys.path.insert(0, str(SRC_ROOT))
@@ -64,9 +64,9 @@ def _prepare_environment(output: Path, *, live: bool) -> None:
     os.environ["XDG_CACHE_HOME"] = str(xdg_root / "cache")
     os.environ["XDG_STATE_HOME"] = str(xdg_root / "state")
     if live:
-        os.environ.pop("GAMEFORGE_DEMO", None)
+        os.environ.pop("GAME_OPTIMIZATION_DEMO", None)
     else:
-        os.environ["GAMEFORGE_DEMO"] = "1"
+        os.environ["GAME_OPTIMIZATION_DEMO"] = "1"
 
 
 def _settle(application: Any, rounds: int = 48) -> None:
@@ -159,7 +159,7 @@ def _create_artwork(output: Path, application: Any) -> list[tuple[Path, Path]]:
         painter.drawText(
             QRect(int(width * 0.10), int(height * 0.88), int(width * 0.80), int(height * 0.07)),
             int(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter),
-            "GAMEFORGE  ·  SYNTHETIC",
+            "GAME OPTIMIZATION  ·  SYNTHETIC",
         )
         painter.end()
         if not image.save(str(path), "PNG"):
@@ -178,7 +178,7 @@ def _create_artwork(output: Path, application: Any) -> list[tuple[Path, Path]]:
 
 
 def _synthetic_games(output: Path, artwork: Sequence[tuple[Path, Path]]) -> tuple[Any, ...]:
-    from gameforge.models import FilesystemType, Game, GameStatus, Launcher
+    from game_optimization_linux.models import FilesystemType, Game, GameStatus, Launcher
 
     names = (
         "Astral Forge",
@@ -235,7 +235,7 @@ class _SyntheticTaskService:
         return self.list_tasks()
 
     def cancel(self, task_id: str) -> Any:
-        from gameforge.models import TaskStatus
+        from game_optimization_linux.models import TaskStatus
 
         for index, task in enumerate(self._tasks):
             if task.id == task_id:
@@ -248,7 +248,7 @@ class _SyntheticTaskService:
 
 
 def _synthetic_tasks() -> tuple[Any, ...]:
-    from gameforge.models import Task, TaskStatus, TaskType
+    from game_optimization_linux.models import Task, TaskStatus, TaskType
 
     return (
         Task(
@@ -303,10 +303,10 @@ def _synthetic_tasks() -> tuple[Any, ...]:
 
 
 def _controller(application: Any, output: Path, games: Sequence[Any]) -> Any:
-    from gameforge.controllers import AppController
-    from gameforge.models import GamepadDevice, GamepadType
-    from gameforge.providers import DemoGameProvider, FakeGamepadProvider
-    from gameforge.services import GamepadService, SettingsStore
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.models import GamepadDevice, GamepadType
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.services import GamepadService, SettingsStore
 
     fake_controller = GamepadDevice(
         instance_id=1,
@@ -340,8 +340,8 @@ def _controller(application: Any, output: Path, games: Sequence[Any]) -> Any:
 def _live_controller(application: Any, output: Path) -> Any:
     """Create the production read-only Steam controller in isolated XDG state."""
 
-    from gameforge.controllers import AppController
-    from gameforge.services import SettingsStore
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.services import SettingsStore
 
     return AppController(
         parent=application,
@@ -495,7 +495,7 @@ def main() -> int:
     output = (
         args.output.expanduser().resolve()
         if args.output is not None
-        else Path(tempfile.mkdtemp(prefix="gameforge-couch-tv-screenshots-"))
+        else Path(tempfile.mkdtemp(prefix="game-optimization-couch-tv-screenshots-"))
     )
     output.mkdir(parents=True, exist_ok=True)
     _prepare_environment(output, live=args.live)

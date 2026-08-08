@@ -9,14 +9,14 @@ import subprocess
 import pytest
 from PySide6.QtCore import QCoreApplication
 
-from gameforge.controllers import AppController
-from gameforge.models import GameOptimizationProfile, MangoHudProfile
-from gameforge.providers import DemoGameProvider
-from gameforge.providers.demo import demo_games
-from gameforge.runner import main as runner_main
-import gameforge.runner as runner_module
-import gameforge.services.optimization_runtime as runtime_module
-from gameforge.services import (
+from game_optimization_linux.controllers import AppController
+from game_optimization_linux.models import GameOptimizationProfile, MangoHudProfile
+from game_optimization_linux.providers import DemoGameProvider
+from game_optimization_linux.providers.demo import demo_games
+from game_optimization_linux.runner import main as runner_main
+import game_optimization_linux.runner as runner_module
+import game_optimization_linux.services.optimization_runtime as runtime_module
+from game_optimization_linux.services import (
     DisplayDetector,
     GameOptimizationProfileRepository,
     KNOWN_CONFIG_KEYS,
@@ -24,6 +24,7 @@ from gameforge.services import (
     MangoHudLaunchIntegration,
     MangoHudProfileRepository,
     OptiScalerProfileRepository,
+    ProtonTweaksRepository,
     OptimizationAdvisor,
     OptimizationLaunchPlanner,
     RunnerIntegration,
@@ -32,7 +33,7 @@ from gameforge.services import (
     MockTaskService,
     SettingsStore,
 )
-from gameforge.models import OptiScalerProfile
+from game_optimization_linux.models import OptiScalerProfile
 
 
 _APPLICATION = QCoreApplication.instance() or QCoreApplication([])
@@ -263,9 +264,62 @@ def test_launch_plan_merges_optiscaler_with_existing_wine_overrides() -> None:
         existing_wine_overrides="d3d11=b;dxgi=b;userloader=n",
     )
     assert plan.environment == {
-        "WINEDLLOVERRIDES": "d3d11=b;dxgi=b,n;userloader=n"
+        "WINEDLLOVERRIDES": "d3d11=b;dxgi=n,b;userloader=n"
     }
+    assert "WINEDLLOVERRIDES:dxgi" in plan.environment_conflicts
+    assert any("native-first order" in warning for warning in plan.warnings)
     assert any("OptiScaler Proton override" in reason for reason in plan.reasons)
+
+
+def test_proton_tweaks_and_optiscaler_share_one_deterministic_environment() -> None:
+    profile = replace(
+        GameOptimizationProfile.default("224760"),
+        gamemode_enabled=False,
+        gamescope_enabled=False,
+    )
+    missing = RuntimeToolAvailability("tool", False)
+
+    plan = OptimizationLaunchPlanner().build(
+        profile,
+        ["/game"],
+        gamemode=missing,
+        gamescope=missing,
+        proton_environment={
+            "PROTON_LOG": "1",
+            "PROTON_NO_ESYNC": "1",
+        },
+        optiscaler_override="dxgi=n,b",
+        existing_wine_overrides="xaudio2_7=n",
+    )
+
+    assert plan.environment == {
+        "PROTON_LOG": "1",
+        "PROTON_NO_ESYNC": "1",
+        "WINEDLLOVERRIDES": "xaudio2_7=n;dxgi=n,b",
+    }
+    assert plan.environment_sources == {
+        "PROTON_LOG": "proton_tweaks",
+        "PROTON_NO_ESYNC": "proton_tweaks",
+        "WINEDLLOVERRIDES": "optiscaler",
+    }
+
+
+def test_proton_tweak_conflict_with_inherited_environment_is_reported() -> None:
+    profile = GameOptimizationProfile.default("224760")
+    missing = RuntimeToolAvailability("tool", False)
+
+    plan = OptimizationLaunchPlanner().build(
+        profile,
+        ["/game"],
+        gamemode=missing,
+        gamescope=missing,
+        proton_environment={"PROTON_LOG": "1"},
+        existing_environment={"PROTON_LOG": "0"},
+    )
+
+    assert plan.environment["PROTON_LOG"] == "1"
+    assert plan.environment_conflicts == ("PROTON_LOG",)
+    assert any("PROTON_LOG" in warning for warning in plan.warnings)
 
 
 def test_runner_applies_installed_optiscaler_profile_without_shell(
@@ -304,6 +358,84 @@ def test_runner_applies_installed_optiscaler_profile_without_shell(
     assert environment["WINEDLLOVERRIDES"].endswith("dxgi=n,b")
     report = json.loads((tmp_path / "reports" / "224760.json").read_text())
     assert report["environmentKeys"] == ["WINEDLLOVERRIDES"]
+
+
+def test_runner_combines_proton_tweaks_with_optiscaler_without_shell(
+    tmp_path: Path,
+) -> None:
+    repository = GameOptimizationProfileRepository(tmp_path / "games")
+    repository.save(GameOptimizationProfile.default("224760"))
+    optiscaler = OptiScalerProfileRepository(tmp_path / "games")
+    optiscaler.save(
+        replace(
+            OptiScalerProfile.default("224760"),
+            enabled=True,
+            installation_state="installed",
+            executable="Game.exe",
+            install_directory="/tmp/game",
+            proton_override="dxgi=n,b",
+            manifest_id="manifest-test",
+        )
+    )
+    proton = ProtonTweaksRepository(tmp_path / "games")
+    proton.save(
+        proton.from_payload(
+            "224760",
+            {"toggles": {"proton_log": True, "no_fsync": True}},
+        )
+    )
+    captured: dict[str, str] = {}
+
+    def execute(_executable: str, _argv: list[str], environment: dict[str, str]) -> int:
+        captured.update(environment)
+        return 0
+
+    assert runner_main(
+        ["--appid", "224760", "--", "/game"],
+        repository=repository,
+        optiscaler_repository=optiscaler,
+        proton_tweaks_repository=proton,
+        detector=RuntimeToolDetector(which=lambda _name: None),
+        executor=execute,
+        report_root=tmp_path / "reports",
+    ) == 0
+    assert captured["PROTON_LOG"] == "1"
+    assert captured["PROTON_NO_FSYNC"] == "1"
+    assert captured["WINEDLLOVERRIDES"] == "dxgi=n,b"
+
+
+def test_runner_records_single_mangohud_application_activation_owner(
+    tmp_path: Path,
+) -> None:
+    repository = GameOptimizationProfileRepository(tmp_path / "games")
+    repository.save(GameOptimizationProfile.default("224760"))
+    mango = MangoHudProfileRepository(tmp_path / "games", log_root=tmp_path / "logs")
+    mango.save(
+        replace(
+            MangoHudProfile.default("224760"),
+            enabled=True,
+            preset="fps_only",
+            executable_path="Game.exe",
+        )
+    )
+    captured: dict[str, str] = {}
+
+    def execute(_executable: str, _argv: list[str], environment: dict[str, str]) -> int:
+        captured.update(environment)
+        return 0
+
+    assert runner_main(
+        ["--appid", "224760", "--", "/game"],
+        repository=repository,
+        mangohud_repository=mango,
+        detector=RuntimeToolDetector(which=lambda _name: None),
+        executor=execute,
+        report_root=tmp_path / "reports",
+    ) == 0
+    report = json.loads((tmp_path / "reports/224760.json").read_text())
+    assert report["mangoHudActivationOwner"] == "per_application_config"
+    assert "MANGOHUD" not in captured
+    assert "--mangoapp" not in report["arguments"]
 
 
 def test_corrupt_optional_optiscaler_profile_does_not_block_game_launch(
@@ -392,7 +524,7 @@ def test_flatpak_runner_executes_complete_plan_on_host_without_host_python(
             }
 
     executed: list[object] = []
-    monkeypatch.setenv("FLATPAK_ID", "io.github.gameforge_linux.GameForge")
+    monkeypatch.setenv("FLATPAK_ID", "io.github.DevVoidPL.GameOptimizationLinux")
     monkeypatch.setattr(runner_module, "HostServiceClient", Host)
     monkeypatch.setattr(
         runner_module.shutil,
@@ -433,9 +565,9 @@ def test_runner_and_launch_planner_never_use_a_shell() -> None:
 
 
 def test_stable_steam_command_never_changes_with_profile(tmp_path: Path) -> None:
-    integration = RunnerIntegration(tmp_path / "gameforge-run")
+    integration = RunnerIntegration(tmp_path / "game-optimization-run")
     command = integration.steam_command("224760")
-    assert command == f'"{tmp_path / "gameforge-run"}" --appid 224760 -- %command%'
+    assert command == f'"{tmp_path / "game-optimization-run"}" --appid 224760 -- %command%'
 
 
 def test_controller_saves_desktop_profile_per_appid(tmp_path: Path) -> None:
@@ -460,6 +592,45 @@ def test_controller_saves_desktop_profile_per_appid(tmp_path: Path) -> None:
     saved = repository.load("224760")
     assert saved.game_category == "platformer_2d"
     assert saved.target_fps == 75
+
+
+def test_controller_saves_proton_tweaks_and_updates_combined_preview(
+    tmp_path: Path,
+) -> None:
+    game = replace(demo_games()[0], steam_app_id="224760")
+    optimization_repository = GameOptimizationProfileRepository(tmp_path / "games")
+    proton_repository = ProtonTweaksRepository(tmp_path / "games")
+    controller = AppController(
+        game_provider=DemoGameProvider((game,)),
+        task_service=MockTaskService(),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        optimization_profile_repository=optimization_repository,
+        proton_tweaks_repository=proton_repository,
+        initial_games=(game,),
+        auto_refresh=False,
+    )
+    try:
+        saved = controller.saveProtonTweaks(
+            game.id,
+            {
+                "toggles": {
+                    "use_wined3d": True,
+                    "proton_log": True,
+                },
+                "optiscalerFsr4Update": False,
+            },
+        )
+        preview = controller.getOptimizationProfile(game.id)
+    finally:
+        controller.shutdown()
+
+    assert saved["success"] is True
+    assert saved["environment"] == {
+        "PROTON_USE_WINED3D": "1",
+        "PROTON_LOG": "1",
+    }
+    assert preview["launchPlan"]["environment"]["PROTON_LOG"] == "1"
+    assert "PROTON_USE_WINED3D=1" in preview["protonOverrides"]
 
 
 def test_gamescope_profile_removes_and_rejects_mangohud_fps_limit(
@@ -532,7 +703,7 @@ def test_gamescope_profile_removes_and_rejects_mangohud_fps_limit(
 
 
 def test_development_installer_has_no_sudo_or_venv_path() -> None:
-    content = (Path(__file__).parents[1] / "scripts" / "install-gameforge-runner.sh").read_text(encoding="utf-8")
+    content = (Path(__file__).parents[1] / "scripts" / "install-game-optimization-runner.sh").read_text(encoding="utf-8")
     assert "sudo" not in content
     assert ".venv" not in content
     assert "--no-deps" in content

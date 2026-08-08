@@ -8,8 +8,8 @@ from types import SimpleNamespace
 
 from PySide6.QtCore import QCoreApplication
 
-from gameforge.controllers.app_controller import AppController
-from gameforge.models import (
+from game_optimization_linux.controllers.app_controller import AppController
+from game_optimization_linux.models import (
     FilesystemType,
     FilesystemInfo,
     Game,
@@ -17,10 +17,10 @@ from gameforge.models import (
     Launcher,
     SizeScanStatus,
 )
-from gameforge.providers import SteamGameProvider
-from gameforge.services import MockTaskService, SettingsStore
-from gameforge.services.directory_size import DirectorySizeResult, DirectorySizeScanner
-from gameforge.services.library_cache import LibraryCache
+from game_optimization_linux.providers import SteamGameProvider
+from game_optimization_linux.services import MockTaskService, SettingsStore
+from game_optimization_linux.services.directory_size import DirectorySizeResult, DirectorySizeScanner
+from game_optimization_linux.services.library_cache import LibraryCache
 
 
 _QT_APPLICATION = QCoreApplication.instance() or QCoreApplication([])
@@ -654,7 +654,7 @@ def test_events_during_active_scan_schedule_at_most_one_retry(
 
 
 def test_demo_environment_keeps_in_memory_provider(monkeypatch: object, tmp_path: Path) -> None:
-    monkeypatch.setenv("GAMEFORGE_DEMO", "1")
+    monkeypatch.setenv("GAME_OPTIMIZATION_DEMO", "1")
     controller = AppController(
         settings_store=SettingsStore(tmp_path / "settings.json"),
         auto_refresh=False,

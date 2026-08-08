@@ -19,7 +19,7 @@ _TOOL_PATH = (
     / "benchmark_game_compression.py"
 )
 _SPEC = importlib.util.spec_from_file_location(
-    "gameforge_benchmark_game_compression",
+    "game_optimization_benchmark_game_compression",
     _TOOL_PATH,
 )
 assert _SPEC is not None and _SPEC.loader is not None

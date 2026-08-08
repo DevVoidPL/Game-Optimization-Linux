@@ -30,7 +30,7 @@ def _run_probe(
             "XDG_CONFIG_HOME": str(tmp_path / "config"),
             "XDG_CACHE_HOME": str(tmp_path / "cache"),
             "XDG_STATE_HOME": str(tmp_path / "state"),
-            "GAMEFORGE_DEBUG_ARTWORK": (
+            "GAME_OPTIMIZATION_DEBUG_ARTWORK": (
                 "1"
                 if mode in {"artwork", "artwork_refresh", "incremental_games"}
                 else "0"
@@ -192,13 +192,13 @@ def test_artwork_lifecycle_logging_is_disabled_by_default(tmp_path: Path) -> Non
         "720",
     )
     assert not any(
-        "GameForge GameArtwork lifecycle" in message
+        "Game Optimization GameArtwork lifecycle" in message
         for message in payload["messages"]
     )
 
 
 def test_other_pages_keep_their_existing_scroll_owners() -> None:
-    qml_pages = ROOT / "src" / "gameforge" / "qml" / "pages"
+    qml_pages = ROOT / "src" / "game_optimization_linux" / "qml" / "pages"
     for relative in (
         "SettingsPage.qml",
         "SystemPage.qml",
@@ -206,7 +206,6 @@ def test_other_pages_keep_their_existing_scroll_owners() -> None:
         "details/StorageTab.qml",
         "details/GraphicsTab.qml",
         "details/OptimizationTab.qml",
-        "details/BackupsTab.qml",
     ):
         source = (qml_pages / relative).read_text(encoding="utf-8")
         assert "ScrollView {" in source, relative
@@ -224,7 +223,7 @@ def test_kde_breeze_read_only_preview_has_no_textarea_warning(tmp_path: Path) ->
     )
     messages = payload["messages"]
     assert not any("TextArea" in message for message in messages)
-    source = (ROOT / "src/gameforge/qml/pages/details/OptimizationTab.qml").read_text(
+    source = (ROOT / "src/game_optimization_linux/qml/pages/details/OptimizationTab.qml").read_text(
         encoding="utf-8"
     )
     assert "TextArea {" not in source
@@ -305,10 +304,10 @@ def test_optimization_desktop_editor_saves_real_appid_profile(tmp_path: Path) ->
 
 
 def test_backups_tab_is_removed_and_couch_exposes_optiscaler_status() -> None:
-    details = (ROOT / "src/gameforge/qml/pages/GameDetailsPage.qml").read_text(
+    details = (ROOT / "src/game_optimization_linux/qml/pages/GameDetailsPage.qml").read_text(
         encoding="utf-8"
     )
-    couch = (ROOT / "src/gameforge/qml/couch/CouchGameDetails.qml").read_text(
+    couch = (ROOT / "src/game_optimization_linux/qml/couch/CouchGameDetails.qml").read_text(
         encoding="utf-8"
     )
     assert 'qsTr("Backups")' not in details

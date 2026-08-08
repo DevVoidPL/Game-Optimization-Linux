@@ -4,9 +4,9 @@ from pathlib import Path
 
 from PySide6.QtCore import QCoreApplication
 
-from gameforge.controllers import AppController
-from gameforge.providers import DemoGameProvider
-from gameforge.services import SettingsStore
+from game_optimization_linux.controllers import AppController
+from game_optimization_linux.providers import DemoGameProvider
+from game_optimization_linux.services import SettingsStore
 
 
 _QT_APPLICATION = QCoreApplication.instance() or QCoreApplication([])

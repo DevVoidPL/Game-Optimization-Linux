@@ -1,3 +1,0 @@
-#!/bin/sh
-# Stable host-side Steam Launch Options wrapper installed by GameForge.
-exec flatpak run --command=gameforge-run io.github.gameforge_linux.GameForge "$@"

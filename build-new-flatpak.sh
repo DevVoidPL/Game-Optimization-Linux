@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 set -e
 
-APP_ID="io.github.gameforge_linux.GameForge"
-MANIFEST="flatpak/io.github.gameforge_linux.GameForge.yml"
+APP_ID="io.github.DevVoidPL.GameOptimizationLinux"
+MANIFEST="flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml"
 BUILD_DIR=".flatpak-build-dir"
 REPO_DIR=".flatpak-repo"
-OUTPUT="dist/GameForge-Linux-0.1.1-alpha-x86_64.flatpak"
+OUTPUT="dist/Game-Optimization-Linux-0.1.2-alpha-x86_64.flatpak"
 
 if [[ ! -f "$MANIFEST" ]]; then
     echo "Brakuje manifestu: $MANIFEST"
@@ -42,6 +42,10 @@ flatpak build-bundle \
     stable
 
 sha256sum "$OUTPUT" > "$OUTPUT.sha256"
+(
+    cd dist
+    sha256sum "$(basename "$OUTPUT")" > SHA256SUMS
+)
 
 echo
 echo "Gotowy Flatpak:"

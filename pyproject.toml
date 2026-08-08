@@ -3,14 +3,14 @@ requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gameforge-linux"
+name = "game-optimization-linux"
 dynamic = ["version"]
-description = "A safe, extensible Linux game library optimization manager."
+description = "Per-game Linux launch profiles and Btrfs storage tools."
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [
-    { name = "GameForge Linux contributors" },
+    { name = "Game Optimization Linux contributors" },
 ]
 classifiers = [
     "Development Status :: 2 - Pre-Alpha",
@@ -32,8 +32,8 @@ dev = [
 ]
 
 [project.scripts]
-gameforge-linux = "gameforge.main:main"
-gameforge-run = "gameforge.runner:main"
+game-optimization-linux = "game_optimization_linux.main:main"
+game-optimization-run = "game_optimization_linux.runner:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -43,10 +43,10 @@ include-package-data = true
 where = ["src"]
 
 [tool.setuptools.dynamic]
-version = { attr = "gameforge.config.APP_VERSION" }
+version = { attr = "game_optimization_linux.config.APP_VERSION" }
 
 [tool.setuptools.package-data]
-gameforge = [
+game_optimization_linux = [
     "py.typed",
     "qml/qmldir",
     "qml/*.qml",
@@ -71,4 +71,4 @@ pythonpath = ["src"]
 
 [tool.coverage.run]
 branch = true
-source = ["gameforge"]
+source = ["game_optimization_linux"]
