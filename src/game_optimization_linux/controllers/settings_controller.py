@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import fields, is_dataclass, replace
 from enum import Enum
 import logging
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -69,6 +70,23 @@ class SettingsController:
                     error,
                 )
                 toast_message = "Steam locations were saved and will apply after restart"
+                toast_level = "warning"
+        elif field_name == "library_directories" and not self._app._demo_mode:
+            setter = getattr(self._app._game_provider, "set_local_roots", None)
+            try:
+                if callable(setter):
+                    setter(tuple(converted_value))
+                self._app.requestLibraryScan(
+                    "settings_local_paths",
+                    "",
+                    "settings",
+                )
+            except Exception as error:
+                logger.warning(
+                    "Saved local game directories but could not apply them immediately: %s",
+                    error,
+                )
+                toast_message = "Local game directories will apply after restart"
                 toast_level = "warning"
         elif field_name == "show_steam_tools_and_runtimes":
             self._app._reload_games()
@@ -201,6 +219,19 @@ class SettingsController:
                 path_values = tuple(str(item) for item in items)
                 if any(not item.strip() for item in path_values):
                     raise ValueError("library directory paths cannot be empty")
+                if field_name == "library_directories":
+                    normalized: dict[str, Path] = {}
+                    home = Path.home().resolve(strict=False)
+                    for item in path_values:
+                        path = Path(item).expanduser().resolve(strict=True)
+                        if not path.is_dir():
+                            raise ValueError(f"local game directory is not a directory: {path}")
+                        if path == Path(path.anchor) or path == home:
+                            raise ValueError(
+                                "select a dedicated games directory, not the filesystem root or home directory"
+                            )
+                        normalized.setdefault(os.path.normcase(os.fspath(path)), path)
+                    return tuple(normalized.values())
                 return tuple(Path(item).expanduser() for item in path_values)
             return items
         if isinstance(current_value, list):

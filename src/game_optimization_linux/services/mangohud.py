@@ -14,7 +14,7 @@ import tempfile
 from typing import Any
 
 from game_optimization_linux.config import GAMES_CONFIG_DIR, MANGOHUD_LOG_DIR
-from game_optimization_linux.models import Game, MangoHudProfile, validate_app_id
+from game_optimization_linux.models import Game, MangoHudProfile, validate_game_key
 
 from .game_executable import ExecutableResolution, GameExecutableResolver
 from .host_bootstrap import host_home_directory
@@ -119,7 +119,7 @@ class MangoHudProfileRepository:
         self.log_root = Path(log_root)
 
     def game_directory(self, app_id: object) -> Path:
-        return self.root / validate_app_id(app_id)
+        return self.root / validate_game_key(app_id)
 
     def profile_path(self, app_id: object) -> Path:
         return self.game_directory(app_id) / PROFILE_FILE_NAME
@@ -128,13 +128,13 @@ class MangoHudProfileRepository:
         return self.game_directory(app_id) / CONFIG_FILE_NAME
 
     def default(self, app_id: object) -> MangoHudProfile:
-        normalized = validate_app_id(app_id)
+        normalized = validate_game_key(app_id)
         return MangoHudProfile.default(
             normalized, output_folder=self.log_root / normalized
         )
 
     def load(self, app_id: object) -> MangoHudProfile:
-        normalized = validate_app_id(app_id)
+        normalized = validate_game_key(app_id)
         path = self.profile_path(normalized)
         if not path.exists():
             return self.default(normalized)
@@ -159,7 +159,7 @@ class MangoHudProfileRepository:
         return path
 
     def reset(self, app_id: object) -> MangoHudProfile:
-        normalized = validate_app_id(app_id)
+        normalized = validate_game_key(app_id)
         for path in (self.profile_path(normalized), self.config_path(normalized)):
             try:
                 path.unlink(missing_ok=True)
@@ -561,6 +561,12 @@ class MangoHudLaunchIntegration:
                 resolution, application_config_path=target, conflict_path=target,
                 requires_steam_restart=True,
             )
+        if game.launcher.value == "Manual" and game.data_source.casefold() == "local":
+            return MangoHudApplicationConfigStatus(
+                "per_application_config", "application_profile",
+                "Application profile - changes apply on the next game launch",
+                resolution, application_config_path=target,
+            )
         running = self._native_steam_environment()
         if running is not None:
             explicit = str(running.get("MANGOHUD_CONFIGFILE", "")).strip()
@@ -651,7 +657,15 @@ class MangoHudLaunchIntegration:
         strategy = self.synchronize(game, profile)
         if steam_type == "native" and strategy.strategy == "per_application_config":
             running = self._native_steam_environment()
-            environment = {} if running is not None else {"MANGOHUD": "1"}
+            local_game = (
+                game.launcher.value == "Manual"
+                and game.data_source.casefold() == "local"
+            )
+            environment = (
+                {"MANGOHUD": "1"}
+                if local_game or running is None
+                else {}
+            )
             return MangoHudLaunchActivation(
                 enabled=True,
                 available=True,
@@ -691,16 +705,20 @@ class MangoHudLaunchIntegration:
     def reset(self, game: Game) -> None:
         """Remove only the per-game Flatpak mirror managed by Game Optimization."""
 
-        if not game.steam_app_id:
+        game_key = str(game.steam_app_id or game.id)
+        if not game.steam_app_id and not (
+            game.launcher.value == "Manual"
+            and game.data_source.casefold() == "local"
+        ):
             return
         if not uses_flatpak_steam(game):
             try:
-                profile = self.repository.load(game.steam_app_id)
+                profile = self.repository.load(game_key)
             except (OSError, ValueError):
                 return
             self._remove_owned_application_config(game, profile)
             return
-        config_path = self.flatpak_config_root / str(game.steam_app_id) / CONFIG_FILE_NAME
+        config_path = self.flatpak_config_root / game_key / CONFIG_FILE_NAME
         try:
             config_path.unlink(missing_ok=True)
             config_path.parent.rmdir()

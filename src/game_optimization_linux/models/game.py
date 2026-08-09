@@ -90,6 +90,9 @@ class Game:
     is_writable: bool | None = None
     is_steam_tool: bool = False
     library_available: bool = True
+    executable_path: str = ""
+    executable_resolution: str = "not_scanned"
+    executable_candidates: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.id.strip():
@@ -131,6 +134,14 @@ class Game:
             raise ValueError("is_steam_tool must be a boolean")
         if not isinstance(self.library_available, bool):
             raise ValueError("library_available must be a boolean")
+        if not isinstance(self.executable_path, str):
+            raise ValueError("executable_path must be a string")
+        if not isinstance(self.executable_resolution, str):
+            raise ValueError("executable_resolution must be a string")
+        if not isinstance(self.executable_candidates, tuple) or not all(
+            isinstance(value, str) for value in self.executable_candidates
+        ):
+            raise ValueError("executable_candidates must be a tuple of strings")
 
     @property
     def size_label(self) -> str:
@@ -139,6 +150,14 @@ class Game:
     @property
     def saved_space_label(self) -> str:
         return f"{self.saved_space_gb:.1f} GB"
+
+    @property
+    def source(self) -> str:
+        if self.launcher is Launcher.STEAM:
+            return "steam"
+        if self.data_source.casefold() == "local":
+            return "local"
+        return self.data_source.casefold() or "manual"
 
     def to_dict(self) -> dict[str, Any]:
         """Return primitives suitable for QVariant/JSON conversion."""
@@ -182,6 +201,7 @@ class Game:
                 str(self.library_path) if self.library_path is not None else None
             ),
             "data_source": self.data_source,
+            "source": self.source,
             "last_scanned_at": self.last_scanned_at.isoformat(),
             "last_updated_at": (
                 self.last_updated_at.isoformat()
@@ -211,6 +231,9 @@ class Game:
             "is_writable": self.is_writable,
             "is_steam_tool": self.is_steam_tool,
             "library_available": self.library_available,
+            "executable_path": self.executable_path,
+            "executable_resolution": self.executable_resolution,
+            "executable_candidates": list(self.executable_candidates),
         }
 
 

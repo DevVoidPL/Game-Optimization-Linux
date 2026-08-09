@@ -11,6 +11,7 @@ from ..models import (
     AutomaticCompressionMode,
     FilesystemType,
     Game,
+    Launcher,
     Task,
     TaskStatus,
     TaskType,
@@ -422,7 +423,12 @@ class UpdatesController:
             return
         scheduled = False
         for game in tuple(self._app._domain_games.values()):
-            if game.is_steam_tool or game.id in self._app._update_jobs:
+            if (
+                game.launcher is not Launcher.STEAM
+                or not game.steam_app_id
+                or game.is_steam_tool
+                or game.id in self._app._update_jobs
+            ):
                 continue
             cancel_event = Event()
             try:
@@ -602,14 +608,28 @@ class UpdatesController:
 
     def _start_automatic_compression(self, record: GameUpdateRecord) -> bool:
         game = self._app._domain_games.get(record.game_id)
-        if game is None or not self._app._automatic_mode_allows(record):
+        if (
+            game is None
+            or not self._app._automatic_mode_allows(record)
+            or not self._app._game_actions_allowed(game)
+            or game.update_in_progress
+            or game.filesystem is not FilesystemType.BTRFS
+        ):
             self._app._pending_automatic_games.discard(record.game_id)
             return False
         report = self._app._analysis_reports.get(game.id)
+        if (
+            not isinstance(report, Mapping)
+            or report.get("scan_complete") is not True
+            or report.get("is_btrfs") is not True
+            or report.get("writable") is not True
+            or report.get("game_running") is True
+        ):
+            self._app._pending_automatic_games.discard(game.id)
+            return False
         btrfs_du = (
             report.get("btrfs_du", {})
-            if isinstance(report, Mapping)
-            else {}
+            if isinstance(report, Mapping) else {}
         )
         if (
             not isinstance(btrfs_du, Mapping)

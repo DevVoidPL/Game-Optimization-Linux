@@ -48,6 +48,7 @@ from ..models import (
     Game,
     GameOptimizationProfile,
     GameStatus,
+    Launcher,
     MangoHudProfile,
     OptiScalerProfile,
     OptimizationOptions,
@@ -576,7 +577,10 @@ class AppController(QObject):
             if not self._game_is_in_ignored_library(game)
         ]
         self._domain_games: dict[str, Game] = {game.id: game for game in domain_games}
-        self._steam_found = bool(domain_games) and not self._demo_mode
+        self._steam_found = bool(
+            not self._demo_mode
+            and any(game.launcher is Launcher.STEAM for game in domain_games)
+        )
         self._is_scanning = False
         self._library_scan_status = (
             "demo"
@@ -935,6 +939,14 @@ class AppController(QObject):
     def restoreIgnoredLibrary(self, library_path: str) -> bool:
         return self._library_controller.restoreIgnoredLibrary(library_path)
 
+    @Slot(str, result="QVariantMap")
+    def localExecutableInfo(self, game_id: str) -> dict[str, Any]:
+        return self._library_controller.localExecutableInfo(game_id)
+
+    @Slot(str, str, result=bool)
+    def selectLocalExecutable(self, game_id: str, executable: str) -> bool:
+        return self._library_controller.selectLocalExecutable(game_id, executable)
+
     @Slot(result=bool)
     def addManualGame(self) -> bool:
         return self._library_controller.addManualGame()
@@ -1195,6 +1207,17 @@ class AppController(QObject):
             logger.info("Demo launch requested for %s; no process was started", game.id)
             self._emit_toast(f"Demo launch requested for {game.name}", "info")
             return True
+        if game.launcher is Launcher.MANUAL and game.data_source.casefold() == "local":
+            try:
+                command = self._runner_integration.launch_local(game)
+            except Exception as error:
+                logger.warning("Could not launch local game %s: %s", game.id, error)
+                self._emit_toast(str(error), "error")
+                return False
+            logger.info("Started local game %s through Game Optimization Runner", game.id)
+            self._emit_toast(f"Starting {game.name}", "success")
+            self.windowActionRequested.emit("stay")
+            return bool(command)
         try:
             activation = None
             profile = self._mangohud_profile_for_game(game)

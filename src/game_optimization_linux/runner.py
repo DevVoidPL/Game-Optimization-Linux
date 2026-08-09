@@ -12,7 +12,7 @@ import shutil
 import sys
 
 from .config import STATE_DIR
-from .models import validate_app_id
+from .models import validate_game_key
 from .services.optimization_profiles import GameOptimizationProfileRepository
 from .services.optimization_runtime import OptimizationLaunchPlanner, RuntimeToolDetector
 from .services.mangohud import MangoHudProfileRepository
@@ -46,7 +46,7 @@ def _arguments(argv: Sequence[str]) -> tuple[str, bool, list[str]]:
     parser.add_argument("--appid", required=True)
     parser.add_argument("--plan-only", action="store_true")
     namespace = parser.parse_args(values[:separator])
-    return validate_app_id(namespace.appid), bool(namespace.plan_only), values[separator + 1:]
+    return validate_game_key(namespace.appid), bool(namespace.plan_only), values[separator + 1:]
 
 
 def main(

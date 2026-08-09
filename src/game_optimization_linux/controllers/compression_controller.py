@@ -6,6 +6,8 @@ import logging
 import os
 from typing import TYPE_CHECKING, Any, cast
 
+from PySide6.QtCore import QCoreApplication
+
 from ..models import (
     CompressionProfile,
     FilesystemType,
@@ -563,6 +565,13 @@ class CompressionController:
             if task.task_type is TaskType.VERIFICATION:
                 self._app.toastDismissRequested.emit(_MEASUREMENT_AUTH_TOAST)
             if status == TaskStatus.COMPLETED.value:
+                automatic_completion = bool(
+                    task.metadata.get("automatic") is True
+                    or (
+                        task.task_type is TaskType.ANALYSIS
+                        and task.game_id in self._app._pending_automatic_games
+                    )
+                )
                 self._app._remember_analysis_report(task)
                 if task.task_type is TaskType.COMPRESSION:
                     self._app._reload_games()
@@ -580,7 +589,13 @@ class CompressionController:
                     record = tracker.get(task.game_id) if tracker is not None else None
                     if record is None or not self._app._start_automatic_compression(record):
                         self._app._pending_automatic_games.discard(task.game_id)
-                self._app._emit_toast(f"{presented['name']} completed", "success")
+                if (
+                    not automatic_completion
+                    or self._app._settings_model.automatic_compression_notify
+                ):
+                    self._app._emit_toast(
+                        f"{presented['name']} completed", "success"
+                    )
             elif status == TaskStatus.FAILED.value:
                 self._app._pending_automatic_games.discard(task.game_id)
                 logger.error(

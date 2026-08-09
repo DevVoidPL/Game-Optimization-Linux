@@ -71,7 +71,9 @@ def _measurement_payload(game: Game) -> dict[str, object]:
     }
 
 
-def test_sandbox_diagnostics_uses_fixed_path_probes_without_host_python() -> None:
+def test_sandbox_diagnostics_uses_fixed_path_probes_without_host_python(
+    tmp_path: Path,
+) -> None:
     calls: list[tuple[list[str], dict[str, object]]] = []
 
     def runner(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
@@ -95,7 +97,10 @@ def test_sandbox_diagnostics_uses_fixed_path_probes_without_host_python() -> Non
 
     client = HostServiceClient(
         flatpak_spawn="flatpak-spawn",
-        environment={"FLATPAK_ID": "io.github.DevVoidPL.GameOptimizationLinux"},
+        environment={
+            "FLATPAK_ID": "io.github.DevVoidPL.GameOptimizationLinux",
+            "HOME": str(tmp_path),
+        },
         command_runner=runner,
         which=lambda _name: None,
     )
@@ -107,7 +112,38 @@ def test_sandbox_diagnostics_uses_fixed_path_probes_without_host_python() -> Non
     assert calls
     assert all(call[0][:2] == ["flatpak-spawn", "--host"] for call in calls)
     assert all("python" not in " ".join(call[0]).casefold() for call in calls)
+    assert all(call[0][2] != "steam" for call in calls)
+    assert all("d3ddriverquery" not in " ".join(call[0]).casefold() for call in calls)
     assert all(call[1]["shell"] is False for call in calls)
+
+
+def test_steam_detection_never_starts_steam_or_a_proton_probe(tmp_path: Path) -> None:
+    steam_root = tmp_path / ".local" / "share" / "Steam"
+    steam_root.mkdir(parents=True)
+    (steam_root / "steam.sh").write_text("#!/bin/sh\n", encoding="utf-8")
+    calls: list[list[str]] = []
+
+    def runner(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 1, "", "not installed")
+
+    client = HostServiceClient(
+        flatpak_spawn="flatpak-spawn",
+        environment={"FLATPAK_ID": "app", "HOME": str(tmp_path)},
+        command_runner=runner,
+        which=lambda _name: None,
+    )
+
+    result = client.tool_info("steam")
+
+    assert result["native_available"] is True
+    assert result["executable"] == "steam"
+    assert calls == [
+        [
+            "flatpak-spawn", "--host", "flatpak", "info", "--show-version",
+            "com.valvesoftware.Steam",
+        ]
+    ]
 
 
 def test_each_missing_or_broken_host_tool_has_an_independent_result() -> None:

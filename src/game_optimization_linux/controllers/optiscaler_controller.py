@@ -9,10 +9,11 @@ from threading import Event
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 
 from ..models import Game, OptiScalerProfile
-from ..services import OptiScalerCancelled
+from ..services import OptiScalerCancelled, OptiScalerError
 from ..services.optiscaler_online import (
     CachedOptiScalerArchive,
     OptiScalerOnlineError,
@@ -40,7 +41,7 @@ class OptiScalerController:
                 self._app._cached_optiscaler_archive(release)
                 if release is not None else None
             )
-            app_id = str(game.steam_app_id or "")
+            app_id = self._app._optiscaler_service.game_key(game)
             installed_version = str(result.get("installedVersion", "")).strip()
             available_version = release.version if release is not None else ""
             installation_state = str(
@@ -129,9 +130,12 @@ class OptiScalerController:
         """Fetch and validate the official release without blocking the GUI."""
 
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or not game.steam_app_id:
+        if game is None:
             return False
-        app_id = str(game.steam_app_id)
+        try:
+            app_id = self._app._optiscaler_service.game_key(game)
+        except OptiScalerError:
+            return False
 
         def operation(
             cancelled: Event, progress: Callable[[str, float], None]

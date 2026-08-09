@@ -5218,200 +5218,220 @@ Only continue after reviewing this risk.</translation>
 <context>
     <name>OverviewTab</name>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="72"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="74"/>
         <source>Logical size</source>
         <translation>Logical size</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="80"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="82"/>
         <source>Physical size</source>
         <translation>Physical size</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="88"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="90"/>
         <source>Space saved</source>
         <translation>Space saved</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="96"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="98"/>
         <source>Optimization profile</source>
         <translation>Optimization profile</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="98"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="100"/>
         <source>Not configured</source>
         <translation>Not configured</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="119"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="121"/>
         <source>Game information</source>
         <translation>Game information</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="127"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="129"/>
         <source>Launcher</source>
         <translation>Launcher</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="128"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="130"/>
         <source>Manual</source>
         <translation>Manual</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="135"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="137"/>
         <source>Installation path</source>
         <translation>Installation path</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="146"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="148"/>
         <source>Filesystem</source>
         <translation>Filesystem</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="147"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="149"/>
         <source>Unknown</source>
         <translation>Unknown</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="152"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="154"/>
         <source>Game status</source>
         <translation>Game status</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="153"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="155"/>
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="168"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="170"/>
         <source>Recent state</source>
         <translation>Recent state</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="178"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="180"/>
         <source>Last operation</source>
         <translation>Last operation</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="183"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="185"/>
         <source>Not run</source>
         <translation>Not run</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="194"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="196"/>
         <source>Backup status</source>
         <translation>Backup status</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="199"/>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="261"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="201"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="314"/>
         <source>Not checked</source>
         <translation>Not checked</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="210"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="212"/>
         <source>Last compression</source>
         <translation>Last compression</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="215"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="217"/>
         <source>Never</source>
         <translation>Never</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="239"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="236"/>
+        <source>Local game executable</source>
+        <translation>Local game executable</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="245"/>
+        <source>Choose the main executable. The choice is saved for this game.</source>
+        <translation>Choose the main executable. The choice is saved for this game.</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="246"/>
+        <source>Detected executable used to identify this local game.</source>
+        <translation>Detected executable used to identify this local game.</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="265"/>
+        <source>Use executable</source>
+        <translation>Use executable</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="292"/>
         <source>Feature compatibility</source>
         <translation>Feature compatibility</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="245"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="298"/>
         <source>Capabilities are reported independently for this game</source>
         <translation>Capabilities are reported independently for this game</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="260"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="313"/>
         <source>Btrfs compression</source>
         <translation>Btrfs compression</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="260"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="313"/>
         <source>Available</source>
         <translation>Available</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="260"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="313"/>
         <source>Unsupported</source>
         <translation>Unsupported</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="261"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="314"/>
         <source>Graphics remaster</source>
         <translation>Graphics remaster</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="262"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="315"/>
         <source>Optimization</source>
         <translation>Optimization</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="262"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="315"/>
         <source>Optional</source>
         <translation>Optional</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="326"/>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="344"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="379"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="397"/>
         <source>Analyze Game</source>
         <translation>Analyze Game</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="334"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="387"/>
         <source>Run a safe simulated scan and generate recommendations.</source>
         <translation>Run a safe simulated scan and generate recommendations.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="335"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="388"/>
         <source>Per-game analysis is planned for a later stage.</source>
         <translation>Per-game analysis is planned for a later stage.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="343"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="396"/>
         <source>Coming soon</source>
         <translation>Coming soon</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="344"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="397"/>
         <source>In progress</source>
         <translation>In progress</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="371"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="424"/>
         <source>Simulation status: %1</source>
         <translation>Simulation status: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="392"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="445"/>
         <source>Latest analysis report</source>
         <translation>Latest analysis report</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="397"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="450"/>
         <source>Completed</source>
         <translation>Completed</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="413"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="466"/>
         <source>Scanned</source>
         <translation>Scanned</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="414"/>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="419"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="467"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="472"/>
         <source>%1 GB</source>
         <translation>%1 GB</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="418"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="471"/>
         <source>Estimated saving</source>
         <translation>Estimated saving</translation>
     </message>
@@ -6142,42 +6162,52 @@ Only continue after reviewing this risk.</translation>
         <translation>Game library directories</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1011"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="981"/>
+        <source>Only immediate child folders are checked for local games. Home and filesystem roots are rejected.</source>
+        <translation>Only immediate child folders are checked for local games. Home and filesystem roots are rejected.</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="1019"/>
         <source>Remove library directory</source>
         <translation>Remove library directory</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1032"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1040"/>
         <source>/path/to/games</source>
         <translation>/path/to/games</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1039"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1047"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1065"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1061"/>
+        <source>Rescan</source>
+        <translation>Rescan</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="1083"/>
         <source>Experimental</source>
         <translation>Experimental</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1073"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1091"/>
         <source>Experimental features</source>
         <translation>Experimental features</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1074"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1092"/>
         <source>Show unfinished capabilities. They remain simulation-only in this build.</source>
         <translation>Show unfinished capabilities. They remain simulation-only in this build.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1093"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1111"/>
         <source>Demo safety: no sudo, deletion, Btrfs property changes, governor changes, downloads, or launcher-file edits are performed.</source>
         <translation>Demo safety: no sudo, deletion, Btrfs property changes, governor changes, downloads, or launcher-file edits are performed.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1094"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1112"/>
         <source>Safety: no sudo, deletion, global mount changes, downloads, or launcher-file edits are performed. Btrfs writes require a confirmed plan or explicit automatic opt-in.</source>
         <translation>Safety: no sudo, deletion, global mount changes, downloads, or launcher-file edits are performed. Btrfs writes require a confirmed plan or explicit automatic opt-in.</translation>
     </message>

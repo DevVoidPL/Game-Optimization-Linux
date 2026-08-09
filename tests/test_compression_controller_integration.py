@@ -1,9 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Event
+import time
 from typing import Any, Sequence
 
 import pytest
@@ -814,6 +815,73 @@ def test_automatic_compression_defaults_to_off(tmp_path: Path) -> None:
         harness.controller.shutdown()
 
 
+def test_automatic_compression_does_not_duplicate_or_run_during_steam_write(
+    tmp_path: Path,
+) -> None:
+    settings = AppSettings(
+        automatic_compression_mode=AutomaticCompressionMode.AFTER_UPDATE,
+        automatic_compression_notify=False,
+    )
+    harness = _harness(
+        tmp_path,
+        settings=settings,
+        records=(),
+    )
+    assert harness.tracker is None
+    tracker = _UpdateTracker(
+        (_record(harness.game, GameUpdateStatus.ANALYSIS_REQUIRED),)
+    )
+    harness.controller._update_tracker = tracker
+    try:
+        busy = replace(harness.game, update_in_progress=True)
+        harness.controller._domain_games[busy.id] = busy
+        harness.controller._queue_eligible_automatic_compression()
+        assert harness.tasks.analysis_calls == []
+
+        harness.controller._domain_games[harness.game.id] = harness.game
+        harness.controller._queue_eligible_automatic_compression()
+        harness.controller._queue_eligible_automatic_compression()
+        assert harness.tasks.analysis_calls == [harness.game.id]
+        assert harness.tasks.compression_calls == []
+    finally:
+        harness.controller.shutdown()
+
+
+@pytest.mark.parametrize("blocked_state", ("running", "ext4"))
+def test_automatic_compression_blocks_running_game_and_non_btrfs(
+    tmp_path: Path,
+    blocked_state: str,
+) -> None:
+    settings = AppSettings(
+        automatic_compression_mode=AutomaticCompressionMode.AFTER_UPDATE,
+        automatic_compression_notify=False,
+    )
+    harness = _harness(tmp_path, settings=settings)
+    tracker = _UpdateTracker(
+        (_record(harness.game, GameUpdateStatus.ANALYSIS_REQUIRED),)
+    )
+    harness.controller._update_tracker = tracker
+    report = _analysis_report(harness.game)
+    if blocked_state == "running":
+        report["game_running"] = True
+        harness.controller._analysis_reports[harness.game.id] = report
+        harness.controller._pending_automatic_games.add(harness.game.id)
+        harness.controller._start_automatic_compression(tracker.get(harness.game.id))
+    else:
+        harness.controller._domain_games[harness.game.id] = replace(
+            harness.game,
+            filesystem=FilesystemType.EXT4,
+            filesystem_name="ext4",
+            compression_available=False,
+        )
+        harness.controller._queue_eligible_automatic_compression()
+    try:
+        assert harness.tasks.analysis_calls == []
+        assert harness.tasks.compression_calls == []
+    finally:
+        harness.controller.shutdown()
+
+
 def test_automatic_settings_round_trip_including_empty_filters(
     tmp_path: Path,
 ) -> None:
@@ -907,6 +975,45 @@ def test_automatic_queue_stages_safety_analysis_for_update_or_install(
         assert tasks.analysis_calls == [game.id]
         assert tasks.compression_calls == []
         assert game.id in controller._pending_automatic_games
+    finally:
+        controller.shutdown()
+
+
+def test_completed_update_observation_event_enqueues_automatic_analysis(
+    tmp_path: Path,
+) -> None:
+    game = _game(tmp_path)
+    tracker = _UpdateTracker(
+        (_record(game, GameUpdateStatus.ANALYSIS_REQUIRED),)
+    )
+    tasks = _TaskService()
+    controller = AppController(
+        game_provider=_GameProvider((game,)),
+        task_service=tasks,
+        settings_store=SettingsStore(
+            tmp_path / "settings.json",
+            default_factory=lambda: AppSettings(
+                automatic_compression_mode=AutomaticCompressionMode.AFTER_UPDATE,
+                automatic_compression_notify=False,
+            ),
+        ),
+        system_provider=_SystemProvider(),
+        filesystem_provider=_FilesystemProvider(),
+        compression_service=_CompressionService(),  # type: ignore[arg-type]
+        update_tracker=tracker,  # type: ignore[arg-type]
+        initial_games=(game,),
+        demo_mode=False,
+        auto_refresh=False,
+    )
+    try:
+        controller._schedule_update_observations()
+        deadline = time.monotonic() + 2.0
+        while controller._update_jobs and time.monotonic() < deadline:
+            if all(future.done() for future, _event in controller._update_jobs.values()):
+                break
+            time.sleep(0.01)
+        controller._poll_update_jobs()
+        assert tasks.analysis_calls == [game.id]
     finally:
         controller.shutdown()
 

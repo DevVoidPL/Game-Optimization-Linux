@@ -166,6 +166,11 @@ class LibraryCache:
             isinstance(option, str) for option in mount_options
         ):
             mount_options = []
+        executable_candidates = raw.get("executable_candidates", [])
+        if not isinstance(executable_candidates, list) or not all(
+            isinstance(value, str) for value in executable_candidates
+        ):
+            executable_candidates = []
         size_scan_status = _enum_value(
             SizeScanStatus,
             raw.get("size_scan_status"),
@@ -278,6 +283,11 @@ class LibraryCache:
                 raw.get("is_steam_tool", is_steam_tool_name(str(raw.get("name", ""))))
             ),
             library_available=bool(raw.get("library_available", True)),
+            executable_path=str(raw.get("executable_path") or ""),
+            executable_resolution=str(
+                raw.get("executable_resolution") or "not_scanned"
+            ),
+            executable_candidates=tuple(executable_candidates),
         )
 
 

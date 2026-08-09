@@ -1415,6 +1415,22 @@ def test_history_recovers_interrupted_operation_as_verification_required(
     )
 
 
+def test_history_records_automatic_compression(tmp_path: Path) -> None:
+    game = _steam_game(tmp_path)
+    plan = _plan(game)
+    store = CompressionHistoryStore(tmp_path / "compression-history.json")
+
+    store.begin_operation(plan, automatic=True)
+    entry = store.finish_operation(
+        game.name,
+        str(game.install_path),
+        _result(game, plan),
+    )
+
+    assert entry["automatic"] is True
+    assert store.history(game.id)[0]["automatic"] is True
+
+
 def test_task_service_shutdown_cancels_and_joins_compression_worker(
     tmp_path: Path,
 ) -> None:

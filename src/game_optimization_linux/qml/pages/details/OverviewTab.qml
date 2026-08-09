@@ -12,6 +12,8 @@ Item {
     property var tasksData: []
     readonly property string gameId: String(value(["id"], ""))
     readonly property bool demoMode: Boolean(controller && controller.demoMode)
+    readonly property bool localGame: Boolean(value(["localGame"], false))
+    readonly property var executableCandidates: value(["executableCandidates"], []) || []
     signal toastRequested(string message, string tone)
 
     function value(keys, fallback) {
@@ -216,6 +218,57 @@ Item {
                                 color: App.Theme.text
                                 font.pixelSize: App.Theme.fontCaption
                                 font.weight: Font.DemiBold
+                            }
+                        }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                visible: tab.localGame
+                Layout.fillWidth: true
+                padding: 18
+
+                contentItem: ColumnLayout {
+                    spacing: 10
+
+                    Label {
+                        text: qsTr("Local game executable")
+                        color: App.Theme.text
+                        font.pixelSize: 17
+                        font.weight: Font.Bold
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: String(tab.value(["executableResolution"], "")) === "ambiguous"
+                              ? qsTr("Choose the main executable. The choice is saved for this game.")
+                              : qsTr("Detected executable used to identify this local game.")
+                        color: App.Theme.textSecondary
+                        font.pixelSize: App.Theme.fontCaption
+                        wrapMode: Text.WordWrap
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        AppComboBox {
+                            id: localExecutableCombo
+                            Layout.fillWidth: true
+                            model: tab.executableCandidates
+                            currentIndex: Math.max(0, tab.executableCandidates.indexOf(
+                                String(tab.value(["executablePath"], ""))))
+                        }
+
+                        AppButton {
+                            text: qsTr("Use executable")
+                            enabled: tab.executableCandidates.length > 0
+                            onClicked: {
+                                if (tab.controller && tab.controller.selectLocalExecutable)
+                                    tab.controller.selectLocalExecutable(
+                                        tab.gameId,
+                                        String(tab.executableCandidates[localExecutableCombo.currentIndex] || ""))
                             }
                         }
                     }

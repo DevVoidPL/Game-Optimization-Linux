@@ -17,13 +17,34 @@ from game_optimization_linux.models import (
     Launcher,
     SizeScanStatus,
 )
-from game_optimization_linux.providers import SteamGameProvider
+from game_optimization_linux.providers import DemoSystemProvider, SteamGameProvider
+from game_optimization_linux.providers.linux_filesystem import LinuxFilesystemProvider
+from game_optimization_linux.providers.local import ConfiguredGameProvider
 from game_optimization_linux.services import MockTaskService, SettingsStore
 from game_optimization_linux.services.directory_size import DirectorySizeResult, DirectorySizeScanner
 from game_optimization_linux.services.library_cache import LibraryCache
 
 
 _QT_APPLICATION = QCoreApplication.instance() or QCoreApplication([])
+
+
+def test_normal_startup_constructs_configured_library_provider(tmp_path: Path) -> None:
+    controller = AppController(
+        task_service=MockTaskService(),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        system_provider=DemoSystemProvider(),
+        library_cache=LibraryCache(tmp_path / "library.json"),
+        initial_games=(),
+        demo_mode=False,
+        auto_refresh=False,
+    )
+    try:
+        assert isinstance(controller._game_provider, ConfiguredGameProvider)
+        assert isinstance(controller._filesystem_provider, LinuxFilesystemProvider)
+        assert isinstance(controller._directory_size_scanner, DirectorySizeScanner)
+        assert controller.demoMode is False
+    finally:
+        controller.shutdown()
 
 
 def _wait_until(predicate: object, timeout: float = 2.0) -> None:

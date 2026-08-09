@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Mapping
 
-from .mangohud import validate_app_id
+from .mangohud import validate_game_key
 
 
 OPTIMIZATION_SCHEMA_VERSION = 1
@@ -79,7 +79,7 @@ class GameOptimizationProfile:
     def __post_init__(self) -> None:
         if self.schema_version != OPTIMIZATION_SCHEMA_VERSION:
             raise ValueError("unsupported optimization profile schema")
-        object.__setattr__(self, "app_id", validate_app_id(self.app_id))
+        object.__setattr__(self, "app_id", validate_game_key(self.app_id))
         object.__setattr__(self, "preset", _choice(self.preset, OPTIMIZATION_PRESETS, "preset"))
         object.__setattr__(self, "game_category", _choice(self.game_category, GAME_CATEGORIES, "game_category"))
         object.__setattr__(self, "user_goal", _choice(self.user_goal, USER_GOALS, "user_goal"))
@@ -108,7 +108,7 @@ class GameOptimizationProfile:
 
     @classmethod
     def default(cls, app_id: object) -> "GameOptimizationProfile":
-        return cls(schema_version=OPTIMIZATION_SCHEMA_VERSION, app_id=validate_app_id(app_id))
+        return cls(schema_version=OPTIMIZATION_SCHEMA_VERSION, app_id=validate_game_key(app_id))
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -133,8 +133,8 @@ class GameOptimizationProfile:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any], *, expected_app_id: object | None = None) -> "GameOptimizationProfile":
-        app_id = validate_app_id(data.get("app_id", expected_app_id))
-        if expected_app_id is not None and app_id != validate_app_id(expected_app_id):
+        app_id = validate_game_key(data.get("app_id", expected_app_id))
+        if expected_app_id is not None and app_id != validate_game_key(expected_app_id):
             raise ValueError("optimization profile AppID does not match its directory")
         migrated = dict(data)
         schema = int(migrated.get("schema_version", 0))

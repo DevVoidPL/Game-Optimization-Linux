@@ -243,6 +243,7 @@ class BtrfsAnalysisTaskService:
                     "profile": plan.profile.value,
                     "full_compression": plan.full_compression,
                     "after_update": plan.after_update,
+                    "automatic": bool(automatic_authorized),
                     "confirmation_recorded": bool(
                         confirmed or automatic_authorized
                     ),

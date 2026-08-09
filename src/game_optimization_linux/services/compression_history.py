@@ -36,7 +36,7 @@ class CompressionHistoryStore:
     def path(self) -> Path:
         return self._path
 
-    def begin_operation(self, plan: CompressionPlan) -> None:
+    def begin_operation(self, plan: CompressionPlan, *, automatic: bool = False) -> None:
         """Durably mark a task before the first mutating command is invoked."""
 
         with self._lock:
@@ -48,6 +48,7 @@ class CompressionHistoryStore:
                 "plan": plan.to_dict(include_files=False),
                 "started_at": datetime.now(UTC).isoformat(),
                 "state": "running",
+                "automatic": bool(automatic),
             }
             self._write_locked()
 
@@ -59,12 +60,20 @@ class CompressionHistoryStore:
     ) -> dict[str, Any]:
         """Append the verified real outcome and clear its crash marker."""
 
+        automatic = False
+        with self._lock:
+            pending = self._payload.setdefault("pending", {})
+            if isinstance(pending, dict):
+                pending_entry = pending.get(result.plan_id)
+                if isinstance(pending_entry, Mapping):
+                    automatic = pending_entry.get("automatic") is True
         entry = {
             "id": f"history-{uuid4().hex}",
             "game_id": result.game_id,
             "game_name": game_name,
             "game_path": game_path,
             **result.to_dict(),
+            "automatic": automatic,
         }
         with self._lock:
             pending = self._payload.setdefault("pending", {})
@@ -128,6 +137,7 @@ class CompressionHistoryStore:
                         plan_map.get("full_compression", True)
                     ),
                     "after_update": bool(plan_map.get("after_update", False)),
+                    "automatic": pending_map.get("automatic") is True,
                     "build_id": plan_map.get("build_id"),
                     "command_exit_codes": [],
                     "warnings": [

@@ -64,6 +64,7 @@ DATA_DIR = DATA_HOME / _APP_DIRECTORY_NAME
 SETTINGS_FILE = CONFIG_DIR / "settings.json"
 GAMEPAD_MAPPINGS_FILE = CONFIG_DIR / "gamecontrollerdb.txt"
 LIBRARY_CACHE_FILE = CACHE_DIR / "library-v1.json"
+LOCAL_EXECUTABLE_CHOICES_FILE = CONFIG_DIR / "local-executables-v1.json"
 ANALYSIS_CACHE_FILE = CACHE_DIR / "compression-analysis-v1.json"
 COMPRESSION_HISTORY_FILE = STATE_DIR / "compression-history-v2.json"
 TASK_HISTORY_FILE = STATE_DIR / "task-history-v1.json"
@@ -98,6 +99,7 @@ __all__ = [
     "MANGOHUD_LOG_DIR",
     "OPTISCALER_DATA_DIR",
     "LIBRARY_CACHE_FILE",
+    "LOCAL_EXECUTABLE_CHOICES_FILE",
     "MAIN_QML",
     "ORGANIZATION_DOMAIN",
     "ORGANIZATION_NAME",

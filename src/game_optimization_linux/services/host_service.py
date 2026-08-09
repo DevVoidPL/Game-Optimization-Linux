@@ -85,7 +85,6 @@ _TOOL_SPECS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
     "lutris": (("lutris",), ("net.lutris.Lutris",)),
 }
 _VERSION_ARGUMENTS: dict[str, tuple[str, ...]] = {
-    "steam": ("--version",),
     "flatpak": ("--version",),
     "gamescope": ("--version",),
     # Execute only the fixed no-op program; gamemoderun has no version flag of
@@ -215,6 +214,11 @@ class HostServiceClient:
         if not refresh and normalized in self._tool_cache:
             return dict(self._tool_cache[normalized])
 
+        if normalized == "steam":
+            payload = self._steam_info()
+            self._tool_cache[normalized] = dict(payload)
+            return payload
+
         commands, flatpak_ids = _TOOL_SPECS[normalized]
         selected = ""
         result: subprocess.CompletedProcess[str] | None = None
@@ -311,18 +315,7 @@ class HostServiceClient:
             "runtime_available": runtime_available,
             "supported_options": list(supported_options),
         }
-        if normalized == "steam":
-            payload.update(
-                {
-                    "native_available": bool(selected),
-                    "flatpak_available": bool(flatpak_id),
-                    "steam_type": (
-                        "native" if selected else "flatpak" if flatpak_id else "unavailable"
-                    ),
-                    "host_launch_available": available,
-                }
-            )
-        elif normalized == "mangohud":
+        if normalized == "mangohud":
             payload.update(
                 {
                     "layer_available": bool(selected),
@@ -331,6 +324,55 @@ class HostServiceClient:
             )
         self._tool_cache[normalized] = dict(payload)
         return payload
+
+    def _steam_info(self) -> dict[str, Any]:
+        """Detect Steam without starting the client or any compatibility probe."""
+
+        home = Path(str(self._environment.get("HOME") or Path.home())).expanduser()
+        native_markers = (
+            home / ".local/share/Steam/steam.sh",
+            home / ".local/share/Steam/ubuntu12_32/steam",
+            home / ".steam/root/steam.sh",
+            home / ".steam/steam/steam.sh",
+            home / ".local/share/applications/steam.desktop",
+        )
+        native_available = any(path.exists() for path in native_markers)
+        if not self.in_flatpak and self._which("steam"):
+            native_available = True
+
+        flatpak_id = ""
+        flatpak_version = ""
+        candidate = self._run_fixed(
+            "flatpak", ("info", "--show-version", "com.valvesoftware.Steam"),
+            timeout=8.0,
+        )
+        if candidate is not None and candidate.returncode == 0:
+            flatpak_id = "com.valvesoftware.Steam"
+            flatpak_version = self._one_line(candidate.stdout)
+
+        available = bool(native_available or flatpak_id)
+        steam_type = (
+            "native" if native_available else "flatpak" if flatpak_id else "unavailable"
+        )
+        return {
+            "available": available,
+            "status": "available" if available else "unavailable",
+            "executable": "steam" if native_available else "",
+            "resolved_via_path": bool(native_available and not self.in_flatpak),
+            "version": flatpak_version,
+            "source": "host" if native_available else "flatpak" if flatpak_id else "unavailable",
+            "diagnostic_message": (
+                "Steam installation detected without starting the client"
+                if available
+                else "Steam was not detected in user data or as a Flatpak"
+            ),
+            "runtime_available": available,
+            "supported_options": [],
+            "native_available": native_available,
+            "flatpak_available": bool(flatpak_id),
+            "steam_type": steam_type,
+            "host_launch_available": available,
+        }
 
     def analysis(self, game: Game) -> dict[str, Any]:
         payload = self._compression_measure(game)
