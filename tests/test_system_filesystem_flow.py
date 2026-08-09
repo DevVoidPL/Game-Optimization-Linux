@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 from game_optimization_linux.controllers import AppController
-from game_optimization_linux.models import FilesystemInfo, FilesystemType, SessionType, SystemInfo
+from game_optimization_linux.models import AppSettings, FilesystemInfo, FilesystemType, SessionType, SystemInfo
 from game_optimization_linux.services import SettingsStore
 
 
@@ -79,7 +79,10 @@ def test_controller_merges_real_filesystems_and_toggles_system_mounts(
         game_provider=_EmptyGameProvider(),  # type: ignore[arg-type]
         filesystem_provider=filesystems,
         system_provider=_SystemProvider(),  # type: ignore[arg-type]
-        settings_store=SettingsStore(tmp_path / "settings.json"),
+        settings_store=SettingsStore(
+            tmp_path / "settings.json",
+            default_factory=lambda: AppSettings(library_directories=(Path("/games"),)),
+        ),
         demo_mode=False,
         auto_refresh=False,
     )

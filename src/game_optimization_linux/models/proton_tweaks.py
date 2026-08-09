@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any, Mapping
 
-from .mangohud import validate_app_id
+from .mangohud import validate_game_key
 
 
 PROTON_TWEAKS_SCHEMA_VERSION = 1
@@ -114,7 +114,7 @@ class ProtonTweaksProfile:
     def __post_init__(self) -> None:
         if self.schema_version != PROTON_TWEAKS_SCHEMA_VERSION:
             raise ValueError("unsupported Proton Tweaks profile schema")
-        object.__setattr__(self, "app_id", validate_app_id(self.app_id))
+        object.__setattr__(self, "app_id", validate_game_key(self.app_id))
         if not isinstance(self.optiscaler_fsr4_update, bool):
             raise ValueError("optiscaler_fsr4_update must be a boolean")
         unknown = set(self.enabled_tweaks).difference(PROTON_TWEAK_BY_ID)
@@ -131,7 +131,7 @@ class ProtonTweaksProfile:
 
     @classmethod
     def default(cls, app_id: object) -> "ProtonTweaksProfile":
-        return cls(PROTON_TWEAKS_SCHEMA_VERSION, validate_app_id(app_id))
+        return cls(PROTON_TWEAKS_SCHEMA_VERSION, validate_game_key(app_id))
 
     def environment(self) -> dict[str, str]:
         enabled = set(self.enabled_tweaks)
@@ -154,8 +154,8 @@ class ProtonTweaksProfile:
     def from_dict(
         cls, data: Mapping[str, Any], *, expected_app_id: object | None = None
     ) -> "ProtonTweaksProfile":
-        app_id = validate_app_id(data.get("app_id", expected_app_id))
-        if expected_app_id is not None and app_id != validate_app_id(expected_app_id):
+        app_id = validate_game_key(data.get("app_id", expected_app_id))
+        if expected_app_id is not None and app_id != validate_game_key(expected_app_id):
             raise ValueError("Proton Tweaks profile AppID does not match its directory")
         raw_enabled = data.get("enabled_tweaks", ())
         if not isinstance(raw_enabled, (list, tuple)) or not all(

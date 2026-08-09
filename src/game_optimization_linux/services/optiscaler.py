@@ -272,6 +272,14 @@ class OptiScalerService:
         self._process_detector = process_detector
 
     @staticmethod
+    def game_key(game: Game) -> str:
+        if game.steam_app_id:
+            return str(game.steam_app_id)
+        if game.data_source.casefold() == "local" and game.id.startswith("local-"):
+            return game.id
+        raise OptiScalerError("OptiScaler requires a Steam or configured local game")
+
+    @staticmethod
     def _check_cancel(cancel_event: Event | None) -> None:
         if cancel_event is not None and cancel_event.is_set():
             raise OptiScalerCancelled("OptiScaler operation was cancelled")
@@ -387,16 +395,15 @@ class OptiScalerService:
         return resolution.selected, resolution.status
 
     def remember_executable(self, game: Game, executable: str) -> OptiScalerProfile:
-        """Persist one validated executable choice for this Steam AppID."""
+        """Persist one validated executable choice for this game."""
 
-        if not game.steam_app_id:
-            raise OptiScalerError("OptiScaler requires a Steam AppID")
+        game_key = self.game_key(game)
         selected = self.executable_resolver.validate_selected(game, executable)
         if selected is None:
             raise OptiScalerError(
                 "selected executable must be a regular game executable inside the game directory"
             )
-        current = self.profile_repository.load(game.steam_app_id)
+        current = self.profile_repository.load(game_key)
         now = datetime.now(UTC)
         updated = replace(
             current,
@@ -459,10 +466,9 @@ class OptiScalerService:
         injection_dll: str = "auto",
         allow_anticheat_risk: bool = False,
     ) -> OptiScalerInstallPlan:
-        if not game.steam_app_id:
-            raise OptiScalerError("OptiScaler requires a Steam AppID")
+        game_key = self.game_key(game)
         root = self._canonical_game_root(game)
-        profile = self.profile_repository.load(game.steam_app_id)
+        profile = self.profile_repository.load(game_key)
         selected_path = executable or profile.executable
         candidate, confidence = self._selected_candidate(
             game, self.executable_resolver, selected_path
@@ -563,7 +569,7 @@ class OptiScalerService:
                 "OptiScaler can trigger anti-cheat systems; use it only after an explicit risk confirmation"
             )
         return OptiScalerInstallPlan(
-            app_id=str(game.steam_app_id),
+            app_id=game_key,
             archive_path=str(Path(archive_path).resolve()),
             archive_format=archive_format,
             version=version,
@@ -574,7 +580,7 @@ class OptiScalerService:
             proton_override=f"{Path(proxy).stem}=n,b",
             backup_directory=str(
                 self.data_root
-                / str(game.steam_app_id)
+                / game_key
                 / "optiscaler"
                 / "backups"
             ),
@@ -1226,9 +1232,7 @@ class OptiScalerService:
             raise OptiScalerError("The game is currently running")
 
     def verify(self, game: Game) -> OptiScalerProfile:
-        if not game.steam_app_id:
-            raise OptiScalerError("OptiScaler requires a Steam AppID")
-        profile = self.profile_repository.load(game.steam_app_id)
+        profile = self.profile_repository.load(self.game_key(game))
         if not profile.manifest_id:
             return profile
         manifest = self._load_manifest(profile)
@@ -1272,9 +1276,7 @@ class OptiScalerService:
         if not isinstance(enabled, bool):
             raise OptiScalerError("Fsr4Update must be a boolean")
         self._assert_mutation_allowed(game)
-        if not game.steam_app_id:
-            raise OptiScalerError("OptiScaler requires a Steam AppID")
-        profile = self.profile_repository.load(game.steam_app_id)
+        profile = self.profile_repository.load(self.game_key(game))
         if not profile.enabled or profile.installation_state != "installed":
             return profile
         manifest = self._load_manifest(profile)
@@ -1369,10 +1371,8 @@ class OptiScalerService:
         progress: Callable[[str, float], None] | None = None,
     ) -> OptiScalerProfile:
         self._assert_mutation_allowed(game)
-        if not game.steam_app_id:
-            raise OptiScalerError("OptiScaler requires a Steam AppID")
         emit = progress or (lambda _stage, _value: None)
-        profile = self.profile_repository.load(game.steam_app_id)
+        profile = self.profile_repository.load(self.game_key(game))
         manifest = self._load_manifest(profile)
         install_root = Path(str(manifest["install_directory"])).resolve(strict=True)
         created = [item for item in manifest.get("created_files", []) if isinstance(item, Mapping)]
@@ -1411,10 +1411,8 @@ class OptiScalerService:
         progress: Callable[[str, float], None] | None = None,
     ) -> OptiScalerProfile:
         self._assert_mutation_allowed(game)
-        if not game.steam_app_id:
-            raise OptiScalerError("OptiScaler requires a Steam AppID")
         emit = progress or (lambda _stage, _value: None)
-        profile = self.profile_repository.load(game.steam_app_id)
+        profile = self.profile_repository.load(self.game_key(game))
         manifest = self._load_manifest(profile)
         install_root = Path(str(manifest["install_directory"])).resolve(strict=True)
         backup_root = self.backup_root(profile.app_id, profile.manifest_id)
@@ -1453,9 +1451,11 @@ class OptiScalerService:
         return updated
 
     def status(self, game: Game) -> dict[str, Any]:
-        if not game.steam_app_id:
-            return {"success": False, "error": "OptiScaler requires a Steam AppID"}
-        profile = self.profile_repository.load(game.steam_app_id)
+        try:
+            game_key = self.game_key(game)
+        except OptiScalerError as error:
+            return {"success": False, "error": str(error)}
+        profile = self.profile_repository.load(game_key)
         resolution = self.executable_resolver.resolve(game, profile.executable)
         selected = resolution.selected
         manifest: dict[str, Any] = {}

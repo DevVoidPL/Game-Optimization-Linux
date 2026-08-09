@@ -313,7 +313,7 @@ class BtrfsCompressionProvider:
         return CompressionPlan(
             id=f"compression-plan-{uuid4().hex}",
             game_id=game.id,
-            app_id=str(game.steam_app_id or ""),
+            app_id=str(game.steam_app_id or game.id),
             game_name=game.name,
             game_path=expected_path,
             profile=profile,
@@ -760,10 +760,15 @@ class BtrfsCompressionProvider:
         self, game: Game, blockers: list[str]
     ) -> _RootIdentity | None:
         manifest_identity: tuple[int, int] | None = None
-        if game.launcher is not Launcher.STEAM or not game.steam_app_id:
-            blockers.append("Only verified Steam installations are supported")
+        steam_game = bool(game.launcher is Launcher.STEAM and game.steam_app_id)
+        local_game = bool(
+            game.launcher is Launcher.MANUAL
+            and game.data_source.casefold() == "local"
+        )
+        if not steam_game and not local_game:
+            blockers.append("Only verified Steam or configured local games are supported")
         if not game.library_available:
-            blockers.append("The Steam library is unavailable")
+            blockers.append("The game library is unavailable")
         if game.filesystem is not FilesystemType.BTRFS and (
             game.filesystem_name.casefold() != "btrfs"
         ):
@@ -781,11 +786,12 @@ class BtrfsCompressionProvider:
             blockers.append("The game root must be a real directory, not a symlink")
             return None
         if game.library_path is None:
-            blockers.append("The Steam library path is unknown")
+            blockers.append("The game library path is unknown")
         else:
-            expected_parent = os.path.realpath(
-                os.fspath(Path(game.library_path) / "steamapps" / "common")
-            )
+            expected_parent = os.path.realpath(os.fspath(
+                Path(game.library_path) / "steamapps" / "common"
+                if steam_game else Path(game.library_path)
+            ))
             absolute_root = os.path.realpath(os.fspath(root))
             try:
                 contained = (
@@ -796,15 +802,20 @@ class BtrfsCompressionProvider:
                 contained = False
             if not contained or absolute_root == expected_parent:
                 blockers.append(
-                    "The path is not a game directory below steamapps/common"
+                    "The path is not a game directory below its configured library"
                 )
-            manifest_identity = self._validate_steam_manifest(game, blockers)
+            if local_game and os.path.dirname(absolute_root) != expected_parent:
+                blockers.append(
+                    "A local game must be an immediate child of its configured library"
+                )
+            if steam_game:
+                manifest_identity = self._validate_steam_manifest(game, blockers)
         return _RootIdentity(
             path=root,
             canonical_path=os.path.realpath(os.fspath(root)),
             device=max(0, int(info.st_dev)),
             inode=max(0, int(info.st_ino)),
-            app_id=str(game.steam_app_id or ""),
+            app_id=str(game.steam_app_id or game.id),
             build_id=str(game.steam_build_id or ""),
             manifest_device=(
                 manifest_identity[0] if manifest_identity is not None else None

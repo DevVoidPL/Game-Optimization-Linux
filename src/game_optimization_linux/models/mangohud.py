@@ -84,6 +84,7 @@ PRESET_METRICS: dict[str, tuple[str, ...]] = {
 }
 
 _APP_ID_PATTERN = re.compile(r"^[1-9][0-9]*$")
+_LOCAL_GAME_ID_PATTERN = re.compile(r"^local-[0-9a-f]{24}$")
 _KEY_PATTERN = re.compile(r"^[A-Za-z0-9_]+(?:\+[A-Za-z0-9_]+)*$")
 
 
@@ -92,6 +93,15 @@ def validate_app_id(value: object) -> str:
     if not _APP_ID_PATTERN.fullmatch(app_id):
         raise ValueError("app_id must be a positive decimal Steam AppID")
     return app_id
+
+
+def validate_game_key(value: object) -> str:
+    game_key = str(value or "").strip()
+    if _APP_ID_PATTERN.fullmatch(game_key) or _LOCAL_GAME_ID_PATTERN.fullmatch(
+        game_key
+    ):
+        return game_key
+    raise ValueError("game key must be a Steam AppID or stable local game ID")
 
 
 def _integer(value: object, name: str, minimum: int, maximum: int) -> int:
@@ -194,7 +204,7 @@ class MangoHudProfile:
     def __post_init__(self) -> None:
         if self.schema_version != MANGOHUD_SCHEMA_VERSION:
             raise ValueError("unsupported MangoHud profile schema")
-        object.__setattr__(self, "app_id", validate_app_id(self.app_id))
+        object.__setattr__(self, "app_id", validate_game_key(self.app_id))
         if self.preset not in MANGOHUD_PRESETS:
             raise ValueError("unsupported MangoHud preset")
         if self.position not in MANGOHUD_POSITIONS:
@@ -273,7 +283,7 @@ class MangoHudProfile:
     def default(cls, app_id: object, *, output_folder: Path | None = None) -> "MangoHudProfile":
         return cls(
             schema_version=MANGOHUD_SCHEMA_VERSION,
-            app_id=validate_app_id(app_id),
+            app_id=validate_game_key(app_id),
             output_folder=str(output_folder) if output_folder is not None else "",
         )
 
@@ -325,8 +335,8 @@ class MangoHudProfile:
         expected_app_id: object | None = None,
         default_output_folder: Path | None = None,
     ) -> "MangoHudProfile":
-        app_id = validate_app_id(data.get("app_id", expected_app_id))
-        if expected_app_id is not None and app_id != validate_app_id(expected_app_id):
+        app_id = validate_game_key(data.get("app_id", expected_app_id))
+        if expected_app_id is not None and app_id != validate_game_key(expected_app_id):
             raise ValueError("MangoHud profile AppID does not match its directory")
         updated_raw = str(data.get("updated_at") or "")
         try:
@@ -351,4 +361,5 @@ __all__ = [
     "MangoHudProfile",
     "PRESET_METRICS",
     "validate_app_id",
+    "validate_game_key",
 ]

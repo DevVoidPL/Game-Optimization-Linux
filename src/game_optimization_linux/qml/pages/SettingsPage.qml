@@ -976,6 +976,14 @@ Item {
                         font.weight: Font.DemiBold
                     }
 
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Only immediate child folders are checked for local games. Home and filesystem roots are rejected.")
+                        color: App.Theme.textMuted
+                        font.pixelSize: App.Theme.fontCaption
+                        wrapMode: Text.WordWrap
+                    }
+
                     Repeater {
                         model: page.libraryDirectories
 
@@ -1046,6 +1054,16 @@ Item {
                                 updated.push(newLibraryField.text.trim())
                                 page.save("libraryDirectories", updated)
                                 newLibraryField.clear()
+                            }
+                        }
+
+                        AppButton {
+                            text: qsTr("Rescan")
+                            enabled: page.libraryDirectories.length > 0
+                            onClicked: {
+                                if (page.controller && page.controller.requestLibraryScan)
+                                    page.controller.requestLibraryScan(
+                                        "settings_local_rescan", "", "manual")
                             }
                         }
                     }

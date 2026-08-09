@@ -5609,7 +5609,7 @@ Continúe solo después de revisar este riesgo.</translation>
 <context>
     <name>OverviewTab</name>
     <message>
-        <location filename="../qml/pages/details/OverviewTab.qml" line="+72"/>
+        <location filename="../qml/pages/details/OverviewTab.qml" line="+74"/>
         <source>Logical size</source>
         <translation>Tamaño lógico</translation>
     </message>
@@ -5695,12 +5695,12 @@ Continúe solo después de revisar este riesgo.</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location line="+62"/>
+        <location line="+113"/>
         <source>Not checked</source>
         <translation>Sin comprobar</translation>
     </message>
     <message>
-        <location line="-51"/>
+        <location line="-102"/>
         <source>Last compression</source>
         <translation>Última compresión</translation>
     </message>
@@ -5710,7 +5710,27 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Nunca</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+19"/>
+        <source>Local game executable</source>
+        <translation>Ejecutable del juego local</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Choose the main executable. The choice is saved for this game.</source>
+        <translation>Elige el ejecutable principal. La selección se guarda para este juego.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Detected executable used to identify this local game.</source>
+        <translation>Ejecutable detectado que se usa para identificar este juego local.</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Use executable</source>
+        <translation>Usar ejecutable</translation>
+    </message>
+    <message>
+        <location line="+27"/>
         <source>Feature compatibility</source>
         <translation>Compatibilidad de funciones</translation>
     </message>
@@ -6541,6 +6561,11 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Directorios de bibliotecas de juegos</translation>
     </message>
     <message>
+        <location line="+8"/>
+        <source>Only immediate child folders are checked for local games. Home and filesystem roots are rejected.</source>
+        <translation>Solo se revisan las subcarpetas inmediatas para los juegos locales. Se rechazan la carpeta personal y la raíz del sistema de archivos.</translation>
+    </message>
+    <message>
         <location line="+38"/>
         <source>Remove library directory</source>
         <translation>Eliminar directorio de biblioteca</translation>
@@ -6556,7 +6581,12 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Añadir</translation>
     </message>
     <message>
-        <location line="+26"/>
+        <location line="+14"/>
+        <source>Rescan</source>
+        <translation>Volver a analizar</translation>
+    </message>
+    <message>
+        <location line="+22"/>
         <source>Experimental</source>
         <translation>Experimental</translation>
     </message>

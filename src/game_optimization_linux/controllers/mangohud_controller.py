@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 import logging
 from typing import TYPE_CHECKING, Any
 
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 
 from ..models import Game, Launcher, MangoHudProfile
@@ -26,13 +27,23 @@ class MangoHudController:
     def __init__(self, app: AppController) -> None:
         self._app = app
 
+    @staticmethod
+    def _profile_key(game: Game | None) -> str:
+        if game is None:
+            return ""
+        if game.steam_app_id:
+            return str(game.steam_app_id)
+        if game.launcher is Launcher.MANUAL and game.data_source.casefold() == "local":
+            return game.id
+        return ""
+
     def getMangoHudProfile(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
         if game is None:
             return self._app._mangohud_error("Select an available Steam game first")
-        app_id = str(game.steam_app_id or "").strip()
-        if game.launcher is not Launcher.STEAM or not app_id:
-            return self._app._mangohud_error("MangoHud profiles require a Steam AppID")
+        app_id = self._profile_key(game)
+        if not app_id:
+            return self._app._mangohud_error("MangoHud profiles require a supported game")
         try:
             profile = self._app._mangohud_repository.load(app_id)
             return self._app._mangohud_profile_to_qml(game, profile)
@@ -44,27 +55,28 @@ class MangoHudController:
         self, game_id: str, values: Mapping[str, Any]
     ) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or not game.steam_app_id:
-            return self._app._mangohud_error("MangoHud profiles require a Steam AppID")
+        app_id = self._profile_key(game)
+        if not app_id:
+            return self._app._mangohud_error("MangoHud profiles require a supported game")
         try:
             profile = self._app._mangohud_profile_from_payload(
-                str(game.steam_app_id), values
+                app_id, values
             )
             result = self._app._mangohud_profile_to_qml(game, profile)
             result["success"] = True
             return result
         except Exception as error:
-            return self._app._mangohud_error(str(error), app_id=str(game.steam_app_id))
+            return self._app._mangohud_error(str(error), app_id=app_id)
 
     def saveMangoHudProfile(
         self, game_id: str, values: Mapping[str, Any]
     ) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or game.launcher is not Launcher.STEAM or not game.steam_app_id:
-            result = self._app._mangohud_error("MangoHud profiles require a Steam AppID")
+        app_id = self._profile_key(game)
+        if game is None or not app_id:
+            result = self._app._mangohud_error("MangoHud profiles require a supported game")
             self._app._emit_toast(result["error"], "error")
             return result
-        app_id = str(game.steam_app_id)
         try:
             previous_profile = self._app._mangohud_repository.load(app_id)
             profile = self._app._mangohud_profile_from_payload(app_id, values)
@@ -115,13 +127,14 @@ class MangoHudController:
 
     def resetMangoHudProfile(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or not game.steam_app_id:
-            return self._app._mangohud_error("MangoHud profiles require a Steam AppID")
+        app_id = self._profile_key(game)
+        if not app_id:
+            return self._app._mangohud_error("MangoHud profiles require a supported game")
         try:
             self._app._mangohud_launch_integration.reset(game)
-            profile = self._app._mangohud_repository.reset(game.steam_app_id)
+            profile = self._app._mangohud_repository.reset(app_id)
         except Exception as error:
-            result = self._app._mangohud_error(str(error), app_id=str(game.steam_app_id))
+            result = self._app._mangohud_error(str(error), app_id=app_id)
             self._app._emit_toast(f"Could not reset MangoHud profile: {error}", "error")
             return result
         self._app.mangoHudProfileChanged.emit(profile.app_id)
@@ -132,9 +145,10 @@ class MangoHudController:
 
     def openMangoHudDirectory(self, game_id: str) -> bool:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or not game.steam_app_id:
+        app_id = self._profile_key(game)
+        if not app_id:
             return False
-        directory = self._app._mangohud_repository.game_directory(game.steam_app_id)
+        directory = self._app._mangohud_repository.game_directory(app_id)
         try:
             directory.mkdir(parents=True, exist_ok=True)
         except OSError as error:
@@ -164,10 +178,11 @@ class MangoHudController:
             return self._app._mangohud_error(str(error), app_id=str(game.steam_app_id or ""))
 
     def _mangohud_profile_for_game(self, game: Game) -> MangoHudProfile | None:
-        if game.launcher is not Launcher.STEAM or not game.steam_app_id:
+        app_id = self._profile_key(game)
+        if not app_id:
             return None
         try:
-            return self._app._mangohud_repository.load(game.steam_app_id)
+            return self._app._mangohud_repository.load(app_id)
         except Exception as error:
             raise SteamLaunchError(f"Could not load MangoHud profile: {error}") from error
 
@@ -296,7 +311,9 @@ class MangoHudController:
         return data
 
     def _clear_mangohud_fps_limit(self, game: Game) -> None:
-        app_id = str(game.steam_app_id or "")
+        app_id = self._profile_key(game)
+        if not app_id:
+            return
         profile = self._app._mangohud_repository.load(app_id)
         if profile.fps_limit is None and not profile.fps_limit_method:
             return

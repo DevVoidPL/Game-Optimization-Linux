@@ -29,6 +29,16 @@ class OptimizationController:
     def __init__(self, app: AppController) -> None:
         self._app = app
 
+    @staticmethod
+    def _profile_key(game: Game | None) -> str:
+        if game is None:
+            return ""
+        if game.steam_app_id:
+            return str(game.steam_app_id)
+        if game.launcher is Launcher.MANUAL and game.data_source.casefold() == "local":
+            return game.id
+        return ""
+
     def buildLaunchPreview(self, game_id: str, options: Mapping[str, Any]) -> str:
         """Build a display-only Steam launch preview."""
 
@@ -81,10 +91,11 @@ class OptimizationController:
 
     def getProtonTweaks(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or not game.steam_app_id:
-            return {"success": False, "error": "Proton Tweaks require a Steam AppID"}
+        app_id = self._profile_key(game)
+        if not app_id:
+            return {"success": False, "error": "Proton Tweaks require a supported game"}
         try:
-            return self._app._proton_tweaks_to_qml(str(game.steam_app_id))
+            return self._app._proton_tweaks_to_qml(app_id)
         except (OSError, ValueError, ProtonTweaksError) as error:
             return {"success": False, "error": str(error)}
 
@@ -92,9 +103,9 @@ class OptimizationController:
         self, game_id: str, values: Mapping[str, Any]
     ) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or not game.steam_app_id:
-            return {"success": False, "error": "Proton Tweaks require a Steam AppID"}
-        app_id = str(game.steam_app_id)
+        app_id = self._profile_key(game)
+        if game is None or not app_id:
+            return {"success": False, "error": "Proton Tweaks require a supported game"}
         try:
             current = self._app._proton_tweaks_repository.load(app_id)
             updated = self._app._proton_tweaks_repository.from_payload(app_id, values)
@@ -116,10 +127,11 @@ class OptimizationController:
 
     def getOptimizationProfile(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or game.launcher is not Launcher.STEAM or not game.steam_app_id:
-            return {"success": False, "error": "Optimization profiles require a Steam AppID"}
+        app_id = self._profile_key(game)
+        if not app_id:
+            return {"success": False, "error": "Optimization profiles require a supported game"}
         try:
-            profile = self._app._optimization_profile_repository.load(game.steam_app_id)
+            profile = self._app._optimization_profile_repository.load(app_id)
             return self._app._optimization_profile_to_qml(profile)
         except Exception as error:
             logger.warning("Could not load optimization profile for %s: %s", game.id, error)
@@ -129,10 +141,11 @@ class OptimizationController:
         self, game_id: str, values: Mapping[str, Any]
     ) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or not game.steam_app_id:
-            return {"success": False, "error": "Optimization profiles require a Steam AppID"}
+        app_id = self._profile_key(game)
+        if not app_id:
+            return {"success": False, "error": "Optimization profiles require a supported game"}
         try:
-            profile = self._app._optimization_profile_from_payload(str(game.steam_app_id), values)
+            profile = self._app._optimization_profile_from_payload(app_id, values)
             return self._app._optimization_profile_to_qml(profile)
         except Exception as error:
             return {"success": False, "error": str(error)}
@@ -141,13 +154,14 @@ class OptimizationController:
         self, game_id: str, values: Mapping[str, Any]
     ) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or game.launcher is not Launcher.STEAM or not game.steam_app_id:
-            return {"success": False, "error": "Optimization profiles require a Steam AppID"}
+        app_id = self._profile_key(game)
+        if not app_id:
+            return {"success": False, "error": "Optimization profiles require a supported game"}
         try:
             previous_profile = self._app._optimization_profile_repository.load(
-                str(game.steam_app_id)
+                app_id
             )
-            profile = self._app._optimization_profile_from_payload(str(game.steam_app_id), values)
+            profile = self._app._optimization_profile_from_payload(app_id, values)
             display = self._app._optimization_display_for(profile.target_display_id)
             recommendation = self._app._optimization_advisor.recommend(profile, display)
             profile = replace(
@@ -182,9 +196,10 @@ class OptimizationController:
 
     def testGameOptimizationRunner(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        if game is None or not game.steam_app_id:
-            return {"success": False, "message": "Optimization profiles require a Steam AppID"}
-        result = self._app._runner_integration.test(game.steam_app_id)
+        app_id = self._profile_key(game)
+        if not app_id:
+            return {"success": False, "message": "Optimization profiles require a supported game"}
+        result = self._app._runner_integration.test(app_id)
         self._app._emit_toast(
             str(result.get("message", "Runner test completed")),
             "success" if result.get("success") else "warning",
@@ -297,7 +312,7 @@ class OptimizationController:
                     (
                         item
                         for item in self._app._domain_games.values()
-                        if str(item.steam_app_id or "") == profile.app_id
+                        if str(item.steam_app_id or item.id) == profile.app_id
                     ),
                     None,
                 )
@@ -368,7 +383,12 @@ class OptimizationController:
             "launchPlan": plan.to_dict(),
             "launchPlanText": shlex.join(plan.command),
             "fpsLimitOwner": plan.fps_limit_owner,
-            "steamLaunchCommand": self._app._runner_integration.steam_command(profile.app_id),
+            "steamLaunchCommand": (
+                self._app._runner_integration.steam_command(profile.app_id)
+                if profile.app_id.isdecimal()
+                else ""
+            ),
+            "localGame": not profile.app_id.isdecimal(),
             "runner": runner.to_dict(),
             "profilePath": str(self._app._optimization_profile_repository.path(profile.app_id)),
             "protonTweaksError": proton_tweaks_error,

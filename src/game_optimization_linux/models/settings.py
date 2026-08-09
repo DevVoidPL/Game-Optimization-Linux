@@ -96,7 +96,7 @@ class AppSettings:
     gpu_limit_percent: int = 75
     backup_directory: Path = Path("backups")
     quarantine_directory: Path = Path("quarantine")
-    library_directories: tuple[Path, ...] = (Path("/games"),)
+    library_directories: tuple[Path, ...] = ()
     steam_installation_directories: tuple[Path, ...] = ()
     ignored_steam_libraries: tuple[Path, ...] = ()
     experimental_features: bool = False

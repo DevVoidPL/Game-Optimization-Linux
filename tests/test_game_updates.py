@@ -346,6 +346,32 @@ def test_tracker_first_scan_is_inventory_then_stabilizes_an_update(
     assert detected.installation_detected is False
 
 
+def test_tracker_restarts_safety_delay_when_files_change_again(tmp_path: Path) -> None:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    clock_value = [now]
+    tracker = GameUpdateTracker(
+        GameUpdateStateStore(tmp_path / "updates.json"),
+        stability_delay_seconds=60,
+        clock=lambda: clock_value[0],
+    )
+    game = _game(tmp_path / "game")
+    baseline = _snapshot(game.install_path, {"data.bin": (10, 1, 1)})
+    tracker.observe(game, snapshot=baseline)
+    tracker.complete_initial_inventory()
+    tracker.observe(game, snapshot=baseline)
+    _write_manifest(game, build_id="101", mtime_ns=2)
+
+    first_change = _snapshot(game.install_path, {"data.bin": (12, 2, 2)})
+    assert tracker.observe(game, snapshot=first_change).status is GameUpdateStatus.WAITING_FOR_STABILITY
+    clock_value[0] += timedelta(seconds=50)
+    second_change = _snapshot(game.install_path, {"data.bin": (14, 3, 3)})
+    assert tracker.observe(game, snapshot=second_change).status is GameUpdateStatus.WAITING_FOR_STABILITY
+    clock_value[0] += timedelta(seconds=59)
+    assert tracker.observe(game, snapshot=second_change).status is GameUpdateStatus.WAITING_FOR_STABILITY
+    clock_value[0] += timedelta(seconds=1)
+    assert tracker.observe(game, snapshot=second_change).status is GameUpdateStatus.ANALYSIS_REQUIRED
+
+
 def test_tracker_detects_new_install_only_after_initial_inventory(
     tmp_path: Path,
 ) -> None:

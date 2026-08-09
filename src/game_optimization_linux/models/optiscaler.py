@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import PurePosixPath
+import re
 from typing import Any, Mapping
 
 from .mangohud import validate_app_id
@@ -29,6 +30,14 @@ OPTISCALER_STATES = (
     "restore_required",
     "removed",
 )
+_LOCAL_GAME_ID = re.compile(r"^local-[0-9a-f]{24}$")
+
+
+def validate_optiscaler_game_id(value: object) -> str:
+    text = str(value or "").strip()
+    if _LOCAL_GAME_ID.fullmatch(text):
+        return text
+    return validate_app_id(text)
 
 
 def _relative_path(value: object, field_name: str) -> str:
@@ -59,7 +68,7 @@ class OptiScalerProfile:
     def __post_init__(self) -> None:
         if self.schema_version != OPTISCALER_SCHEMA_VERSION:
             raise ValueError("unsupported OptiScaler profile schema")
-        object.__setattr__(self, "app_id", validate_app_id(self.app_id))
+        object.__setattr__(self, "app_id", validate_optiscaler_game_id(self.app_id))
         object.__setattr__(
             self, "executable", _relative_path(self.executable, "executable")
         )
@@ -83,7 +92,7 @@ class OptiScalerProfile:
     def default(cls, app_id: object) -> "OptiScalerProfile":
         return cls(
             schema_version=OPTISCALER_SCHEMA_VERSION,
-            app_id=validate_app_id(app_id),
+            app_id=validate_optiscaler_game_id(app_id),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -113,8 +122,8 @@ class OptiScalerProfile:
         *,
         expected_app_id: object | None = None,
     ) -> "OptiScalerProfile":
-        app_id = validate_app_id(data.get("app_id", expected_app_id))
-        if expected_app_id is not None and app_id != validate_app_id(expected_app_id):
+        app_id = validate_optiscaler_game_id(data.get("app_id", expected_app_id))
+        if expected_app_id is not None and app_id != validate_optiscaler_game_id(expected_app_id):
             raise ValueError("OptiScaler profile AppID does not match its directory")
         raw = dict(data)
         schema = int(raw.get("schema_version", 0))

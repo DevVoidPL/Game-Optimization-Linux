@@ -8,7 +8,7 @@ from pathlib import Path
 import tempfile
 
 from game_optimization_linux.config import GAMES_CONFIG_DIR
-from game_optimization_linux.models import GameOptimizationProfile, validate_app_id
+from game_optimization_linux.models import GameOptimizationProfile, validate_game_key
 
 
 OPTIMIZATION_FILE_NAME = "optimization.json"
@@ -34,13 +34,13 @@ class GameOptimizationProfileRepository:
         self.root = Path(root)
 
     def path(self, app_id: object) -> Path:
-        return self.root / validate_app_id(app_id) / OPTIMIZATION_FILE_NAME
+        return self.root / validate_game_key(app_id) / OPTIMIZATION_FILE_NAME
 
     def default(self, app_id: object) -> GameOptimizationProfile:
         return GameOptimizationProfile.default(app_id)
 
     def load(self, app_id: object) -> GameOptimizationProfile:
-        normalized = validate_app_id(app_id)
+        normalized = validate_game_key(app_id)
         path = self.path(normalized)
         if not path.is_file():
             return self.default(normalized)

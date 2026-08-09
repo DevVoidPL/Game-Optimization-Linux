@@ -15,7 +15,7 @@ from game_optimization_linux.models import Game
 _IGNORED_PARTS = (
     "unins", "uninstall", "crash", "reporter", "redist", "redistributable",
     "setup", "installer", "config", "configuration", "benchmark", "diagnostic",
-    "supporttool", "helper", "eac", "easyanticheat", "battleye", "dotnet",
+    "support", "supporttool", "helper", "eac", "easyanticheat", "battleye", "dotnet",
     "vcredist", "dxsetup",
 )
 _PRUNED_DIRECTORIES = {
@@ -195,24 +195,37 @@ class GameExecutableResolver:
             path for path in files
             if path.suffix.casefold() == ".exe" and not self._ignored(path.relative_to(root))
         ]
-        wine = bool(proton_files)
-        if wine:
-            executable_files = proton_files
-        else:
-            executable_files = []
-            for path in files:
-                relative = path.relative_to(root)
-                if len(relative.parts) > 4 or self._ignored(relative):
-                    continue
-                try:
-                    executable = os.access(path, os.X_OK)
-                except OSError:
-                    executable = False
-                if executable and not path.suffix.casefold() in {".so", ".dll", ".sh", ".py"}:
-                    executable_files.append(path)
+        native_files = []
+        for path in files:
+            relative = path.relative_to(root)
+            if len(relative.parts) > 4 or self._ignored(relative):
+                continue
+            try:
+                executable = os.access(path, os.X_OK)
+            except OSError:
+                executable = False
+            if (
+                executable
+                and path.suffix.casefold()
+                not in {".exe", ".so", ".dll", ".sh", ".py"}
+            ):
+                native_files.append(path)
+        executable_files = (
+            [*proton_files, *native_files]
+            if game.data_source.casefold() == "local"
+            else (proton_files or native_files)
+        )
         candidates = tuple(
             sorted(
-                (self._score(game, root, path, wine=wine) for path in executable_files),
+                (
+                    self._score(
+                        game,
+                        root,
+                        path,
+                        wine=path.suffix.casefold() == ".exe",
+                    )
+                    for path in executable_files
+                ),
                 key=lambda item: (-item.score, item.relative_path.casefold()),
             )[:30]
         )

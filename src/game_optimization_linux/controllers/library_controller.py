@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
 from ..models import (
     BackupStatus,
@@ -22,7 +22,7 @@ from ..services import GameUpdateRecord, aggregate_library_compression
 from .presenters import game_to_qml, settings_to_qml
 
 if TYPE_CHECKING:
-    from .app_controller import AppController
+    from .app_controller import AppController, GameProviderLike
 
 logger = logging.getLogger(__name__)
 
@@ -356,31 +356,58 @@ class LibraryController:
         self._app._set_current_page("gameDetails")
         return True
 
+    def localExecutableInfo(self, game_id: str) -> dict[str, Any]:
+        game = self._app._find_game(game_id)
+        if game is None or game.launcher is not Launcher.MANUAL:
+            return {"available": False, "error": "This is not a local game"}
+        return {
+            "available": True,
+            "gameId": game.id,
+            "selected": game.executable_path,
+            "status": game.executable_resolution,
+            "candidates": list(game.executable_candidates),
+        }
+
+    def selectLocalExecutable(self, game_id: str, executable: str) -> bool:
+        selector = getattr(self._app._game_provider, "select_local_executable", None)
+        if not callable(selector):
+            return False
+        try:
+            updated = selector(str(game_id), str(executable))
+        except Exception as error:
+            self._app._report_error("selecting the local game executable", error)
+            return False
+        self._app._domain_games[updated.id] = updated
+        self._app._reload_games(reason="local_executable_selected")
+        if self._app._selected_game_id == updated.id:
+            self._app.openGame(updated.id)
+        self._app._emit_toast("Local game executable saved", "success")
+        return True
+
     def _create_steam_provider(self) -> GameProviderLike:
         """Build Linux read-only integrations lazily for normal operation."""
 
         # Imported only outside Demo mode so GUI fixtures have no host coupling.
         from ..providers.linux_filesystem import LinuxFilesystemProvider
+        from ..providers.local import ConfiguredGameProvider, LocalGameProvider
         from ..providers.steam import SteamGameProvider
         from ..services.directory_size import DirectorySizeScanner
+        from ..config import LOCAL_EXECUTABLE_CHOICES_FILE
 
         if self._app._filesystem_provider is None:
-            self._app._filesystem_provider = cast(
-                FilesystemProviderLike,
-                LinuxFilesystemProvider(),
-            )
+            self._app._filesystem_provider = LinuxFilesystemProvider()
         if self._app._directory_size_scanner is None:
-            self._app._directory_size_scanner = cast(
-                DirectorySizeScannerLike,
-                DirectorySizeScanner(),
-            )
-        return cast(
-            GameProviderLike,
-            SteamGameProvider(
-                self._app._filesystem_provider,
-                additional_roots=self._app._settings_model.steam_installation_directories,
-            ),
+            self._app._directory_size_scanner = DirectorySizeScanner()
+        steam = SteamGameProvider(
+            self._app._filesystem_provider,
+            additional_roots=self._app._settings_model.steam_installation_directories,
         )
+        local = LocalGameProvider(
+            self._app._filesystem_provider,
+            self._app._settings_model.library_directories,
+            choices_path=LOCAL_EXECUTABLE_CHOICES_FILE,
+        )
+        return ConfiguredGameProvider(steam, local)
 
     def _initial_games(self, initial_games: Sequence[Game] | None) -> list[Game]:
         if initial_games is not None:
@@ -410,7 +437,7 @@ class LibraryController:
             self._app._operational_tasks = {
                 self._app._scan_task_id(generation): self._app._operational_task(
                     task_id=self._app._scan_task_id(generation),
-                    title="Scan Steam libraries",
+                    title="Scan game libraries",
                     operation="Library scan",
                     status="running",
                     progress=0.0,
@@ -423,7 +450,7 @@ class LibraryController:
             message=(
                 "Refreshing demonstration library"
                 if self._app._demo_mode
-                else "Scanning local Steam libraries…"
+                else "Scanning configured game libraries…"
             ),
             is_scanning=True,
         )
@@ -641,7 +668,7 @@ class LibraryController:
         if self._app._demo_mode:
             status = "demo"
             message = f"Demo library ready · {len(self._app._domain_games)} games"
-        elif not self._app._steam_found:
+        elif not self._app._steam_found and not self._app._domain_games:
             status = "steam-not-found"
             message = "Steam was not found in standard or configured locations"
         elif not self._app._domain_games:
@@ -649,7 +676,9 @@ class LibraryController:
             message = "Steam was found, but no installed games were detected"
         else:
             status = "ready"
-            message = f"Steam library ready · {len(self._app._domain_games)} games"
+            message = f"Game library ready · {len(self._app._domain_games)} games"
+            if not self._app._steam_found:
+                message += " · Steam not found"
             if failed_sizes:
                 message += f" · {failed_sizes} size scans unavailable"
         self._app._set_scan_state(
@@ -996,7 +1025,7 @@ class LibraryController:
             logger.warning("Could not save the Steam library cache: %s", error)
 
     def _provider_steam_found(self, games: Sequence[Game]) -> bool:
-        if games:
+        if any(game.launcher is Launcher.STEAM for game in games):
             return True
         direct = getattr(self._app._game_provider, "steam_found", None)
         if isinstance(direct, bool):

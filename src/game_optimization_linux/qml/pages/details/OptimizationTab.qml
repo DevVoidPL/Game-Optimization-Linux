@@ -12,6 +12,7 @@ Item {
     property var controller
     property var gameData: ({})
     readonly property string gameId: String(gameData && gameData.id || "")
+    readonly property bool localGame: Boolean(gameData && gameData.localGame)
     property bool loading: false
     property bool dirty: false
     property string errorMessage: ""
@@ -308,6 +309,7 @@ Item {
             }
 
             SurfaceCard {
+                visible: !tab.localGame
                 Layout.fillWidth: true; padding: 18
                 contentItem: ColumnLayout {
                     RowLayout { Layout.fillWidth: true

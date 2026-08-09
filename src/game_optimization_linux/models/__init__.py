@@ -53,6 +53,7 @@ from .mangohud import (
     MangoHudProfile,
     PRESET_METRICS,
     validate_app_id,
+    validate_game_key,
 )
 from .system import FilesystemInfo, SystemInfo
 from .optimization_profile import (
@@ -156,4 +157,5 @@ __all__ = [
     "ThemeMode",
     "button_hints",
     "validate_app_id",
+    "validate_game_key",
 ]

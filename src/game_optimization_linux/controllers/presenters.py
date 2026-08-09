@@ -267,6 +267,10 @@ def game_to_qml(
         library_available
         and game_status not in {"Drive disconnected", "Missing files"}
     )
+    local_game = bool(
+        str(raw.get("launcher", "")).casefold() == "manual"
+        and str(raw.get("data_source", "")).casefold() == "local"
+    )
     report_available = bool(
         normalized_report
         and str(normalized_report.get("game_id") or "") == str(raw.get("id", ""))
@@ -378,7 +382,23 @@ def game_to_qml(
         "status": game_status,
         "libraryAvailable": library_available,
         "availabilityStatus": "" if library_available else "Library unavailable",
-        "launchAllowed": actionable,
+        "launchAllowed": bool(
+            actionable
+            and (
+                not local_game
+                or (
+                    str(raw.get("executable_path") or "")
+                    and not str(raw.get("executable_path") or "").casefold().endswith(".exe")
+                )
+            )
+        ),
+        "launchUnavailableReason": (
+            "Choose the main executable first"
+            if local_game and not str(raw.get("executable_path") or "")
+            else "A compatible Proton runner is not configured"
+            if local_game and str(raw.get("executable_path") or "").casefold().endswith(".exe")
+            else ""
+        ),
         "analysisAllowed": actionable,
         "cover": preferred_artwork_url,
         "effectiveArtworkUrl": preferred_artwork_url,
@@ -432,6 +452,13 @@ def game_to_qml(
         "steamAppId": str(raw.get("steam_app_id") or ""),
         "libraryPath": str(raw.get("library_path") or ""),
         "dataSource": str(raw.get("data_source") or raw.get("launcher", "Unknown")),
+        "source": str(raw.get("source") or ""),
+        "localGame": local_game,
+        "executablePath": str(raw.get("executable_path") or ""),
+        "executableResolution": str(
+            raw.get("executable_resolution") or "not_scanned"
+        ),
+        "executableCandidates": qml_value(raw.get("executable_candidates") or []),
         "lastScannedAt": str(raw.get("last_scanned_at") or ""),
         "lastUpdatedAt": str(raw.get("last_updated_at") or ""),
         "language": str(raw.get("language") or ""),

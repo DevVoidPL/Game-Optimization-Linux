@@ -154,7 +154,10 @@ class CompressionService:
         try:
             # A durable marker is a precondition: without it a power loss would
             # leave an operation that cannot be surfaced on next launch.
-            self._history.begin_operation(plan)
+            self._history.begin_operation(
+                plan,
+                automatic=bool(automatic_authorized),
+            )
             history_started = True
             result = self._provider.execute_plan(
                 game,
