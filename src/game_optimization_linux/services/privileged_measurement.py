@@ -80,25 +80,7 @@ class PrivilegedMeasurementClient:
             raise PrivilegedMeasurementError(
                 "The privileged compression measurement helper is not installed"
             )
-        if (
-            game.library_path is None
-            or not game.steam_app_id
-            or not game.steam_build_id
-        ):
-            raise PrivilegedMeasurementError(
-                "Steam library, AppID and buildid are required for measurement"
-            )
-        command = [
-            os.fspath(self._pkexec_path),
-            os.fspath(self._helper_path),
-            "measure",
-            "--library",
-            os.fspath(game.library_path),
-            "--appid",
-            str(game.steam_app_id),
-            "--buildid",
-            str(game.steam_build_id),
-        ]
+        command = self._measurement_command(game)
         logger.info("Privileged measurement helper argv=%r", command)
         try:
             if self._command_runner is subprocess.run:
@@ -193,6 +175,45 @@ class PrivilegedMeasurementClient:
                     logical_bytes=known_logical_bytes,
                 )
         return measurement
+
+    def _measurement_command(self, game: Game) -> list[str]:
+        command = [
+            os.fspath(self._pkexec_path),
+            os.fspath(self._helper_path),
+            "measure",
+        ]
+        if game.library_path is not None and game.steam_app_id and game.steam_build_id:
+            return [
+                *command,
+                "--library",
+                os.fspath(game.library_path.resolve(strict=True)),
+                "--appid",
+                str(game.steam_app_id),
+                "--buildid",
+                str(game.steam_build_id),
+            ]
+        try:
+            game_path = game.install_path.resolve(strict=True)
+            identity = game_path.stat()
+        except OSError as error:
+            raise PrivilegedMeasurementError(
+                f"The selected game directory is unavailable: {error}"
+            ) from error
+        if not game_path.is_dir():
+            raise PrivilegedMeasurementError(
+                "The selected game path is not a directory"
+            )
+        return [
+            *command,
+            "--game-path",
+            os.fspath(game_path),
+            "--game-id",
+            str(game.id),
+            "--device",
+            str(identity.st_dev),
+            "--inode",
+            str(identity.st_ino),
+        ]
 
     def cancel_all(self) -> None:
         """Terminate complete pkexec/helper process groups started by this client."""
@@ -315,16 +336,32 @@ class PrivilegedMeasurementClient:
 
     @staticmethod
     def _validate_identity(game: Game, payload: Mapping[str, Any]) -> None:
-        expected_path = os.path.abspath(os.fspath(game.install_path))
+        expected_path = os.path.realpath(os.fspath(game.install_path))
         returned_path = os.path.abspath(str(payload.get("game_path") or ""))
-        if (
-            int(payload.get("schema_version") or 0) != 1
-            or str(payload.get("app_id") or "") != str(game.steam_app_id)
-            or str(payload.get("build_id") or "") != str(game.steam_build_id)
-            or returned_path != expected_path
-            or payload.get("read_only") is not True
-            or str(payload.get("measurement_source") or "") != "polkit_helper"
-        ):
+        common_valid = bool(
+            int(payload.get("schema_version") or 0) == 1
+            and returned_path == expected_path
+            and payload.get("read_only") is True
+            and str(payload.get("measurement_source") or "") == "polkit_helper"
+        )
+        if game.library_path is not None and game.steam_app_id and game.steam_build_id:
+            identity_valid = bool(
+                str(payload.get("identity_kind") or "steam") == "steam"
+                and str(payload.get("app_id") or "") == str(game.steam_app_id)
+                and str(payload.get("build_id") or "") == str(game.steam_build_id)
+            )
+        else:
+            try:
+                identity = Path(expected_path).stat()
+                identity_valid = bool(
+                    str(payload.get("identity_kind") or "") == "local"
+                    and str(payload.get("game_id") or "") == str(game.id)
+                    and int(payload.get("path_device")) == identity.st_dev
+                    and int(payload.get("path_inode")) == identity.st_ino
+                )
+            except (OSError, TypeError, ValueError):
+                identity_valid = False
+        if not common_valid or not identity_valid:
             raise PrivilegedMeasurementError(
                 "The privileged measurement identity could not be verified"
             )

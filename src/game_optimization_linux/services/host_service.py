@@ -8,17 +8,22 @@ module and is started as an argv list through ``flatpak-spawn --host``.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
+from datetime import UTC, datetime
 import json
 import os
 from pathlib import Path
 import re
+import signal
 import shutil
 import subprocess
+from threading import RLock
 from typing import Any
 
 from game_optimization_linux.models.compression import CompressionMeasurement
 from game_optimization_linux.models.game import Game
+from game_optimization_linux.models.enums import FilesystemType
 
+from .btrfs_analysis import BtrfsCompressionAnalyzer
 from .privileged_measurement import (
     PrivilegedMeasurementClient,
     PrivilegedMeasurementError,
@@ -145,6 +150,9 @@ class HostServiceClient:
         self._measurement_helper = Path(measurement_helper)
         self._tool_cache: dict[str, dict[str, Any]] = {}
         self._measurement_capability: bool | None = None
+        self._measurement_mode = ""
+        self._measurement_processes: set[subprocess.Popen[str]] = set()
+        self._measurement_processes_lock = RLock()
 
     @property
     def in_flatpak(self) -> bool:
@@ -375,6 +383,15 @@ class HostServiceClient:
         }
 
     def analysis(self, game: Game) -> dict[str, Any]:
+        available = self.measurement_available
+        if self._measurement_mode == "direct_compsize":
+            raise HostServiceError(
+                "Exact compsize is available as an explicit authenticated measurement"
+            )
+        if not available:
+            raise HostServiceError(
+                "Exact compsize measurement is unavailable because host compsize or pkexec was not detected"
+            )
         payload = self._compression_measure(game)
         try:
             PrivilegedMeasurementClient._validate_identity(game, payload)
@@ -383,6 +400,12 @@ class HostServiceClient:
         return payload
 
     def measure(self, game: Game) -> CompressionMeasurement:
+        if not self.measurement_available:
+            raise HostServiceError(
+                "Exact compsize measurement is unavailable because host compsize or pkexec was not detected"
+            )
+        if self._measurement_mode == "direct_compsize":
+            return self._measure_direct_compsize(game)
         payload = self._compression_measure(game)
         try:
             PrivilegedMeasurementClient._validate_identity(game, payload)
@@ -401,30 +424,63 @@ class HostServiceClient:
         return measurement
 
     def cancel_all(self) -> None:
-        return None
+        with self._measurement_processes_lock:
+            processes = tuple(self._measurement_processes)
+        for process in processes:
+            self._terminate_group(process, signal.SIGTERM)
+        for process in processes:
+            try:
+                process.wait(timeout=0.5)
+            except subprocess.TimeoutExpired:
+                self._terminate_group(process, signal.SIGKILL)
 
     def _compression_measure(self, game: Game) -> dict[str, Any]:
-        if game.library_path is None or not game.steam_app_id or not game.steam_build_id:
-            raise HostServiceError(
-                "Steam library, AppID and buildid are required for host measurement"
-            )
         if not self.measurement_available:
             raise HostServiceError(
                 "Exact compsize measurement is unavailable because the optional "
                 "privileged host component is not installed"
             )
-        result = self._run_fixed(
-            "pkexec",
-            (
+        if self._measurement_mode != "installed_helper":
+            raise HostServiceError(
+                "Exact compsize is available only as an explicit authenticated measurement"
+            )
+        arguments: tuple[str, ...]
+        if game.library_path is not None and game.steam_app_id and game.steam_build_id:
+            arguments = (
                 os.fspath(self._measurement_helper),
                 "measure",
                 "--library",
-                os.fspath(game.library_path),
+                os.fspath(game.library_path.resolve(strict=True)),
                 "--appid",
                 str(game.steam_app_id),
                 "--buildid",
                 str(game.steam_build_id),
-            ),
+            )
+        else:
+            try:
+                game_path = game.install_path.resolve(strict=True)
+                identity = game_path.stat()
+            except OSError as error:
+                raise HostServiceError(
+                    f"The selected game directory is unavailable: {error}"
+                ) from error
+            if not game_path.is_dir():
+                raise HostServiceError("The selected game path is not a directory")
+            arguments = (
+                os.fspath(self._measurement_helper),
+                "measure",
+                "--game-path",
+                os.fspath(game_path),
+                "--game-id",
+                str(game.id),
+                "--device",
+                str(identity.st_dev),
+                "--inode",
+                str(identity.st_ino),
+            )
+        result = self._run_fixed(
+            "pkexec",
+            arguments,
             timeout=self._timeout_seconds,
         )
         if result is None:
@@ -452,6 +508,19 @@ class HostServiceClient:
         return payload
 
     def _probe_measurement_component(self) -> bool:
+        try:
+            compsize = self.tool_info("compsize", refresh=True)
+            pkexec = self._run_fixed("pkexec", ("--version",), timeout=5.0)
+        except HostServiceError:
+            compsize = {}
+            pkexec = None
+        if (
+            compsize.get("available") is True
+            and pkexec is not None
+            and pkexec.returncode == 0
+        ):
+            self._measurement_mode = "direct_compsize"
+            return True
         result = self._run_fixed(
             os.fspath(self._measurement_helper),
             ("capability", "--json"),
@@ -464,7 +533,210 @@ class HostServiceClient:
             payload = json.loads(str(result.stdout or ""))
         except json.JSONDecodeError:
             return False
-        return bool(isinstance(payload, dict) and payload.get("available") is True)
+        available = bool(
+            isinstance(payload, dict) and payload.get("available") is True
+        )
+        if available:
+            self._measurement_mode = "installed_helper"
+        return available
+
+    def _measure_direct_compsize(self, game: Game) -> CompressionMeasurement:
+        try:
+            root = game.install_path.resolve(strict=True)
+        except OSError as error:
+            raise HostServiceError(
+                f"The selected game directory is unavailable: {error}"
+            ) from error
+        if not root.is_absolute() or not root.is_dir():
+            raise HostServiceError("The selected game path is not a directory")
+        if game.filesystem is not FilesystemType.BTRFS and (
+            game.filesystem_name.casefold() != "btrfs"
+        ):
+            raise HostServiceError("Exact compsize is available only for a verified Btrfs game")
+
+        result = self._run_privileged(
+            [self._flatpak_spawn, "--host", "pkexec", "compsize", "--", os.fspath(root)]
+            if self.in_flatpak
+            else [str(self._which("pkexec") or "pkexec"), "compsize", "--", os.fspath(root)]
+        )
+        stdout = str(result.stdout or "")[:_MAX_OUTPUT]
+        stderr = str(result.stderr or "")[:_MAX_OUTPUT]
+        debug_measurement = (
+            str(
+                self._environment.get(
+                    "GAME_OPTIMIZATION_DEBUG_COMPRESSION", ""
+                )
+            ).strip()
+            == "1"
+        )
+        if debug_measurement:
+            logger.info(
+                "Exact compsize raw output: gameId=%s path=%s exitCode=%s "
+                "stdout=%r stderr=%r",
+                game.id,
+                root,
+                result.returncode,
+                stdout,
+                stderr,
+            )
+        if result.returncode in {126, 127}:
+            raise HostServiceError(
+                "Authorization cancelled",
+                exit_code=int(result.returncode),
+                stdout=stdout,
+                stderr=stderr,
+            )
+        if result.returncode != 0:
+            detail = " ".join(stderr.split())
+            raise HostServiceError(
+                detail or f"compsize exited with status {result.returncode}",
+                exit_code=int(result.returncode),
+                stdout=stdout,
+                stderr=stderr,
+            )
+        parsed = BtrfsCompressionAnalyzer.parse_compsize(stdout)
+        if debug_measurement:
+            complete = bool(
+                parsed.available
+                and parsed.disk_usage_bytes is not None
+                and parsed.disk_usage_bytes > 0
+                and parsed.uncompressed_bytes is not None
+                and parsed.uncompressed_bytes > 0
+                and parsed.referenced_bytes is not None
+                and parsed.referenced_bytes > 0
+            )
+            logger.info(
+                "Exact compsize parsed output: gameId=%s disk=%r "
+                "uncompressed=%r referenced=%r ratio=%r saving=%r "
+                "source=polkit_compsize exact=true complete=%s message=%r",
+                game.id,
+                parsed.disk_usage_bytes,
+                parsed.uncompressed_bytes,
+                parsed.referenced_bytes,
+                parsed.current_compression_ratio,
+                (
+                    max(0, parsed.uncompressed_bytes - parsed.disk_usage_bytes)
+                    if complete
+                    else None
+                ),
+                complete,
+                parsed.message,
+            )
+        if (
+            not parsed.available
+            or parsed.disk_usage_bytes is None
+            or parsed.disk_usage_bytes <= 0
+            or parsed.uncompressed_bytes is None
+            or parsed.uncompressed_bytes <= 0
+            or parsed.referenced_bytes is None
+            or parsed.referenced_bytes <= 0
+        ):
+            raise HostServiceError(
+                "Exact compsize returned an incomplete result: "
+                + (parsed.message or "required values are missing"),
+                exit_code=int(result.returncode),
+                stdout=stdout,
+                stderr=stderr,
+            )
+        try:
+            filesystem = os.statvfs(root)
+            block_size = filesystem.f_frsize or filesystem.f_bsize
+            total = int(filesystem.f_blocks * block_size)
+            free = int(filesystem.f_bfree * block_size)
+            available = int(filesystem.f_bavail * block_size)
+        except OSError:
+            total = free = available = None
+        return CompressionMeasurement(
+            logical_bytes=max(0, int(float(game.logical_size_gb) * 1_000_000_000)),
+            physical_bytes=parsed.disk_usage_bytes,
+            exclusive_bytes=None,
+            shared_bytes=None,
+            compsize_disk_bytes=parsed.disk_usage_bytes,
+            compsize_uncompressed_bytes=parsed.uncompressed_bytes,
+            compsize_referenced_bytes=parsed.referenced_bytes,
+            scan_complete=True,
+            shared_extent_state=(
+                "detected"
+                if parsed.possible_shared_extents is True
+                else "not_detected"
+                if parsed.possible_shared_extents is False
+                else "unknown"
+            ),
+            filesystem_available_bytes=available,
+            filesystem_free_bytes=free,
+            filesystem_used_bytes=(total - free if total is not None and free is not None else None),
+            filesystem_total_bytes=total,
+            measurement_source="polkit_compsize",
+            measured_at=datetime.now(UTC),
+        )
+
+    def _run_privileged(
+        self, command: list[str]
+    ) -> subprocess.CompletedProcess[str]:
+        if self._command_runner is not subprocess.run:
+            try:
+                return self._command_runner(
+                    command,
+                    stdin=subprocess.DEVNULL,
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                    timeout=self._timeout_seconds,
+                    shell=False,
+                )
+            except (OSError, subprocess.SubprocessError) as error:
+                raise HostServiceError(
+                    f"Exact measurement could not start: {error}"
+                ) from error
+        try:
+            process = subprocess.Popen(
+                command,
+                stdin=subprocess.DEVNULL,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                shell=False,
+                start_new_session=True,
+            )
+        except OSError as error:
+            raise HostServiceError(
+                f"Exact measurement could not start: {error}"
+            ) from error
+        with self._measurement_processes_lock:
+            self._measurement_processes.add(process)
+        try:
+            try:
+                stdout, stderr = process.communicate(timeout=self._timeout_seconds)
+            except subprocess.TimeoutExpired:
+                self._terminate_group(process, signal.SIGTERM)
+                try:
+                    stdout, stderr = process.communicate(timeout=0.5)
+                except subprocess.TimeoutExpired:
+                    self._terminate_group(process, signal.SIGKILL)
+                    stdout, stderr = process.communicate()
+                raise HostServiceError("Exact compsize measurement timed out")
+            return subprocess.CompletedProcess(
+                command, int(process.returncode or 0), stdout, stderr
+            )
+        finally:
+            with self._measurement_processes_lock:
+                self._measurement_processes.discard(process)
+
+    @staticmethod
+    def _terminate_group(
+        process: subprocess.Popen[str], sig: signal.Signals
+    ) -> None:
+        if process.poll() is not None:
+            return
+        try:
+            os.killpg(process.pid, sig)
+        except ProcessLookupError:
+            return
+        except OSError:
+            try:
+                process.send_signal(sig)
+            except OSError:
+                return
 
     def _run_fixed(
         self,

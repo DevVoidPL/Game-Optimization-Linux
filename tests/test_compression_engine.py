@@ -355,6 +355,80 @@ class _PrivilegedMeasurements:
         return
 
 
+def test_verify_current_uses_exact_compsize_when_component_is_available(
+    tmp_path: Path,
+) -> None:
+    game = _steam_game(tmp_path)
+    measurements = _PrivilegedMeasurements(logical_bytes=16_384)
+    analyzer = _StaticAnalyzer(_report(game))
+    provider = _provider(
+        analyzer=analyzer,
+        measurement_provider=measurements,
+    )
+
+    result = provider.measure_current(game)
+
+    assert result.measurement_source == "polkit_helper"
+    assert result.compsize_disk_bytes == 7_000
+    assert result.compsize_uncompressed_bytes == 16_384
+    assert result.compsize_referenced_bytes == 16_384
+    assert result.measurement_error is None
+    assert analyzer.calls == 0
+
+
+def test_verify_current_falls_back_to_basic_btrfs_when_component_is_missing(
+    tmp_path: Path,
+) -> None:
+    game = _steam_game(tmp_path)
+    report = _report(
+        game,
+        logical_bytes=16_384,
+        physical_bytes=12_000,
+        shared_state="not_detected",
+        shared_total=12_000,
+        shared_exclusive=12_000,
+        set_shared=0,
+    )
+
+    class MissingMeasurementComponent:
+        installed = False
+
+        def measure(self, requested: Game) -> CompressionMeasurement:
+            raise AssertionError(f"exact measurement was attempted for {requested.id}")
+
+        def cancel_all(self) -> None:
+            return
+
+    class RecordingAnalyzer(_StaticAnalyzer):
+        def __init__(self, active_report: BtrfsAnalysisReport) -> None:
+            super().__init__(active_report)
+            self.options: list[dict[str, object]] = []
+
+        def analyze(self, game: Game, **kwargs: object) -> BtrfsAnalysisReport:
+            self.options.append(dict(kwargs))
+            return super().analyze(game, **kwargs)
+
+    analyzer = RecordingAnalyzer(report)
+    provider = _provider(
+        analyzer=analyzer,
+        measurement_provider=MissingMeasurementComponent(),
+    )
+
+    result = provider.measure_current(game)
+
+    assert result.measurement_source == "basic_btrfs"
+    assert result.measurement_error is not None
+    assert "Exact compsize measurement is unavailable" in result.measurement_error
+    assert result.compsize_disk_bytes is None
+    assert result.compsize_uncompressed_bytes is None
+    assert result.compsize_referenced_bytes is None
+    assert result.exclusive_bytes == 12_000
+    assert result.shared_bytes == 0
+    assert analyzer.options == [
+        {"sample_files": False, "measure_compsize": False}
+    ]
+
+
 def test_privileged_baseline_skips_unprivileged_compsize_and_stable_root_passes(
     tmp_path: Path,
 ) -> None:

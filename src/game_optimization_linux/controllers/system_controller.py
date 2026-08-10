@@ -22,6 +22,7 @@ class SystemController:
 
     def _add_gamepad_system_info(self) -> None:
         active = dict(self._app._gamepad_service.activeController)
+        diagnostics = dict(self._app._gamepad_service.diagnostics)
         self._app._system_info.update(
             {
                 "sdl3Status": str(self._app._gamepad_service.status),
@@ -31,6 +32,12 @@ class SystemController:
                 "activeControllerName": str(active.get("name", "")),
                 "activeControllerType": str(active.get("type", "")),
                 "activeControllerMapping": str(active.get("mappingStatus", "")),
+                "controllerDiagnostics": diagnostics,
+                "sdl3LibraryAvailable": diagnostics.get("sdl3LibraryAvailable") is True,
+                "inputDeviceAccessAvailable": diagnostics.get("inputDeviceAccessAvailable") is True,
+                "joystickCount": int(diagnostics.get("joystickCount") or 0),
+                "gamepadCount": int(diagnostics.get("gamepadCount") or 0),
+                "controllerDiagnosticReason": str(diagnostics.get("reason") or ""),
             }
         )
         capabilities = self._app._system_info.get("capabilities")

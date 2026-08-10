@@ -20,10 +20,7 @@ trap 'rm -f "$temporary_runner"' EXIT
 
 if [ "${FLATPAK_ID:-}" = "$app_id" ] \
         || { command -v flatpak >/dev/null 2>&1 && flatpak info "$app_id" >/dev/null 2>&1; }; then
-    {
-        printf '%s\n' '#!/usr/bin/env sh'
-        printf '%s\n' 'exec flatpak run --command=game-optimization-run io.github.DevVoidPL.GameOptimizationLinux "$@"'
-    } > "$temporary_runner"
+    cp "$project_root/libexec/game-optimization-run-host" "$temporary_runner"
 else
     mkdir -p "$python_root"
     python3 -m pip install --no-deps --no-build-isolation --upgrade --target "$python_root" "$project_root"

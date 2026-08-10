@@ -11,7 +11,7 @@ defragmenting an untrusted directory tree.
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 import logging
 import os
@@ -34,6 +34,7 @@ from game_optimization_linux.models.compression import (
     CompressionProviderError,
     CompressionResult,
     CompressionToolCapabilities,
+    is_exact_compsize_measurement_source,
 )
 from game_optimization_linux.models.enums import CompressionProfile, FilesystemType, Launcher
 from game_optimization_linux.models.game import Game
@@ -59,6 +60,10 @@ _MAX_MANIFEST_BYTES = 2 * _MIB
 # a write operation.
 _STEAM_ACTIVE_WRITE_STATE_MASK = ~0xFF
 _PROCESS_POLL_INTERVAL_SECONDS = 1.0
+_EXACT_MEASUREMENT_UNAVAILABLE = (
+    "Exact compsize measurement is unavailable because the optional "
+    "privileged host component is not installed"
+)
 _COMPRESSED_EXTENSIONS = frozenset(
     {
         ".7z",
@@ -642,13 +647,26 @@ class BtrfsCompressionProvider:
         for process in children:
             self._terminate_process(process)
 
-    def measure_current(self, game: Game) -> CompressionMeasurement:
-        """Authenticate and measure without changing the game or filesystem."""
+    def measure_current(
+        self, game: Game, *, exact: bool = True
+    ) -> CompressionMeasurement:
+        """Measure without changing the game or filesystem."""
 
         provider = self._measurement_provider
-        if provider is None:
-            raise PrivilegedMeasurementError(
-                "The privileged compression measurement helper is unavailable"
+        if not exact or provider is None or not bool(
+            getattr(provider, "installed", True)
+        ):
+            report = self._analyzer.analyze(
+                game,
+                sample_files=False,
+                measure_compsize=False,
+            )
+            return replace(
+                self.measurement_from_report(report),
+                measurement_source="basic_btrfs",
+                measurement_error=(
+                    _EXACT_MEASUREMENT_UNAVAILABLE if exact else None
+                ),
             )
         measurement = provider.measure(game)
         if measurement.compsize_disk_bytes is None:
@@ -1734,8 +1752,12 @@ class BtrfsCompressionProvider:
         # statvfs counter is a substitute for this compression measurement.
         if (
             after is None
-            or before.measurement_source != "polkit_helper"
-            or after.measurement_source != "polkit_helper"
+            or not is_exact_compsize_measurement_source(
+                before.measurement_source
+            )
+            or not is_exact_compsize_measurement_source(
+                after.measurement_source
+            )
             or before.compsize_disk_bytes is None
             or after.compsize_disk_bytes is None
         ):

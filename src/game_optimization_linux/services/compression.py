@@ -47,7 +47,9 @@ class CompressionExecutionProvider(Protocol):
 
     def cancel_all(self) -> None: ...
 
-    def measure_current(self, game: Game) -> CompressionMeasurement: ...
+    def measure_current(
+        self, game: Game, *, exact: bool = False
+    ) -> CompressionMeasurement: ...
 
 
 class CompressionService:
@@ -297,12 +299,14 @@ class CompressionService:
     def cancel_all(self) -> None:
         self._provider.cancel_all()
 
-    def verify_measurement(self, game: Game) -> CompressionMeasurement:
-        """Perform one authenticated, read-only current-state measurement."""
+    def verify_measurement(
+        self, game: Game, *, exact: bool = False
+    ) -> CompressionMeasurement:
+        """Perform one read-only current-state measurement."""
 
         with self._lock:
             self._ensure_open()
-        return self._provider.measure_current(game)
+        return self._provider.measure_current(game, exact=exact)
 
     def recover_interrupted(self) -> tuple[dict[str, Any], ...]:
         return self._history.recover_interrupted()

@@ -58,16 +58,6 @@ FocusScope {
             "description": qsTr("Automatically enter Couch Mode after Game Optimization detects controller input.")
         },
         {
-            "id": "vibration", "category": "couch", "title": qsTr("Vibration"),
-            "value": qsTr("Planned"), "enabled": false,
-            "description": qsTr("Controller vibration is planned for a later implementation stage.")
-        },
-        {
-            "id": "sounds", "category": "couch", "title": qsTr("Interface sounds"),
-            "value": qsTr("Off"), "enabled": false,
-            "description": qsTr("Couch Mode does not play interface sounds at this implementation stage.")
-        },
-        {
             "id": "desktop", "category": "system", "title": qsTr("Switch to Desktop Mode"),
             "value": qsTr("Always available"), "enabled": true,
             "description": qsTr("Leave Couch Mode and return to the standard desktop interface.")
@@ -218,7 +208,6 @@ FocusScope {
             controller.saveSetting("navigationRepeatRateMs", 110)
             controller.saveSetting("hideCursorInCouchMode", true)
             controller.saveSetting("startCouchModeFullscreen", true)
-            controller.saveSetting("interfaceSounds", false)
         } else {
             change(1)
         }

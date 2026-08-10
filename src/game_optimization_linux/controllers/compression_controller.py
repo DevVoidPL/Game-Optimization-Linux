@@ -104,7 +104,16 @@ class CompressionController:
         return self._app.analyzeGame(game_id)
 
     def verifyCompression(self, game_id: str) -> bool:
-        """Queue one authenticated read-only measurement, never recompression."""
+        """Queue one basic read-only Btrfs verification."""
+
+        return self._queue_verification(game_id, exact=False)
+
+    def exactCompressionMeasurement(self, game_id: str) -> bool:
+        """Queue one user-authorized exact compsize measurement."""
+
+        return self._queue_verification(game_id, exact=True)
+
+    def _queue_verification(self, game_id: str, *, exact: bool) -> bool:
 
         game = self._app._resolve_game(game_id)
         if game is None or self._app._demo_mode:
@@ -128,13 +137,15 @@ class CompressionController:
             )
             return False
         try:
-            task = method(game)
+            task = method(game, exact=exact)
         except Exception as error:
             self._app._report_error(f"verifying compression for {game.name}", error)
             return False
         self._app._reload_tasks()
         self._app._emit_toast(
-            _MEASUREMENT_AUTH_TOAST,
+            _MEASUREMENT_AUTH_TOAST
+            if exact
+            else "Basic Btrfs verification started",
             "info",
         )
         logger.info(
@@ -564,6 +575,7 @@ class CompressionController:
             self._app._reported_terminal_tasks.add(task_id)
             if task.task_type is TaskType.VERIFICATION:
                 self._app.toastDismissRequested.emit(_MEASUREMENT_AUTH_TOAST)
+            verification_propagated = True
             if status == TaskStatus.COMPLETED.value:
                 automatic_completion = bool(
                     task.metadata.get("automatic") is True
@@ -579,8 +591,60 @@ class CompressionController:
                     self._app._reload_updates()
                     self._app._reload_system_info()
                 elif task.task_type is TaskType.VERIFICATION:
+                    debug_measurement = (
+                        os.environ.get(
+                            "GAME_OPTIMIZATION_DEBUG_COMPRESSION", ""
+                        ).strip()
+                        == "1"
+                    )
+                    if debug_measurement:
+                        logger.info(
+                            "Exact measurement controller before update: "
+                            "taskId=%s taskGameId=%s selectedGameId=%s "
+                            "taskResult=%r selectedMeasurement=%r",
+                            task.id,
+                            task.game_id,
+                            self._app._selected_game_id,
+                            task.result,
+                            self._app._selected_game.get(
+                                "currentCompressionMeasurement", {}
+                            ),
+                        )
                     self._app._reload_games()
                     self._app._reload_selected_history()
+                    propagated = self._app._current_authoritative_compsize(
+                        task.game_id
+                    )
+                    exact_requested = bool(
+                        task.metadata.get("verification_mode") == "exact"
+                        and task.metadata.get("exact_measurement_available")
+                        is True
+                    )
+                    verification_propagated = bool(
+                        not exact_requested or propagated
+                    )
+                    if debug_measurement:
+                        logger.info(
+                            "Exact measurement controller after update: "
+                            "taskId=%s taskGameId=%s selectedGameId=%s "
+                            "authoritativeMeasurement=%r selectedMeasurement=%r "
+                            "signals=selectedGameChanged,taskFinished",
+                            task.id,
+                            task.game_id,
+                            self._app._selected_game_id,
+                            propagated,
+                            self._app._selected_game.get(
+                                "currentCompressionMeasurement", {}
+                            ),
+                        )
+                    if exact_requested and not verification_propagated:
+                        logger.error(
+                            "Exact measurement completed but was not propagated: "
+                            "taskId=%s taskGameId=%s selectedGameId=%s",
+                            task.id,
+                            task.game_id,
+                            self._app._selected_game_id,
+                        )
                 elif (
                     task.task_type is TaskType.ANALYSIS
                     and task.game_id in self._app._pending_automatic_games
@@ -593,9 +657,27 @@ class CompressionController:
                     not automatic_completion
                     or self._app._settings_model.automatic_compression_notify
                 ):
-                    self._app._emit_toast(
-                        f"{presented['name']} completed", "success"
-                    )
+                    if (
+                        task.task_type is TaskType.VERIFICATION
+                        and task.metadata.get("exact_measurement_available") is False
+                    ):
+                        self._app._emit_toast(
+                            "Basic Btrfs verification completed; exact "
+                            "compsize measurement is unavailable",
+                            "warning",
+                        )
+                    elif (
+                        task.task_type is TaskType.VERIFICATION
+                        and not verification_propagated
+                    ):
+                        self._app._emit_toast(
+                            "Exact compression measurement could not update the game state",
+                            "error",
+                        )
+                    else:
+                        self._app._emit_toast(
+                            f"{presented['name']} completed", "success"
+                        )
             elif status == TaskStatus.FAILED.value:
                 self._app._pending_automatic_games.discard(task.game_id)
                 logger.error(

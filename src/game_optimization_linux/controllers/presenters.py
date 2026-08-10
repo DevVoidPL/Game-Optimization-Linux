@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QUrl
 
+from ..models import is_exact_compsize_measurement_source
+
 from ..services.benchmark_estimates import (
     current_compression_saving,
     normalized_benchmark_projection,
@@ -155,10 +157,9 @@ def game_to_qml(
     )
     verification_complete = bool(
         verification_status == "completed"
-        and str(
-            verification_measurement.get("measurement_source") or ""
-        ).casefold()
-        == "polkit_helper"
+        and is_exact_compsize_measurement_source(
+            verification_measurement.get("measurement_source")
+        )
         and verification_disk_bytes is not None
         and verification_uncompressed_bytes is not None
         and verification_referenced_bytes is not None
@@ -181,8 +182,9 @@ def game_to_qml(
     )
     after_complete = bool(
         result_authoritative
-        and str(after_map.get("measurement_source") or "").casefold()
-        == "polkit_helper"
+        and is_exact_compsize_measurement_source(
+            after_map.get("measurement_source")
+        )
         and after_disk_bytes is not None
         and after_uncompressed_bytes is not None
         and after_referenced_bytes is not None
@@ -562,6 +564,10 @@ def task_to_qml(task: Task) -> dict[str, Any]:
         ),
         "warnings": qml_value(metadata.get("warnings") or []),
         "outcome": str(metadata.get("outcome") or ""),
+        "verificationMode": str(metadata.get("verification_mode") or ""),
+        "exactMeasurementAvailable": bool(
+            metadata.get("exact_measurement_available", False)
+        ),
     }
 
 

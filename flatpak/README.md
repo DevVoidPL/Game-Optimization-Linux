@@ -1,12 +1,26 @@
 # Game Optimization Linux Flatpak
 
-Build and install the development package without root:
+Build the development repository without installing from inside Flatpak Builder:
 
 ```bash
-flatpak run --command=flatpak-builder org.flatpak.Builder \
-  --user --install --force-clean build-flatpak \
+flatpak run --filesystem="$PWD" --command=flatpak-builder org.flatpak.Builder \
+  --force-clean --repo=.flatpak-build-repo build-flatpak \
   flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml
 ```
+
+Export the bundle and install it with the host Flatpak executable:
+
+```bash
+flatpak build-bundle .flatpak-build-repo \
+  dist/Game-Optimization-Linux-0.1.4-alpha-x86_64.flatpak \
+  io.github.DevVoidPL.GameOptimizationLinux master
+flatpak install --user --reinstall \
+  dist/Game-Optimization-Linux-0.1.4-alpha-x86_64.flatpak
+```
+
+Do not pass `--install` to Flatpak Builder running inside its sandbox. That
+would export a desktop entry pointing at the Builder sandbox's
+`/app/bin/flatpak` instead of the host Flatpak executable.
 
 The manifest pins `py7zr` and all runtime dependencies. Archive extraction is
 performed inside the sandbox and never calls a host `7z` executable.

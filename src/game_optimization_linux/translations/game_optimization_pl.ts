@@ -1151,12 +1151,12 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+45"/>
+        <location line="+35"/>
         <source>On</source>
         <translation>Włączone</translation>
     </message>
     <message>
-        <location line="-45"/>
+        <location line="-35"/>
         <source>Controlled by interface mode</source>
         <translation>Zależne od trybu interfejsu</translation>
     </message>
@@ -1166,29 +1166,24 @@
         <translation>Automatycznie włączaj Couch Mode, gdy Game Optimization wykryje sterowanie kontrolerem.</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>Vibration</source>
-        <translation>Wibracje</translation>
+        <translation type="vanished">Wibracje</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>Planned</source>
-        <translation>Planowane</translation>
+        <translation type="vanished">Planowane</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>Controller vibration is planned for a later implementation stage.</source>
-        <translation>Wibracje kontrolera są planowane na późniejszy etap implementacji.</translation>
+        <translation type="vanished">Wibracje kontrolera są planowane na późniejszy etap implementacji.</translation>
     </message>
     <message>
-        <location line="+3"/>
         <source>Interface sounds</source>
-        <translation>Dźwięki interfejsu</translation>
+        <translation type="vanished">Dźwięki interfejsu</translation>
     </message>
     <message>
-        <location line="+2"/>
         <source>Couch Mode does not play interface sounds at this implementation stage.</source>
-        <translation>Na tym etapie Couch Mode nie odtwarza dźwięków interfejsu.</translation>
+        <translation type="vanished">Na tym etapie Couch Mode nie odtwarza dźwięków interfejsu.</translation>
     </message>
     <message>
         <location line="+4"/>
@@ -1211,7 +1206,7 @@
         <translation>Bezpieczne wartości domyślne</translation>
     </message>
     <message>
-        <location line="+233"/>
+        <location line="+232"/>
         <source>Use the controller to choose a category and adjust its options.</source>
         <translation>Użyj kontrolera, aby wybrać kategorię i dostosować jej opcje.</translation>
     </message>
@@ -1231,13 +1226,12 @@
         <translation>Użyj kierunków w lewo i w prawo, aby zmienić wybraną wartość.</translation>
     </message>
     <message>
-        <location line="-370"/>
-        <location line="+34"/>
+        <location line="-335"/>
         <source>Off</source>
         <translation>Wyłączona</translation>
     </message>
     <message>
-        <location line="-82"/>
+        <location line="-72"/>
         <source>General</source>
         <translation>Ogólne</translation>
     </message>
@@ -1267,12 +1261,12 @@
         <translation>Tryb i bezpieczne ustawienia domyślne</translation>
     </message>
     <message>
-        <location line="+48"/>
+        <location line="+38"/>
         <source>Restore safe controller and Couch Mode defaults without changing game data.</source>
         <translation>Przywróć bezpieczne ustawienia domyślne kontrolera i Couch Mode bez zmiany danych gier.</translation>
     </message>
     <message>
-        <location line="+225"/>
+        <location line="+224"/>
         <source>Couch Mode settings</source>
         <translation>Ustawienia trybu kanapowego</translation>
     </message>
@@ -1297,7 +1291,7 @@
         <translation type="vanished">Brak aktywnego kontrolera</translation>
     </message>
     <message>
-        <location line="-232"/>
+        <location line="-231"/>
         <source>Switch to Desktop Mode</source>
         <translation>Przejdź do trybu pulpitu</translation>
     </message>
@@ -1306,7 +1300,7 @@
         <translation type="vanished">Wróć do pełnego interfejsu pulpitu</translation>
     </message>
     <message>
-        <location line="-26"/>
+        <location line="-16"/>
         <source>Interface mode</source>
         <translation>Tryb interfejsu</translation>
     </message>
@@ -4128,12 +4122,11 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Anuluj zadanie i zamknij</translation>
     </message>
     <message>
-        <location line="+85"/>
         <source>Not checked</source>
-        <translation>Nie sprawdzono</translation>
+        <translation type="vanished">Nie sprawdzono</translation>
     </message>
     <message>
-        <location line="+90"/>
+        <location line="+171"/>
         <source>This page could not be opened</source>
         <translation>Nie udało się otworzyć tej strony</translation>
     </message>
@@ -5135,19 +5128,19 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation type="vanished">Nadaj priorytet płynności klatek i wydajności na pierwszym planie.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="+51"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="+57"/>
         <source>Maximum Performance</source>
         <translation>Maksymalna wydajność</translation>
     </message>
     <message>
         <location line="+0"/>
         <location line="+6"/>
-        <location line="+197"/>
+        <location line="+573"/>
         <source>Automatic</source>
         <translation>Automatyczny</translation>
     </message>
     <message>
-        <location line="-201"/>
+        <location line="-577"/>
         <source>Competitive</source>
         <translation>Rywalizacyjna</translation>
     </message>
@@ -5178,11 +5171,24 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+0"/>
+        <location line="+241"/>
+        <location line="+7"/>
+        <location line="+9"/>
+        <location line="+7"/>
+        <location line="+7"/>
+        <location line="+7"/>
+        <location line="+6"/>
+        <location line="+41"/>
+        <location line="+1"/>
+        <location line="+1"/>
+        <location line="+1"/>
+        <location line="+1"/>
+        <location line="+1"/>
         <source>Unknown</source>
         <translation>Nieznana</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="-328"/>
         <source>Lowest latency</source>
         <translation>Najniższe opóźnienia</translation>
     </message>
@@ -5222,12 +5228,12 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Jakość</translation>
     </message>
     <message>
-        <location line="+47"/>
+        <location line="+50"/>
         <source>None</source>
         <translation>Brak</translation>
     </message>
     <message>
-        <location line="+71"/>
+        <location line="+88"/>
         <source>Invalid optimization profile</source>
         <translation>Nieprawidłowy profil optymalizacji</translation>
     </message>
@@ -5237,12 +5243,11 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Nie udało się zapisać profilu optymalizacji</translation>
     </message>
     <message>
-        <location line="+18"/>
         <source>Game Optimization recommendation</source>
-        <translation>Rekomendacja Game Optimization</translation>
+        <translation type="vanished">Rekomendacja Game Optimization</translation>
     </message>
     <message>
-        <location line="+1"/>
+        <location line="+369"/>
         <source>Preliminary recommendation - game measurement required</source>
         <translation>Rekomendacja wstępna - wymaga pomiaru gry</translation>
     </message>
@@ -5250,6 +5255,20 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <location line="+1"/>
         <source>Target: %1 FPS</source>
         <translation>Cel: %1 FPS</translation>
+    </message>
+    <message>
+        <source>Analyze</source>
+        <translation type="vanished">Analizuj</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Exact changes are shown in the launch plan below</source>
+        <translation>Dokładne zmiany są pokazane w planie uruchomienia poniżej</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Analyze the current profile before applying it</source>
+        <translation>Przeanalizuj bieżący profil przed jego zastosowaniem</translation>
     </message>
     <message>
         <location line="+23"/>
@@ -5273,6 +5292,359 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+3"/>
+        <source>Classification source: %1, confidence: %2%</source>
+        <translation>Źródło klasyfikacji: %1, pewność: %2%</translation>
+    </message>
+    <message>
+        <location line="-267"/>
+        <location line="+10"/>
+        <location line="+257"/>
+        <source>not detected</source>
+        <translation>niewykryta</translation>
+    </message>
+    <message>
+        <location line="-406"/>
+        <source>Game analysis could not start</source>
+        <translation>Nie udało się rozpocząć analizy gry</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Baseline session started. Play a representative part of the game, then exit normally.</source>
+        <translation>Rozpoczęto sesję bazową. Zagraj w reprezentatywny fragment gry, a następnie zakończ ją normalnie.</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Baseline recording could not start</source>
+        <translation>Nie udało się rozpocząć nagrywania pomiaru bazowego</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <location line="+243"/>
+        <source>Unavailable</source>
+        <translation>Niedostępne</translation>
+    </message>
+    <message>
+        <location line="-218"/>
+        <source>Detected game</source>
+        <translation>Wykryta gra</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Analyzing</source>
+        <translation>Analizowanie</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Analyzed</source>
+        <translation>Przeanalizowano</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Analysis failed</source>
+        <translation>Analiza nie powiodła się</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Not analyzed</source>
+        <translation>Nie przeanalizowano</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Analyzing…</source>
+        <translation>Analizowanie…</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Analyze Game</source>
+        <translation>Analizuj grę</translation>
+    </message>
+    <message>
+        <location line="+15"/>
+        <source>Engine</source>
+        <translation>Silnik</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Graphics API</source>
+        <translation>API grafiki</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Available graphics APIs</source>
+        <translation>Dostępne API graficzne</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Runtime</source>
+        <translation>Środowisko uruchomieniowe</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Architecture</source>
+        <translation>Architektura</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Category</source>
+        <translation>Kategoria</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Executable</source>
+        <translation>Plik wykonywalny</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Engine confidence: %1% - source: %2</source>
+        <translation>Pewność wykrycia silnika: %1% - źródło: %2</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>Category source: %1 - confidence: %2%</source>
+        <translation>Źródło kategorii: %1 - pewność: %2%</translation>
+    </message>
+    <message>
+        <location line="+12"/>
+        <source>System snapshot</source>
+        <translation>Stan systemu</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>CPU</source>
+        <translation>CPU</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>GPU</source>
+        <translation>GPU</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>RAM</source>
+        <translation>RAM</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>VRAM</source>
+        <translation>VRAM</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Display</source>
+        <translation>Ekran</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Resolution</source>
+        <translation>Rozdzielczość</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Game analysis failed</source>
+        <translation>Analiza gry nie powiodła się</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Performance analysis</source>
+        <translation>Analiza wydajności</translation>
+    </message>
+    <message>
+        <source>MangoHud baseline loaded - %1 samples</source>
+        <translation type="vanished">Wczytano pomiar bazowy MangoHud - próbki: %1</translation>
+    </message>
+    <message>
+        <source>Baseline required - enable MangoHud logging and record a representative session</source>
+        <translation type="vanished">Wymagany pomiar bazowy - włącz logowanie MangoHud i zarejestruj reprezentatywną sesję</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Baseline recorded</source>
+        <translation>Zarejestrowano pomiar bazowy</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Waiting for the game to start...</source>
+        <translation>Oczekiwanie na uruchomienie gry...</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <location line="+14"/>
+        <source>Recording...</source>
+        <translation>Nagrywanie...</translation>
+    </message>
+    <message>
+        <location line="-13"/>
+        <source>Processing MangoHud log...</source>
+        <translation>Przetwarzanie logu MangoHud...</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Baseline recording failed: %1</source>
+        <translation>Nagrywanie pomiaru bazowego nie powiodło się: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>No usable log was produced</source>
+        <translation>Nie utworzono użytecznego logu</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Baseline: Not recorded</source>
+        <translation>Pomiar bazowy: Nie zarejestrowano</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Record baseline</source>
+        <translation>Nagraj pomiar bazowy</translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <location line="+289"/>
+        <source>Import MangoHud log</source>
+        <translation>Importuj log MangoHud</translation>
+    </message>
+    <message>
+        <location line="-281"/>
+        <source>Recording uses a private one-session MangoHud configuration and does not modify the saved game profile.</source>
+        <translation>Nagrywanie używa prywatnej konfiguracji MangoHud dla jednej sesji i nie zmienia zapisanego profilu gry.</translation>
+    </message>
+    <message>
+        <location line="+11"/>
+        <source>Duration</source>
+        <translation>Czas trwania</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Average FPS</source>
+        <translation>Średnie FPS</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>1% low</source>
+        <translation>1% low</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Frametime</source>
+        <translation>Czas klatki</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>CPU usage</source>
+        <translation>Użycie CPU</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>GPU usage</source>
+        <translation>Użycie GPU</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>RAM usage</source>
+        <translation>Użycie RAM</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>VRAM usage</source>
+        <translation>Użycie VRAM</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Bottleneck</source>
+        <translation>Wąskie gardło</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Insufficient data</source>
+        <translation>Niewystarczające dane</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Confidence</source>
+        <translation>Pewność</translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>Recommendations</source>
+        <translation>Rekomendacje</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>No safe optimization recommendations were found</source>
+        <translation>Nie znaleziono bezpiecznych rekomendacji optymalizacji</translation>
+    </message>
+    <message>
+        <location line="+21"/>
+        <source>Reversible</source>
+        <translation>Odwracalne</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Manual rollback</source>
+        <translation>Ręczne cofnięcie</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Why: %1</source>
+        <translation>Dlaczego: %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Change: %1 → %2</source>
+        <translation>Zmiana: %1 → %2</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Expected effect: %1</source>
+        <translation>Oczekiwany efekt: %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Quality impact: %1</source>
+        <translation>Wpływ na jakość: %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Risk: %1</source>
+        <translation>Ryzyko: %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Files: %1</source>
+        <translation>Pliki: %1</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Apply</source>
+        <translation>Zastosuj</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Optimization applied</source>
+        <translation>Zastosowano optymalizację</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Optimization could not be applied</source>
+        <translation>Nie udało się zastosować optymalizacji</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Measured optimization recommendations</source>
+        <translation>Rekomendacje optymalizacji oparte na pomiarze</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Preliminary settings</source>
+        <translation>Ustawienia wstępne</translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Preview changes</source>
+        <translation>Podgląd zmian</translation>
+    </message>
+    <message>
+        <location line="+42"/>
         <source>User goal</source>
         <translation>Cel użytkownika</translation>
     </message>
@@ -5389,8 +5761,43 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+1"/>
+        <source>Warnings: %1</source>
+        <translation>Ostrzeżenia: %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>Environment conflicts: %1</source>
         <translation>Konflikty środowiska: %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Decision sources: %1</source>
+        <translation>Źródła decyzji: %1</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Preset constraints: %1</source>
+        <translation>Ograniczenia presetu: %1</translation>
+    </message>
+    <message>
+        <location line="+27"/>
+        <source>Apply profile</source>
+        <translation>Zastosuj profil</translation>
+    </message>
+    <message>
+        <location line="+13"/>
+        <source>MangoHud logs (*.csv)</source>
+        <translation>Logi MangoHud (*.csv)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>All files (*)</source>
+        <translation>Wszystkie pliki (*)</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>MangoHud log could not be imported</source>
+        <translation>Nie udało się zaimportować logu MangoHud</translation>
     </message>
     <message>
         <source>Proton overrides: %1</source>
@@ -5401,7 +5808,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation type="vanished">Nadpisania Protona: brak</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="-39"/>
         <source>Steam connection</source>
         <translation>Połączenie ze Steam</translation>
     </message>
@@ -5441,16 +5848,15 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Steam → Właściwości → Ogólne → Opcje uruchamiania</translation>
     </message>
     <message>
-        <location line="+6"/>
         <source>Save profile</source>
-        <translation>Zapisz profil</translation>
+        <translation type="vanished">Zapisz profil</translation>
     </message>
     <message>
         <source>Useful defaults with moderate system impact.</source>
         <translation type="vanished">Przydatne ustawienia domyślne o umiarkowanym wpływie na system.</translation>
     </message>
     <message>
-        <location line="-281"/>
+        <location line="-655"/>
         <source>Balanced</source>
         <translation>Zrównoważony</translation>
     </message>
@@ -5492,7 +5898,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation type="vanished">Narzędzia środowiska uruchomieniowego</translation>
     </message>
     <message>
-        <location line="+209"/>
+        <location line="+585"/>
         <source>GameMode</source>
         <translation>GameMode</translation>
     </message>
@@ -6089,7 +6495,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Określa ilość zapisywanych informacji diagnostycznych</translation>
     </message>
     <message>
-        <location line="+451"/>
+        <location line="+490"/>
         <source>Appearance</source>
         <translation>Wygląd</translation>
     </message>
@@ -6134,68 +6540,63 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Tryb wstępnie wybrany po otwarciu karty Pamięć masowa</translation>
     </message>
     <message>
-        <location line="-419"/>
-        <location line="+423"/>
+        <location line="-458"/>
+        <location line="+462"/>
         <source>Fast</source>
         <translation>Szybki</translation>
     </message>
     <message>
-        <location line="-423"/>
-        <location line="+423"/>
+        <location line="-462"/>
+        <location line="+462"/>
         <source>Balanced</source>
         <translation>Zrównoważony</translation>
     </message>
     <message>
-        <location line="-423"/>
-        <location line="+423"/>
+        <location line="-462"/>
+        <location line="+462"/>
         <source>Maximum</source>
         <translation>Maksymalny</translation>
     </message>
     <message>
-        <location line="-423"/>
-        <location line="+423"/>
+        <location line="-462"/>
+        <location line="+462"/>
         <source>Auto</source>
         <translation>Automatyczny</translation>
     </message>
     <message>
-        <location line="+12"/>
         <source>CPU usage limit</source>
-        <translation>Limit użycia CPU</translation>
+        <translation type="vanished">Limit użycia CPU</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>Maximum CPU share for future background enhancement jobs</source>
-        <translation>Maksymalny udział CPU dla przyszłych zadań ulepszania w tle</translation>
+        <translation type="vanished">Maksymalny udział CPU dla przyszłych zadań ulepszania w tle</translation>
     </message>
     <message>
-        <location line="-203"/>
-        <location line="+217"/>
-        <location line="+34"/>
+        <location line="-179"/>
         <source>%1%</source>
         <translation>%1%</translation>
     </message>
     <message>
-        <location line="-351"/>
+        <location line="-150"/>
         <source>Controller</source>
         <translation>Kontroler</translation>
     </message>
     <message>
-        <location line="+7"/>
         <source>SDL3 available</source>
-        <translation>SDL3 dostępne</translation>
+        <translation type="vanished">SDL3 dostępne</translation>
     </message>
     <message>
-        <location line="+0"/>
+        <location line="+12"/>
         <source>SDL3 missing</source>
         <translation>Brak SDL3</translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="+17"/>
         <source>Install SDL3 to enable controller detection and Couch Mode input.</source>
         <translation>Zainstaluj SDL3, aby włączyć wykrywanie kontrolerów i sterowanie trybem kanapowym.</translation>
     </message>
     <message>
-        <location line="+14"/>
+        <location line="+50"/>
         <source>Controller mode</source>
         <translation>Tryb kontrolera</translation>
     </message>
@@ -6255,7 +6656,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>%1 ms</translation>
     </message>
     <message>
-        <location line="-358"/>
+        <location line="-408"/>
         <source>Hidden Updates history</source>
         <translation>Historia ukrytych aktualizacji</translation>
     </message>
@@ -6371,7 +6772,59 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Tryb automatyczny nigdy nie omija zabezpieczeń: niedostępne biblioteki, uruchomione lub aktualizowane gry, brak miejsca, współdzielone extenty i nieznany stan współdzielenia blokują zapis.</translation>
     </message>
     <message>
-        <location line="+52"/>
+        <location line="+32"/>
+        <source>Controller connected</source>
+        <translation>Kontroler podłączony</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <source>Input access unavailable</source>
+        <translation>Brak dostępu do urządzeń wejściowych</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>No controller detected</source>
+        <translation>Nie wykryto kontrolera</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Controller status is unavailable</source>
+        <translation>Status kontrolera jest niedostępny</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>SDL3 library</source>
+        <translation>Biblioteka SDL3</translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <location line="+7"/>
+        <source>Available</source>
+        <translation>Dostępne</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <location line="+7"/>
+        <source>Unavailable</source>
+        <translation>Niedostępne</translation>
+    </message>
+    <message>
+        <location line="-3"/>
+        <source>Input device access</source>
+        <translation>Dostęp do urządzeń wejściowych</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Joysticks detected</source>
+        <translation>Wykryte joysticki</translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Gamepads detected</source>
+        <translation>Wykryte gamepady</translation>
+    </message>
+    <message>
+        <location line="+15"/>
         <source>Choose startup and automatic switching behavior; F11 always remains available</source>
         <translation>Wybierz zachowanie przy starcie i automatyczne przełączanie; klawisz F11 jest zawsze dostępny</translation>
     </message>
@@ -6431,27 +6884,23 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Zamknij launcher</translation>
     </message>
     <message>
-        <location line="+12"/>
         <source>Interface sounds</source>
-        <translation>Dźwięki interfejsu</translation>
+        <translation type="vanished">Dźwięki interfejsu</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>Optional navigation sounds; disabled by default</source>
-        <translation>Opcjonalne dźwięki nawigacji; domyślnie wyłączone</translation>
+        <translation type="vanished">Opcjonalne dźwięki nawigacji; domyślnie wyłączone</translation>
     </message>
     <message>
-        <location line="+148"/>
         <source>GPU usage limit</source>
-        <translation>Limit użycia GPU</translation>
+        <translation type="vanished">Limit użycia GPU</translation>
     </message>
     <message>
-        <location line="+1"/>
         <source>Maximum GPU share for future texture enhancement jobs</source>
-        <translation>Maksymalny udział GPU dla przyszłych zadań ulepszania tekstur</translation>
+        <translation type="vanished">Maksymalny udział GPU dla przyszłych zadań ulepszania tekstur</translation>
     </message>
     <message>
-        <location line="+41"/>
+        <location line="+125"/>
         <source>Storage locations</source>
         <translation>Lokalizacje danych</translation>
     </message>
@@ -6619,7 +7068,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Aplikacja</translation>
     </message>
     <message>
-        <location line="+18"/>
+        <location line="+16"/>
         <source>Games</source>
         <translation>Gry</translation>
     </message>
@@ -6649,17 +7098,15 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>PULPIT</translation>
     </message>
     <message>
-        <location line="+119"/>
         <source>Not checked</source>
-        <translation>Nie sprawdzono</translation>
+        <translation type="vanished">Nie sprawdzono</translation>
     </message>
     <message>
-        <location line="+8"/>
         <source>Version %1</source>
-        <translation>Wersja %1</translation>
+        <translation type="vanished">Wersja %1</translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+96"/>
         <source>Expand sidebar</source>
         <translation>Rozwiń pasek boczny</translation>
     </message>
@@ -6681,7 +7128,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
 <context>
     <name>StorageTab</name>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="+167"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="+196"/>
         <source>automatic</source>
         <translation>automatycznie</translation>
     </message>
@@ -6730,23 +7177,36 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Wybiera poziom 1, 3, 6 lub 9 na podstawie zmierzonych próbek.</translation>
     </message>
     <message>
-        <location line="+169"/>
+        <location line="+179"/>
+        <source>Exact compsize / polkit_compsize</source>
+        <translation>Dokładny compsize / polkit_compsize</translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Exact compsize / polkit_helper</source>
+        <translation>Dokładny compsize / polkit_helper</translation>
+    </message>
+    <message>
+        <location line="+71"/>
         <location line="+3"/>
         <location line="+19"/>
         <location line="+3"/>
         <location line="+51"/>
-        <location line="+467"/>
-        <location line="+37"/>
+        <location line="+497"/>
+        <location line="+39"/>
         <location line="+12"/>
         <location line="+9"/>
+        <location line="+8"/>
         <location line="+21"/>
-        <location line="+10"/>
-        <location line="+10"/>
+        <location line="+15"/>
+        <location line="+14"/>
+        <location line="+16"/>
+        <location line="+16"/>
         <location line="+13"/>
         <location line="+13"/>
         <location line="+20"/>
         <location line="+12"/>
-        <location line="+73"/>
+        <location line="+76"/>
         <location line="+10"/>
         <location line="+9"/>
         <location line="+9"/>
@@ -6762,7 +7222,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Niedostępne</translation>
     </message>
     <message>
-        <location line="-1446"/>
+        <location line="-1530"/>
         <source>B</source>
         <translation>B</translation>
     </message>
@@ -6791,12 +7251,12 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <location line="+15"/>
         <location line="+33"/>
         <location line="+57"/>
-        <location line="+854"/>
+        <location line="+938"/>
         <source>Not estimated</source>
         <translation>Brak oszacowania</translation>
     </message>
     <message>
-        <location line="-958"/>
+        <location line="-1042"/>
         <source>%1-%2</source>
         <translation>%1-%2</translation>
     </message>
@@ -6817,12 +7277,12 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+910"/>
+        <location line="+994"/>
         <source>Low benefit</source>
         <translation>Mała korzyść</translation>
     </message>
     <message>
-        <location line="-904"/>
+        <location line="-988"/>
         <location line="+2"/>
         <source>None detected</source>
         <translation>Nie wykryto</translation>
@@ -7004,7 +7464,34 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Anuluj analizę</translation>
     </message>
     <message>
-        <location line="+158"/>
+        <location line="+35"/>
+        <source>Waiting for authorization…</source>
+        <translation>Oczekiwanie na autoryzację…</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Exact measurement</source>
+        <translation>Dokładny pomiar</translation>
+    </message>
+    <message>
+        <location line="+80"/>
+        <source>Authorization cancelled</source>
+        <translation>Anulowano autoryzację</translation>
+    </message>
+    <message>
+        <location line="+4"/>
+        <location line="+118"/>
+        <source>Basic verification completed</source>
+        <translation>Podstawowa weryfikacja zakończona</translation>
+    </message>
+    <message>
+        <location line="-116"/>
+        <location line="+120"/>
+        <source>Exact measurement unavailable</source>
+        <translation>Dokładny pomiar niedostępny</translation>
+    </message>
+    <message>
+        <location line="-44"/>
         <source>Compression classification</source>
         <translation>Klasyfikacja kompresji</translation>
     </message>
@@ -7014,12 +7501,38 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Odzyskane podczas ostatniej operacji Game Optimization</translation>
     </message>
     <message>
-        <location line="+101"/>
+        <location line="+17"/>
+        <location line="+4"/>
+        <source>Basic Btrfs verification</source>
+        <translation>Podstawowa weryfikacja Btrfs</translation>
+    </message>
+    <message>
+        <location line="+8"/>
+        <source>Exact measurement completed</source>
+        <translation>Dokładny pomiar zakończony</translation>
+    </message>
+    <message>
+        <location line="+14"/>
+        <source>Exclusive data (btrfs filesystem du)</source>
+        <translation>Dane wyłączne (btrfs filesystem du)</translation>
+    </message>
+    <message>
+        <location line="+16"/>
+        <source>Shared data (btrfs filesystem du)</source>
+        <translation>Dane współdzielone (btrfs filesystem du)</translation>
+    </message>
+    <message>
+        <location line="+83"/>
         <source>Current total saving may predate Game Optimization. Only a valid compsize before/after pair is attributed to the last Game Optimization operation.</source>
         <translation>Obecna całkowita oszczędność mogła powstać przed użyciem Game Optimization. Do ostatniej operacji Game Optimization przypisywana jest wyłącznie poprawna para pomiarów compsize przed i po.</translation>
     </message>
     <message>
-        <location line="+224"/>
+        <location line="+20"/>
+        <source>Exact compsize measurement is unavailable. Compression may still be working correctly. Basic read-only Btrfs checks completed, but exact physical usage, compression ratio, and saving cannot be claimed without the optional root-owned Polkit measurement component.</source>
+        <translation>Dokładny pomiar compsize jest niedostępny. Kompresja może nadal działać poprawnie. Podstawowe kontrole Btrfs tylko do odczytu zakończyły się, ale bez opcjonalnego komponentu pomiarowego Polkit należącego do użytkownika root nie można potwierdzić dokładnego użycia fizycznego, współczynnika kompresji ani oszczędności.</translation>
+    </message>
+    <message>
+        <location line="+207"/>
         <source>Current compression effect</source>
         <translation>Obecny efekt kompresji</translation>
     </message>
@@ -7044,7 +7557,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Szacowana ilość danych do przepisania</translation>
     </message>
     <message>
-        <location line="-873"/>
+        <location line="-957"/>
         <source>Analysis complete. Choose a planning profile below.</source>
         <translation>Analiza zakończona. Wybierz poniżej profil planowania.</translation>
     </message>
@@ -7055,46 +7568,46 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Najpierw przeanalizuj grę</translation>
     </message>
     <message>
-        <location line="+311"/>
+        <location line="+335"/>
         <source>%1 files scanned · %2 sampled · %3 s</source>
         <translation>Przeskanowano %1 plików · próbka %2 · %3 s</translation>
     </message>
     <message>
-        <location line="+67"/>
-        <location line="+477"/>
+        <location line="+75"/>
+        <location line="+529"/>
         <source>File size reported by the application scanner</source>
         <translation>Rozmiar plików według skanera aplikacji</translation>
     </message>
     <message>
-        <location line="-471"/>
-        <location line="+476"/>
+        <location line="-523"/>
+        <location line="+528"/>
         <source>Uncompressed extent size (compsize)</source>
         <translation>Nieskompresowany rozmiar extentów (compsize)</translation>
     </message>
     <message>
-        <location line="-464"/>
-        <location line="+475"/>
+        <location line="-516"/>
+        <location line="+527"/>
         <source>Current physical usage (compsize)</source>
         <translation>Aktualne użycie fizyczne (compsize)</translation>
     </message>
     <message>
-        <location line="-463"/>
+        <location line="-515"/>
         <source>Current saving for active files</source>
         <translation>Obecna oszczędność aktywnych plików</translation>
     </message>
     <message>
-        <location line="+30"/>
-        <location line="+179"/>
+        <location line="+38"/>
+        <location line="+223"/>
         <source>Source</source>
         <translation>Źródło</translation>
     </message>
     <message>
-        <location line="-177"/>
+        <location line="-960"/>
         <source>Measurement (compsize)</source>
         <translation>Pomiar (compsize)</translation>
     </message>
     <message>
-        <location line="+140"/>
+        <location line="+923"/>
         <source>Current measured saving</source>
         <translation>Obecna zmierzona oszczędność</translation>
     </message>
@@ -7153,15 +7666,15 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>System plików</translation>
     </message>
     <message>
-        <location line="-916"/>
+        <location line="-1000"/>
         <location line="+242"/>
-        <location line="+675"/>
+        <location line="+759"/>
         <location line="+509"/>
         <source>Unknown</source>
         <translation>Nieznane</translation>
     </message>
     <message>
-        <location line="-1380"/>
+        <location line="-1464"/>
         <source>Auto selected ZSTD level 1 because the measured samples favor speed over a small additional space gain.</source>
         <translation>Auto wybrało poziom ZSTD 1, ponieważ zmierzone próbki wskazują, że szybkość jest korzystniejsza od niewielkiej dodatkowej oszczędności miejsca.</translation>
     </message>
@@ -7332,7 +7845,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Zweryfikuj kompresję</translation>
     </message>
     <message>
-        <location line="+70"/>
+        <location line="+94"/>
         <source>Measured compression result</source>
         <translation>Zmierzony wynik kompresji</translation>
     </message>
@@ -7342,20 +7855,19 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Mierzenie</translation>
     </message>
     <message>
-        <location line="+2"/>
-        <location line="+91"/>
-        <location line="+10"/>
+        <location line="+4"/>
+        <location line="+108"/>
+        <location line="+14"/>
         <source>Measurement failed</source>
         <translation>Pomiar nieudany</translation>
     </message>
     <message>
-        <location line="-96"/>
-        <location line="+94"/>
+        <location line="-113"/>
         <source>Measured</source>
         <translation>Zmierzono</translation>
     </message>
     <message>
-        <location line="-94"/>
+        <location line="+0"/>
         <source>Not measured</source>
         <translation>Nie zmierzono</translation>
     </message>
@@ -7368,12 +7880,12 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation type="vanished">Obecny całkowity efekt kompresji aktywnych plików</translation>
     </message>
     <message>
-        <location line="+92"/>
+        <location line="+107"/>
         <source>Measurement status</source>
         <translation>Status pomiaru</translation>
     </message>
     <message>
-        <location line="+11"/>
+        <location line="+47"/>
         <source>Physical usage before</source>
         <translation>Fizyczne użycie przed</translation>
     </message>
@@ -7408,12 +7920,12 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>compsize mierzy aktywne dane tej gry. Zmiana statvfs całego systemu plików jest pomocnicza i może obejmować niezwiązane zapisy.</translation>
     </message>
     <message>
-        <location line="+24"/>
+        <location line="+25"/>
         <source>Privileged measurement failed: %1</source>
         <translation>Pomiar uprzywilejowany nie powiódł się: %1</translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+4"/>
         <source>The actual saving cannot be claimed because a complete privileged compsize measurement before and after is unavailable.</source>
         <translation>Nie można potwierdzić rzeczywistej oszczędności, ponieważ brakuje kompletnego uprzywilejowanego pomiaru compsize przed i po.</translation>
     </message>
@@ -7590,7 +8102,8 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Rozmiar referencyjny</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="-678"/>
+        <location line="+683"/>
         <source>Current compression ratio</source>
         <translation>Bieżący współczynnik kompresji</translation>
     </message>

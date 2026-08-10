@@ -10,6 +10,8 @@ from collections.abc import Iterable, Mapping
 from datetime import UTC, datetime
 from typing import Any
 
+from ..models import is_exact_compsize_measurement_source
+
 
 STRONG_COMPRESSION_EFFECT_FRACTION = 0.15
 MODERATE_COMPRESSION_EFFECT_FRACTION = 0.05
@@ -159,10 +161,12 @@ def reclaimed_by_last_operation(
 
     complete = bool(
         result.get("measurement_authoritative") is True
-        and str(before_map.get("measurement_source") or "").casefold()
-        == "polkit_helper"
-        and str(after_map.get("measurement_source") or "").casefold()
-        == "polkit_helper"
+        and is_exact_compsize_measurement_source(
+            before_map.get("measurement_source")
+        )
+        and is_exact_compsize_measurement_source(
+            after_map.get("measurement_source")
+        )
         and before_disk is not None
         and after_disk is not None
         and complete_compsize(before_map)

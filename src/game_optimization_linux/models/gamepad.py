@@ -46,6 +46,9 @@ class GamepadDevice:
     mapping_status: str = "Mapped"
     battery_percent: int | None = None
     connected: bool = True
+    guid: str = ""
+    vendor_id: int | None = None
+    product_id: int | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -57,6 +60,9 @@ class GamepadDevice:
             "batteryPercent": self.battery_percent,
             "batteryAvailable": self.battery_percent is not None,
             "connected": bool(self.connected),
+            "guid": self.guid,
+            "vendorId": self.vendor_id,
+            "productId": self.product_id,
         }
 
 

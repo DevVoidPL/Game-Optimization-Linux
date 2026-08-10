@@ -3,10 +3,13 @@ from __future__ import annotations
 import logging
 import os
 from pathlib import Path
+import shlex
 import shutil
 import subprocess
 import sys
+import tomllib
 
+import pytest
 from PySide6.QtGui import QGuiApplication, QImage
 
 from game_optimization_linux import config
@@ -49,6 +52,31 @@ def test_desktop_entry_and_opt_in_installer_use_the_same_app_id() -> None:
     assert f"StartupWMClass={config.APP_ID}\n" in desktop_path.read_text(
         encoding="utf-8"
     )
+    desktop_exec = next(
+        line.removeprefix("Exec=")
+        for line in desktop_path.read_text(encoding="utf-8").splitlines()
+        if line.startswith("Exec=")
+    )
+    assert shlex.split(desktop_exec) == ["game-optimization-linux"]
+    assert "/app/bin/flatpak" not in desktop_exec
+
+    manifest = (
+        project_root / "flatpak" / f"{config.APP_ID}.yml"
+    ).read_text(encoding="utf-8")
+    assert "command: game-optimization-linux\n" in manifest
+    project = tomllib.loads(
+        (project_root / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    assert project["project"]["scripts"]["game-optimization-linux"] == (
+        "game_optimization_linux.main:main"
+    )
+
+    build_instructions = (
+        project_root / "flatpak" / "README.md"
+    ).read_text(encoding="utf-8")
+    builder_command = build_instructions.split("```bash", 1)[1].split("```", 1)[0]
+    assert "--install" not in builder_command
+    assert "--repo=.flatpak-build-repo" in builder_command
     _set_application_metadata()
     assert QGuiApplication.desktopFileName() == config.APP_ID
     assert QGuiApplication.applicationName() == config.APP_NAME
@@ -62,6 +90,47 @@ def test_desktop_entry_and_opt_in_installer_use_the_same_app_id() -> None:
             check=False,
         )
         assert completed.returncode == 0, completed.stderr
+
+
+@pytest.mark.skipif(
+    os.environ.get("GAME_OPTIMIZATION_INSTALLED_FLATPAK_TEST") != "1",
+    reason="requires the freshly installed Flatpak",
+)
+def test_installed_flatpak_export_and_main_command_start() -> None:
+    exported = (
+        Path.home()
+        / ".local/share/flatpak/exports/share/applications"
+        / f"{config.APP_ID}.desktop"
+    )
+    content = exported.read_text(encoding="utf-8")
+    command = next(
+        line.removeprefix("Exec=")
+        for line in content.splitlines()
+        if line.startswith("Exec=")
+    )
+    argv = shlex.split(command)
+    assert argv[0] == shutil.which("flatpak")
+    assert argv[0] != "/app/bin/flatpak"
+    assert "--command=game-optimization-linux" in argv
+    assert config.APP_ID in argv
+
+    completed = subprocess.run(
+        [
+            "timeout", "--signal=TERM", "6s",
+            argv[0], "run", "--user",
+            "--env=GAME_OPTIMIZATION_DEMO=1",
+            "--env=QT_QPA_PLATFORM=offscreen",
+            config.APP_ID, "--desktop", "-platform", "offscreen",
+        ],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    assert completed.returncode == 124, completed.stdout
+    assert "Starting Game Optimization Linux" in completed.stdout
+    assert "Stopped Game Optimization controller" in completed.stdout
 
 
 def test_desktop_installer_uses_a_working_launcher_in_temporary_xdg_home(

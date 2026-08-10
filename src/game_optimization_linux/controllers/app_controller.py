@@ -34,8 +34,10 @@ from ..config import (
     APP_VERSION,
     COMPRESSION_HISTORY_FILE,
     COMPRESSION_BENCHMARK_REPORTS_DIR,
+    DATA_DIR,
     LIBRARY_CACHE_FILE,
     SETTINGS_FILE,
+    STATE_DIR,
     TASK_HISTORY_FILE,
     UPDATE_DISPLAY_STATE_FILE,
     UPDATE_STATE_FILE,
@@ -58,6 +60,7 @@ from ..models import (
     Task,
     TaskStatus,
     TaskType,
+    is_exact_compsize_measurement_source,
 )
 from ..providers import (
     BtrfsCompressionProvider,
@@ -80,9 +83,15 @@ from ..services import (
     HostServiceClient,
     GameUpdateRecord,
     GameArtworkResolver,
+    GameAnalyzer,
+    GameRecommendationEngine,
     GameOptimizationProfileRepository,
     DisplayDetector,
     OptimizationAdvisor,
+    OptimizationChangeService,
+    BottleneckAnalyzer,
+    BaselineSessionRepository,
+    MangoHudLogParser,
     OptimizationLaunchPlanner,
     OptiScalerService,
     RuntimeToolDetector,
@@ -102,6 +111,7 @@ from ..services import (
     UiSoundService,
     UnavailableBackupService,
     UpdateDisplayStateStore,
+    uses_flatpak_steam,
 )
 from ..services.library_cache import LibraryCache
 from ..services.optiscaler_online import (
@@ -257,6 +267,7 @@ class AppController(QObject):
     mangoHudProfileChanged = Signal(str)
     optiScalerChanged = Signal(str)
     protonTweaksChanged = Signal(str)
+    optimizationAnalysisChanged = Signal(str)
 
     toastRequested = Signal(str, str)
     toastDismissRequested = Signal(str)
@@ -461,6 +472,16 @@ class AppController(QObject):
         )
         self._display_detector = display_detector or DisplayDetector()
         self._optimization_advisor = optimization_advisor or OptimizationAdvisor()
+        self._game_analyzer = GameAnalyzer(
+            self._mangohud_launch_integration.executable_resolver
+        )
+        self._mangohud_log_parser = MangoHudLogParser()
+        self._baseline_sessions = BaselineSessionRepository()
+        self._bottleneck_analyzer = BottleneckAnalyzer()
+        self._game_recommendation_engine = GameRecommendationEngine()
+        self._optimization_change_service = OptimizationChangeService(
+            DATA_DIR / "games" / "optimization-changes"
+        )
         self._runner_integration = runner_integration or RunnerIntegration()
         self._optimization_launch_planner = OptimizationLaunchPlanner()
         self._optiscaler_service = optiscaler_service or OptiScalerService(
@@ -548,6 +569,16 @@ class AppController(QObject):
             str, tuple[Future[OptiScalerProfile], Event, str]
         ] = {}
         self._optiscaler_events: SimpleQueue[tuple[str, str, float]] = SimpleQueue()
+        self._optimization_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="game-optimization-analysis",
+        )
+        self._optimization_jobs: dict[str, Future[Any]] = {}
+        self._optimization_analyses: dict[str, Any] = {}
+        self._optimization_comparisons: dict[str, Any] = {}
+        self._optimization_applied_changes: dict[str, dict[str, Any]] = {}
+        self._active_baseline_games: set[str] = set()
+        self._baseline_statuses: dict[str, str] = {}
         self._inventory_completion_pending = bool(
             self._update_tracker is not None
             and not self._update_tracker.initial_inventory_complete
@@ -829,6 +860,10 @@ class AppController(QObject):
     def controllerCount(self) -> int:
         return int(self._gamepad_service.controllerCount)
 
+    @Property("QVariantMap", notify=controllersChanged)
+    def controllerDiagnostics(self) -> dict[str, Any]:
+        return dict(self._gamepad_service.diagnostics)
+
     @Property("QVariantMap", notify=activeControllerChanged)
     def activeController(self) -> dict[str, Any]:
         return dict(self._gamepad_service.activeController)
@@ -990,6 +1025,10 @@ class AppController(QObject):
     @Slot(str, result=bool)
     def verifyCompression(self, game_id: str) -> bool:
         return self._compression_controller.verifyCompression(game_id)
+
+    @Slot(str, result=bool)
+    def exactCompressionMeasurement(self, game_id: str) -> bool:
+        return self._compression_controller.exactCompressionMeasurement(game_id)
 
     @Slot(str, str, bool, result="QVariantMap")
     def prepareCompression(
@@ -1439,6 +1478,55 @@ class AppController(QObject):
     def testGameOptimizationRunner(self, game_id: str) -> dict[str, Any]:
         return self._optimization_controller.testGameOptimizationRunner(game_id)
 
+    @Slot(str, result="QVariantMap")
+    @Slot(str, str, result="QVariantMap")
+    def analyzeGameOptimization(
+        self, game_id: str, log_path: str = ""
+    ) -> dict[str, Any]:
+        return self._optimization_controller.analyzeGameOptimization(
+            game_id, log_path
+        )
+
+    @Slot(str, result="QVariantMap")
+    def recordOptimizationBaseline(self, game_id: str) -> dict[str, Any]:
+        return self._optimization_controller.recordOptimizationBaseline(game_id)
+
+    @Slot(str, result="QVariantMap")
+    def recordOptimizationComparison(self, game_id: str) -> dict[str, Any]:
+        return self._optimization_controller.recordOptimizationComparison(game_id)
+
+    @Slot(str, str, result="QVariantMap")
+    def importOptimizationBaseline(
+        self, game_id: str, log_path: str
+    ) -> dict[str, Any]:
+        return self._optimization_controller.importOptimizationBaseline(
+            game_id, log_path
+        )
+
+    @staticmethod
+    def _runner_report_path(app_id: str) -> Path:
+        return STATE_DIR / "launch-reports" / f"{app_id}.json"
+
+    @Slot(str, result="QVariantMap")
+    def getGameOptimizationAnalysis(self, game_id: str) -> dict[str, Any]:
+        return self._optimization_controller.getGameOptimizationAnalysis(game_id)
+
+    @Slot(str, str, result="QVariantMap")
+    def applyOptimizationCandidate(
+        self, game_id: str, candidate_id: str
+    ) -> dict[str, Any]:
+        return self._optimization_controller.applyOptimizationCandidate(
+            game_id, candidate_id
+        )
+
+    @Slot(str, str, result="QVariantMap")
+    def revertOptimizationChange(
+        self, game_id: str, change_id: str
+    ) -> dict[str, Any]:
+        return self._optimization_controller.revertOptimizationChange(
+            game_id, change_id
+        )
+
     @Slot(str)
     @Slot(str, str)
     def showToast(self, message: str, level: str = "info") -> None:
@@ -1502,6 +1590,21 @@ class AppController(QObject):
             except Exception:
                 logger.exception("Could not stop the OptiScaler executor")
         self._optiscaler_jobs = {}
+        optimization_jobs = getattr(self, "_optimization_jobs", {})
+        for future in tuple(optimization_jobs.values()):
+            future.cancel()
+        optimization_executor = getattr(self, "_optimization_executor", None)
+        if optimization_jobs:
+            try:
+                wait_for_futures(tuple(optimization_jobs.values()), timeout=2.0)
+            except Exception:
+                logger.exception("Could not wait for game analysis tasks cleanly")
+        if optimization_executor is not None:
+            try:
+                optimization_executor.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                logger.exception("Could not stop the game analysis executor")
+        self._optimization_jobs = {}
         shutdown_tasks = getattr(self._task_service, "shutdown", None)
         if callable(shutdown_tasks):
             try:
@@ -2070,9 +2173,8 @@ class AppController(QObject):
 
     @staticmethod
     def _complete_privileged_compsize(measurement: Mapping[str, Any]) -> bool:
-        if (
-            str(measurement.get("measurement_source") or "").casefold()
-            != "polkit_helper"
+        if not is_exact_compsize_measurement_source(
+            measurement.get("measurement_source")
         ):
             return False
         for key in (
@@ -2133,7 +2235,9 @@ class AppController(QObject):
         return self._system_controller._read_filesystems()
 
     def _poll_tasks(self) -> None:
-        return self._compression_controller._poll_tasks()
+        self._compression_controller._poll_tasks()
+        self._optimization_controller._poll_baseline_sessions()
+        self._optimization_controller._poll_analysis_jobs()
 
     def _remember_analysis_report(self, task: Task) -> None:
         return self._compression_controller._remember_analysis_report(task)
