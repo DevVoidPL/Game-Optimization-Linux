@@ -11,8 +11,6 @@ Rectangle {
     property bool collapsed: false
     property string currentPage: "games"
     property string appName: qsTr("Application")
-    property string appVersion: "0.1.4-alpha"
-    property string updateStatus: "Up to date"
     property url logoSource: ""
     property int updatesPendingCount: 0
     readonly property int logoExtent: collapsed ? 42 : 54
@@ -28,12 +26,12 @@ Rectangle {
     }
 
     readonly property var destinations: [
-        { "page": "games", "label": qsTr("Games"), "symbol": "▦" },
-        { "page": "updates", "label": qsTr("Updates"), "symbol": "↓",
+        { "page": "games", "label": qsTr("Games"), "icon": Qt.resolvedUrl("../resources/sidebar-games.svg") },
+        { "page": "updates", "label": qsTr("Updates"), "icon": Qt.resolvedUrl("../resources/sidebar-updates.svg"),
           "count": Math.max(0, sidebar.updatesPendingCount) },
-        { "page": "tasks", "label": qsTr("Tasks"), "symbol": "↻" },
-        { "page": "system", "label": qsTr("System"), "symbol": "◈" },
-        { "page": "settings", "label": qsTr("Settings"), "symbol": "⚙" }
+        { "page": "tasks", "label": qsTr("Tasks"), "icon": Qt.resolvedUrl("../resources/sidebar-tasks.svg") },
+        { "page": "system", "label": qsTr("System"), "icon": Qt.resolvedUrl("../resources/sidebar-system.svg") },
+        { "page": "settings", "label": qsTr("Settings"), "icon": Qt.resolvedUrl("../resources/sidebar-settings.svg") }
     ]
 
     function isSelected(page) {
@@ -135,14 +133,15 @@ Rectangle {
                     contentItem: RowLayout {
                         spacing: 12
 
-                        Label {
+                        Image {
                             Layout.preferredWidth: 46
-                            text: navButton.modelData.symbol
-                            color: sidebar.isSelected(navButton.modelData.page) ? App.Theme.accent : App.Theme.textSecondary
-                            font.pixelSize: 19
-                            font.weight: Font.DemiBold
-                            horizontalAlignment: Text.AlignHCenter
-                            verticalAlignment: Text.AlignVCenter
+                            Layout.preferredHeight: 22
+                            source: navButton.modelData.icon
+                            sourceSize.width: 22
+                            sourceSize.height: 22
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
+                            opacity: sidebar.isSelected(navButton.modelData.page) ? 1.0 : 0.72
                         }
 
                         Label {
@@ -189,51 +188,6 @@ Rectangle {
         }
 
         Item { Layout.fillHeight: true }
-
-        Rectangle {
-            visible: !sidebar.collapsed
-            Layout.fillWidth: true
-            Layout.preferredHeight: updateColumn.implicitHeight + 20
-            radius: App.Theme.radiusMedium
-            color: App.Theme.surfaceRaised
-            border.width: 1
-            border.color: App.Theme.border
-
-            ColumnLayout {
-                id: updateColumn
-                anchors.fill: parent
-                anchors.margins: 10
-                spacing: 3
-
-                RowLayout {
-                    Layout.fillWidth: true
-                    spacing: 7
-
-                    Rectangle {
-                        Layout.preferredWidth: 7
-                        Layout.preferredHeight: 7
-                        radius: 4
-                        color: String(sidebar.updateStatus).toLowerCase().indexOf("up to date") >= 0
-                               ? App.Theme.success : App.Theme.warning
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        text: App.I18n.updateStatus(
-                                  App.Theme.display(sidebar.updateStatus, qsTr("Not checked")))
-                        color: App.Theme.textSecondary
-                        font.pixelSize: App.Theme.fontCaption
-                        elide: Text.ElideRight
-                    }
-                }
-
-                Label {
-                    text: qsTr("Version %1").arg(App.Theme.display(sidebar.appVersion, "0.1.4-alpha"))
-                    color: App.Theme.textMuted
-                    font.pixelSize: 10
-                }
-            }
-        }
 
         Button {
             id: collapseButton

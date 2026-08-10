@@ -2,22 +2,30 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import replace
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+import json
 import logging
 import os
+from pathlib import Path
+import re
 import shlex
 from typing import TYPE_CHECKING, Any
 
+from PySide6.QtCore import QUrl
 from PySide6.QtGui import QGuiApplication
 
 from ..models import (
     Game,
+    DetectedValue,
+    DetectionEvidence,
+    OptimizationAnalysis,
     GameOptimizationProfile,
     Launcher,
     OptimizationOptions,
     OptimizationProfile,
 )
-from ..services import OptiScalerError, ProtonTweaksError
+from ..services import OptiScalerError, ProtonTweaksError, uses_flatpak_steam
+from ..services.performance_analysis import compare_measurements
 
 if TYPE_CHECKING:
     from .app_controller import AppController
@@ -131,8 +139,11 @@ class OptimizationController:
         if not app_id:
             return {"success": False, "error": "Optimization profiles require a supported game"}
         try:
-            profile = self._app._optimization_profile_repository.load(app_id)
-            return self._app._optimization_profile_to_qml(profile)
+            previous_profile = self._app._optimization_profile_repository.load(app_id)
+            profile = previous_profile
+            result = self._app._optimization_profile_to_qml(profile)
+            result["gameAnalysis"] = self.getGameOptimizationAnalysis(game_id)
+            return result
         except Exception as error:
             logger.warning("Could not load optimization profile for %s: %s", game.id, error)
             return {"success": False, "error": str(error)}
@@ -163,7 +174,9 @@ class OptimizationController:
             )
             profile = self._app._optimization_profile_from_payload(app_id, values)
             display = self._app._optimization_display_for(profile.target_display_id)
-            recommendation = self._app._optimization_advisor.recommend(profile, display)
+            recommendation = self._app._optimization_advisor.recommend(
+                profile, display, system_info=self._app._system_info
+            )
             profile = replace(
                 profile,
                 target_fps=(
@@ -179,6 +192,7 @@ class OptimizationController:
                 raise ValueError(gamemode.message)
             if profile.gamescope_enabled and not gamescope.available:
                 raise ValueError(gamescope.message)
+            result = self._app._optimization_profile_to_qml(profile)
             path = self._app._optimization_profile_repository.save(profile)
             try:
                 if self._app._gamescope_owns_fps_limit(profile):
@@ -186,7 +200,6 @@ class OptimizationController:
             except Exception:
                 self._app._optimization_profile_repository.save(previous_profile)
                 raise
-            result = self._app._optimization_profile_to_qml(profile)
             result.update({"success": True, "profilePath": str(path)})
             self._app._emit_toast("Optimization profile saved", "success")
             return result
@@ -205,6 +218,592 @@ class OptimizationController:
             "success" if result.get("success") else "warning",
         )
         return result
+
+    def analyzeGameOptimization(
+        self, game_id: str, log_path: str = ""
+    ) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        app_id = self._profile_key(game)
+        if game is None or not app_id:
+            return {"success": False, "error": "Game analysis requires an available game"}
+        if game_id in self._app._optimization_jobs:
+            return {"success": True, "status": "running", "gameId": game_id}
+        try:
+            profile = self._app._optimization_profile_repository.load(app_id)
+            display = self._app._optimization_display_for(profile.target_display_id)
+            gamemode, gamescope = self._app._runtime_tool_detector.detect()
+            selected_log = self._select_mangohud_log(game, app_id, log_path)
+            future = self._app._optimization_executor.submit(
+                self._analyze_game,
+                game,
+                profile,
+                display,
+                dict(self._app._system_info),
+                selected_log,
+                gamemode.available,
+                gamescope.available,
+            )
+            self._app._optimization_jobs[game_id] = future
+        except Exception as error:
+            return {"success": False, "error": str(error) or type(error).__name__}
+        return {
+            "success": True,
+            "status": "running",
+            "gameId": game_id,
+            "baselineLog": str(selected_log or ""),
+        }
+
+    def recordOptimizationBaseline(self, game_id: str) -> dict[str, Any]:
+        return self._record_optimization_measurement(game_id, kind="baseline")
+
+    def recordOptimizationComparison(self, game_id: str) -> dict[str, Any]:
+        app_id = self._profile_key(
+            self._app._resolve_game(game_id, show_error=False)
+        )
+        if not app_id or self._app._baseline_sessions.load_measurement(
+            app_id, slot="before"
+        ) is None:
+            return {"success": False, "error": "Record a baseline before the comparison"}
+        return self._record_optimization_measurement(game_id, kind="comparison")
+
+    def _record_optimization_measurement(
+        self, game_id: str, *, kind: str
+    ) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        app_id = self._profile_key(game)
+        if game is None or not app_id or not game.library_available:
+            return {"success": False, "error": "Baseline recording requires an available game"}
+        if not self._app._runner_integration.status().installed:
+            return {"success": False, "error": "Install Game Optimization Runner first"}
+        try:
+            profile = self._app._optimization_profile_repository.load(app_id)
+            if profile.gamescope_enabled and profile.gamescope_mode != "disabled":
+                return {
+                    "success": False,
+                    "error": "Baseline recording currently requires Gamescope to be disabled",
+                }
+            steam_type = "flatpak" if uses_flatpak_steam(game) else "native"
+            availability = self._app._mangohud_detector.detect(steam_type)
+            if not availability.available:
+                return {"success": False, "error": availability.message}
+            if game.launcher is not Launcher.MANUAL or game.data_source.casefold() != "local":
+                preflight_method = getattr(
+                    self._app._runner_integration,
+                    "steam_launch_option_status",
+                    None,
+                )
+                preflight = preflight_method(game) if callable(preflight_method) else None
+                if preflight is not None and preflight.configured is False:
+                    return {
+                        "success": False,
+                        "code": "runner_not_configured",
+                        "error": preflight.message,
+                        "runnerPreflight": preflight.to_dict(),
+                    }
+            session = self._app._baseline_sessions.create(
+                app_id, game.id, kind=kind
+            )
+            if kind == "baseline":
+                self._app._optimization_comparisons.pop(game.id, None)
+            if game.launcher is Launcher.MANUAL and game.data_source.casefold() == "local":
+                self._app._runner_integration.launch_local(game)
+            else:
+                self._app._game_launcher.launch(game)
+            session = self._app._baseline_sessions.mark_waiting_for_runner(
+                app_id, session.id
+            ) or session
+        except Exception as error:
+            try:
+                self._app._baseline_sessions.fail(
+                    app_id, str(error), session.id if "session" in locals() else ""
+                )
+            except Exception:
+                pass
+            return {"success": False, "error": str(error) or type(error).__name__}
+        self._app._active_baseline_games.add(game.id)
+        self._app._baseline_statuses[game.id] = session.status
+        self._app.optimizationAnalysisChanged.emit(game.id)
+        self._app._emit_toast(
+            "Comparison recording will start with the game"
+            if kind == "comparison"
+            else "Baseline recording will start with the game",
+            "info",
+        )
+        return {
+            "success": True,
+            "status": session.status,
+            "baselineSession": session.to_dict(),
+        }
+
+    def importOptimizationBaseline(
+        self, game_id: str, log_path: str
+    ) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        app_id = self._profile_key(game)
+        if game is None or not app_id:
+            return {"success": False, "error": "Select an available game"}
+        text = str(log_path or "").strip()
+        url = QUrl(text)
+        if url.isValid() and url.isLocalFile():
+            text = url.toLocalFile()
+        try:
+            session = self._app._baseline_sessions.import_log(
+                app_id, game.id, Path(text)
+            )
+            log = self._app._baseline_sessions.newest_log(app_id)
+            if log is None:
+                raise ValueError("The imported MangoHud log is empty")
+            self._app._mangohud_log_parser.parse(log)
+            result = self.analyzeGameOptimization(game.id, str(log))
+            if not result.get("success"):
+                raise ValueError(str(result.get("error") or "Could not analyze the imported log"))
+        except Exception as error:
+            try:
+                self._app._baseline_sessions.fail(app_id, str(error))
+            except Exception:
+                pass
+            return {"success": False, "error": str(error) or type(error).__name__}
+        self._app._active_baseline_games.add(game.id)
+        self._app._baseline_statuses[game.id] = session.status
+        self._app.optimizationAnalysisChanged.emit(game.id)
+        return {"success": True, "status": "running", "baselineSession": session.to_dict()}
+
+    def _poll_baseline_sessions(self) -> None:
+        for game_id in tuple(self._app._active_baseline_games):
+            game = self._app._resolve_game(game_id, show_error=False)
+            app_id = self._profile_key(game)
+            session = self._app._baseline_sessions.load(app_id) if app_id else None
+            if game is None or session is None:
+                self._app._active_baseline_games.discard(game_id)
+                continue
+            previous = self._app._baseline_statuses.get(game_id, "")
+            if session.status == "processing":
+                log = self._app._baseline_sessions.newest_log(app_id)
+                if log is not None:
+                    result = (
+                        {"success": True, "status": "running"}
+                        if game_id in self._app._optimization_jobs
+                        else self.analyzeGameOptimization(game_id, str(log))
+                    )
+                    if not result.get("success"):
+                        session = self._app._baseline_sessions.fail(
+                            app_id,
+                            str(result.get("error") or "Baseline analysis failed"),
+                            session.id,
+                        ) or session
+                elif session.finished_at and datetime.now(UTC) - session.finished_at > timedelta(seconds=5):
+                    session = self._app._baseline_sessions.fail(
+                        app_id, "MangoHud did not produce a baseline log", session.id
+                    ) or session
+            elif session.status == "recording":
+                if self._app._baseline_sessions.newest_log(app_id) is not None:
+                    session = self._app._baseline_sessions.mark_waiting_for_game_exit(
+                        app_id, session.id
+                    ) or session
+                elif (
+                    session.started_at
+                    and datetime.now(UTC) - session.started_at > timedelta(hours=4, minutes=5)
+                ):
+                    session = self._app._baseline_sessions.fail(
+                        app_id,
+                        "Baseline recording exceeded the four-hour MangoHud limit",
+                        session.id,
+                    ) or session
+            elif session.status == "waiting_for_game_exit":
+                log = self._app._baseline_sessions.newest_log(app_id)
+                try:
+                    log_stable = bool(
+                        log is not None
+                        and datetime.now(UTC).timestamp() - log.stat().st_mtime >= 15
+                    )
+                except OSError:
+                    log_stable = False
+                if log_stable:
+                    session = self._app._baseline_sessions.finish_from_stable_log(
+                        app_id, session.id
+                    ) or session
+            elif session.status in {"waiting_for_steam", "waiting_for_runner"} and datetime.now(UTC) - session.created_at > timedelta(seconds=45):
+                session = self._app._baseline_sessions.fail(
+                    app_id,
+                    "The Steam launch did not reach Game Optimization Runner",
+                    session.id,
+                ) or session
+            if session.status != previous:
+                logger.info(
+                    "Baseline lifecycle: session=%s appId=%s gameId=%s status=%s "
+                    "runnerPid=%s spawnedPid=%s processGroup=%s handshakeAt=%s "
+                    "runnerCompletion=%s logExists=%s observed=%s reason=%s",
+                    session.id,
+                    app_id,
+                    game_id,
+                    session.status,
+                    session.runner_pid,
+                    session.spawned_pid,
+                    session.process_group,
+                    session.handshake_at.isoformat() if session.handshake_at else "not received",
+                    session.runner_completed_at is not None,
+                    self._app._baseline_sessions.newest_log(app_id) is not None,
+                    list(session.observed_processes),
+                    session.lifecycle_reason or "not reported",
+                )
+                self._app._baseline_statuses[game_id] = session.status
+                self._app.optimizationAnalysisChanged.emit(game_id)
+            if session.status in {"completed", "failed"}:
+                self._app._active_baseline_games.discard(game_id)
+                if session.status == "failed":
+                    self._app._emit_toast(session.error or "Baseline recording failed", "error")
+
+    def _analyze_game(
+        self,
+        game: Game,
+        profile: GameOptimizationProfile,
+        display: Any,
+        system_info: Mapping[str, Any],
+        log_path: Path | None,
+        gamemode_available: bool,
+        gamescope_available: bool,
+    ) -> OptimizationAnalysis:
+        app_id = self._profile_key(game)
+        selected_executable = self._selected_executable(game, app_id)
+        fingerprint = self._app._game_analyzer.analyze(
+            game,
+            system_info=system_info,
+            display=display,
+            category=profile.game_category,
+            manual_category_override=bool(
+                profile.manual_overrides.get("category")
+            ),
+            selected_executable=selected_executable,
+            runtime_hint=self._runtime_hint(app_id, selected_executable),
+        )
+        measurement = (
+            self._app._mangohud_log_parser.parse(log_path)
+            if log_path is not None
+            else None
+        )
+        bottleneck = self._app._bottleneck_analyzer.analyze(
+            measurement,
+            fingerprint.system,
+            target_fps=profile.target_fps,
+        )
+        candidates = self._app._game_recommendation_engine.recommend(
+            fingerprint,
+            measurement,
+            bottleneck,
+            profile,
+            gamemode_available=gamemode_available,
+            gamescope_available=gamescope_available,
+        )
+        return OptimizationAnalysis(fingerprint, measurement, bottleneck, candidates)
+
+    def _selected_executable(self, game: Game, app_id: str) -> str:
+        resolver = self._app._mangohud_launch_integration.executable_resolver
+        candidates: list[str] = [game.executable_path]
+        try:
+            candidates.append(
+                self._app._optiscaler_service.profile_repository.load(app_id).executable
+            )
+        except Exception:
+            pass
+        try:
+            candidates.append(
+                self._app._mangohud_repository.load(app_id).executable_path
+            )
+        except (OSError, ValueError):
+            pass
+        for candidate in candidates:
+            if candidate and resolver.validate_selected(game, candidate) is not None:
+                return candidate
+        resolution = resolver.resolve(game)
+        return (
+            resolution.selected.relative_path
+            if resolution.reliable and resolution.selected is not None
+            else ""
+        )
+
+    @staticmethod
+    def _runtime_label(tool_name: str) -> str:
+        folded = tool_name.casefold()
+        if "ge-proton" in folded or "proton-ge" in folded:
+            return tool_name
+        if "cachy" in folded and "proton" in folded:
+            return tool_name
+        if "proton" in folded:
+            return tool_name
+        return ""
+
+    def _runtime_hint(
+        self, app_id: str, selected_executable: str
+    ) -> DetectedValue | None:
+        if not app_id or not selected_executable.casefold().endswith(".exe"):
+            return None
+        report_path = self._app._runner_report_path(app_id)
+        try:
+            if report_path.stat().st_size > 1024 * 1024:
+                return None
+            payload = json.loads(report_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return None
+        if not isinstance(payload, Mapping) or str(payload.get("appId") or "") != app_id:
+            return None
+        command = payload.get("steamCommand")
+        values = command if isinstance(command, list) else []
+        for raw in values:
+            path = Path(str(raw))
+            if path.name.casefold() != "proton":
+                continue
+            label = self._runtime_label(path.parent.name)
+            if label:
+                evidence = DetectionEvidence(
+                    "runner launch report",
+                    f"Steam selected {path.parent.name}",
+                    0.98,
+                )
+                return DetectedValue(
+                    label, 0.98, "last verified Steam LaunchPlan", (evidence,)
+                )
+        return DetectedValue(
+            "Windows game using Steam compatibility layer",
+            0.85,
+            "resolved PE executable",
+        )
+
+    def _poll_analysis_jobs(self) -> None:
+        for game_id, future in tuple(self._app._optimization_jobs.items()):
+            if not future.done():
+                continue
+            self._app._optimization_jobs.pop(game_id, None)
+            try:
+                analysis = future.result()
+            except Exception as error:
+                logger.exception("Game analysis failed for %s", game_id)
+                self._app._optimization_analyses[game_id] = {
+                    "success": False,
+                    "status": "failed",
+                    "error": str(error) or type(error).__name__,
+                }
+                self._app._emit_toast("Game analysis failed", "error")
+            else:
+                payload = analysis.to_dict()
+                payload.update({"success": True, "status": "completed"})
+                self._app._optimization_analyses[game_id] = analysis
+                game = self._app._resolve_game(game_id, show_error=False)
+                app_id = self._profile_key(game)
+                session = self._app._baseline_sessions.load(app_id) if app_id else None
+                if session is not None and session.status == "processing":
+                    if analysis.measurement is not None and analysis.measurement.available:
+                        if session.kind == "comparison":
+                            before = self._app._baseline_sessions.load_measurement(
+                                app_id, slot="before"
+                            )
+                            self._app._baseline_sessions.save_measurement(
+                                app_id, analysis.measurement, slot="after"
+                            )
+                            if before is not None:
+                                self._app._optimization_comparisons[game_id] = (
+                                    compare_measurements(before, analysis.measurement)
+                                )
+                        else:
+                            self._app._baseline_sessions.save_measurement(
+                                app_id, analysis.measurement, slot="before"
+                            )
+                            self._app._optimization_comparisons.pop(game_id, None)
+                        self._app._baseline_sessions.complete(app_id, session.id)
+                    else:
+                        self._app._baseline_sessions.fail(
+                            app_id,
+                            "The MangoHud log did not contain usable performance samples",
+                            session.id,
+                        )
+                self._app._emit_toast("Game analysis completed", "success")
+            self._app.optimizationAnalysisChanged.emit(game_id)
+
+    def getGameOptimizationAnalysis(self, game_id: str) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        app_id = self._profile_key(game)
+        session = self._app._baseline_sessions.load(app_id) if app_id else None
+        if session is not None and session.status in {
+            "waiting_for_steam", "waiting_for_runner", "recording",
+            "waiting_for_game_exit", "processing"
+        }:
+            self._app._active_baseline_games.add(game_id)
+            self._app._baseline_statuses.setdefault(game_id, session.status)
+        if (
+            session is not None
+            and session.status == "processing"
+            and game_id not in self._app._optimization_jobs
+            and not isinstance(
+                self._app._optimization_analyses.get(game_id), OptimizationAnalysis
+            )
+        ):
+            log = self._app._baseline_sessions.newest_log(app_id)
+            if log is not None:
+                self.analyzeGameOptimization(game_id, str(log))
+        if game_id in self._app._optimization_jobs:
+            return {
+                "success": True,
+                "status": "running",
+                "gameId": game_id,
+                "baselineSession": session.to_dict() if session else {},
+            }
+        value = self._app._optimization_analyses.get(game_id)
+        if isinstance(value, OptimizationAnalysis):
+            result = value.to_dict()
+            result.update({"success": True, "status": "completed"})
+            result["baselineSession"] = session.to_dict() if session else {}
+            before = self._app._baseline_sessions.load_measurement(
+                app_id, slot="before"
+            ) if app_id else None
+            after = self._app._baseline_sessions.load_measurement(
+                app_id, slot="after"
+            ) if app_id else None
+            comparison = self._app._optimization_comparisons.get(game_id)
+            result["beforeMeasurement"] = before.to_dict() if before else {}
+            result["afterMeasurement"] = after.to_dict() if after else {}
+            result["comparison"] = comparison.to_dict() if comparison else {}
+            result["appliedChange"] = dict(
+                self._app._optimization_applied_changes.get(game_id, {})
+            )
+            return result
+        if isinstance(value, Mapping):
+            result = dict(value)
+            result["baselineSession"] = session.to_dict() if session else {}
+            return result
+        return {
+            "success": True,
+            "status": "not_analyzed",
+            "gameId": game_id,
+            "baselineSession": session.to_dict() if session else {},
+        }
+
+    def applyOptimizationCandidate(
+        self, game_id: str, candidate_id: str
+    ) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        app_id = self._profile_key(game)
+        analysis = self._app._optimization_analyses.get(game_id)
+        if game is None or not app_id or not isinstance(analysis, OptimizationAnalysis):
+            return {"success": False, "error": "Analyze the game before applying a recommendation"}
+        candidate = next(
+            (item for item in analysis.candidates if item.id == candidate_id),
+            None,
+        )
+        if candidate is None:
+            return {"success": False, "error": "Optimization candidate is no longer available"}
+        try:
+            if candidate.files_to_modify:
+                manifest = self._app._optimization_change_service.apply(game, candidate)
+                self._app._optimization_applied_changes[game_id] = dict(manifest)
+                self._app.optimizationAnalysisChanged.emit(game_id)
+                return {"success": True, "change": manifest}
+            profile = self._app._optimization_profile_repository.load(app_id)
+            if candidate.id == "gamemode_cpu_schedule":
+                profile = replace(profile, preset="custom", gamemode_enabled=True)
+            elif candidate.id == "gamescope_gpu_scaling":
+                width, height = candidate.proposed_value.split("x", 1)
+                profile = replace(
+                    profile,
+                    preset="custom",
+                    gamescope_enabled=True,
+                    gamescope_mode="performance",
+                    gamescope_input_width=int(width),
+                    gamescope_input_height=int(height),
+                )
+            elif candidate.id == "quiet_fps_target":
+                profile = replace(
+                    profile,
+                    preset="custom",
+                    target_fps_mode="manual",
+                    target_fps=int(candidate.proposed_value.split()[0]),
+                )
+            else:
+                raise ValueError("Unsupported runtime recommendation")
+            path = self._app._optimization_profile_repository.save(profile)
+            try:
+                manifest = self._app._optimization_change_service.record_runtime_change(
+                    game, candidate, previous_profile, profile
+                )
+            except Exception:
+                self._app._optimization_profile_repository.save(previous_profile)
+                raise
+            self._app._optimization_applied_changes[game_id] = dict(manifest)
+            self._app.optimizationAnalysisChanged.emit(game_id)
+            return {
+                "success": True,
+                "profilePath": str(path),
+                "change": manifest,
+            }
+        except Exception as error:
+            return {"success": False, "error": str(error) or type(error).__name__}
+
+    def revertOptimizationChange(
+        self, game_id: str, change_id: str
+    ) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        if game is None:
+            return {"success": False, "error": "Game is unavailable"}
+        try:
+            active = self._app._optimization_applied_changes.get(game_id, {})
+            if active.get("kind") == "runtime_profile":
+                manifest = self._app._optimization_change_service.runtime_change(
+                    game, change_id
+                )
+                previous = GameOptimizationProfile.from_dict(
+                    manifest["before_profile"],
+                    expected_app_id=self._profile_key(game),
+                )
+                current = self._app._optimization_profile_repository.load(
+                    self._profile_key(game)
+                )
+                if current.to_dict() != manifest["after_profile"]:
+                    raise RuntimeError(
+                        "The optimization profile changed outside this recommendation"
+                    )
+                self._app._optimization_profile_repository.save(previous)
+                try:
+                    manifest = self._app._optimization_change_service.mark_runtime_reverted(
+                        game, change_id
+                    )
+                except Exception:
+                    self._app._optimization_profile_repository.save(current)
+                    raise
+            else:
+                manifest = self._app._optimization_change_service.revert(
+                    game, change_id
+                )
+        except Exception as error:
+            return {"success": False, "error": str(error) or type(error).__name__}
+        self._app._optimization_applied_changes.pop(game_id, None)
+        self._app.optimizationAnalysisChanged.emit(game_id)
+        return {"success": True, "change": manifest}
+
+    def _select_mangohud_log(
+        self, game: Game, app_id: str, explicit: str
+    ) -> Path | None:
+        if explicit:
+            path = Path(explicit).expanduser()
+            return path.resolve(strict=True)
+        try:
+            profile = self._app._mangohud_repository.load(app_id)
+        except (OSError, ValueError):
+            return None
+        if not profile.output_folder:
+            return None
+        folder = Path(profile.output_folder)
+        if not folder.is_dir():
+            return None
+        tokens = {
+            re.sub(r"[^a-z0-9]", "", game.name.casefold()),
+            re.sub(r"[^a-z0-9]", "", app_id.casefold()),
+            re.sub(r"[^a-z0-9]", "", Path(game.executable_path).stem.casefold()),
+        }
+        tokens.discard("")
+        candidates: list[Path] = []
+        for path in folder.glob("*.csv"):
+            folded = re.sub(r"[^a-z0-9]", "", path.name.casefold())
+            if any(token in folded for token in tokens):
+                candidates.append(path)
+        return max(candidates, key=lambda item: item.stat().st_mtime, default=None)
 
     def _optimization_options(self, options: Mapping[str, Any]) -> OptimizationOptions:
         def option(*names: str, default: Any = None) -> Any:
@@ -283,6 +882,21 @@ class OptimizationController:
             "manualOverrides": "manual_overrides", "lastRecommendation": "last_recommendation",
         }
         data = base.to_dict()
+        runtime_keys = {
+            "targetFpsMode", "target_fps_mode", "targetFps", "target_fps",
+            "gamemodeEnabled", "gamemode_enabled", "gamescopeEnabled",
+            "gamescope_enabled", "gamescopeMode", "gamescope_mode",
+            "gamescopeInputWidth", "gamescope_input_width",
+            "gamescopeInputHeight", "gamescope_input_height",
+            "gamescopeOutputWidth", "gamescope_output_width",
+            "gamescopeOutputHeight", "gamescope_output_height",
+            "gamescopeRefreshRate", "gamescope_refresh_rate",
+            "gamescopeFullscreen", "gamescope_fullscreen",
+            "gamescopeScaler", "gamescope_scaler",
+            "gamescopeFilter", "gamescope_filter",
+        }
+        if "preset" not in values and runtime_keys.intersection(values):
+            data["preset"] = "custom"
         for key, value in values.items():
             normalized = aliases.get(str(key), str(key))
             if normalized in data and normalized not in {"schema_version", "app_id", "updated_at"}:
@@ -294,15 +908,33 @@ class OptimizationController:
                 "updated_at": datetime.now(UTC),
             }
         )
-        return GameOptimizationProfile.from_dict(data, expected_app_id=app_id)
+        profile = GameOptimizationProfile.from_dict(data, expected_app_id=app_id)
+        display = self._app._optimization_display_for(profile.target_display_id)
+        gamemode, gamescope = self._app._runtime_tool_detector.detect()
+        return self._app._optimization_advisor.resolve_preset(
+            profile,
+            display,
+            gamemode_available=gamemode.available,
+            gamescope_available=gamescope.available,
+            system_info=self._app._system_info,
+        ).profile
 
     def _optimization_profile_to_qml(
         self, profile: GameOptimizationProfile
     ) -> dict[str, Any]:
         displays = self._app._optimization_displays()
         display = self._app._optimization_display_for(profile.target_display_id)
-        recommendation = self._app._optimization_advisor.recommend(profile, display)
+        recommendation = self._app._optimization_advisor.recommend(
+            profile, display, system_info=self._app._system_info
+        )
         gamemode, gamescope = self._app._runtime_tool_detector.detect()
+        preset_plan = self._app._optimization_advisor.resolve_preset(
+            profile,
+            display,
+            gamemode_available=gamemode.available,
+            gamescope_available=gamescope.available,
+            system_info=self._app._system_info,
+        )
         mangohud_activation_owner = "none"
         try:
             mangohud_profile = self._app._mangohud_repository.load(profile.app_id)
@@ -379,6 +1011,25 @@ class OptimizationController:
             "updatedAt": profile.updated_at.astimezone(UTC).isoformat(),
             "displays": [item.to_dict() for item in displays],
             "recommendation": recommendation.to_dict(),
+            "presetPlan": preset_plan.to_dict(),
+            "categoryClassification": {
+                "value": profile.game_category,
+                "source": (
+                    "manual override"
+                    if profile.manual_overrides.get("category")
+                    else "saved profile"
+                    if profile.game_category != "unknown"
+                    else "not detected"
+                ),
+                "confidence": (
+                    1.0
+                    if profile.manual_overrides.get("category")
+                    else 0.75
+                    if profile.game_category != "unknown"
+                    else 0.0
+                ),
+                "manualOverride": bool(profile.manual_overrides.get("category")),
+            },
             "gamemode": gamemode.to_dict(), "gamescope": gamescope.to_dict(),
             "launchPlan": plan.to_dict(),
             "launchPlanText": shlex.join(plan.command),

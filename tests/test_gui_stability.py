@@ -215,6 +215,24 @@ def test_other_pages_keep_their_existing_scroll_owners() -> None:
     assert "id: updatesList" in updates
 
 
+def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
+    qml_root = ROOT / "src" / "game_optimization_linux" / "qml"
+    settings = (qml_root / "pages" / "SettingsPage.qml").read_text(encoding="utf-8")
+    couch_settings = (qml_root / "couch" / "CouchSettings.qml").read_text(encoding="utf-8")
+    sidebar = (qml_root / "components" / "Sidebar.qml").read_text(encoding="utf-8")
+
+    assert 'title: qsTr("CPU usage limit")' not in settings
+    assert 'title: qsTr("GPU usage limit")' not in settings
+    assert 'title: qsTr("Interface sounds")' not in settings
+    assert '"id": "sounds"' not in couch_settings
+    assert '"id": "vibration"' not in couch_settings
+    assert "Local Steam manifests" not in sidebar
+    assert "updateColumn" not in sidebar
+    for name in ("games", "updates", "tasks", "system", "settings"):
+        assert f"sidebar-{name}.svg" in sidebar
+        assert (qml_root / "resources" / f"sidebar-{name}.svg").is_file()
+
+
 def test_kde_breeze_read_only_preview_has_no_textarea_warning(tmp_path: Path) -> None:
     payload = _run_probe(
         tmp_path,

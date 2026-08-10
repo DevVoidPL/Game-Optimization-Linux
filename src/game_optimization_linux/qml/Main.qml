@@ -172,13 +172,9 @@ ApplicationWindow {
             collapsed: window.compactNavigation || window.manuallyCollapsed
             currentPage: window.activePage
             appName: window.applicationName
-            appVersion: window.controller && window.controller.appVersion
-                        ? String(window.controller.appVersion) : "0.1.4-alpha"
             logoSource: window.controller && window.controller.appLogoUrl
                         ? String(window.controller.appLogoUrl) : ""
             updatesPendingCount: window.updatesPendingCount()
-            updateStatus: window.controller && window.controller.updateStatus
-                          ? String(window.controller.updateStatus) : qsTr("Not checked")
             onNavigateRequested: function(page) { window.navigate(page) }
             onCollapseRequested: window.manuallyCollapsed = !window.manuallyCollapsed
         }
@@ -336,6 +332,13 @@ ApplicationWindow {
     Connections {
         target: window.controller
         ignoreUnknownSignals: true
+
+        function onSettingsChanged() {
+            window.synchronizeWindowMode()
+            if (couchLoader.item && couchLoader.item.hasOwnProperty("hideCursor"))
+                couchLoader.item.hideCursor = Boolean(
+                            window.setting("hideCursorInCouchMode", true))
+        }
 
         function onToastRequested(message, level) {
             if (window.interfaceMode === "couch")

@@ -182,3 +182,24 @@ def test_linux_system_provider_lspci_driver_belongs_to_gpu(tmp_path: Path) -> No
 
     assert info.gpu == "Example PCI GPU [1234:5678]"
     assert info.gpu_driver == "gpu-driver"
+
+
+def test_linux_system_provider_reads_eight_gib_vram_from_drm(tmp_path: Path) -> None:
+    drm = tmp_path / "drm"
+    vram = drm / "card1" / "device" / "mem_info_vram_total"
+    vram.parent.mkdir(parents=True)
+    vram.write_text(str(8 * 1024**3) + "\n", encoding="utf-8")
+    provider = LinuxSystemProvider(
+        os_release_path=tmp_path / "missing-os-release",
+        cpuinfo_path=tmp_path / "missing-cpuinfo",
+        meminfo_path=tmp_path / "missing-meminfo",
+        drm_path=drm,
+        environment={},
+        which=lambda _name: None,
+        home=tmp_path,
+    )
+
+    info = provider.collect()
+
+    assert info.vram_gb == 8.0
+    assert f"{info.vram_gb:.1f} GiB" == "8.0 GiB"

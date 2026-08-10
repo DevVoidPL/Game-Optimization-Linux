@@ -54,10 +54,17 @@ MESSAGES: list[str] = []
 
 class StorageProbeController(QObject):
     historyChanged = Signal()
+    settingsChanged = Signal()
 
-    def __init__(self, history: list[dict[str, Any]]) -> None:
+    def __init__(
+        self,
+        history: list[dict[str, Any]],
+        *,
+        default_profile: str = "Auto",
+    ) -> None:
         super().__init__()
         self._history = history
+        self._settings = {"defaultCompressionProfile": default_profile}
         self.verification_calls: list[str] = []
         self.prepare_result: dict[str, Any] = {}
         self.prepare_calls: list[tuple[str, str, bool]] = []
@@ -66,6 +73,10 @@ class StorageProbeController(QObject):
     @Property("QVariantList", notify=historyChanged)
     def selectedGameCompressionHistory(self) -> list[dict[str, Any]]:
         return self._history
+
+    @Property("QVariantMap", notify=settingsChanged)
+    def settings(self) -> dict[str, Any]:
+        return dict(self._settings)
 
     @Slot(str, result=bool)
     def verifyCompression(self, game_id: str) -> bool:
@@ -509,6 +520,11 @@ def _game_data(report: dict[str, Any] | None = None, *, available: bool = True) 
 
 def probe_storage(application: QGuiApplication) -> dict[str, Any]:
     view, root = _view(application, "pages/details/StorageTab.qml", 1050, 900)
+    default_profile_controller = StorageProbeController([], default_profile="Balanced")
+    root.setProperty("controller", default_profile_controller)
+    _settle(application)
+    if root.property("selectedMode") != "Balanced":
+        raise AssertionError("Storage ignored the persisted default compression profile")
     valid = _analysis_report()
     states = (
         ("no_report", _game_data(), [], False, False),
@@ -657,6 +673,53 @@ def probe_storage(application: QGuiApplication) -> dict[str, Any]:
         raise AssertionError(f"Failed compsize detail was not visible: {failure_probe}")
     results["measurement_failure"] = failure_probe
 
+    root.setProperty(
+        "tasksData",
+        [
+            {
+                "id": "verification-basic",
+                "gameId": "steam-test",
+                "operation": "Verification",
+                "status": "completed",
+                "result": {
+                    "logical_bytes": 186 * 1024 * 1024,
+                    "exclusive_bytes": 160 * 1024 * 1024,
+                    "shared_bytes": 6 * 1024 * 1024,
+                    "compsize_disk_bytes": None,
+                    "compsize_uncompressed_bytes": None,
+                    "compsize_referenced_bytes": None,
+                    "measurement_source": "basic_btrfs",
+                    "measurement_error": (
+                        "Exact compsize measurement is unavailable because the "
+                        "optional privileged host component is not installed"
+                    ),
+                },
+            }
+        ],
+    )
+    _settle(application)
+    unavailable_message = _item(root, "measurementFailureMessage")
+    unavailable_probe = {
+        "badge": _item(root, "compressionMeasurementStatus").property("text"),
+        "source": _item(root, "measuredCurrentStatus").property("value"),
+        "status": _item(root, "measuredCurrentStatusValue").property("value"),
+        "physical": _item(root, "measuredCurrentPhysical").property("value"),
+        "saving": _item(root, "measuredCurrentEffect").property("value"),
+        "exclusive": _item(root, "basicBtrfsExclusive").property("value"),
+        "shared": _item(root, "basicBtrfsShared").property("value"),
+        "message": unavailable_message.property("text"),
+        "messageVisible": bool(unavailable_message.property("visible")),
+    }
+    if unavailable_probe["badge"] != "Exact measurement unavailable":
+        raise AssertionError(f"Unavailable compsize was shown as failed: {unavailable_probe}")
+    if unavailable_probe["source"] != "Basic Btrfs verification":
+        raise AssertionError(f"Basic Btrfs source was hidden: {unavailable_probe}")
+    if unavailable_probe["physical"] != "Not available" or unavailable_probe["saving"] != "Not available":
+        raise AssertionError(f"Basic data was presented as compsize saving: {unavailable_probe}")
+    if not unavailable_probe["messageVisible"] or "may still be working correctly" not in str(unavailable_probe["message"]):
+        raise AssertionError(f"Unavailable explanation was not visible: {unavailable_probe}")
+    results["measurement_unavailable"] = unavailable_probe
+
     gib = 1024 * 1024 * 1024
     current_verification_controller = StorageProbeController([])
     current_verification_controller.prepare_result = {
@@ -684,8 +747,19 @@ def probe_storage(application: QGuiApplication) -> dict[str, Any]:
         "lowBenefit": True,
         "additionalConfirmationRequired": True,
     }
+    verification_game = dict(estimated_game)
+    verification_game.update(
+        {
+            "analysisReport": {},
+            "analysisReportAvailable": False,
+            "analysisPathAvailable": False,
+            "analysisIsBtrfs": False,
+            "analysisScanComplete": False,
+            "analysisProfilesUnlocked": False,
+        }
+    )
     root.setProperty("controller", current_verification_controller)
-    root.setProperty("gameData", estimated_game)
+    root.setProperty("gameData", verification_game)
     root.setProperty(
         "tasksData",
         [
@@ -701,7 +775,7 @@ def probe_storage(application: QGuiApplication) -> dict[str, Any]:
                     "compsize_disk_bytes": 166 * 1024 * 1024,
                     "compsize_uncompressed_bytes": 186 * 1024 * 1024,
                     "compsize_referenced_bytes": 186 * 1024 * 1024,
-                    "measurement_source": "polkit_helper",
+                    "measurement_source": "polkit_compsize",
                 },
             },
             {
@@ -719,6 +793,7 @@ def probe_storage(application: QGuiApplication) -> dict[str, Any]:
     current_logical = _item(root, "measuredLogicalSize")
     current_physical = _item(root, "measuredCurrentPhysical")
     current_effect = _item(root, "measuredCurrentEffect")
+    current_ratio = _item(root, "measuredCurrentRatio")
     current_measurement_status = _item(root, "measuredCurrentStatus")
     current_status_value = _item(root, "measuredCurrentStatusValue")
     old_failure_message = _item(root, "measurementFailureMessage")
@@ -730,6 +805,7 @@ def probe_storage(application: QGuiApplication) -> dict[str, Any]:
         "physicalValue": current_physical.property("value"),
         "effectLabel": current_effect.property("label"),
         "effectValue": current_effect.property("value"),
+        "ratioValue": current_ratio.property("value"),
         "statusLabel": current_measurement_status.property("label"),
         "statusValue": current_measurement_status.property("value"),
         "measurementStatusLabel": current_status_value.property("label"),
@@ -751,6 +827,13 @@ def probe_storage(application: QGuiApplication) -> dict[str, Any]:
     if (
         verification_probe["badge"] != "Measured"
         or verification_probe["logicalValue"] in {"0 B", "Not available"}
+        or verification_probe["physicalValue"] == "Not available"
+        or verification_probe["effectValue"] == "Not available"
+        or verification_probe["ratioValue"] == "Not available"
+        or verification_probe["statusValue"]
+        != "Exact compsize / polkit_compsize"
+        or verification_probe["measurementStatusValue"]
+        != "Exact measurement completed"
         or not verification_probe["currentVisible"]
         or verification_probe["beforeVisible"]
         or verification_probe["afterVisible"]
@@ -763,6 +846,8 @@ def probe_storage(application: QGuiApplication) -> dict[str, Any]:
         )
     results["current_verification"] = verification_probe
 
+    root.setProperty("gameData", estimated_game)
+    _settle(application)
     compress_button = _item(root, "compressGameButton")
     if not bool(compress_button.property("enabled")):
         raise AssertionError("Low estimated benefit incorrectly blocked manual compression")
@@ -2427,6 +2512,16 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     executable = game_root / "Binaries" / "Win64" / "Probe-Win64-Shipping.exe"
     executable.parent.mkdir(parents=True)
     executable.write_bytes(b"executable")
+    (game_root / "Engine/Build").mkdir(parents=True)
+    (game_root / "Engine/Build/Build.version").write_text(
+        '{"MajorVersion": 5, "MinorVersion": 4}', encoding="utf-8"
+    )
+    (game_root / "Probe/Content/Paks").mkdir(parents=True)
+    (game_root / "Probe/Content/Paks/probe.pak").write_bytes(b"pak")
+    (game_root / "Config").mkdir()
+    (game_root / "Config/DefaultEngine.ini").write_text(
+        "DefaultGraphicsRHI=DefaultGraphicsRHI_DX12\n", encoding="utf-8"
+    )
     archive = temporary_root / "OptiScaler_v0.7.7.7z"
     import py7zr
     with py7zr.SevenZipFile(archive, "w") as handle:
@@ -2521,6 +2616,22 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     _settle(application, 20)
     if str(root.property("appId")) != "224760":
         raise AssertionError(f"Optimization profile did not load: {root.property('errorMessage')!r}")
+    started_analysis = controller.analyzeGameOptimization(game.id)
+    if not started_analysis.get("success"):
+        raise AssertionError(f"Synthetic game analysis did not start: {started_analysis!r}")
+    analysis_deadline = time.monotonic() + 3.0
+    while time.monotonic() < analysis_deadline and controller._optimization_jobs:
+        controller._poll_tasks()
+        _settle(application, 1)
+    _settle(application, 8)
+    analysis = controller.getGameOptimizationAnalysis(game.id)
+    if analysis.get("status") != "completed":
+        raise AssertionError(f"Synthetic game analysis did not finish: {analysis!r}")
+    if analysis["fingerprint"]["engine"]["value"] != "Unreal Engine":
+        raise AssertionError(f"Synthetic fingerprint is incorrect: {analysis!r}")
+    rendered_analysis = _variant(root.property("gameAnalysis")) or {}
+    if rendered_analysis.get("status") != "completed":
+        raise AssertionError(f"Optimization QML did not refresh its analysis: {rendered_analysis!r}")
     _invoke_qml(root, "choosePreset", "quiet")
     _settle(application, 8)
     _invoke_qml(root, "saveProfile")
@@ -2609,6 +2720,10 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
         ),
         "proton_environment": dict(proton_saved.get("environment", {})),
         "proton_entries": len(_variant(proton_section.property("entries")) or []),
+        "analysis_status": analysis.get("status"),
+        "analysis_engine": analysis["fingerprint"]["engine"]["value"],
+        "analysis_api": analysis["fingerprint"]["graphicsApi"]["value"],
+        "analysis_baseline_available": analysis.get("baselineAvailable"),
         "save_button_inside": True,
         "screenshot": str(screenshot),
         "screenshot_size": screenshot.stat().st_size,

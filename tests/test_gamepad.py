@@ -38,7 +38,16 @@ def test_gamepad_mapper_deadzone_repeat_debounce_and_swap() -> None:
 
 
 def test_gamepad_service_hotplug_active_device_and_safe_disconnect() -> None:
-    first = GamepadDevice(7, "DualSense", GamepadType.PLAYSTATION, "Mapped", 82)
+    first = GamepadDevice(
+        7,
+        "DualSense",
+        GamepadType.PLAYSTATION,
+        "Mapped",
+        82,
+        guid="030000004c050000e60c000000016800",
+        vendor_id=0x054C,
+        product_id=0x0CE6,
+    )
     provider = FakeGamepadProvider((first,))
     service = GamepadService(provider)
     actions: list[str] = []
@@ -52,6 +61,8 @@ def test_gamepad_service_hotplug_active_device_and_safe_disconnect() -> None:
         assert service.available is True
         assert service.controllerCount == 1
         assert service.controllers[0]["batteryPercent"] == 82
+        assert service.controllers[0]["guid"].startswith("03000000")
+        assert service.controllers[0]["vendorId"] == 0x054C
 
         provider.emit(GamepadEvent("button", 7, "south", True, 1.0))
         service.pollNow()
@@ -93,8 +104,37 @@ def test_missing_sdl_provider_keeps_service_operational() -> None:
         assert service.available is False
         assert service.status == "Missing"
         assert service.controllers == []
+        assert service.diagnostics["sdl3LibraryAvailable"] is False
+        assert service.diagnostics["gamepadCount"] == 0
     finally:
         service.stop()
+
+
+def test_controller_diagnostics_do_not_treat_loaded_sdl_as_a_gamepad() -> None:
+    service = GamepadService(FakeGamepadProvider())
+    try:
+        service.start()
+        assert service.available is True
+        assert service.controllerCount == 0
+        assert service.diagnostics == {
+            "sdl3LibraryAvailable": True,
+            "inputDeviceAccessAvailable": True,
+            "joystickCount": 0,
+            "gamepadCount": 0,
+            "reason": "No joystick or gamepad is connected",
+        }
+    finally:
+        service.stop()
+
+
+def test_flatpak_manifest_exposes_only_dedicated_input_devices() -> None:
+    manifest = (
+        Path(__file__).resolve().parents[1]
+        / "flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml"
+    ).read_text(encoding="utf-8")
+
+    assert "--device=input" in manifest
+    assert "--device=all" not in manifest
 
 
 def test_contextual_hints_cover_controller_families_and_unknown_devices() -> None:
@@ -290,6 +330,11 @@ def test_fixed_controller_modes_and_settings_persistence(tmp_path: Path) -> None
         assert controller.saveSetting("postLaunchBehavior", "Stay open")
         assert controller.saveSetting("interfaceSounds", True)
         assert controller.interfaceMode == "couch"
+        mapper = controller._gamepad_service._mapper
+        assert mapper.swap_accept_back is True
+        assert mapper.deadzone == 0.31
+        assert mapper.repeat_delay_seconds == 0.45
+        assert mapper.repeat_rate_seconds == 0.12
     finally:
         controller.shutdown()
 

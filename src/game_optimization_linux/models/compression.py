@@ -10,6 +10,15 @@ from typing import Any, Mapping, Sequence
 from .enums import CompressionProfile
 
 
+EXACT_COMPSIZE_MEASUREMENT_SOURCES = frozenset(
+    {"polkit_helper", "polkit_compsize"}
+)
+
+
+def is_exact_compsize_measurement_source(value: object) -> bool:
+    return str(value or "").strip().casefold() in EXACT_COMPSIZE_MEASUREMENT_SOURCES
+
+
 class CompressionProviderError(RuntimeError):
     """Base error surfaced as a failed or blocked compression task."""
 
@@ -347,8 +356,12 @@ class CompressionResult:
     def measurement_authoritative(self) -> bool:
         return bool(
             self.after is not None
-            and self.before.measurement_source == "polkit_helper"
-            and self.after.measurement_source == "polkit_helper"
+            and is_exact_compsize_measurement_source(
+                self.before.measurement_source
+            )
+            and is_exact_compsize_measurement_source(
+                self.after.measurement_source
+            )
             and self.before.compsize_disk_bytes is not None
             and self.after.compsize_disk_bytes is not None
         )

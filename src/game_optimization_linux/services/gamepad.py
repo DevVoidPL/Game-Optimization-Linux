@@ -216,6 +216,17 @@ class GamepadService(QObject):
     def controllerCount(self) -> int:
         return len(self._devices)
 
+    @Property("QVariantMap", notify=controllersChanged)
+    def diagnostics(self) -> dict[str, object]:
+        raw = self._provider.diagnostics()
+        return {
+            "sdl3LibraryAvailable": raw.get("sdl3_library_available") is True,
+            "inputDeviceAccessAvailable": raw.get("input_device_access_available") is True,
+            "joystickCount": int(raw.get("joystick_count") or 0),
+            "gamepadCount": int(raw.get("gamepad_count") or 0),
+            "reason": str(raw.get("reason") or "Controller status is unavailable"),
+        }
+
     @Property("QVariantMap", notify=activeControllerChanged)
     def activeController(self) -> dict[str, object]:
         device = self._device(self._active_id)

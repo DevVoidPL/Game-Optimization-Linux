@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Root-owned Polkit helper for one strictly read-only Steam measurement."""
+"""Root-owned Polkit helper for one strictly read-only game measurement."""
 
 from __future__ import annotations
 
@@ -206,7 +206,93 @@ def _require_btrfs(descriptor: int) -> None:
         error = ctypes.get_errno()
         raise MeasurementError(f"fstatfs failed: {os.strerror(error)}")
     if int(info.f_type) & 0xFFFFFFFF != BTRFS_SUPER_MAGIC:
-        raise MeasurementError("the verified Steam game is not on Btrfs")
+        raise MeasurementError("the verified game is not on Btrfs")
+
+
+def _open_local_game(
+    game_path: Path,
+    game_id: str,
+    expected_device: int,
+    expected_inode: int,
+    uid: int,
+) -> tuple[int, str]:
+    if not re.fullmatch(r"[A-Za-z0-9._:-]{1,160}", game_id):
+        raise _path_error("GAME_PATH_VALIDATION_FAILED", "local game ID is invalid")
+    raw = os.fspath(game_path)
+    if (
+        not raw.strip()
+        or not game_path.is_absolute()
+        or os.path.normpath(raw) != raw
+    ):
+        raise _path_error(
+            "GAME_PATH_VALIDATION_FAILED",
+            "local game path must be normalized and absolute",
+        )
+    try:
+        path_info = os.lstat(game_path)
+        resolved = game_path.resolve(strict=True)
+    except FileNotFoundError as error:
+        raise _path_error(
+            "GAME_PATH_NOT_FOUND", "the selected local game directory does not exist"
+        ) from error
+    if stat.S_ISLNK(path_info.st_mode) or not stat.S_ISDIR(path_info.st_mode):
+        raise _path_error(
+            "GAME_PATH_VALIDATION_FAILED", "local game path is not a real directory"
+        )
+    if resolved != game_path:
+        raise _path_error(
+            "GAME_PATH_VALIDATION_FAILED", "local game path is not canonical"
+        )
+    if path_info.st_uid != uid:
+        raise _path_error(
+            "GAME_PATH_VALIDATION_FAILED",
+            "local game directory is not owned by the calling user",
+        )
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | os.O_CLOEXEC
+    descriptor = os.open(game_path, flags)
+    try:
+        opened_info = os.fstat(descriptor)
+        if (
+            opened_info.st_dev != expected_device
+            or opened_info.st_ino != expected_inode
+            or opened_info.st_dev != path_info.st_dev
+            or opened_info.st_ino != path_info.st_ino
+        ):
+            raise _path_error(
+                "GAME_PATH_VALIDATION_FAILED",
+                "local game directory identity changed during authorization",
+            )
+        _require_btrfs(descriptor)
+        return descriptor, os.fspath(resolved)
+    except BaseException:
+        os.close(descriptor)
+        raise
+
+
+def _validated_local_game_path(
+    game_path: Path,
+    descriptor: int,
+    expected_device: int,
+    expected_inode: int,
+) -> str:
+    try:
+        resolved = game_path.resolve(strict=True)
+        path_info = os.stat(resolved, follow_symlinks=False)
+    except FileNotFoundError as error:
+        raise _path_error("GAME_PATH_NOT_FOUND", "local game directory disappeared") from error
+    descriptor_info = os.fstat(descriptor)
+    if (
+        resolved != game_path
+        or path_info.st_dev != descriptor_info.st_dev
+        or path_info.st_ino != descriptor_info.st_ino
+        or descriptor_info.st_dev != expected_device
+        or descriptor_info.st_ino != expected_inode
+    ):
+        raise _path_error(
+            "GAME_PATH_VALIDATION_FAILED",
+            "local game directory no longer matches the authorized directory",
+        )
+    return os.fspath(resolved)
 
 
 def _validated_game_path(
@@ -355,17 +441,34 @@ def measure(args: argparse.Namespace) -> dict[str, Any]:
     if not BTRFS:
         raise MeasurementError("btrfs is not installed")
     uid = _calling_uid()
-    game_fd, game_path = _open_game(
-        Path(args.library),
-        str(args.appid),
-        str(args.buildid),
-        uid,
-    )
+    local_measurement = bool(getattr(args, "game_path", None))
+    if local_measurement:
+        game_fd, game_path = _open_local_game(
+            Path(args.game_path),
+            str(args.game_id),
+            int(args.device),
+            int(args.inode),
+            uid,
+        )
+    else:
+        game_fd, game_path = _open_game(
+            Path(args.library),
+            str(args.appid),
+            str(args.buildid),
+            uid,
+        )
     try:
         # Revalidate immediately before invoking either external command.  The
         # normal absolute path is passed as one argv item; /proc/self/fd magic
         # links are intentionally not used because compsize may reject them.
-        game_path = _validated_game_path(Path(args.library), Path(game_path), game_fd)
+        if local_measurement:
+            game_path = _validated_local_game_path(
+                Path(game_path), game_fd, int(args.device), int(args.inode)
+            )
+        else:
+            game_path = _validated_game_path(
+                Path(args.library), Path(game_path), game_fd
+            )
         measured_at = datetime.now(UTC).isoformat()
         logical, file_count = _logical_size(game_fd)
         fs = os.fstatvfs(game_fd)
@@ -419,9 +522,13 @@ def measure(args: argparse.Namespace) -> dict[str, Any]:
             "measurement_source": "polkit_helper",
             "measurement_error": "; ".join(errors) or None,
             "authorized_uid": uid,
-            "app_id": str(args.appid),
-            "build_id": str(args.buildid),
+            "identity_kind": "local" if local_measurement else "steam",
+            "app_id": "" if local_measurement else str(args.appid),
+            "build_id": "" if local_measurement else str(args.buildid),
+            "game_id": str(args.game_id) if local_measurement else "",
             "game_path": game_path,
+            "path_device": int(os.fstat(game_fd).st_dev),
+            "path_inode": int(os.fstat(game_fd).st_ino),
             "measured_at": measured_at,
             "logical_bytes": logical,
             "file_count": file_count,
@@ -444,6 +551,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--library")
     parser.add_argument("--appid")
     parser.add_argument("--buildid")
+    parser.add_argument("--game-path")
+    parser.add_argument("--game-id")
+    parser.add_argument("--device")
+    parser.add_argument("--inode")
     return parser
 
 
@@ -466,10 +577,21 @@ def main(argv: list[str] | None = None) -> int:
                 },
                 0,
             )
-        if not args.library or not args.appid or not args.buildid:
-            raise MeasurementError("library, AppID and buildid are required")
-        if not str(args.appid).isdecimal() or not str(args.buildid).isdecimal():
-            raise MeasurementError("AppID and buildid must be decimal")
+        local_args = (args.game_path, args.game_id, args.device, args.inode)
+        steam_args = (args.library, args.appid, args.buildid)
+        if any(local_args) and not all(local_args):
+            raise MeasurementError(
+                "game path, game ID, device and inode are required together"
+            )
+        if all(local_args) and any(steam_args):
+            raise MeasurementError("local and Steam identities cannot be combined")
+        if not all(local_args):
+            if not all(steam_args):
+                raise MeasurementError("library, AppID and buildid are required")
+            if not str(args.appid).isdecimal() or not str(args.buildid).isdecimal():
+                raise MeasurementError("AppID and buildid must be decimal")
+        elif not str(args.device).isdecimal() or not str(args.inode).isdecimal():
+            raise MeasurementError("device and inode must be decimal")
         helper_argv = [os.fspath(Path(sys.argv[0]).resolve()), *(argv or sys.argv[1:])]
         _log_argv("helper", helper_argv)
         payload = measure(args)

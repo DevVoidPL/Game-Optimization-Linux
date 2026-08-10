@@ -43,6 +43,7 @@ class GamepadProvider(Protocol):
     def start(self) -> Sequence[GamepadDevice]: ...
     def poll_events(self, limit: int = 256) -> Sequence[GamepadEvent]: ...
     def list_devices(self) -> Sequence[GamepadDevice]: ...
+    def diagnostics(self) -> dict[str, object]: ...
     def close(self) -> None: ...
 
 
@@ -70,6 +71,21 @@ class _SDLEvent(ctypes.Union):
         ("gaxis", _SDLGamepadAxisEvent),
         ("padding", ctypes.c_uint8 * 128),
     ]
+
+
+class _SDLGuid(ctypes.Structure):
+    _fields_ = [("data", ctypes.c_uint8 * 16)]
+
+
+def _input_device_access() -> tuple[bool, str]:
+    root = Path("/dev/input")
+    if not root.is_dir():
+        return False, "Input devices are not exposed to the application sandbox"
+    try:
+        tuple(root.iterdir())
+    except OSError as error:
+        return False, f"Input device directory is not accessible: {error}"
+    return True, "Input device access is available"
 
 
 def _decode(value: bytes | None, fallback: str = "Unknown controller") -> str:
@@ -103,6 +119,7 @@ class SDL3GamepadProvider:
         self._mapping_file = mapping_file
         self._handles: dict[int, ctypes.c_void_p] = {}
         self._devices: dict[int, GamepadDevice] = {}
+        self._joystick_count = 0
         self._started = False
         self._closed = False
         self._configure_abi()
@@ -123,7 +140,7 @@ class SDL3GamepadProvider:
     def _configure_abi(self) -> None:
         required = (
             "SDL_InitSubSystem", "SDL_QuitSubSystem", "SDL_GetGamepads",
-            "SDL_OpenGamepad", "SDL_CloseGamepad", "SDL_GetGamepadName",
+            "SDL_GetJoysticks", "SDL_OpenGamepad", "SDL_CloseGamepad", "SDL_GetGamepadName",
             "SDL_GetGamepadType", "SDL_GetGamepadMapping", "SDL_PollEvent",
             "SDL_GetGamepadPowerInfo", "SDL_free", "SDL_GetError",
         )
@@ -136,6 +153,8 @@ class SDL3GamepadProvider:
         lib.SDL_QuitSubSystem.argtypes = [ctypes.c_uint32]
         lib.SDL_GetGamepads.argtypes = [ctypes.POINTER(ctypes.c_int)]
         lib.SDL_GetGamepads.restype = ctypes.POINTER(ctypes.c_uint32)
+        lib.SDL_GetJoysticks.argtypes = [ctypes.POINTER(ctypes.c_int)]
+        lib.SDL_GetJoysticks.restype = ctypes.POINTER(ctypes.c_uint32)
         lib.SDL_OpenGamepad.argtypes = [ctypes.c_uint32]
         lib.SDL_OpenGamepad.restype = ctypes.c_void_p
         lib.SDL_CloseGamepad.argtypes = [ctypes.c_void_p]
@@ -151,6 +170,16 @@ class SDL3GamepadProvider:
         lib.SDL_PollEvent.restype = ctypes.c_bool
         lib.SDL_free.argtypes = [ctypes.c_void_p]
         lib.SDL_GetError.restype = ctypes.c_char_p
+        if hasattr(lib, "SDL_GetGamepadGUIDForID"):
+            lib.SDL_GetGamepadGUIDForID.argtypes = [ctypes.c_uint32]
+            lib.SDL_GetGamepadGUIDForID.restype = _SDLGuid
+        if hasattr(lib, "SDL_GUIDToString"):
+            lib.SDL_GUIDToString.argtypes = [_SDLGuid, ctypes.c_char_p, ctypes.c_int]
+        for name in ("SDL_GetGamepadVendorForID", "SDL_GetGamepadProductForID"):
+            if hasattr(lib, name):
+                function = getattr(lib, name)
+                function.argtypes = [ctypes.c_uint32]
+                function.restype = ctypes.c_uint16
         if hasattr(lib, "SDL_AddGamepadMappingsFromFile"):
             lib.SDL_AddGamepadMappingsFromFile.argtypes = [ctypes.c_char_p]
             lib.SDL_AddGamepadMappingsFromFile.restype = ctypes.c_int
@@ -177,6 +206,11 @@ class SDL3GamepadProvider:
             count = self._library.SDL_AddGamepadMappingsFromFile(str(self._mapping_file).encode())
             if count < 0:
                 logger.warning("Could not load SDL gamepad mappings: %s", self._error())
+        joystick_count = ctypes.c_int(0)
+        joysticks = self._library.SDL_GetJoysticks(ctypes.byref(joystick_count))
+        self._joystick_count = max(0, joystick_count.value)
+        if joysticks:
+            self._library.SDL_free(ctypes.cast(joysticks, ctypes.c_void_p))
         count = ctypes.c_int(0)
         identifiers = self._library.SDL_GetGamepads(ctypes.byref(count))
         try:
@@ -207,7 +241,35 @@ class SDL3GamepadProvider:
         battery = ctypes.c_int(-1)
         power_state = self._library.SDL_GetGamepadPowerInfo(pointer, ctypes.byref(battery))
         battery_percent = battery.value if power_state > 0 and 0 <= battery.value <= 100 else None
-        device = GamepadDevice(instance_id, name, gamepad_type, mapping_status, battery_percent)
+        guid = ""
+        if hasattr(self._library, "SDL_GetGamepadGUIDForID") and hasattr(
+            self._library, "SDL_GUIDToString"
+        ):
+            buffer = ctypes.create_string_buffer(33)
+            value = self._library.SDL_GetGamepadGUIDForID(instance_id)
+            self._library.SDL_GUIDToString(value, buffer, len(buffer))
+            guid = _decode(buffer.value, "")
+        vendor = (
+            int(self._library.SDL_GetGamepadVendorForID(instance_id))
+            if hasattr(self._library, "SDL_GetGamepadVendorForID")
+            else 0
+        )
+        product = (
+            int(self._library.SDL_GetGamepadProductForID(instance_id))
+            if hasattr(self._library, "SDL_GetGamepadProductForID")
+            else 0
+        )
+        device = GamepadDevice(
+            instance_id,
+            name,
+            gamepad_type,
+            mapping_status,
+            battery_percent,
+            True,
+            guid,
+            vendor or None,
+            product or None,
+        )
         self._devices[instance_id] = device
         return device
 
@@ -251,6 +313,25 @@ class SDL3GamepadProvider:
     def list_devices(self) -> Sequence[GamepadDevice]:
         return tuple(self._devices.values())
 
+    def diagnostics(self) -> dict[str, object]:
+        input_access, input_message = _input_device_access()
+        gamepad_count = len(self._devices)
+        if not input_access:
+            reason = input_message
+        elif gamepad_count:
+            reason = "Controller input is available"
+        elif self._joystick_count:
+            reason = "Joysticks were detected, but SDL3 has no gamepad mapping for them"
+        else:
+            reason = "No joystick or gamepad is connected"
+        return {
+            "sdl3_library_available": True,
+            "input_device_access_available": input_access,
+            "joystick_count": self._joystick_count,
+            "gamepad_count": gamepad_count,
+            "reason": reason,
+        }
+
     def close(self) -> None:
         if self._closed:
             return
@@ -277,6 +358,15 @@ class UnavailableGamepadProvider:
         return ()
     def list_devices(self) -> Sequence[GamepadDevice]:
         return ()
+    def diagnostics(self) -> dict[str, object]:
+        input_access, _message = _input_device_access()
+        return {
+            "sdl3_library_available": False,
+            "input_device_access_available": input_access,
+            "joystick_count": 0,
+            "gamepad_count": 0,
+            "reason": self.reason,
+        }
     def close(self) -> None:
         return None
 
@@ -311,6 +401,15 @@ class FakeGamepadProvider:
         return tuple(events)
     def list_devices(self) -> Sequence[GamepadDevice]:
         return tuple(self._devices.values())
+    def diagnostics(self) -> dict[str, object]:
+        count = len(self._devices)
+        return {
+            "sdl3_library_available": self._available,
+            "input_device_access_available": self._available,
+            "joystick_count": count,
+            "gamepad_count": count,
+            "reason": "Controller input is available" if count else "No joystick or gamepad is connected",
+        }
     def close(self) -> None:
         self.closed = True
         self._events.clear()

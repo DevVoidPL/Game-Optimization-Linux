@@ -133,6 +133,17 @@ from .game_executable import (
     ExecutableResolution,
     GameExecutableResolver,
 )
+from .game_analysis import GameAnalyzer
+from .performance_analysis import (
+    BottleneckAnalyzer,
+    MangoHudLogParser,
+    compare_measurements,
+)
+from .performance_session import BaselineSessionRepository
+from .game_optimization import (
+    GameRecommendationEngine,
+    OptimizationChangeService,
+)
 from .gamepad import GamepadInputMapper, GamepadService
 from .game_updates import (
     UPDATE_STATE_FORMAT_VERSION,
@@ -238,6 +249,13 @@ __all__ = [
     "OptimizationRecommendation",
     "SessionPerformanceData",
     "GameOptimizationProfileRepository",
+    "GameAnalyzer",
+    "MangoHudLogParser",
+    "BottleneckAnalyzer",
+    "BaselineSessionRepository",
+    "GameRecommendationEngine",
+    "OptimizationChangeService",
+    "compare_measurements",
     "OPTIMIZATION_FILE_NAME",
     "GameRuntimeLaunchPlan",
     "OptimizationLaunchPlanner",

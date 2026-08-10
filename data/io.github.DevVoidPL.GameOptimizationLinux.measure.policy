@@ -6,9 +6,9 @@
   <vendor>Game Optimization Linux</vendor>
   <vendor_url>https://github.com/DevVoidPL/GameOptimizationLinux</vendor_url>
   <action id="io.github.DevVoidPL.GameOptimizationLinux.measure">
-    <description>Measure Btrfs compression for a verified Steam game</description>
-    <description xml:lang="pl">Zmierz kompresję Btrfs zweryfikowanej gry Steam</description>
-    <description xml:lang="es">Medir la compresión Btrfs de un juego de Steam verificado</description>
+    <description>Measure Btrfs compression for a verified game directory</description>
+    <description xml:lang="pl">Zmierz kompresję Btrfs zweryfikowanego katalogu gry</description>
+    <description xml:lang="es">Medir la compresión Btrfs de un directorio de juego verificado</description>
     <message>Authentication is required for a read-only Btrfs compression measurement</message>
     <message xml:lang="pl">Uwierzytelnienie jest wymagane do odczytowego pomiaru kompresji Btrfs</message>
     <message xml:lang="es">Se requiere autenticación para medir la compresión Btrfs en modo de solo lectura</message>

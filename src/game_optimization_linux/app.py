@@ -240,6 +240,13 @@ def run(argv: Sequence[str] | None = None) -> int:
             "gameOptimizationDebugArtwork",
             os.environ.get("GAME_OPTIMIZATION_DEBUG_ARTWORK", "").strip() == "1",
         )
+        context.setContextProperty(
+            "gameOptimizationDebugCompression",
+            os.environ.get(
+                "GAME_OPTIMIZATION_DEBUG_COMPRESSION", ""
+            ).strip()
+            == "1",
+        )
 
         engine.load(QUrl.fromLocalFile(str(qml_path)))
         if not engine.rootObjects():

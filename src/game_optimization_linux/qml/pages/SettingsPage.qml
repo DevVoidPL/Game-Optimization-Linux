@@ -380,19 +380,69 @@ Item {
                             font.weight: Font.Bold
                         }
                         StatusBadge {
-                            text: page.controller && page.controller.gamepadAvailable
-                                  ? qsTr("SDL3 available") : qsTr("SDL3 missing")
-                            status: page.controller && page.controller.gamepadAvailable ? "available" : "missing"
+                            property var diagnostics: page.controller
+                                                      ? page.controller.controllerDiagnostics
+                                                      : ({})
+                            text: Number(diagnostics.gamepadCount || 0) > 0
+                                  ? qsTr("Controller connected")
+                                  : diagnostics.sdl3LibraryAvailable !== true
+                                    ? qsTr("SDL3 missing")
+                                    : diagnostics.inputDeviceAccessAvailable !== true
+                                      ? qsTr("Input access unavailable")
+                                      : qsTr("No controller detected")
+                            status: Number(diagnostics.gamepadCount || 0) > 0
+                                    ? "available"
+                                    : diagnostics.sdl3LibraryAvailable !== true
+                                      ? "missing" : "warning"
                         }
                     }
 
                     Label {
                         Layout.fillWidth: true
-                        visible: !(page.controller && page.controller.gamepadAvailable)
-                        text: qsTr("Install SDL3 to enable controller detection and Couch Mode input.")
+                        visible: page.controller
+                                 && Number(page.controller.controllerDiagnostics.gamepadCount || 0) === 0
+                        text: page.controller
+                              && page.controller.controllerDiagnostics.sdl3LibraryAvailable !== true
+                              ? qsTr("Install SDL3 to enable controller detection and Couch Mode input.")
+                              : String(page.controller.controllerDiagnostics.reason
+                                       || qsTr("Controller status is unavailable"))
                         color: App.Theme.warning
                         font.pixelSize: App.Theme.fontCaption
                         wrapMode: Text.WordWrap
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: width >= 720 ? 4 : 2
+                        rowSpacing: 6
+                        columnSpacing: 12
+
+                        LabeledValue {
+                            Layout.fillWidth: true
+                            label: qsTr("SDL3 library")
+                            value: page.controller
+                                   && page.controller.controllerDiagnostics.sdl3LibraryAvailable === true
+                                   ? qsTr("Available") : qsTr("Unavailable")
+                        }
+                        LabeledValue {
+                            Layout.fillWidth: true
+                            label: qsTr("Input device access")
+                            value: page.controller
+                                   && page.controller.controllerDiagnostics.inputDeviceAccessAvailable === true
+                                   ? qsTr("Available") : qsTr("Unavailable")
+                        }
+                        LabeledValue {
+                            Layout.fillWidth: true
+                            label: qsTr("Joysticks detected")
+                            value: String(page.controller
+                                          ? page.controller.controllerDiagnostics.joystickCount || 0 : 0)
+                        }
+                        LabeledValue {
+                            Layout.fillWidth: true
+                            label: qsTr("Gamepads detected")
+                            value: String(page.controller
+                                          ? page.controller.controllerDiagnostics.gamepadCount || 0 : 0)
+                        }
                     }
 
                     ColumnLayout {
@@ -557,17 +607,6 @@ Item {
                             }
                         }
 
-                        Divider { Layout.fillWidth: true }
-
-                        SettingRow {
-                            Layout.fillWidth: true
-                            title: qsTr("Interface sounds")
-                            description: qsTr("Optional navigation sounds; disabled by default")
-                            AppSwitch {
-                                checked: Boolean(page.setting(["interfaceSounds", "interface_sounds"], false))
-                                onToggled: page.save("interfaceSounds", checked)
-                            }
-                        }
                     }
                 }
             }
@@ -672,73 +711,6 @@ Item {
                         }
                     }
 
-                    Divider { Layout.fillWidth: true }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("CPU usage limit")
-                        description: qsTr("Maximum CPU share for future background enhancement jobs")
-
-                        RowLayout {
-                            spacing: 10
-                            AppSlider {
-                                id: cpuSlider
-                                Layout.preferredWidth: 190
-                                from: 10
-                                to: 100
-                                stepSize: 5
-                                value: Number(page.setting(["cpuUsageLimit", "cpu_limit_percent"], 75))
-                                onMoved: cpuSaveTimer.restart()
-                            }
-                            Label {
-                                text: qsTr("%1%").arg(Math.round(cpuSlider.value))
-                                color: App.Theme.text
-                                font.pixelSize: App.Theme.fontBody
-                                font.weight: Font.Bold
-                                Layout.preferredWidth: 42
-                                horizontalAlignment: Text.AlignRight
-                            }
-                            Timer {
-                                id: cpuSaveTimer
-                                interval: 250
-                                onTriggered: page.save("cpuUsageLimit", Math.round(cpuSlider.value))
-                            }
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("GPU usage limit")
-                        description: qsTr("Maximum GPU share for future texture enhancement jobs")
-
-                        RowLayout {
-                            spacing: 10
-                            AppSlider {
-                                id: gpuSlider
-                                Layout.preferredWidth: 190
-                                from: 10
-                                to: 100
-                                stepSize: 5
-                                value: Number(page.setting(["gpuUsageLimit", "gpu_limit_percent"], 75))
-                                onMoved: gpuSaveTimer.restart()
-                            }
-                            Label {
-                                text: qsTr("%1%").arg(Math.round(gpuSlider.value))
-                                color: App.Theme.text
-                                font.pixelSize: App.Theme.fontBody
-                                font.weight: Font.Bold
-                                Layout.preferredWidth: 42
-                                horizontalAlignment: Text.AlignRight
-                            }
-                            Timer {
-                                id: gpuSaveTimer
-                                interval: 250
-                                onTriggered: page.save("gpuUsageLimit", Math.round(gpuSlider.value))
-                            }
-                        }
-                    }
                 }
             }
 

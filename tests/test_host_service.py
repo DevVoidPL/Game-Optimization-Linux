@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 import subprocess
@@ -149,7 +150,7 @@ def test_steam_detection_never_starts_steam_or_a_proton_probe(tmp_path: Path) ->
 def test_each_missing_or_broken_host_tool_has_an_independent_result() -> None:
     def runner(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
         command = argv[2]
-        if command in {"mangohud", "gamemoderun", "gamemoded"}:
+        if command in {"mangohud", "gamemoderun", "gamemoded", "compsize", "pkexec"}:
             return subprocess.CompletedProcess(argv, 127, "", "command not found")
         if command == "gamescope":
             raise subprocess.TimeoutExpired(argv, 1)
@@ -171,6 +172,100 @@ def test_each_missing_or_broken_host_tool_has_an_independent_result() -> None:
     assert diagnostics["tools"]["gamescope"]["status"] == "error"
     assert diagnostics["tools"]["btrfs-progs"]["available"] is True
     assert diagnostics["measurement_component_available"] is False
+
+
+def test_exact_measurement_uses_fixed_polkit_compsize_argv_for_path_with_space(
+    tmp_path: Path,
+) -> None:
+    game = _game(tmp_path)
+    renamed = game.install_path.with_name("House Flipper")
+    game.install_path.rename(renamed)
+    game = replace(game, install_path=renamed)
+    calls: list[tuple[list[str], dict[str, object]]] = []
+    compsize_output = (
+        "Type Perc Disk Usage Uncompressed Referenced\n"
+        "TOTAL 50% 512K 1M 1M\n"
+        "zstd 50% 512K 1M 1M\n"
+    )
+
+    def runner(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        calls.append((argv, dict(kwargs)))
+        if argv[2:] == ["compsize", "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "compsize 1.5", "")
+        if argv[2:] == ["pkexec", "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "pkexec version 126", "")
+        return subprocess.CompletedProcess(argv, 0, compsize_output, "")
+
+    client = HostServiceClient(
+        flatpak_spawn="flatpak-spawn",
+        environment={"FLATPAK_ID": "app"},
+        command_runner=runner,
+        which=lambda _name: None,
+    )
+
+    measurement = client.measure(game)
+
+    exact_argv, exact_kwargs = calls[-1]
+    assert exact_argv == [
+        "flatpak-spawn", "--host", "pkexec", "compsize", "--", str(renamed),
+    ]
+    assert exact_argv[-1] == str(renamed)
+    assert exact_kwargs["shell"] is False
+    assert measurement.measurement_source == "polkit_compsize"
+    assert measurement.compsize_disk_bytes == 512 * 1024
+    assert measurement.compsize_uncompressed_bytes == 1024 * 1024
+
+
+def test_exact_measurement_rejects_zero_exit_with_incomplete_compsize(
+    tmp_path: Path,
+) -> None:
+    game = _game(tmp_path)
+
+    def runner(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        if argv[2:] == ["compsize", "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "compsize 1.5", "")
+        if argv[2:] == ["pkexec", "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "pkexec version 126", "")
+        return subprocess.CompletedProcess(
+            argv,
+            0,
+            "compsize completed without a TOTAL row\n",
+            "",
+        )
+
+    client = HostServiceClient(
+        flatpak_spawn="flatpak-spawn",
+        environment={"FLATPAK_ID": "app"},
+        command_runner=runner,
+        which=lambda _name: None,
+    )
+
+    with pytest.raises(HostServiceError, match="incomplete result"):
+        client.measure(game)
+
+
+def test_exact_measurement_polkit_cancel_is_not_compression_failure(
+    tmp_path: Path,
+) -> None:
+    game = _game(tmp_path)
+
+    def runner(argv: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        if argv[2:] == ["compsize", "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "compsize 1.5", "")
+        if argv[2:] == ["pkexec", "--version"]:
+            return subprocess.CompletedProcess(argv, 0, "pkexec version 126", "")
+        return subprocess.CompletedProcess(argv, 126, "", "")
+
+    client = HostServiceClient(
+        flatpak_spawn="flatpak-spawn",
+        environment={"FLATPAK_ID": "app"},
+        command_runner=runner,
+        which=lambda _name: None,
+    )
+
+    with pytest.raises(HostServiceError, match="Authorization cancelled") as caught:
+        client.measure(game)
+    assert caught.value.exit_code == 126
 
 
 def test_host_has_no_generic_command_api() -> None:

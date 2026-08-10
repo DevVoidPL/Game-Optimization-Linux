@@ -1078,7 +1078,7 @@
     </message>
     <message>
         <location filename="../qml/couch/CouchSettings.qml" line="56"/>
-        <location filename="../qml/couch/CouchSettings.qml" line="101"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="91"/>
         <source>On</source>
         <translation>On</translation>
     </message>
@@ -1093,88 +1093,82 @@
         <translation>Automatically enter Couch Mode after Game Optimization detects controller input.</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="61"/>
         <source>Vibration</source>
-        <translation>Vibration</translation>
+        <translation type="vanished">Vibration</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="62"/>
         <source>Planned</source>
-        <translation>Planned</translation>
+        <translation type="vanished">Planned</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="63"/>
         <source>Controller vibration is planned for a later implementation stage.</source>
-        <translation>Controller vibration is planned for a later implementation stage.</translation>
+        <translation type="vanished">Controller vibration is planned for a later implementation stage.</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="66"/>
         <source>Interface sounds</source>
-        <translation>Interface sounds</translation>
+        <translation type="vanished">Interface sounds</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="67"/>
-        <location filename="../qml/couch/CouchSettings.qml" line="101"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="91"/>
         <source>Off</source>
         <translation>Off</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="68"/>
         <source>Couch Mode does not play interface sounds at this implementation stage.</source>
-        <translation>Couch Mode does not play interface sounds at this implementation stage.</translation>
+        <translation type="vanished">Couch Mode does not play interface sounds at this implementation stage.</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="71"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="61"/>
         <source>Switch to Desktop Mode</source>
         <translation>Switch to Desktop Mode</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="72"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="62"/>
         <source>Always available</source>
         <translation>Always available</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="73"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="63"/>
         <source>Leave Couch Mode and return to the standard desktop interface.</source>
         <translation>Leave Couch Mode and return to the standard desktop interface.</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="76"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="66"/>
         <source>Reset Couch Mode settings</source>
         <translation>Reset Couch Mode settings</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="77"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="67"/>
         <source>Safe defaults</source>
         <translation>Safe defaults</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="78"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="68"/>
         <source>Restore safe controller and Couch Mode defaults without changing game data.</source>
         <translation>Restore safe controller and Couch Mode defaults without changing game data.</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="303"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="292"/>
         <source>Couch Mode settings</source>
         <translation>Couch Mode settings</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="310"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="299"/>
         <source>Use the controller to choose a category and adjust its options.</source>
         <translation>Use the controller to choose a category and adjust its options.</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="337"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="326"/>
         <source>Categories</source>
         <translation>Categories</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="403"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="392"/>
         <source>Use LB and RB to change category</source>
         <translation>Use LB and RB to change category</translation>
     </message>
     <message>
-        <location filename="../qml/couch/CouchSettings.qml" line="437"/>
+        <location filename="../qml/couch/CouchSettings.qml" line="426"/>
         <source>Use left and right to change the selected value.</source>
         <translation>Use left and right to change the selected value.</translation>
     </message>
@@ -3897,22 +3891,21 @@ Only continue after reviewing this risk.</translation>
         <translation>Cancel task and close</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="181"/>
         <source>Not checked</source>
-        <translation>Not checked</translation>
+        <translation type="vanished">Not checked</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="271"/>
+        <location filename="../qml/Main.qml" line="267"/>
         <source>This page could not be opened</source>
         <translation>This page could not be opened</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="280"/>
+        <location filename="../qml/Main.qml" line="276"/>
         <source>Return to Games and try again.</source>
         <translation>Return to Games and try again.</translation>
     </message>
     <message>
-        <location filename="../qml/Main.qml" line="288"/>
+        <location filename="../qml/Main.qml" line="284"/>
         <source>Back to Games</source>
         <translation>Back to Games</translation>
     </message>
@@ -4884,335 +4877,748 @@ Only continue after reviewing this risk.</translation>
 <context>
     <name>OptimizationTab</name>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="51"/>
         <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="254"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="63"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="636"/>
         <source>Automatic</source>
         <translation>Automatic</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="51"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
         <source>Maximum Performance</source>
         <translation>Maximum Performance</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="51"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
         <source>Balanced</source>
         <translation>Balanced</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="51"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
         <source>Quiet</source>
         <translation>Quiet</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="51"/>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="53"/>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="55"/>
         <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="59"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="61"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="63"/>
         <source>Custom</source>
         <translation>Custom</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="53"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="59"/>
         <source>Competitive</source>
         <translation>Competitive</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="53"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="59"/>
         <source>Fast action</source>
         <translation>Fast action</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="53"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="59"/>
         <source>Cinematic single-player</source>
         <translation>Cinematic single-player</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="53"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="59"/>
         <source>Platformer / 2D</source>
         <translation>Platformer / 2D</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="53"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="59"/>
         <source>Strategy / simulation</source>
         <translation>Strategy / simulation</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="53"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="59"/>
         <source>Retro</source>
         <translation>Retro</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="53"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="59"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="300"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="307"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="316"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="323"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="330"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="337"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="343"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="384"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="385"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="386"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="387"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="388"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="389"/>
         <source>Unknown</source>
         <translation>Unknown</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="55"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="61"/>
         <source>Lowest latency</source>
         <translation>Lowest latency</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="55"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="61"/>
         <source>Stable image</source>
         <translation>Stable image</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="55"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="61"/>
         <source>Best quality</source>
         <translation>Best quality</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="55"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="61"/>
         <source>Low power</source>
         <translation>Low power</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="63"/>
         <source>Disabled</source>
         <translation>Disabled</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="63"/>
         <source>Native</source>
         <translation>Native</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="63"/>
         <source>Performance</source>
         <translation>Performance</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="57"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="63"/>
         <source>Quality</source>
         <translation>Quality</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="104"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="113"/>
         <source>None</source>
         <translation>None</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="175"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="201"/>
         <source>Invalid optimization profile</source>
         <translation>Invalid optimization profile</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="181"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="207"/>
         <source>Could not save optimization profile</source>
         <translation>Could not save optimization profile</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="199"/>
         <source>Game Optimization recommendation</source>
-        <translation>Game Optimization recommendation</translation>
+        <translation type="vanished">Game Optimization recommendation</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="200"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="576"/>
         <source>Preliminary recommendation - game measurement required</source>
         <translation>Preliminary recommendation - game measurement required</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="201"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="577"/>
         <source>Target: %1 FPS</source>
         <translation>Target: %1 FPS</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="224"/>
+        <source>Analyze</source>
+        <translation type="vanished">Analyze</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="582"/>
+        <source>Exact changes are shown in the launch plan below</source>
+        <translation>Exact changes are shown in the launch plan below</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="582"/>
+        <source>Analyze the current profile before applying it</source>
+        <translation>Analyze the current profile before applying it</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="605"/>
         <source>Profile</source>
         <translation>Profile</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="237"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="618"/>
         <source>Game and user goal</source>
         <translation>Game and user goal</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="238"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="619"/>
         <source>Game category</source>
         <translation>Game category</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="238"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="619"/>
         <source>You can always correct this classification manually</source>
         <translation>You can always correct this classification manually</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="241"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="622"/>
+        <source>Classification source: %1, confidence: %2%</source>
+        <translation>Classification source: %1, confidence: %2%</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="355"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="365"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="622"/>
+        <source>not detected</source>
+        <translation>not detected</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="216"/>
+        <source>Game analysis could not start</source>
+        <translation>Game analysis could not start</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="226"/>
+        <source>Baseline session started. Play a representative part of the game, then exit normally.</source>
+        <translation>Baseline session started. Play a representative part of the game, then exit normally.</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="228"/>
+        <source>Baseline recording could not start</source>
+        <translation>Baseline recording could not start</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="237"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="480"/>
+        <source>Unavailable</source>
+        <translation>Unavailable</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="262"/>
+        <source>Detected game</source>
+        <translation>Detected game</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="269"/>
+        <source>Analyzing</source>
+        <translation>Analyzing</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="271"/>
+        <source>Analyzed</source>
+        <translation>Analyzed</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="273"/>
+        <source>Analysis failed</source>
+        <translation>Analysis failed</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="274"/>
+        <source>Not analyzed</source>
+        <translation>Not analyzed</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="282"/>
+        <source>Analyzing…</source>
+        <translation>Analyzing…</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="282"/>
+        <source>Analyze Game</source>
+        <translation>Analyze Game</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="297"/>
+        <source>Engine</source>
+        <translation>Engine</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="304"/>
+        <source>Graphics API</source>
+        <translation>Graphics API</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="311"/>
+        <source>Available graphics APIs</source>
+        <translation>Available graphics APIs</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="320"/>
+        <source>Runtime</source>
+        <translation>Runtime</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="327"/>
+        <source>Architecture</source>
+        <translation>Architecture</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="334"/>
+        <source>Category</source>
+        <translation>Category</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="341"/>
+        <source>Executable</source>
+        <translation>Executable</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="349"/>
+        <source>Engine confidence: %1% - source: %2</source>
+        <translation>Engine confidence: %1% - source: %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="362"/>
+        <source>Category source: %1 - confidence: %2%</source>
+        <translation>Category source: %1 - confidence: %2%</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="374"/>
+        <source>System snapshot</source>
+        <translation>System snapshot</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="384"/>
+        <source>CPU</source>
+        <translation>CPU</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="385"/>
+        <source>GPU</source>
+        <translation>GPU</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="386"/>
+        <source>RAM</source>
+        <translation>RAM</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="387"/>
+        <source>VRAM</source>
+        <translation>VRAM</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="388"/>
+        <source>Display</source>
+        <translation>Display</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="389"/>
+        <source>Resolution</source>
+        <translation>Resolution</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="394"/>
+        <source>Game analysis failed</source>
+        <translation>Game analysis failed</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="408"/>
+        <source>Performance analysis</source>
+        <translation>Performance analysis</translation>
+    </message>
+    <message>
+        <source>MangoHud baseline loaded - %1 samples</source>
+        <translation type="vanished">MangoHud baseline loaded - %1 samples</translation>
+    </message>
+    <message>
+        <source>Baseline required - enable MangoHud logging and record a representative session</source>
+        <translation type="vanished">Baseline required - enable MangoHud logging and record a representative session</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="415"/>
+        <source>Baseline recorded</source>
+        <translation>Baseline recorded</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="416"/>
+        <source>Waiting for the game to start...</source>
+        <translation>Waiting for the game to start...</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="417"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="431"/>
+        <source>Recording...</source>
+        <translation>Recording...</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="418"/>
+        <source>Processing MangoHud log...</source>
+        <translation>Processing MangoHud log...</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="420"/>
+        <source>Baseline recording failed: %1</source>
+        <translation>Baseline recording failed: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="420"/>
+        <source>No usable log was produced</source>
+        <translation>No usable log was produced</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="421"/>
+        <source>Baseline: Not recorded</source>
+        <translation>Baseline: Not recorded</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="431"/>
+        <source>Record baseline</source>
+        <translation>Record baseline</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="440"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="729"/>
+        <source>Import MangoHud log</source>
+        <translation>Import MangoHud log</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="448"/>
+        <source>Recording uses a private one-session MangoHud configuration and does not modify the saved game profile.</source>
+        <translation>Recording uses a private one-session MangoHud configuration and does not modify the saved game profile.</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="459"/>
+        <source>Duration</source>
+        <translation>Duration</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="460"/>
+        <source>Average FPS</source>
+        <translation>Average FPS</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="461"/>
+        <source>1% low</source>
+        <translation>1% low</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="462"/>
+        <source>Frametime</source>
+        <translation>Frametime</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="463"/>
+        <source>CPU usage</source>
+        <translation>CPU usage</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="464"/>
+        <source>GPU usage</source>
+        <translation>GPU usage</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="465"/>
+        <source>RAM usage</source>
+        <translation>RAM usage</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="466"/>
+        <source>VRAM usage</source>
+        <translation>VRAM usage</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="470"/>
+        <source>Bottleneck</source>
+        <translation>Bottleneck</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="473"/>
+        <source>Insufficient data</source>
+        <translation>Insufficient data</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="477"/>
+        <source>Confidence</source>
+        <translation>Confidence</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="504"/>
+        <source>Recommendations</source>
+        <translation>Recommendations</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="512"/>
+        <source>No safe optimization recommendations were found</source>
+        <translation>No safe optimization recommendations were found</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="533"/>
+        <source>Reversible</source>
+        <translation>Reversible</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="533"/>
+        <source>Manual rollback</source>
+        <translation>Manual rollback</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="537"/>
+        <source>Why: %1</source>
+        <translation>Why: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="538"/>
+        <source>Change: %1 → %2</source>
+        <translation>Change: %1 → %2</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="539"/>
+        <source>Expected effect: %1</source>
+        <translation>Expected effect: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="540"/>
+        <source>Quality impact: %1</source>
+        <translation>Quality impact: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="541"/>
+        <source>Risk: %1</source>
+        <translation>Risk: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="542"/>
+        <source>Files: %1</source>
+        <translation>Files: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="547"/>
+        <source>Apply</source>
+        <translation>Apply</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="552"/>
+        <source>Optimization applied</source>
+        <translation>Optimization applied</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="554"/>
+        <source>Optimization could not be applied</source>
+        <translation>Optimization could not be applied</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="570"/>
+        <source>Measured optimization recommendations</source>
+        <translation>Measured optimization recommendations</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="571"/>
+        <source>Preliminary settings</source>
+        <translation>Preliminary settings</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="581"/>
+        <source>Preview changes</source>
+        <translation>Preview changes</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="623"/>
         <source>User goal</source>
         <translation>User goal</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="249"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="631"/>
         <source>Monitor and FPS</source>
         <translation>Monitor and FPS</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="250"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="632"/>
         <source>Gaming monitor</source>
         <translation>Gaming monitor</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="250"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="632"/>
         <source>Detected from active Qt screens</source>
         <translation>Detected from active Qt screens</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="250"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="632"/>
         <source>No active screen detected</source>
         <translation>No active screen detected</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="253"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="635"/>
         <source>Target FPS</source>
         <translation>Target FPS</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="253"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="635"/>
         <source>Enforced by Gamescope</source>
         <translation>Enforced by Gamescope</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="253"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="635"/>
         <source>Advisory until Gamescope is enabled</source>
         <translation>Advisory until Gamescope is enabled</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="254"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="636"/>
         <source>Manual</source>
         <translation>Manual</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="254"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="636"/>
         <source>Unlimited</source>
         <translation>Unlimited</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="265"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="647"/>
         <source>Runtime wrappers</source>
         <translation>Runtime wrappers</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="266"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="648"/>
         <source>GameMode</source>
         <translation>GameMode</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="270"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="652"/>
         <source>Gamescope</source>
         <translation>Gamescope</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="273"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="655"/>
         <source>Gamescope mode</source>
         <translation>Gamescope mode</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="278"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="660"/>
         <source>Render width</source>
         <translation>Render width</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="279"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="661"/>
         <source>Render height</source>
         <translation>Render height</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="280"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="662"/>
         <source>Output width</source>
         <translation>Output width</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="281"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="663"/>
         <source>Output height</source>
         <translation>Output height</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="286"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="668"/>
         <source>Refresh Hz</source>
         <translation>Refresh Hz</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="288"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="670"/>
         <source>Fullscreen</source>
         <translation>Fullscreen</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="296"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="678"/>
         <source>Launch plan preview</source>
         <translation>Launch plan preview</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="303"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="685"/>
         <source>Wrapper order: %1</source>
         <translation>Wrapper order: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="303"/>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="305"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="685"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="687"/>
         <source>none</source>
         <translation>none</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="304"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="686"/>
         <source>FPS limit owner: %1</source>
         <translation>FPS limit owner: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="305"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="687"/>
         <source>Final runtime environment: %1</source>
         <translation>Final runtime environment: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="306"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="688"/>
+        <source>Warnings: %1</source>
+        <translation>Warnings: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="689"/>
         <source>Environment conflicts: %1</source>
         <translation>Environment conflicts: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="314"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="690"/>
+        <source>Decision sources: %1</source>
+        <translation>Decision sources: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="691"/>
+        <source>Preset constraints: %1</source>
+        <translation>Preset constraints: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="700"/>
         <source>Steam connection</source>
         <translation>Steam connection</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="315"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="701"/>
         <source>Runner installed</source>
         <translation>Runner installed</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="315"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="701"/>
         <source>Runner not installed</source>
         <translation>Runner not installed</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="317"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="703"/>
         <source>Set this command once in the game’s Steam Launch Options. Later profile changes do not change it.</source>
         <translation>Set this command once in the game’s Steam Launch Options. Later profile changes do not change it.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="322"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="708"/>
         <source>Copy command</source>
         <translation>Copy command</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="323"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="709"/>
         <source>Show instructions</source>
         <translation>Show instructions</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="324"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="710"/>
         <source>Test runner</source>
         <translation>Test runner</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="326"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="712"/>
         <source>Steam → Properties → General → Launch Options</source>
         <translation>Steam → Properties → General → Launch Options</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="332"/>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="718"/>
+        <source>Apply profile</source>
+        <translation>Apply profile</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="731"/>
+        <source>MangoHud logs (*.csv)</source>
+        <translation>MangoHud logs (*.csv)</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="731"/>
+        <source>All files (*)</source>
+        <translation>All files (*)</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="739"/>
+        <source>MangoHud log could not be imported</source>
+        <translation>MangoHud log could not be imported</translation>
+    </message>
+    <message>
         <source>Save profile</source>
-        <translation>Save profile</translation>
+        <translation type="vanished">Save profile</translation>
     </message>
 </context>
 <context>
@@ -5766,25 +6172,25 @@ Only continue after reviewing this risk.</translation>
     </message>
     <message>
         <location filename="../qml/pages/SettingsPage.qml" line="244"/>
-        <location filename="../qml/pages/SettingsPage.qml" line="667"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="706"/>
         <source>Fast</source>
         <translation>Fast</translation>
     </message>
     <message>
         <location filename="../qml/pages/SettingsPage.qml" line="244"/>
-        <location filename="../qml/pages/SettingsPage.qml" line="667"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="706"/>
         <source>Balanced</source>
         <translation>Balanced</translation>
     </message>
     <message>
         <location filename="../qml/pages/SettingsPage.qml" line="244"/>
-        <location filename="../qml/pages/SettingsPage.qml" line="667"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="706"/>
         <source>Maximum</source>
         <translation>Maximum</translation>
     </message>
     <message>
         <location filename="../qml/pages/SettingsPage.qml" line="244"/>
-        <location filename="../qml/pages/SettingsPage.qml" line="667"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="706"/>
         <source>Auto</source>
         <translation>Auto</translation>
     </message>
@@ -5839,375 +6245,418 @@ Only continue after reviewing this risk.</translation>
         <translation>Controller</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="384"/>
-        <source>SDL3 available</source>
-        <translation>SDL3 available</translation>
+        <location filename="../qml/pages/SettingsPage.qml" line="387"/>
+        <source>Controller connected</source>
+        <translation>Controller connected</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="384"/>
+        <source>SDL3 available</source>
+        <translation type="vanished">SDL3 available</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="389"/>
         <source>SDL3 missing</source>
         <translation>SDL3 missing</translation>
     </message>
     <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="391"/>
+        <source>Input access unavailable</source>
+        <translation>Input access unavailable</translation>
+    </message>
+    <message>
         <location filename="../qml/pages/SettingsPage.qml" line="392"/>
+        <source>No controller detected</source>
+        <translation>No controller detected</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="406"/>
         <source>Install SDL3 to enable controller detection and Couch Mode input.</source>
         <translation>Install SDL3 to enable controller detection and Couch Mode input.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="406"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="408"/>
+        <source>Controller status is unavailable</source>
+        <translation>Controller status is unavailable</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="422"/>
+        <source>SDL3 library</source>
+        <translation>SDL3 library</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="425"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="432"/>
+        <source>Available</source>
+        <translation>Available</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="425"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="432"/>
+        <source>Unavailable</source>
+        <translation>Unavailable</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="429"/>
+        <source>Input device access</source>
+        <translation>Input device access</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="436"/>
+        <source>Joysticks detected</source>
+        <translation>Joysticks detected</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="442"/>
+        <source>Gamepads detected</source>
+        <translation>Gamepads detected</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/SettingsPage.qml" line="456"/>
         <source>Controller mode</source>
         <translation>Controller mode</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="407"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="457"/>
         <source>Choose startup and automatic switching behavior; F11 always remains available</source>
         <translation>Choose startup and automatic switching behavior; F11 always remains available</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="410"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="460"/>
         <source>Automatic</source>
         <translation>Automatic</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="410"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="460"/>
         <source>Desktop only</source>
         <translation>Desktop only</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="410"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="460"/>
         <source>Couch only</source>
         <translation>Couch only</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="422"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="472"/>
         <source>Swap Accept and Back</source>
         <translation>Swap Accept and Back</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="423"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="473"/>
         <source>Reverse the two primary face-button actions</source>
         <translation>Reverse the two primary face-button actions</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="434"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="484"/>
         <source>Repeat interval</source>
         <translation>Repeat interval</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="435"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="485"/>
         <source>Time between repeated navigation steps</source>
         <translation>Time between repeated navigation steps</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="447"/>
-        <location filename="../qml/pages/SettingsPage.qml" line="507"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="497"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="557"/>
         <source>%1 ms</source>
         <translation>%1 ms</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="464"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="514"/>
         <source>Analog dead zone</source>
         <translation>Analog dead zone</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="465"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="515"/>
         <source>Ignore small stick movement around the center</source>
         <translation>Ignore small stick movement around the center</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="477"/>
-        <location filename="../qml/pages/SettingsPage.qml" line="694"/>
-        <location filename="../qml/pages/SettingsPage.qml" line="728"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="527"/>
         <source>%1%</source>
         <translation>%1%</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="494"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="544"/>
         <source>Navigation repeat</source>
         <translation>Navigation repeat</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="495"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="545"/>
         <source>Delay before held directional input starts repeating</source>
         <translation>Delay before held directional input starts repeating</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="524"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="574"/>
         <source>Hide cursor in Couch Mode</source>
         <translation>Hide cursor in Couch Mode</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="525"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="575"/>
         <source>The cursor returns as soon as the mouse moves</source>
         <translation>The cursor returns as soon as the mouse moves</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="536"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="586"/>
         <source>Start Couch Mode fullscreen</source>
         <translation>Start Couch Mode fullscreen</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="537"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="587"/>
         <source>Use the whole display when Couch Mode opens</source>
         <translation>Use the whole display when Couch Mode opens</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="548"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="598"/>
         <source>After launching a game</source>
         <translation>After launching a game</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="549"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="599"/>
         <source>Choose what the Game Optimization window should do</source>
         <translation>Choose what the Game Optimization window should do</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="552"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="602"/>
         <source>Minimize</source>
         <translation>Minimize</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="552"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="602"/>
         <source>Stay open</source>
         <translation>Stay open</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="552"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="602"/>
         <source>Close launcher</source>
         <translation>Close launcher</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="564"/>
         <source>Interface sounds</source>
-        <translation>Interface sounds</translation>
+        <translation type="vanished">Interface sounds</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="565"/>
         <source>Optional navigation sounds; disabled by default</source>
-        <translation>Optional navigation sounds; disabled by default</translation>
+        <translation type="vanished">Optional navigation sounds; disabled by default</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="585"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="624"/>
         <source>Appearance</source>
         <translation>Appearance</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="593"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="632"/>
         <source>Color mode</source>
         <translation>Color mode</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="594"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="633"/>
         <source>Follow the desktop or choose a fixed light or dark palette</source>
         <translation>Follow the desktop or choose a fixed light or dark palette</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="601"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="640"/>
         <source>System</source>
         <translation>System</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="602"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="641"/>
         <source>Dark</source>
         <translation>Dark</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="603"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="642"/>
         <source>Light</source>
         <translation>Light</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="654"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="693"/>
         <source>Resource limits</source>
         <translation>Resource limits</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="662"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="701"/>
         <source>Default compression profile</source>
         <translation>Default compression profile</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="663"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="702"/>
         <source>Preselected mode when opening the Storage tab</source>
         <translation>Preselected mode when opening the Storage tab</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="679"/>
         <source>CPU usage limit</source>
-        <translation>CPU usage limit</translation>
+        <translation type="vanished">CPU usage limit</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="680"/>
         <source>Maximum CPU share for future background enhancement jobs</source>
-        <translation>Maximum CPU share for future background enhancement jobs</translation>
+        <translation type="vanished">Maximum CPU share for future background enhancement jobs</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="713"/>
         <source>GPU usage limit</source>
-        <translation>GPU usage limit</translation>
+        <translation type="vanished">GPU usage limit</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="714"/>
         <source>Maximum GPU share for future texture enhancement jobs</source>
-        <translation>Maximum GPU share for future texture enhancement jobs</translation>
+        <translation type="vanished">Maximum GPU share for future texture enhancement jobs</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="755"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="727"/>
         <source>Storage locations</source>
         <translation>Storage locations</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="763"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="735"/>
         <source>Steam discovery</source>
         <translation>Steam discovery</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="765"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="737"/>
         <source>Demo data is active because GAME_OPTIMIZATION_DEMO=1</source>
         <translation>Demo data is active because GAME_OPTIMIZATION_DEMO=1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="766"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="738"/>
         <source>Standard and Flatpak locations are scanned read-only</source>
         <translation>Standard and Flatpak locations are scanned read-only</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="770"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="742"/>
         <source>Scanning</source>
         <translation>Scanning</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="772"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="744"/>
         <source>Steam detected</source>
         <translation>Steam detected</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="772"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="744"/>
         <source>Not detected</source>
         <translation>Not detected</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="781"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="753"/>
         <source>Show Steam tools and runtimes</source>
         <translation>Show Steam tools and runtimes</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="782"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="754"/>
         <source>Include Proton, Steam Linux Runtime, SDKs, and dedicated servers on Games</source>
         <translation>Include Proton, Steam Linux Runtime, SDKs, and dedicated servers on Games</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="793"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="765"/>
         <source>Additional Steam locations</source>
         <translation>Additional Steam locations</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="801"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="773"/>
         <source>Optional Steam roots are read during the next library refresh. No files are modified.</source>
         <translation>Optional Steam roots are read during the next library refresh. No files are modified.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="839"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="811"/>
         <source>Remove additional Steam location</source>
         <translation>Remove additional Steam location</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="860"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="832"/>
         <source>/path/to/Steam</source>
         <translation>/path/to/Steam</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="867"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="839"/>
         <source>Add Steam location</source>
         <translation>Add Steam location</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="883"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="855"/>
         <source>Libraries forgotten in Game Optimization</source>
         <translation>Libraries forgotten in Game Optimization</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="892"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="864"/>
         <source>These paths remain untouched in Steam and can be restored at any time.</source>
         <translation>These paths remain untouched in Steam and can be restored at any time.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="928"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="900"/>
         <source>Restore</source>
         <translation>Restore</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="944"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="916"/>
         <source>Backup directory</source>
         <translation>Backup directory</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="945"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="917"/>
         <source>Future backups will be placed here; no directory is touched in demo mode</source>
         <translation>Future backups will be placed here; no directory is touched in demo mode</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="959"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="931"/>
         <source>Quarantine directory</source>
         <translation>Quarantine directory</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="960"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="932"/>
         <source>Reserved for a future safe-review workflow</source>
         <translation>Reserved for a future safe-review workflow</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="973"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="945"/>
         <source>Game library directories</source>
         <translation>Game library directories</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="981"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="953"/>
         <source>Only immediate child folders are checked for local games. Home and filesystem roots are rejected.</source>
         <translation>Only immediate child folders are checked for local games. Home and filesystem roots are rejected.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1019"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="991"/>
         <source>Remove library directory</source>
         <translation>Remove library directory</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1040"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1012"/>
         <source>/path/to/games</source>
         <translation>/path/to/games</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1047"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1019"/>
         <source>Add</source>
         <translation>Add</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1061"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1033"/>
         <source>Rescan</source>
         <translation>Rescan</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1083"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1055"/>
         <source>Experimental</source>
         <translation>Experimental</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1091"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1063"/>
         <source>Experimental features</source>
         <translation>Experimental features</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1092"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1064"/>
         <source>Show unfinished capabilities. They remain simulation-only in this build.</source>
         <translation>Show unfinished capabilities. They remain simulation-only in this build.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1111"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1083"/>
         <source>Demo safety: no sudo, deletion, Btrfs property changes, governor changes, downloads, or launcher-file edits are performed.</source>
         <translation>Demo safety: no sudo, deletion, Btrfs property changes, governor changes, downloads, or launcher-file edits are performed.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/SettingsPage.qml" line="1112"/>
+        <location filename="../qml/pages/SettingsPage.qml" line="1084"/>
         <source>Safety: no sudo, deletion, global mount changes, downloads, or launcher-file edits are performed. Btrfs writes require a confirmed plan or explicit automatic opt-in.</source>
         <translation>Safety: no sudo, deletion, global mount changes, downloads, or launcher-file edits are performed. Btrfs writes require a confirmed plan or explicit automatic opt-in.</translation>
     </message>
@@ -6220,53 +6669,51 @@ Only continue after reviewing this risk.</translation>
         <translation>Application</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="31"/>
+        <location filename="../qml/components/Sidebar.qml" line="29"/>
         <source>Games</source>
         <translation>Games</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="32"/>
+        <location filename="../qml/components/Sidebar.qml" line="30"/>
         <source>Updates</source>
         <translation>Updates</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="34"/>
+        <location filename="../qml/components/Sidebar.qml" line="32"/>
         <source>Tasks</source>
         <translation>Tasks</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="35"/>
+        <location filename="../qml/components/Sidebar.qml" line="33"/>
         <source>System</source>
         <translation>System</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="36"/>
+        <location filename="../qml/components/Sidebar.qml" line="34"/>
         <source>Settings</source>
         <translation>Settings</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="104"/>
+        <location filename="../qml/components/Sidebar.qml" line="102"/>
         <source>DESKTOP</source>
         <translation>DESKTOP</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="223"/>
         <source>Not checked</source>
-        <translation>Not checked</translation>
+        <translation type="vanished">Not checked</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="231"/>
         <source>Version %1</source>
-        <translation>Version %1</translation>
+        <translation type="vanished">Version %1</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="244"/>
+        <location filename="../qml/components/Sidebar.qml" line="198"/>
         <source>Expand sidebar</source>
         <translation>Expand sidebar</translation>
     </message>
     <message>
-        <location filename="../qml/components/Sidebar.qml" line="244"/>
-        <location filename="../qml/components/Sidebar.qml" line="264"/>
+        <location filename="../qml/components/Sidebar.qml" line="198"/>
+        <location filename="../qml/components/Sidebar.qml" line="218"/>
         <source>Collapse sidebar</source>
         <translation>Collapse sidebar</translation>
     </message>
@@ -6282,960 +6729,1026 @@ Only continue after reviewing this risk.</translation>
 <context>
     <name>StorageTab</name>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="164"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="193"/>
         <source>Fast</source>
         <translation>Fast</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="164"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="193"/>
         <source>Prioritizes speed with lower CPU use.</source>
         <translation>Prioritizes speed with lower CPU use.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="165"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="194"/>
         <source>Balanced</source>
         <translation>Balanced</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="165"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="194"/>
         <source>Recommended balance of time and estimated savings.</source>
         <translation>Recommended balance of time and estimated savings.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="166"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="195"/>
         <source>Maximum</source>
         <translation>Maximum</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="166"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="195"/>
         <source>Uses more CPU for a potentially small additional gain.</source>
         <translation>Uses more CPU for a potentially small additional gain.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="167"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="196"/>
         <source>Auto</source>
         <translation>Auto</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="167"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="196"/>
         <source>automatic</source>
         <translation>automatic</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="167"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="196"/>
         <source>Chooses between levels 1, 3, 6 and 9 from measured samples.</source>
         <translation>Chooses between levels 1, 3, 6 and 9 from measured samples.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="336"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="339"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="358"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="361"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="412"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="879"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="916"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="928"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="937"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="958"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="968"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="978"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="991"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1004"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1024"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1036"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1109"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1119"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1128"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1137"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1147"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1289"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1299"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1392"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1422"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1753"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1770"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1786"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="375"/>
+        <source>Exact compsize / polkit_compsize</source>
+        <translation>Exact compsize / polkit_compsize</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="377"/>
+        <source>Exact compsize / polkit_helper</source>
+        <translation>Exact compsize / polkit_helper</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="448"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="451"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="470"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="473"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="524"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1021"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1060"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1072"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1081"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1089"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1110"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1125"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1139"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1155"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1171"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1184"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1197"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1217"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1229"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1305"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1315"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1324"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1333"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1343"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1485"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1495"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1588"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1618"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1949"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1966"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1982"/>
         <source>Not available</source>
         <translation>Not available</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="340"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="452"/>
         <source>B</source>
         <translation>B</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="340"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="452"/>
         <source>KiB</source>
         <translation>KiB</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="340"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="452"/>
         <source>MiB</source>
         <translation>MiB</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="340"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="452"/>
         <source>GiB</source>
         <translation>GiB</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="340"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="452"/>
         <source>TiB</source>
         <translation>TiB</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="352"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="367"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="400"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="457"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1311"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="464"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="479"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="512"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="569"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1507"/>
         <source>Not estimated</source>
         <translation>Not estimated</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="353"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="465"/>
         <source>%1-%2</source>
         <translation>%1-%2</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="368"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="480"/>
         <source>%1-%2 min</source>
         <translation>%1-%2 min</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="395"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="507"/>
         <source>High benefit</source>
         <translation>High benefit</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="397"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="509"/>
         <source>Moderate benefit</source>
         <translation>Moderate benefit</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="399"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1309"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="511"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1505"/>
         <source>Low benefit</source>
         <translation>Low benefit</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="405"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="407"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="517"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="519"/>
         <source>None detected</source>
         <translation>None detected</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="416"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="528"/>
         <source>Yes</source>
         <translation>Yes</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="417"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="529"/>
         <source>No</source>
         <translation>No</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="418"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="660"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1335"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1844"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="530"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="772"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1531"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2040"/>
         <source>Unknown</source>
         <translation>Unknown</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="423"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="521"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="535"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="633"/>
         <source>Library unavailable</source>
         <translation>Library unavailable</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="425"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="537"/>
         <source>Analysis is queued.</source>
         <translation>Analysis is queued.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="427"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="539"/>
         <source>Analysis is running.</source>
         <translation>Analysis is running.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="429"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="541"/>
         <source>Analysis was cancelled. Analyze the game again to enable profiles.</source>
         <translation>Analysis was cancelled. Analyze the game again to enable profiles.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="433"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="545"/>
         <source>Analysis failed: %1</source>
         <translation>Analysis failed: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="434"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="546"/>
         <source>Analysis failed. Profiles remain disabled.</source>
         <translation>Analysis failed. Profiles remain disabled.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="437"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="525"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="549"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="637"/>
         <source>Analyze the game first</source>
         <translation>Analyze the game first</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="439"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="551"/>
         <source>Analysis finished, but the game directory could not be read.</source>
         <translation>Analysis finished, but the game directory could not be read.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="441"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="553"/>
         <source>Analysis finished. Compression profiles are unavailable on %1.</source>
         <translation>Analysis finished. Compression profiles are unavailable on %1.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="442"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="554"/>
         <source>this filesystem</source>
         <translation>this filesystem</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="444"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="556"/>
         <source>Analysis finished with read errors. Profiles remain disabled.</source>
         <translation>Analysis finished with read errors. Profiles remain disabled.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="445"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="557"/>
         <source>Analysis complete. Choose a planning profile below.</source>
         <translation>Analysis complete. Choose a planning profile below.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="450"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="562"/>
         <source>Very high</source>
         <translation>Very high</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="452"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="564"/>
         <source>High</source>
         <translation>High</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="454"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="566"/>
         <source>Moderate</source>
         <translation>Moderate</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="456"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="568"/>
         <source>Low</source>
         <translation>Low</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="464"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="576"/>
         <source>Auto selected ZSTD level 1 because the measured samples favor speed over a small additional space gain.</source>
         <translation>Auto selected ZSTD level 1 because the measured samples favor speed over a small additional space gain.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="466"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="578"/>
         <source>Auto selected ZSTD level 3 because higher levels produced only a minimal measured gain.</source>
         <translation>Auto selected ZSTD level 3 because higher levels produced only a minimal measured gain.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="468"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="580"/>
         <source>Auto selected ZSTD level 6 because the measured samples showed a worthwhile gain over the balanced level.</source>
         <translation>Auto selected ZSTD level 6 because the measured samples showed a worthwhile gain over the balanced level.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="470"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="582"/>
         <source>Auto selected ZSTD level 9 because the measured samples showed a strong additional space gain.</source>
         <translation>Auto selected ZSTD level 9 because the measured samples showed a strong additional space gain.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="471"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="583"/>
         <source>Auto selects deterministically from ZSTD levels 1, 3, 6 and 9 using sample size and elapsed time; it does not use AI.</source>
         <translation>Auto selects deterministically from ZSTD levels 1, 3, 6 and 9 using sample size and elapsed time; it does not use AI.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="516"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="628"/>
         <source>The compression plan could not be prepared safely.</source>
         <translation>The compression plan could not be prepared safely.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="523"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="635"/>
         <source>Wait until analysis is complete.</source>
         <translation>Wait until analysis is complete.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="527"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="639"/>
         <source>The analyzed game path is unavailable.</source>
         <translation>The analyzed game path is unavailable.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="529"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="641"/>
         <source>A complete analysis is required.</source>
         <translation>A complete analysis is required.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="531"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="643"/>
         <source>The game is not on a verified Btrfs filesystem.</source>
         <translation>The game is not on a verified Btrfs filesystem.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="533"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="645"/>
         <source>The game directory is not writable.</source>
         <translation>The game directory is not writable.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="535"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="647"/>
         <source>Close the game before preparing compression.</source>
         <translation>Close the game before preparing compression.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="537"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="649"/>
         <source>Shared-extent risk could not be measured reliably. Compression is blocked.</source>
         <translation>Shared-extent risk could not be measured reliably. Compression is blocked.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="539"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="651"/>
         <source>The analysis did not confirm that compression can run safely.</source>
         <translation>The analysis did not confirm that compression can run safely.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="541"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="653"/>
         <source>Choose a compression profile.</source>
         <translation>Choose a compression profile.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="542"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="654"/>
         <source>A safe plan can now be prepared and reviewed.</source>
         <translation>A safe plan can now be prepared and reviewed.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="568"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="680"/>
         <source>Warning: shared extents are present. Recompression breaks sharing for processed data; Snapper snapshots may retain the old extents, so filesystem usage may temporarily grow by up to %1 and free space may not increase until snapshots expire.</source>
         <translation>Warning: shared extents are present. Recompression breaks sharing for processed data; Snapper snapshots may retain the old extents, so filesystem usage may temporarily grow by up to %1 and free space may not increase until snapshots expire.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="570"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="682"/>
         <source>No shared extents were detected by the analysis. Game Optimization will recheck each file immediately before recompression.</source>
         <translation>No shared extents were detected by the analysis. Game Optimization will recheck each file immediately before recompression.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="572"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="684"/>
         <source>Game: %1</source>
         <translation>Game: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="573"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="685"/>
         <source>Unknown game</source>
         <translation>Unknown game</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="574"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="686"/>
         <source>Profile: %1</source>
         <translation>Profile: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="575"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="687"/>
         <source>Persistent algorithm: %1</source>
         <translation>Persistent algorithm: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="576"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="688"/>
         <source>One-time recompression level: ZSTD %1</source>
         <translation>One-time recompression level: ZSTD %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="577"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="689"/>
         <source>Planned files: %1 (%2)</source>
         <translation>Planned files: %1 (%2)</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="579"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="691"/>
         <source>Current measured saving: %1</source>
         <translation>Current measured saving: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="581"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="693"/>
         <source>Current measured saving: Not available</source>
         <translation>Current measured saving: Not available</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="583"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="695"/>
         <source>Estimated additional saving: %1</source>
         <translation>Estimated additional saving: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="585"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="697"/>
         <source>Estimated additional saving: Not available</source>
         <translation>Estimated additional saving: Not available</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="587"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="699"/>
         <source>Estimated physical size after operation: %1</source>
         <translation>Estimated physical size after operation: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="589"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="701"/>
         <source>Estimated physical size after operation: Not available</source>
         <translation>Estimated physical size after operation: Not available</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="590"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="702"/>
         <source>Required free space: %1</source>
         <translation>Required free space: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="593"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="705"/>
         <source>The operation can take time. Keep Steam and the game closed until final verification is complete.</source>
         <translation>The operation can take time. Keep Steam and the game closed until final verification is complete.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="597"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="709"/>
         <source>Warnings: %1</source>
         <translation>Warnings: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="606"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="718"/>
         <source>Confirm Btrfs compression</source>
         <translation>Confirm Btrfs compression</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="608"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="720"/>
         <source>Start compression</source>
         <translation>Start compression</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="624"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="736"/>
         <source>The compression plan could not be prepared: %1</source>
         <translation>The compression plan could not be prepared: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="636"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="748"/>
         <source>Low estimated benefit</source>
         <translation>Low estimated benefit</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="637"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="749"/>
         <source>The estimated additional saving is below 1 GiB or below 5% of current physical usage. Recompression may rewrite files for a long time for little benefit. Do you want to continue to the final safety confirmation?</source>
         <translation>The estimated additional saving is below 1 GiB or below 5% of current physical usage. Recompression may rewrite files for a long time for little benefit. Do you want to continue to the final safety confirmation?</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="638"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="750"/>
         <source>Continue to final confirmation</source>
         <translation>Continue to final confirmation</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="670"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="782"/>
         <source>logical %1 · compsize disk usage %2 · btrfs du exclusive %3 · btrfs du set shared %4</source>
         <translation>logical %1 · compsize disk usage %2 · btrfs du exclusive %3 · btrfs du set shared %4</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="740"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="852"/>
         <source>Btrfs compression analysis</source>
         <translation>Btrfs compression analysis</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="747"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="859"/>
         <source>Analysis is read-only. Compression starts only after a complete safety check and your explicit confirmation.</source>
         <translation>Analysis is read-only. Compression starts only after a complete safety check and your explicit confirmation.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="755"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="867"/>
         <source>Analyzing</source>
         <translation>Analyzing</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="756"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="868"/>
         <source>Analyzed</source>
         <translation>Analyzed</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="757"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="869"/>
         <source>Not analyzed</source>
         <translation>Not analyzed</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="769"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="881"/>
         <source>Analyzing…</source>
         <translation>Analyzing…</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="769"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="881"/>
         <source>Analyze compression</source>
         <translation>Analyze compression</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="784"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="896"/>
         <source>Cancel analysis</source>
         <translation>Cancel analysis</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="796"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="908"/>
         <source>Verifying…</source>
         <translation>Verifying…</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="797"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="909"/>
         <source>Verify compression</source>
         <translation>Verify compression</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="836"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="931"/>
+        <source>Waiting for authorization…</source>
+        <translation>Waiting for authorization…</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="932"/>
+        <source>Exact measurement</source>
+        <translation>Exact measurement</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="972"/>
         <source>%1 files scanned · %2 sampled · %3 s</source>
         <translation>%1 files scanned · %2 sampled · %3 s</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="867"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1003"/>
         <source>Measured compression result</source>
         <translation>Measured compression result</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="874"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1010"/>
         <source>Measuring</source>
         <translation>Measuring</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="876"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="967"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="977"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1012"/>
+        <source>Authorization cancelled</source>
+        <translation>Authorization cancelled</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1014"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1122"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1136"/>
         <source>Measurement failed</source>
         <translation>Measurement failed</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="881"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="975"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1016"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1134"/>
+        <source>Basic verification completed</source>
+        <translation>Basic verification completed</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1018"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1138"/>
+        <source>Exact measurement unavailable</source>
+        <translation>Exact measurement unavailable</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1023"/>
         <source>Measured</source>
         <translation>Measured</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="881"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1023"/>
         <source>Not measured</source>
         <translation>Not measured</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="903"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1380"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1047"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1576"/>
         <source>File size reported by the application scanner</source>
         <translation>File size reported by the application scanner</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="909"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1385"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1053"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1581"/>
         <source>Uncompressed extent size (compsize)</source>
         <translation>Uncompressed extent size (compsize)</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="921"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1396"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1065"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1592"/>
         <source>Current physical usage (compsize)</source>
         <translation>Current physical usage (compsize)</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="933"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1077"/>
         <source>Current saving for active files</source>
         <translation>Current saving for active files</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="942"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1094"/>
         <source>Compression classification</source>
         <translation>Compression classification</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="951"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1103"/>
         <source>Reclaimed during the last Game Optimization operation</source>
         <translation>Reclaimed during the last Game Optimization operation</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="963"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1142"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1115"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1338"/>
         <source>Source</source>
         <translation>Source</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="965"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="378"/>
         <source>Measurement (compsize)</source>
         <translation>Measurement (compsize)</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="973"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1120"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1124"/>
+        <source>Basic Btrfs verification</source>
+        <translation>Basic Btrfs verification</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1130"/>
         <source>Measurement status</source>
         <translation>Measurement status</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="984"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1132"/>
+        <source>Exact measurement completed</source>
+        <translation>Exact measurement completed</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1146"/>
+        <source>Exclusive data (btrfs filesystem du)</source>
+        <translation>Exclusive data (btrfs filesystem du)</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1162"/>
+        <source>Shared data (btrfs filesystem du)</source>
+        <translation>Shared data (btrfs filesystem du)</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1177"/>
         <source>Physical usage before</source>
         <translation>Physical usage before</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="997"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1190"/>
         <source>Physical usage after</source>
         <translation>Physical usage after</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1010"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1203"/>
         <source>Total compression effect for active files</source>
         <translation>Total compression effect for active files</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1018"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1211"/>
         <source>Actually reclaimed during this operation</source>
         <translation>Actually reclaimed during this operation</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1030"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1223"/>
         <source>Whole-filesystem free-space change</source>
         <translation>Whole-filesystem free-space change</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1043"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1236"/>
         <source>This is a read-only current-state measurement. No before/after operation took place.</source>
         <translation>This is a read-only current-state measurement. No before/after operation took place.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1044"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1237"/>
         <source>compsize measures the active data of this game. The whole-filesystem statvfs change is auxiliary and may include unrelated writes.</source>
         <translation>compsize measures the active data of this game. The whole-filesystem statvfs change is auxiliary and may include unrelated writes.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1052"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1245"/>
         <source>Current total saving may predate Game Optimization. Only a valid compsize before/after pair is attributed to the last Game Optimization operation.</source>
         <translation>Current total saving may predate Game Optimization. Only a valid compsize before/after pair is attributed to the last Game Optimization operation.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1068"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1262"/>
         <source>Privileged measurement failed: %1</source>
         <translation>Privileged measurement failed: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1070"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1265"/>
+        <source>Exact compsize measurement is unavailable. Compression may still be working correctly. Basic read-only Btrfs checks completed, but exact physical usage, compression ratio, and saving cannot be claimed without the optional root-owned Polkit measurement component.</source>
+        <translation>Exact compsize measurement is unavailable. Compression may still be working correctly. Basic read-only Btrfs checks completed, but exact physical usage, compression ratio, and saving cannot be claimed without the optional root-owned Polkit measurement component.</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1266"/>
         <source>The actual saving cannot be claimed because a complete privileged compsize measurement before and after is unavailable.</source>
         <translation>The actual saving cannot be claimed because a complete privileged compsize measurement before and after is unavailable.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1089"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1285"/>
         <source>Current build estimate</source>
         <translation>Current build estimate</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1090"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1286"/>
         <source>No current estimate</source>
         <translation>No current estimate</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1105"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1301"/>
         <source>Current measured saving</source>
         <translation>Current measured saving</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1114"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1310"/>
         <source>Estimated total potential for ZSTD-%1</source>
         <translation>Estimated total potential for ZSTD-%1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1124"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1320"/>
         <source>Estimated additional saving from the current state</source>
         <translation>Estimated additional saving from the current state</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1133"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1285"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1329"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1481"/>
         <source>Estimated physical size after operation</source>
         <translation>Estimated physical size after operation</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1144"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1340"/>
         <source>Measurement (compsize) + matching-build estimate</source>
         <translation>Measurement (compsize) + matching-build estimate</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1146"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1342"/>
         <source>Measurement (compsize); estimate unavailable</source>
         <translation>Measurement (compsize); estimate unavailable</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1153"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1349"/>
         <source>The estimate is normalized to the current compsize Uncompressed value. It does not guarantee an identical change in free space for the whole filesystem.</source>
         <translation>The estimate is normalized to the current compsize Uncompressed value. It does not guarantee an identical change in free space for the whole filesystem.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1173"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1369"/>
         <source>Low additional benefit: recompression may rewrite files for a long time for little additional space saving. Manual compression remains available, but it requires an extra confirmation.</source>
         <translation>Low additional benefit: recompression may rewrite files for a long time for little additional space saving. Manual compression remains available, but it requires an extra confirmation.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1269"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1465"/>
         <source>Current disk usage</source>
         <translation>Current disk usage</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1276"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1472"/>
         <source>Current compression effect</source>
         <translation>Current compression effect</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1295"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1491"/>
         <source>Estimated additional saving</source>
         <translation>Estimated additional saving</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1306"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1502"/>
         <source>Profitability</source>
         <translation>Profitability</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1310"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1506"/>
         <source>Worthwhile</source>
         <translation>Worthwhile</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1318"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1514"/>
         <source>Estimated data to rewrite</source>
         <translation>Estimated data to rewrite</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1334"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1530"/>
         <source>Filesystem</source>
         <translation>Filesystem</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1340"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1536"/>
         <source>Mount point</source>
         <translation>Mount point</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1346"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1542"/>
         <source>Estimated time</source>
         <translation>Estimated time</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1352"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1548"/>
         <source>CPU usage</source>
         <translation>CPU usage</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1357"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1553"/>
         <source>Files and directories</source>
         <translation>Files and directories</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1358"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1554"/>
         <source>%1 files · %2 directories</source>
         <translation>%1 files · %2 directories</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1364"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1560"/>
         <source>Symbolic links</source>
         <translation>Symbolic links</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1369"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1565"/>
         <source>Available space</source>
         <translation>Available space</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1374"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1570"/>
         <source>Compression measurement</source>
         <translation>Compression measurement</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1376"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1572"/>
         <source>Not run</source>
         <translation>Not run</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1401"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1597"/>
         <source>Writable</source>
         <translation>Writable</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1406"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1602"/>
         <source>Existing compression</source>
         <translation>Existing compression</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1411"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1607"/>
         <source>Shared extents / reflinks</source>
         <translation>Shared extents / reflinks</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1416"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1612"/>
         <source>Sampled data</source>
         <translation>Sampled data</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1421"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1617"/>
         <source>Sample codec</source>
         <translation>Sample codec</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1426"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1622"/>
         <source>Read errors</source>
         <translation>Read errors</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1455"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1651"/>
         <source>Btrfs shared-extent safety check</source>
         <translation>Btrfs shared-extent safety check</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1475"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1671"/>
         <source>Total</source>
         <translation>Total</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1482"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1678"/>
         <source>Exclusive</source>
         <translation>Exclusive</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1489"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1685"/>
         <source>Set shared</source>
         <translation>Set shared</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1496"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1692"/>
         <source>Possible allocation growth</source>
         <translation>Possible allocation growth</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1507"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1703"/>
         <source>Shared extents or snapshots were detected. Manual recompression is available only after reviewing the warning; it breaks sharing for processed data and can increase physical usage by up to %1 before old snapshots expire.</source>
         <translation>Shared extents or snapshots were detected. Manual recompression is available only after reviewing the warning; it breaks sharing for processed data and can increase physical usage by up to %1 before old snapshots expire.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1513"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1709"/>
         <source>No shared extents were detected by btrfs filesystem du. The result will be checked again immediately before compression.</source>
         <translation>No shared extents were detected by btrfs filesystem du. The result will be checked again immediately before compression.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1514"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1710"/>
         <source>Shared-extent risk could not be measured reliably. Compression remains blocked (fail closed). %1</source>
         <translation>Shared-extent risk could not be measured reliably. Compression remains blocked (fail closed). %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1517"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1713"/>
         <source>Measurement unavailable</source>
         <translation>Measurement unavailable</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1545"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1741"/>
         <source>Analysis-time compsize snapshot</source>
         <translation>Analysis-time compsize snapshot</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1558"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1754"/>
         <source>Disk usage</source>
         <translation>Disk usage</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1563"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1759"/>
         <source>Uncompressed size</source>
         <translation>Uncompressed size</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1568"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1764"/>
         <source>Referenced size</source>
         <translation>Referenced size</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1573"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1086"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1769"/>
         <source>Current compression ratio</source>
         <translation>Current compression ratio</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1578"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1774"/>
         <source>Compression types</source>
         <translation>Compression types</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1584"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1780"/>
         <source>Space already saved</source>
         <translation>Space already saved</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1601"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1797"/>
         <source>The game appears to be running. Analysis is read-only, but any future operation must wait until it exits.</source>
         <translation>The game appears to be running. Analysis is read-only, but any future operation must wait until it exits.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1613"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1809"/>
         <source>Warnings</source>
         <translation>Warnings</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1639"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1656"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1835"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1852"/>
         <source>Compress Game</source>
         <translation>Compress Game</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1646"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1842"/>
         <source>Preparing a read-only plan…</source>
         <translation>Preparing a read-only plan…</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1674"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1870"/>
         <source>Compression history</source>
         <translation>Compression history</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1733"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1929"/>
         <source>Profile</source>
         <translation>Profile</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1740"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1936"/>
         <source>Physical before (compsize)</source>
         <translation>Physical before (compsize)</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1757"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1953"/>
         <source>Physical after (compsize)</source>
         <translation>Physical after (compsize)</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1774"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1970"/>
         <source>Actual savings</source>
         <translation>Actual savings</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1802"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="1998"/>
         <source>Actual savings could not be measured</source>
         <translation>Actual savings could not be measured</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1810"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2006"/>
         <source>Before: %1</source>
         <translation>Before: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1822"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2018"/>
         <source>After: %1</source>
         <translation>After: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1838"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2034"/>
         <source>Verification: %1</source>
         <translation>Verification: %1</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1878"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2074"/>
         <source>Deep Optimize</source>
         <translation>Deep Optimize</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1885"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2081"/>
         <source>Recursive directory defragmentation remains disabled. Game Optimization processes verified files individually and requires manual confirmation when snapshots or reflinks make data shared.</source>
         <translation>Recursive directory defragmentation remains disabled. Game Optimization processes verified files individually and requires manual confirmation when snapshots or reflinks make data shared.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1891"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2087"/>
         <source>Planned</source>
         <translation>Planned</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1904"/>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1919"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2100"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2115"/>
         <source>The compression plan is no longer available.</source>
         <translation>The compression plan is no longer available.</translation>
     </message>
     <message>
-        <location filename="../qml/pages/details/StorageTab.qml" line="1923"/>
+        <location filename="../qml/pages/details/StorageTab.qml" line="2119"/>
         <source>Compression could not be started. Review the latest safety checks.</source>
         <translation>Compression could not be started. Review the latest safety checks.</translation>
     </message>

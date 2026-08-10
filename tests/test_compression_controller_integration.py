@@ -31,6 +31,8 @@ from game_optimization_linux.models import (
     TaskType,
 )
 from game_optimization_linux.services import (
+    BtrfsAnalysisTaskService,
+    BtrfsCompressionAnalyzer,
     GameChangeSet,
     GameUpdateRecord,
     GameUpdateStatus,
@@ -180,13 +182,19 @@ class _TaskService:
 
 
 class _CompressionService:
-    def __init__(self, history: Sequence[dict[str, Any]] = ()) -> None:
+    def __init__(
+        self,
+        history: Sequence[dict[str, Any]] = (),
+        *,
+        measurement: CompressionMeasurement | None = None,
+    ) -> None:
         self.plans: dict[str, CompressionPlan] = {}
         self.prepare_calls: list[dict[str, Any]] = []
         self.cancel_all_calls = 0
         self.shutdown_calls = 0
         self.last_error = ""
         self._history = tuple(dict(entry) for entry in history)
+        self._measurement = measurement
 
     def recover_interrupted(self) -> tuple[object, ...]:
         return ()
@@ -204,6 +212,17 @@ class _CompressionService:
 
     def active_game_ids(self) -> tuple[str, ...]:
         return ()
+
+    def verify_measurement(
+        self,
+        game: Game,
+        *,
+        exact: bool = False,
+    ) -> CompressionMeasurement:
+        del game, exact
+        if self._measurement is None:
+            raise AssertionError("this fixture has no verification measurement")
+        return self._measurement
 
     def prepare(
         self,
@@ -588,6 +607,99 @@ def test_newest_verification_replaces_old_error_and_updates_game_header(
         assert selected["savedSpace"] != "Measurement unavailable"
     finally:
         harness.controller.shutdown()
+
+
+def test_exact_polkit_compsize_flows_from_task_to_selected_game(
+    tmp_path: Path,
+) -> None:
+    parsed = BtrfsCompressionAnalyzer.parse_compsize(
+        "Type       Perc     Disk Usage   Uncompressed Referenced\n"
+        "TOTAL       80%      800M         1000M        1000M\n"
+    )
+    assert parsed.available is True
+    assert parsed.disk_usage_bytes is not None
+    assert parsed.uncompressed_bytes is not None
+    assert parsed.referenced_bytes is not None
+    measurement = CompressionMeasurement(
+        logical_bytes=parsed.uncompressed_bytes,
+        physical_bytes=parsed.disk_usage_bytes,
+        exclusive_bytes=parsed.disk_usage_bytes,
+        shared_bytes=0,
+        compsize_disk_bytes=parsed.disk_usage_bytes,
+        compsize_uncompressed_bytes=parsed.uncompressed_bytes,
+        compsize_referenced_bytes=parsed.referenced_bytes,
+        scan_complete=True,
+        shared_extent_state="not_detected",
+        measurement_source="polkit_compsize",
+    )
+    game_a = _game(tmp_path, "42")
+    game_b = _game(tmp_path, "43")
+    compression = _CompressionService(measurement=measurement)
+    tasks = BtrfsAnalysisTaskService(
+        compression_service=compression,  # type: ignore[arg-type]
+        max_workers=1,
+    )
+    controller = AppController(
+        game_provider=_GameProvider((game_a, game_b)),
+        task_service=tasks,
+        settings_store=SettingsStore(
+            tmp_path / "settings.json",
+            default_factory=AppSettings,
+        ),
+        system_provider=_SystemProvider(),
+        filesystem_provider=_FilesystemProvider(),
+        compression_service=compression,  # type: ignore[arg-type]
+        initial_games=(game_a, game_b),
+        demo_mode=False,
+        auto_refresh=False,
+    )
+    selected_changes: list[None] = []
+    finished: list[tuple[str, str]] = []
+    controller.selectedGameChanged.connect(lambda: selected_changes.append(None))
+    controller.taskFinished.connect(
+        lambda task_id, status: finished.append((task_id, status))
+    )
+
+    try:
+        assert controller.openGame(game_a.id)
+        assert controller.exactCompressionMeasurement(game_a.id)
+        verification = next(
+            task
+            for task in tasks.list_tasks()
+            if task.task_type is TaskType.VERIFICATION
+        )
+        completed = tasks.wait_for(verification.id, timeout=1.0)
+        assert completed.status is TaskStatus.COMPLETED
+        assert completed.metadata["exact_measurement_available"] is True
+
+        # Changing the selected game before the GUI poll must not leak A's
+        # result into B's presentation state.
+        assert controller.openGame(game_b.id)
+        controller._poll_tasks()
+        assert controller.selectedGame["id"] == game_b.id
+        assert controller.selectedGame["currentCompressionMeasurement"] == {}
+        assert controller.selectedGame["physicalSize"] == "Measurement unavailable"
+
+        assert controller.openGame(game_a.id)
+        selected = controller.selectedGame
+        current = selected["currentCompressionMeasurement"]
+        assert current["measurement_source"] == "polkit_compsize"
+        assert current["compsize_disk_bytes"] == parsed.disk_usage_bytes
+        assert current["compsize_uncompressed_bytes"] == parsed.uncompressed_bytes
+        assert current["compsize_referenced_bytes"] == parsed.referenced_bytes
+        assert selected["physicalSizeBytes"] == parsed.disk_usage_bytes
+        assert selected["savedBytes"] == (
+            parsed.uncompressed_bytes - parsed.disk_usage_bytes
+        )
+        assert selected["physicalSize"] != "Measurement unavailable"
+        assert selected["savedSpace"] != "Measurement unavailable"
+        assert selected["compressionClassificationKey"] != "measurement_unavailable"
+        assert selected["verificationStatus"] == "completed"
+        assert selected["verificationTaskId"] == verification.id
+        assert (verification.id, TaskStatus.COMPLETED.value) in finished
+        assert selected_changes
+    finally:
+        controller.shutdown()
 
 
 def test_low_additional_benefit_warns_without_blocking_manual_plan(

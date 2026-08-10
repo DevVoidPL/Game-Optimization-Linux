@@ -34,6 +34,7 @@ class LinuxSystemProvider:
         timeout_seconds: float = 4.0,
         home: Path | None = None,
         host_service: object | None = None,
+        drm_path: Path = Path("/sys/class/drm"),
     ) -> None:
         self._os_release_path = Path(os_release_path)
         self._cpuinfo_path = Path(cpuinfo_path)
@@ -43,6 +44,7 @@ class LinuxSystemProvider:
         self._command_runner = command_runner
         self._timeout_seconds = timeout_seconds
         self._home = Path.home() if home is None else Path(home)
+        self._drm_path = Path(drm_path)
         if host_service is None and str(self._environment.get("FLATPAK_ID", "")).strip():
             try:
                 from game_optimization_linux.services.host_service import HostServiceClient
@@ -79,7 +81,7 @@ class LinuxSystemProvider:
             gpu=gpu_name,
             gpu_driver=gpu_driver,
             ram_gb=self._ram_gb(),
-            vram_gb=0.0,
+            vram_gb=self._vram_gb(),
             capabilities=capabilities,
             filesystems=(),
             demo=False,
@@ -235,6 +237,25 @@ class LinuxSystemProvider:
         if match is None:
             return 0.0
         return round(int(match.group(1)) / (1024 * 1024), 1)
+
+    def _vram_gb(self) -> float:
+        totals: list[int] = []
+        try:
+            candidates = tuple(
+                self._drm_path.glob("card*/device/mem_info_vram_total")
+            )
+        except OSError:
+            candidates = ()
+        for path in candidates:
+            try:
+                value = int(path.read_text(encoding="ascii").strip())
+            except (OSError, ValueError):
+                continue
+            if value > 0:
+                totals.append(value)
+        if not totals:
+            return 0.0
+        return round(max(totals) / (1024 ** 3), 1)
 
     def _gpu_info(self) -> tuple[str, str, bool]:
         vulkan_available = False

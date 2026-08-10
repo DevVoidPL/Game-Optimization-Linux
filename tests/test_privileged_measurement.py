@@ -84,6 +84,23 @@ def _payload(game: Game) -> dict[str, object]:
     }
 
 
+def _local_game(tmp_path: Path) -> Game:
+    game_path = tmp_path / "Local Games" / "Fixture"
+    game_path.mkdir(parents=True)
+    return Game(
+        id="local-fixture",
+        name="Local Fixture",
+        launcher=Launcher.MANUAL,
+        install_path=game_path,
+        logical_size_gb=1.0,
+        physical_size_gb=1.0,
+        filesystem=FilesystemType.BTRFS,
+        compression_available=True,
+        data_source="Local",
+        filesystem_name="btrfs",
+    )
+
+
 def test_polkit_client_uses_fixed_argv_without_shell(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
@@ -133,6 +150,73 @@ def test_polkit_client_uses_fixed_argv_without_shell(
     assert kwargs["shell"] is False
     assert "sudo" not in command
     assert repr(command) in caplog.text
+
+
+def test_polkit_client_validates_local_game_identity(tmp_path: Path) -> None:
+    game = _local_game(tmp_path)
+    helper = tmp_path / "measure-helper"
+    pkexec = tmp_path / "pkexec"
+    helper.write_text("", encoding="utf-8")
+    pkexec.write_text("", encoding="utf-8")
+    helper.chmod(0o755)
+    pkexec.chmod(0o755)
+    identity = game.install_path.stat()
+    payload = _payload(game)
+    payload.update(
+        {
+            "identity_kind": "local",
+            "app_id": "",
+            "build_id": "",
+            "game_id": game.id,
+            "path_device": identity.st_dev,
+            "path_inode": identity.st_ino,
+        }
+    )
+    calls: list[list[str]] = []
+
+    def runner(command: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
+        assert kwargs["shell"] is False
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, json.dumps(payload), "")
+
+    client = PrivilegedMeasurementClient(
+        helper_path=helper,
+        pkexec_path=pkexec,
+        command_runner=runner,
+    )
+
+    measured = client.measure(game)
+
+    assert measured.compsize_disk_bytes == 800_000_000
+    assert calls == [[
+        str(pkexec),
+        str(helper),
+        "measure",
+        "--game-path",
+        str(game.install_path.resolve()),
+        "--game-id",
+        game.id,
+        "--device",
+        str(identity.st_dev),
+        "--inode",
+        str(identity.st_ino),
+    ]]
+
+
+def test_polkit_client_rejects_replaced_local_game_identity(tmp_path: Path) -> None:
+    game = _local_game(tmp_path)
+    payload = _payload(game)
+    payload.update(
+        {
+            "identity_kind": "local",
+            "game_id": game.id,
+            "path_device": game.install_path.stat().st_dev,
+            "path_inode": game.install_path.stat().st_ino + 1,
+        }
+    )
+
+    with pytest.raises(PrivilegedMeasurementError, match="identity"):
+        PrivilegedMeasurementClient._validate_identity(game, payload)
 
 
 def test_polkit_denial_returns_no_measurement(tmp_path: Path) -> None:
@@ -359,8 +443,114 @@ def test_verification_task_is_read_only_and_reaches_history(tmp_path: Path) -> N
     assert completed.status.value == "completed"
     assert completed.task_type.value == "Verification"
     assert completed.metadata["read_only"] is True
+    assert completed.metadata["exact_measurement_available"] is True
+    assert completed.metadata["outcome"] == "exact_measurement"
     assert completed.result is not None
     assert completed.result["compsize_disk_bytes"] == 800_000_000
+    assert tasks.shutdown(wait=True, timeout=1.0)
+
+
+def test_exact_task_rejects_incomplete_successful_measurement(tmp_path: Path) -> None:
+    game = _game(tmp_path)
+    incomplete = CompressionMeasurement(
+        logical_bytes=1_000_000_000,
+        physical_bytes=800_000_000,
+        exclusive_bytes=800_000_000,
+        shared_bytes=0,
+        compsize_disk_bytes=800_000_000,
+        compsize_uncompressed_bytes=None,
+        compsize_referenced_bytes=1_000_000_000,
+        scan_complete=True,
+        shared_extent_state="not_detected",
+        measurement_source="polkit_compsize",
+    )
+
+    class IncompleteMeasurementService:
+        def verify_measurement(
+            self,
+            requested: Game,
+            *,
+            exact: bool = False,
+        ) -> CompressionMeasurement:
+            assert requested.id == game.id
+            assert exact is True
+            return incomplete
+
+        def cancel_all(self) -> None:
+            return None
+
+    tasks = BtrfsAnalysisTaskService(
+        compression_service=IncompleteMeasurementService(),  # type: ignore[arg-type]
+        max_workers=1,
+    )
+
+    failed = tasks.wait_for(
+        tasks.enqueue_verification(game, exact=True).id,
+        timeout=1.0,
+    )
+
+    assert failed.status.value == "failed"
+    assert failed.result is None
+    assert failed.error is not None
+    assert "incomplete measurement" in failed.error
+    assert "uncompressed size" in failed.error
+    assert failed.metadata["stage"] == "Failed"
+    assert tasks.shutdown(wait=True, timeout=1.0)
+
+
+def test_unavailable_exact_measurement_completes_with_basic_status(
+    tmp_path: Path,
+) -> None:
+    game = _game(tmp_path)
+    basic = CompressionMeasurement(
+        logical_bytes=1_000_000_000,
+        physical_bytes=0,
+        exclusive_bytes=900_000_000,
+        shared_bytes=100_000_000,
+        compsize_disk_bytes=None,
+        compsize_uncompressed_bytes=None,
+        compsize_referenced_bytes=None,
+        scan_complete=True,
+        shared_extent_state="detected",
+        measurement_source="basic_btrfs",
+        measurement_error=(
+            "Exact compsize measurement is unavailable because the optional "
+            "privileged host component is not installed"
+        ),
+    )
+
+    class BasicMeasurementService:
+        def verify_measurement(
+            self,
+            requested: Game,
+            *,
+            exact: bool = False,
+        ) -> CompressionMeasurement:
+            assert requested.id == game.id
+            assert exact is True
+            return basic
+
+        def cancel_all(self) -> None:
+            return None
+
+    tasks = BtrfsAnalysisTaskService(
+        compression_service=BasicMeasurementService(),  # type: ignore[arg-type]
+        max_workers=1,
+    )
+
+    completed = tasks.wait_for(
+        tasks.enqueue_verification(game, exact=True).id,
+        timeout=1.0,
+    )
+
+    assert completed.status.value == "completed"
+    assert completed.error is None
+    assert completed.metadata["stage"] == "Exact measurement unavailable"
+    assert completed.metadata["outcome"] == "exact_measurement_unavailable"
+    assert completed.metadata["exact_measurement_available"] is False
+    assert completed.result is not None
+    assert completed.result["measurement_source"] == "basic_btrfs"
+    assert completed.result["compsize_disk_bytes"] is None
     assert tasks.shutdown(wait=True, timeout=1.0)
 
 

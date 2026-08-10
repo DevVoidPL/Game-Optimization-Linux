@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 import shutil
 import subprocess
 from typing import Any
@@ -11,6 +12,71 @@ from typing import Any
 from game_optimization_linux.models import GameOptimizationProfile
 
 from .optiscaler import merge_wine_dll_overrides
+
+
+_HOST_WRAPPER_ENVIRONMENT_KEYS = frozenset(
+    {
+        "LD_LIBRARY_PATH",
+        "LD_PRELOAD",
+        "LIBGL_DRIVERS_PATH",
+        "MESA_LOADER_DRIVER_OVERRIDE",
+        "STEAM_LD_LIBRARY_PATH",
+        "STEAM_RUNTIME",
+        "SYSTEM_LD_LIBRARY_PATH",
+        "SYSTEM_PATH",
+        "VK_ADD_LAYER_PATH",
+        "VK_DRIVER_FILES",
+        "VK_ICD_FILENAMES",
+        "VK_INSTANCE_LAYERS",
+        "VK_LAYER_PATH",
+        "VK_LOADER_LAYERS_DISABLE",
+        "VK_LOADER_LAYERS_ENABLE",
+    }
+)
+_HOST_WRAPPER_ENVIRONMENT_PREFIXES = ("PRESSURE_VESSEL_", "STEAM_RUNTIME_")
+_STEAM_RUNTIME_PATH_MARKERS = (
+    "pinned_libs",
+    "pressure-vessel",
+    "steam-runtime",
+    "steamlinuxruntime",
+    "steamrt",
+)
+
+
+def _gamescope_environment_boundary(
+    environment: Mapping[str, str],
+) -> tuple[dict[str, str], tuple[str, ...], dict[str, str]]:
+    restore: dict[str, str] = {}
+    removed: list[str] = []
+    for key, raw_value in environment.items():
+        if key in _HOST_WRAPPER_ENVIRONMENT_KEYS or key.startswith(
+            _HOST_WRAPPER_ENVIRONMENT_PREFIXES
+        ):
+            restore[key] = str(raw_value)
+            removed.append(key)
+
+    overrides: dict[str, str] = {}
+    original_path = str(environment.get("PATH", ""))
+    if original_path:
+        safe_entries = [
+            entry
+            for entry in original_path.split(":")
+            if entry
+            and not any(
+                marker in entry.casefold() for marker in _STEAM_RUNTIME_PATH_MARKERS
+            )
+        ]
+        safe_path = ":".join(safe_entries)
+        if safe_path != original_path:
+            if not safe_path:
+                raise ValueError(
+                    "Gamescope cannot be launched safely because PATH contains only Steam Runtime entries"
+                )
+            restore["PATH"] = original_path
+            overrides["PATH"] = safe_path
+            removed.append("PATH")
+
+    return restore, tuple(sorted(removed)), overrides
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,10 +225,33 @@ class GameRuntimeLaunchPlan:
     environment_sources: Mapping[str, str] = field(default_factory=dict)
     environment_conflicts: tuple[str, ...] = ()
     mangohud_activation_owner: str = "none"
+    steam_command: tuple[str, ...] = ()
+    gamemode_wrapper: tuple[str, ...] = ()
+    gamescope_wrapper: tuple[str, ...] = ()
+    wrapper_environment_removed: tuple[str, ...] = ()
+    wrapper_environment_overrides: Mapping[str, str] = field(default_factory=dict)
+    environment_restore_keys: tuple[str, ...] = ()
 
     @property
     def command(self) -> list[str]:
         return [self.executable, *self.arguments]
+
+    @property
+    def diagnostic_command(self) -> list[str]:
+        restore = set(self.environment_restore_keys)
+        return [
+            f"{key}=<preserved>"
+            if "=" in value and (key := value.partition("=")[0]) in restore
+            else value
+            for value in self.command
+        ]
+
+    def process_environment(self, game_environment: Mapping[str, str]) -> dict[str, str]:
+        result = dict(game_environment)
+        for key in self.wrapper_environment_removed:
+            result.pop(key, None)
+        result.update(self.wrapper_environment_overrides)
+        return result
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -176,6 +265,11 @@ class GameRuntimeLaunchPlan:
             "fpsLimitOwner": self.fps_limit_owner,
             "fpsLimit": self.fps_limit or 0,
             "command": self.command,
+            "diagnosticCommand": self.diagnostic_command,
+            "steamCommand": list(self.steam_command),
+            "gameModeWrapper": list(self.gamemode_wrapper),
+            "gamescopeWrapper": list(self.gamescope_wrapper),
+            "wrapperEnvironmentRemoved": list(self.wrapper_environment_removed),
         }
 
 
@@ -195,6 +289,7 @@ class OptimizationLaunchPlanner:
         proton_environment: Mapping[str, str] | None = None,
         existing_environment: Mapping[str, str] | None = None,
         mangohud_activation_owner: str = "none",
+        measurement_environment: Mapping[str, str] | None = None,
         allow_placeholder: bool = False,
     ) -> GameRuntimeLaunchPlan:
         command = [str(value) for value in game_argv]
@@ -208,12 +303,18 @@ class OptimizationLaunchPlanner:
         environment: dict[str, str] = {}
         environment_sources: dict[str, str] = {}
         environment_conflicts: list[str] = []
+        gamemode_wrapper: list[str] = []
+        gamescope_wrapper: list[str] = []
+        wrapper_environment_removed: tuple[str, ...] = ()
+        wrapper_environment_overrides: dict[str, str] = {}
+        environment_restore_keys: tuple[str, ...] = ()
         inherited = existing_environment or {}
         normalized_mangohud_owner = str(
             mangohud_activation_owner or "none"
         ).strip().casefold()
         if normalized_mangohud_owner not in {
-            "none", "per_application_config", "steam_environment", "mangoapp"
+            "none", "per_application_config", "steam_environment", "mangoapp",
+            "measurement_session",
         }:
             raise ValueError("unsupported MangoHud activation owner")
         if normalized_mangohud_owner == "per_application_config":
@@ -222,6 +323,8 @@ class OptimizationLaunchPlanner:
             reasons.append("MangoHud uses the existing Steam environment activation")
         elif normalized_mangohud_owner == "mangoapp":
             reasons.append("Gamescope mangoapp is the sole MangoHud activation owner")
+        elif normalized_mangohud_owner == "measurement_session":
+            reasons.append("MangoHud logging is active for one baseline session")
         for raw_key, raw_value in sorted((proton_environment or {}).items()):
             key = str(raw_key)
             value = str(raw_value)
@@ -282,12 +385,28 @@ class OptimizationLaunchPlanner:
                 reasons.append(
                     f"OptiScaler Proton override: {optiscaler_override}"
                 )
+        allowed_measurement_keys = {"MANGOHUD", "MANGOHUD_CONFIGFILE"}
+        for raw_key, raw_value in sorted((measurement_environment or {}).items()):
+            key = str(raw_key)
+            value = str(raw_value)
+            if key not in allowed_measurement_keys or not value or "\0" in value:
+                raise ValueError("invalid MangoHud baseline environment")
+            if key == "MANGOHUD_CONFIGFILE" and not Path(value).is_absolute():
+                raise ValueError("MangoHud baseline config path must be absolute")
+            if key in inherited and str(inherited[key]) != value:
+                environment_conflicts.append(key)
+                warnings.append(
+                    f"{key} is temporarily overridden for the baseline session"
+                )
+            environment[key] = value
+            environment_sources[key] = "baseline_measurement"
         fps_limit_owner = "mangohud" if mangohud_fps_limit else "none"
         effective_fps_limit = mangohud_fps_limit
         inner = command
         if profile.gamemode_enabled:
             if gamemode.available:
                 inner = [gamemode.executable, *inner]
+                gamemode_wrapper = [gamemode.executable]
                 wrappers.append("gamemode")
                 reasons.append("GameMode directly wraps the game process")
             else:
@@ -295,44 +414,72 @@ class OptimizationLaunchPlanner:
         use_gamescope = profile.gamescope_enabled and profile.gamescope_mode != "disabled"
         if use_gamescope:
             if not gamescope.available:
-                warnings.append("Gamescope was requested but is unavailable")
+                raise ValueError(
+                    gamescope.message or "Gamescope was requested but is unavailable"
+                )
             else:
                 supported = set(gamescope.supported_options)
                 flags: list[str] = []
-                def add(option: str, value: object | None = None) -> bool:
+                def add(option: str, value: object | None = None) -> None:
                     if option not in supported:
-                        warnings.append(f"Installed Gamescope does not support {option}")
-                        return False
+                        raise ValueError(
+                            f"Gamescope configuration cannot be applied: installed version does not support {option}"
+                        )
                     flags.append(option)
                     if value is not None:
                         flags.append(str(value))
-                    return True
-                input_size = add("-w", profile.gamescope_input_width) & add("-h", profile.gamescope_input_height)
-                output_size = add("-W", profile.gamescope_output_width) & add("-H", profile.gamescope_output_height)
-                if input_size and output_size:
-                    reasons.append(
-                        f"Gamescope renders at {profile.gamescope_input_width}×{profile.gamescope_input_height} "
-                        f"and outputs {profile.gamescope_output_width}×{profile.gamescope_output_height}"
-                    )
+
+                same_size = (
+                    profile.gamescope_input_width == profile.gamescope_output_width
+                    and profile.gamescope_input_height == profile.gamescope_output_height
+                )
+                if not same_size:
+                    add("-w", profile.gamescope_input_width)
+                    add("-h", profile.gamescope_input_height)
+                add("-W", profile.gamescope_output_width)
+                add("-H", profile.gamescope_output_height)
+                reasons.append(
+                    f"Gamescope renders at {profile.gamescope_input_width}×{profile.gamescope_input_height} "
+                    f"and outputs {profile.gamescope_output_width}×{profile.gamescope_output_height}"
+                )
                 # Gamescope is the sole limiter owner when active.  The local
                 # release documents -r as the nested refresh in frames per
                 # second; emitting --framerate-limit as well created two
                 # competing limiters for the same game.
-                if add("-r", profile.target_fps):
+                if profile.target_fps_mode != "unlimited":
+                    add("-r", profile.target_fps)
                     fps_limit_owner = "gamescope"
                     effective_fps_limit = profile.target_fps
                     reasons.append(f"Gamescope owns the FPS limit at {profile.target_fps} FPS")
-                if add("-S", profile.gamescope_scaler):
+                if profile.gamescope_scaler != "auto":
+                    add("-S", profile.gamescope_scaler)
                     reasons.append(f"Gamescope scaler: {profile.gamescope_scaler}")
-                if add("-F", profile.gamescope_filter):
+                if profile.gamescope_filter != "linear":
+                    add("-F", profile.gamescope_filter)
                     reasons.append(f"Gamescope filter: {profile.gamescope_filter}")
-                if add("-f" if profile.gamescope_fullscreen else "-b"):
-                    reasons.append("Gamescope uses fullscreen mode" if profile.gamescope_fullscreen else "Gamescope uses borderless mode")
-                if profile.target_display_id.startswith("screen-"):
-                    index = profile.target_display_id.partition(":")[0].removeprefix("screen-")
-                    if index.isdecimal():
-                        if add("--display-index", int(index)):
-                            reasons.append(f"Gamescope targets display index {index}")
+                add("-f" if profile.gamescope_fullscreen else "-b")
+                reasons.append("Gamescope uses fullscreen mode" if profile.gamescope_fullscreen else "Gamescope uses borderless mode")
+                if profile.target_display_id:
+                    warnings.append(
+                        "The selected Qt display cannot be mapped safely to Gamescope; desktop placement will be used"
+                    )
+
+                game_environment = dict(inherited)
+                game_environment.update(environment)
+                restore, wrapper_environment_removed, wrapper_environment_overrides = (
+                    _gamescope_environment_boundary(game_environment)
+                )
+                environment_restore_keys = tuple(sorted(restore))
+                if restore:
+                    inner = [
+                        "env",
+                        *(f"{key}={value}" for key, value in sorted(restore.items())),
+                        *inner,
+                    ]
+                    reasons.append(
+                        "Steam Runtime loader variables are isolated from the host Gamescope process and restored for the game"
+                    )
+                gamescope_wrapper = [gamescope.executable, *flags, "--"]
                 inner = [gamescope.executable, *flags, "--", *inner]
                 wrappers.insert(0, "gamescope")
         elif profile.target_fps_mode != "unlimited":
@@ -347,6 +494,12 @@ class OptimizationLaunchPlanner:
             environment_sources=environment_sources,
             environment_conflicts=tuple(environment_conflicts),
             mangohud_activation_owner=normalized_mangohud_owner,
+            steam_command=tuple(command),
+            gamemode_wrapper=tuple(gamemode_wrapper),
+            gamescope_wrapper=tuple(gamescope_wrapper),
+            wrapper_environment_removed=wrapper_environment_removed,
+            wrapper_environment_overrides=wrapper_environment_overrides,
+            environment_restore_keys=environment_restore_keys,
         )
 
 

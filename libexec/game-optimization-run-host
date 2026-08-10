@@ -1,3 +1,92 @@
 #!/bin/sh
-# Stable host-side Steam Launch Options wrapper installed by Game Optimization.
-exec flatpak run --command=game-optimization-run io.github.DevVoidPL.GameOptimizationLinux "$@"
+set -eu
+
+app_id="io.github.DevVoidPL.GameOptimizationLinux"
+snapshot_directory="${HOME}/.local/share/game-optimization-linux/run-env"
+
+umask 077
+mkdir -p "$snapshot_directory"
+chmod 0700 "$snapshot_directory"
+snapshot="$(mktemp "$snapshot_directory/steam-env.XXXXXX")"
+
+cleanup() {
+    rm -f "$snapshot"
+}
+trap cleanup EXIT HUP INT TERM
+
+env -0 > "$snapshot"
+
+safe_path=""
+old_ifs=$IFS
+IFS=:
+for entry in ${PATH-}; do
+    case "$entry" in
+        ""|*steam-runtime*|*SteamLinuxRuntime*|*pressure-vessel*|*pinned_libs*|*steamrt*)
+            continue
+            ;;
+    esac
+    safe_path="${safe_path:+${safe_path}:}${entry}"
+done
+IFS=$old_ifs
+
+flatpak_executable="$(command -v flatpak 2>/dev/null || true)"
+flatpak_spawn="$(command -v flatpak-spawn 2>/dev/null || true)"
+if [ -z "$safe_path" ]; then
+    if [ -n "$flatpak_executable" ]; then
+        safe_path="$(dirname "$flatpak_executable")"
+    elif [ -n "$flatpak_spawn" ]; then
+        safe_path="$(dirname "$flatpak_spawn")"
+    else
+        echo "game-optimization-run: flatpak and flatpak-spawn are unavailable" >&2
+        exit 127
+    fi
+fi
+
+run_flatpak() {
+    env -i \
+        HOME="${HOME-}" \
+        USER="${USER-}" \
+        LOGNAME="${LOGNAME-}" \
+        PATH="$safe_path" \
+        XDG_CACHE_HOME="${XDG_CACHE_HOME-}" \
+        XDG_CONFIG_HOME="${XDG_CONFIG_HOME-}" \
+        XDG_CONFIG_DIRS="${XDG_CONFIG_DIRS-}" \
+        XDG_CURRENT_DESKTOP="${XDG_CURRENT_DESKTOP-}" \
+        XDG_DATA_HOME="${XDG_DATA_HOME-}" \
+        XDG_DATA_DIRS="${XDG_DATA_DIRS-}" \
+        XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR-}" \
+        XDG_SESSION_DESKTOP="${XDG_SESSION_DESKTOP-}" \
+        XDG_SESSION_TYPE="${XDG_SESSION_TYPE-}" \
+        XDG_STATE_HOME="${XDG_STATE_HOME-}" \
+        DISPLAY="${DISPLAY-}" \
+        WAYLAND_DISPLAY="${WAYLAND_DISPLAY-}" \
+        DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS-}" \
+        XAUTHORITY="${XAUTHORITY-}" \
+        LANG="${LANG-}" \
+        LANGUAGE="${LANGUAGE-}" \
+        LC_ALL="${LC_ALL-}" \
+        LC_CTYPE="${LC_CTYPE-}" \
+        "$@"
+}
+
+if [ -n "${FLATPAK_ID-}" ] && [ -n "$flatpak_spawn" ]; then
+    run_flatpak "$flatpak_spawn" --host flatpak run \
+        "--env=GAME_OPTIMIZATION_STEAM_ENV_FILE=$snapshot" \
+        --command=game-optimization-run "$app_id" "$@"
+    status=$?
+elif [ -n "$flatpak_executable" ]; then
+    run_flatpak "$flatpak_executable" run \
+        "--env=GAME_OPTIMIZATION_STEAM_ENV_FILE=$snapshot" \
+        --command=game-optimization-run "$app_id" "$@"
+    status=$?
+elif [ -n "$flatpak_spawn" ]; then
+    run_flatpak "$flatpak_spawn" --host flatpak run \
+        "--env=GAME_OPTIMIZATION_STEAM_ENV_FILE=$snapshot" \
+        --command=game-optimization-run "$app_id" "$@"
+    status=$?
+else
+    echo "game-optimization-run: flatpak and flatpak-spawn are unavailable" >&2
+    status=127
+fi
+
+exit "$status"

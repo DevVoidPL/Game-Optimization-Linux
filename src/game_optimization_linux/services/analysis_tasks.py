@@ -12,7 +12,11 @@ from typing import Any, Mapping, Sequence
 from uuid import uuid4
 
 from game_optimization_linux.models.enums import CompressionProfile, TaskStatus, TaskType
-from game_optimization_linux.models.compression import CompressionPlan, CompressionResult
+from game_optimization_linux.models.compression import (
+    CompressionPlan,
+    CompressionResult,
+    is_exact_compsize_measurement_source,
+)
 from game_optimization_linux.models.game import Game
 from game_optimization_linux.models.task import TERMINAL_TASK_STATUSES, Task
 
@@ -139,7 +143,7 @@ class BtrfsAnalysisTaskService:
             "Prepare and confirm a compression plan before enqueueing it"
         )
 
-    def enqueue_verification(self, game: Game) -> Task:
+    def enqueue_verification(self, game: Game, *, exact: bool = False) -> Task:
         service = self._compression_service
         if service is None:
             raise FeatureUnavailableError("The compression service is unavailable")
@@ -164,9 +168,18 @@ class BtrfsAnalysisTaskService:
                 game_id=game.id,
                 game_name=game.name,
                 task_type=TaskType.VERIFICATION,
-                title=f"Verify compression for {game.name}",
+                title=(
+                    f"Exact compression measurement for {game.name}"
+                    if exact
+                    else f"Verify compression for {game.name}"
+                ),
                 metadata={
-                    "stage": "Waiting for authorization",
+                    "stage": (
+                        "Waiting for authorization"
+                        if exact
+                        else "Basic Btrfs verification"
+                    ),
+                    "verification_mode": "exact" if exact else "basic",
                     "cancellable": True,
                     "pausable": False,
                     "read_only": True,
@@ -181,6 +194,7 @@ class BtrfsAnalysisTaskService:
                 task.id,
                 game,
                 cancel_event,
+                exact,
             )
             self._futures[task.id] = future
             self._persist_locked()
@@ -469,6 +483,7 @@ class BtrfsAnalysisTaskService:
         task_id: str,
         game: Game,
         cancelled: Event,
+        exact: bool,
     ) -> None:
         started = time.monotonic()
         service = self._compression_service
@@ -480,19 +495,48 @@ class BtrfsAnalysisTaskService:
             if task is None:
                 return
             task.status = TaskStatus.RUNNING
-            task.metadata["stage"] = "Measuring compression"
+            task.metadata["stage"] = (
+                "Measuring compression with compsize"
+                if exact
+                else "Basic Btrfs verification"
+            )
             task.updated_at = datetime.now(UTC)
             self._persist_locked()
         if service is None:
             self._fail(task_id, "The compression service is unavailable", started)
             return
         try:
-            measurement = service.verify_measurement(game)
+            measurement = (
+                service.verify_measurement(game, exact=True)
+                if exact
+                else service.verify_measurement(game)
+            )
         except Exception as error:
             if cancelled.is_set():
                 self._mark_cancelled(task_id)
                 return
             if isinstance(error, PrivilegedMeasurementError):
+                if error.exit_code in {126, 127} or "cancel" in str(error).casefold():
+                    with self._lock:
+                        task = self._tasks.get(task_id)
+                        if task is not None:
+                            task.status = TaskStatus.CANCELLED
+                            task.error = "Authorization cancelled"
+                            task.metadata.update(
+                                {
+                                    "stage": "Authorization cancelled",
+                                    "outcome": "authorization_cancelled",
+                                    "helper_exit_code": error.exit_code,
+                                    "helper_stdout": error.stdout,
+                                    "helper_stderr": error.stderr,
+                                    "elapsed_seconds": max(
+                                        0.0, time.monotonic() - started
+                                    ),
+                                }
+                            )
+                            task.updated_at = datetime.now(UTC)
+                            self._persist_locked()
+                    return
                 with self._lock:
                     task = self._tasks.get(task_id)
                     if task is not None:
@@ -516,6 +560,74 @@ class BtrfsAnalysisTaskService:
         if cancelled.is_set():
             self._mark_cancelled(task_id)
             return
+        source = str(measurement.measurement_source or "").strip().casefold()
+        required_values = {
+            "disk usage": measurement.compsize_disk_bytes,
+            "uncompressed size": measurement.compsize_uncompressed_bytes,
+            "referenced size": measurement.compsize_referenced_bytes,
+        }
+        exact_source = is_exact_compsize_measurement_source(source)
+        exact_measurement = bool(
+            exact_source
+            and all(
+                isinstance(value, (int, float))
+                and not isinstance(value, bool)
+                and value > 0
+                for value in required_values.values()
+            )
+        )
+        saving = (
+            max(
+                0,
+                int(measurement.compsize_uncompressed_bytes)
+                - int(measurement.compsize_disk_bytes),
+            )
+            if exact_measurement
+            else None
+        )
+        ratio = (
+            float(measurement.compsize_uncompressed_bytes)
+            / float(measurement.compsize_disk_bytes)
+            if exact_measurement and measurement.compsize_disk_bytes
+            else None
+        )
+        logger.info(
+            "Compression verification parsed: taskId=%s gameId=%s "
+            "source=%s disk=%r uncompressed=%r referenced=%r ratio=%r "
+            "saving=%r exact=%s complete=%s",
+            task_id,
+            game.id,
+            source,
+            measurement.compsize_disk_bytes,
+            measurement.compsize_uncompressed_bytes,
+            measurement.compsize_referenced_bytes,
+            ratio,
+            saving,
+            exact_source,
+            exact_measurement,
+        )
+        if exact and exact_source and not exact_measurement:
+            missing = ", ".join(
+                name
+                for name, value in required_values.items()
+                if not isinstance(value, (int, float))
+                or isinstance(value, bool)
+                or value <= 0
+            )
+            self._fail(
+                task_id,
+                "Exact compsize returned an incomplete measurement"
+                + (f": {missing}" if missing else ""),
+                started,
+            )
+            return
+        if exact and source not in {"basic_btrfs"} and not exact_source:
+            self._fail(
+                task_id,
+                f"Exact compsize returned an unsupported measurement source: {source or 'missing'}",
+                started,
+            )
+            return
         with self._lock:
             task = self._tasks.get(task_id)
             if task is None:
@@ -524,7 +636,24 @@ class BtrfsAnalysisTaskService:
             task.progress = 100.0
             task.result = measurement.to_dict()
             task.error = None
-            task.metadata["stage"] = "Completed"
+            task.metadata.update(
+                {
+                    "stage": (
+                        "Completed"
+                        if exact_measurement or not exact
+                        else "Exact measurement unavailable"
+                    ),
+                    "outcome": (
+                        "exact_measurement"
+                        if exact_measurement
+                        else "basic_verification"
+                        if not exact
+                        else "exact_measurement_unavailable"
+                    ),
+                    "exact_measurement_available": exact_measurement,
+                    "verification_mode": "exact" if exact else "basic",
+                }
+            )
             task.metadata["elapsed_seconds"] = max(
                 0.0, time.monotonic() - started
             )

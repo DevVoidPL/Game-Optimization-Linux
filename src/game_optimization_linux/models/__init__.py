@@ -2,6 +2,7 @@
 
 from .backup import Backup
 from .compression import (
+    EXACT_COMPSIZE_MEASUREMENT_SOURCES,
     CompressionCancelled,
     CompressionFile,
     CompressionHistoryEntry,
@@ -11,6 +12,7 @@ from .compression import (
     CompressionProviderError,
     CompressionResult,
     CompressionToolCapabilities,
+    is_exact_compsize_measurement_source,
 )
 from .enums import (
     AutomaticCompressionMode,
@@ -34,6 +36,18 @@ from .enums import (
     ThemeMode,
 )
 from .gamepad import GamepadAction, GamepadDevice, GamepadEvent, GamepadType, button_hints
+from .game_analysis import (
+    BaselineSession,
+    BottleneckAnalysis,
+    DetectedValue,
+    DetectionEvidence,
+    GameFingerprint,
+    OptimizationAnalysis,
+    OptimizationCandidate,
+    PerformanceComparison,
+    PerformanceMeasurement,
+    SystemSnapshot,
+)
 from .game import (
     AnalysisReport,
     CompressionEstimate,
@@ -91,6 +105,7 @@ __all__ = [
     "BackupStatus",
     "CapabilityStatus",
     "CompressionEstimate",
+    "EXACT_COMPSIZE_MEASUREMENT_SOURCES",
     "CompressionCancelled",
     "CompressionFile",
     "CompressionHistoryEntry",
@@ -102,10 +117,21 @@ __all__ = [
     "CompressionProviderError",
     "CompressionResult",
     "CompressionToolCapabilities",
+    "is_exact_compsize_measurement_source",
     "ControllerMode",
     "FilesystemInfo",
     "FilesystemType",
     "Game",
+    "GameFingerprint",
+    "DetectedValue",
+    "DetectionEvidence",
+    "SystemSnapshot",
+    "PerformanceMeasurement",
+    "BottleneckAnalysis",
+    "BaselineSession",
+    "OptimizationCandidate",
+    "OptimizationAnalysis",
+    "PerformanceComparison",
     "GameOptimizationProfile",
     "ProtonTweakDefinition",
     "ProtonTweaksProfile",

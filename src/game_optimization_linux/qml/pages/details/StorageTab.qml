@@ -17,6 +17,9 @@ Item {
     property string selectedMode: "Auto"
     property var preparedPlan: ({})
     property bool preparingPlan: false
+    readonly property bool debugCompression: (
+        typeof gameOptimizationDebugCompression !== "undefined"
+        && gameOptimizationDebugCompression === true)
 
     readonly property string gameId: String(value(["id"], ""))
     readonly property var report: value(["analysisReport"], ({}))
@@ -48,10 +51,15 @@ Item {
                                                         verificationTask.id || "").length > 0)
     readonly property string verificationStatus: String(
                                                      verificationTask.status || "")
+    readonly property string verificationMode: String(
+                                                   verificationTask.verificationMode
+                                                   || "exact").toLowerCase()
     readonly property bool verificationActive: ["queued", "running", "analyzing"]
                                                .indexOf(verificationStatus.toLowerCase()) >= 0
     readonly property bool verificationFailed: verificationStatus.toLowerCase()
                                                === "failed"
+    readonly property bool verificationCancelled: verificationStatus.toLowerCase()
+                                                  === "cancelled"
     readonly property var verificationMeasurement: (
                                                        verificationStatus.toLowerCase() === "completed"
                                                        && verificationTask.result
@@ -62,6 +70,18 @@ Item {
                                                     === "completed"
                                                     && hasCompleteCompsizeMeasurement(
                                                         verificationMeasurement))
+    readonly property bool verificationExactUnavailable: Boolean(
+        verificationStatus.toLowerCase() === "completed"
+        && verificationMode === "exact"
+        && String(measurementValue(verificationMeasurement,
+                                   ["measurementSource", "measurement_source"],
+                                   "")).toLowerCase() === "basic_btrfs")
+    readonly property bool verificationBasicSucceeded: Boolean(
+        verificationStatus.toLowerCase() === "completed"
+        && verificationMode === "basic"
+        && String(measurementValue(verificationMeasurement,
+                                   ["measurementSource", "measurement_source"],
+                                   "")).toLowerCase() === "basic_btrfs")
     readonly property string analysisStatus: String(analysisTask.status || "")
     readonly property string normalizedAnalysisStatus: analysisStatus.toLowerCase()
     readonly property bool hasAnalysisTask: Boolean(analysisTask
@@ -160,12 +180,42 @@ Item {
 
     signal toastRequested(string message, string tone)
 
+    function applyDefaultProfile() {
+        var settings = controller && controller.settings ? controller.settings : ({})
+        var preferred = String(settings.defaultCompressionProfile || "Auto")
+        if (["Fast", "Balanced", "Maximum", "Auto"].indexOf(preferred) >= 0)
+            selectedMode = preferred
+        else
+            selectedMode = "Auto"
+    }
+
     readonly property var modes: [
         { "key": "Fast", "name": qsTr("Fast"), "symbol": "⚡", "level": "zstd:1", "description": qsTr("Prioritizes speed with lower CPU use.") },
         { "key": "Balanced", "name": qsTr("Balanced"), "symbol": "◐", "level": "zstd:3", "description": qsTr("Recommended balance of time and estimated savings.") },
         { "key": "Maximum", "name": qsTr("Maximum"), "symbol": "◆", "level": "zstd:9", "description": qsTr("Uses more CPU for a potentially small additional gain.") },
         { "key": "Auto", "name": qsTr("Auto"), "symbol": "✦", "level": qsTr("automatic"), "description": qsTr("Chooses between levels 1, 3, 6 and 9 from measured samples.") }
     ]
+
+    Component.onCompleted: applyDefaultProfile()
+    onControllerChanged: applyDefaultProfile()
+
+    Connections {
+        target: tab.controller || null
+        ignoreUnknownSignals: true
+        function onSettingsChanged() { tab.applyDefaultProfile() }
+        function onTaskFinished(taskId, status) {
+            Qt.callLater(function() {
+                tab.logMeasurementState("taskFinished:" + taskId + ":" + status)
+            })
+        }
+    }
+
+    onGameDataChanged: Qt.callLater(function() {
+        tab.logMeasurementState("gameDataChanged")
+    })
+    onTasksDataChanged: Qt.callLater(function() {
+        tab.logMeasurementState("tasksDataChanged")
+    })
 
     function value(keys, fallback) {
         var source = gameData || {}
@@ -259,6 +309,14 @@ Item {
         return resultMeasurement(["after"])
     }
 
+    function exactMeasurementSource(measurement) {
+        var source = String(measurementValue(
+                                measurement,
+                                ["measurementSource", "measurement_source"],
+                                "")).toLowerCase()
+        return source === "polkit_helper" || source === "polkit_compsize"
+    }
+
     function activeCompressionEffect() {
         var current = displayedAfterMeasurement()
         var uncompressed = measurementValue(
@@ -275,10 +333,7 @@ Item {
     function hasCompleteCompsizeMeasurement(measurement) {
         var source = measurement && typeof measurement === "object"
                      ? measurement : ({})
-        return String(measurementValue(source,
-                                       ["measurementSource",
-                                        "measurement_source"],
-                                       "")).toLowerCase() === "polkit_helper"
+        return exactMeasurementSource(source)
                 && Number(measurementValue(
                               source,
                               ["compsizeDiskBytes", "compsize_disk_bytes"],
@@ -293,6 +348,63 @@ Item {
                               ["compsizeReferencedBytes",
                                "compsize_referenced_bytes"],
                               0)) > 0
+    }
+
+    function currentCompressionRatio() {
+        var current = displayedAfterMeasurement()
+        if (!hasCompleteCompsizeMeasurement(current))
+            return null
+        var disk = Number(measurementValue(
+                              current,
+                              ["compsizeDiskBytes", "compsize_disk_bytes"],
+                              0))
+        var uncompressed = Number(measurementValue(
+                                      current,
+                                      ["compsizeUncompressedBytes",
+                                       "compsize_uncompressed_bytes"],
+                                      0))
+        return disk > 0 && uncompressed > 0 ? uncompressed / disk : null
+    }
+
+    function exactSourceLabel(measurement) {
+        var source = String(measurementValue(
+                                measurement,
+                                ["measurementSource", "measurement_source"],
+                                "")).toLowerCase()
+        if (source === "polkit_compsize")
+            return qsTr("Exact compsize / polkit_compsize")
+        if (source === "polkit_helper")
+            return qsTr("Exact compsize / polkit_helper")
+        return qsTr("Measurement (compsize)")
+    }
+
+    function logMeasurementState(reason) {
+        if (!debugCompression)
+            return
+        var measurement = displayedAfterMeasurement()
+        console.info("Exact measurement QML state " + JSON.stringify({
+            "reason": reason,
+            "gameId": gameId,
+            "taskGameId": String(verificationTask.gameId || ""),
+            "taskId": String(verificationTask.id || ""),
+            "taskStatus": verificationStatus,
+            "source": String(measurementValue(
+                                 measurement,
+                                 ["measurementSource", "measurement_source"],
+                                 "")),
+            "disk": measurementValue(
+                        measurement,
+                        ["compsizeDiskBytes", "compsize_disk_bytes"], null),
+            "uncompressed": measurementValue(
+                                measurement,
+                                ["compsizeUncompressedBytes",
+                                 "compsize_uncompressed_bytes"], null),
+            "referenced": measurementValue(
+                              measurement,
+                              ["compsizeReferencedBytes",
+                               "compsize_referenced_bytes"], null),
+            "complete": hasCompleteCompsizeMeasurement(measurement)
+        }))
     }
 
     function scannerLogicalBytes() {
@@ -693,7 +805,7 @@ Item {
     }
 
     onGameIdChanged: {
-        selectedMode = "Auto"
+        applyDefaultProfile()
         preparedPlan = ({})
     }
 
@@ -812,6 +924,30 @@ Item {
                             }
                         }
 
+                        AppButton {
+                            objectName: "exactCompressionMeasurementButton"
+                            text: tab.verificationActive
+                                  && tab.verificationMode === "exact"
+                                  ? qsTr("Waiting for authorization…")
+                                  : qsTr("Exact measurement")
+                            iconText: "≋"
+                            kind: "secondary"
+                            busy: tab.verificationActive
+                                  && tab.verificationMode === "exact"
+                            enabled: Boolean(tab.gameId.length > 0
+                                             && tab.analysisAllowed
+                                             && !tab.verificationActive
+                                             && (tab.confirmedBtrfs
+                                                 || String(tab.value(
+                                                               ["filesystem"], ""))
+                                                    .toLowerCase() === "btrfs"))
+                            onClicked: {
+                                if (tab.controller
+                                        && tab.controller.exactCompressionMeasurement)
+                                    tab.controller.exactCompressionMeasurement(tab.gameId)
+                            }
+                        }
+
                         Label {
                             Layout.fillWidth: true
                             text: tab.analysisExplanation()
@@ -872,8 +1008,14 @@ Item {
                                     objectName: "compressionMeasurementStatus"
                                     text: tab.verificationActive
                                           ? qsTr("Measuring")
+                                          : tab.verificationCancelled
+                                            ? qsTr("Authorization cancelled")
                                           : tab.verificationFailed
                                             ? qsTr("Measurement failed")
+                                          : tab.verificationBasicSucceeded
+                                            ? qsTr("Basic verification completed")
+                                          : tab.verificationExactUnavailable
+                                            ? qsTr("Exact measurement unavailable")
                                           : measuredResultCard.verificationContext
                                             && !tab.verificationSucceeded
                                             ? qsTr("Not available")
@@ -881,6 +1023,8 @@ Item {
                                             ? qsTr("Measured") : qsTr("Not measured")
                                     status: tab.verificationActive
                                             ? "analyzing"
+                                            : tab.verificationCancelled
+                                              ? "cancelled"
                                             : tab.verificationFailed
                                               ? "failed"
                                             : measuredResultCard.verificationContext
@@ -937,6 +1081,14 @@ Item {
                                            : qsTr("Not available")
                                 }
                                 LabeledValue {
+                                    objectName: "measuredCurrentRatio"
+                                    Layout.fillWidth: true
+                                    label: qsTr("Current compression ratio")
+                                    value: measuredResultCard.completeCurrentMeasurement
+                                           ? Number(tab.currentCompressionRatio()).toFixed(2) + "×"
+                                           : qsTr("Not available")
+                                }
+                                LabeledValue {
                                     objectName: "compressionClassification"
                                     Layout.fillWidth: true
                                     label: qsTr("Compression classification")
@@ -962,9 +1114,14 @@ Item {
                                     Layout.fillWidth: true
                                     label: qsTr("Source")
                                     value: measuredResultCard.completeCurrentMeasurement
-                                           ? qsTr("Measurement (compsize)")
+                                           ? tab.exactSourceLabel(
+                                                 measuredResultCard.afterMeasurement)
+                                           : tab.verificationBasicSucceeded
+                                             ? qsTr("Basic Btrfs verification")
                                            : tab.verificationFailed
                                              ? qsTr("Measurement failed")
+                                           : tab.verificationExactUnavailable
+                                             ? qsTr("Basic Btrfs verification")
                                              : qsTr("Not available")
                                 }
                                 LabeledValue {
@@ -972,10 +1129,46 @@ Item {
                                     Layout.fillWidth: true
                                     label: qsTr("Measurement status")
                                     value: measuredResultCard.completeCurrentMeasurement
-                                           ? qsTr("Measured")
+                                           ? qsTr("Exact measurement completed")
+                                           : tab.verificationBasicSucceeded
+                                             ? qsTr("Basic verification completed")
                                            : tab.verificationFailed
                                              ? qsTr("Measurement failed")
+                                           : tab.verificationExactUnavailable
+                                             ? qsTr("Exact measurement unavailable")
                                              : qsTr("Not available")
+                                }
+                                LabeledValue {
+                                    objectName: "basicBtrfsExclusive"
+                                    visible: tab.verificationExactUnavailable
+                                             || tab.verificationBasicSucceeded
+                                    Layout.fillWidth: true
+                                    label: qsTr("Exclusive data (btrfs filesystem du)")
+                                    value: tab.measurementValue(
+                                               measuredResultCard.afterMeasurement,
+                                               ["exclusiveBytes", "exclusive_bytes"],
+                                               null) !== null
+                                           ? tab.formatBytes(tab.measurementValue(
+                                                 measuredResultCard.afterMeasurement,
+                                                 ["exclusiveBytes", "exclusive_bytes"],
+                                                 null))
+                                           : qsTr("Not available")
+                                }
+                                LabeledValue {
+                                    objectName: "basicBtrfsShared"
+                                    visible: tab.verificationExactUnavailable
+                                             || tab.verificationBasicSucceeded
+                                    Layout.fillWidth: true
+                                    label: qsTr("Shared data (btrfs filesystem du)")
+                                    value: tab.measurementValue(
+                                               measuredResultCard.afterMeasurement,
+                                               ["sharedBytes", "shared_bytes"],
+                                               null) !== null
+                                           ? tab.formatBytes(tab.measurementValue(
+                                                 measuredResultCard.afterMeasurement,
+                                                 ["sharedBytes", "shared_bytes"],
+                                                 null))
+                                           : qsTr("Not available")
                                 }
                                 LabeledValue {
                                     objectName: "measuredPhysicalBefore"
@@ -1059,6 +1252,7 @@ Item {
                                 objectName: "measurementFailureMessage"
                                 Layout.fillWidth: true
                                 visible: tab.verificationFailed
+                                         || tab.verificationExactUnavailable
                                          || (!measuredResultCard.verificationContext
                                              && tab.latestCompressionResult
                                           && Object.keys(
@@ -1067,6 +1261,8 @@ Item {
                                 text: tab.verificationFailed
                                       ? qsTr("Privileged measurement failed: %1")
                                         .arg(String(tab.verificationTask.error || ""))
+                                      : tab.verificationExactUnavailable
+                                        ? qsTr("Exact compsize measurement is unavailable. Compression may still be working correctly. Basic read-only Btrfs checks completed, but exact physical usage, compression ratio, and saving cannot be claimed without the optional root-owned Polkit measurement component.")
                                       : qsTr("The actual saving cannot be claimed because a complete privileged compsize measurement before and after is unavailable.")
                                 color: App.Theme.warning
                                 font.pixelSize: App.Theme.fontCaption
