@@ -27,6 +27,7 @@ Rectangle {
 
     readonly property var destinations: [
         { "page": "games", "label": qsTr("Games"), "icon": Qt.resolvedUrl("../resources/sidebar-games.svg") },
+        { "page": "narrator", "label": qsTr("Narrator"), "icon": Qt.resolvedUrl("../resources/sidebar-narrator.svg") },
         { "page": "updates", "label": qsTr("Updates"), "icon": Qt.resolvedUrl("../resources/sidebar-updates.svg"),
           "count": Math.max(0, sidebar.updatesPendingCount) },
         { "page": "tasks", "label": qsTr("Tasks"), "icon": Qt.resolvedUrl("../resources/sidebar-tasks.svg") },

@@ -9,6 +9,7 @@ from threading import Event
 
 import pytest
 
+from game_optimization_linux.controllers import AppController
 from game_optimization_linux.controllers.presenters import game_to_qml, settings_to_qml
 from game_optimization_linux.models.enums import (
     AutomaticCompressionMode,
@@ -25,7 +26,9 @@ from game_optimization_linux.services.game_updates import (
     UPDATE_STATE_FORMAT_VERSION,
     FileFingerprint,
     FingerprintSnapshot,
+    GameChangeSet,
     GameFingerprintScanner,
+    GameUpdateRecord,
     GameUpdateStateStore,
     GameUpdateStatus,
     GameUpdateTracker,
@@ -580,6 +583,30 @@ def test_update_state_store_is_atomic_restartable_and_migrates_v1(
 
     path.write_text("{broken", encoding="utf-8")
     assert store.load() == UpdateStateDatabase()
+
+
+def test_update_state_store_handles_surrogateescaped_file_names(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "state" / "updates.json"
+    store = GameUpdateStateStore(path)
+    record = GameUpdateRecord(
+        "steam-42",
+        "42",
+        GameUpdateStatus.ERROR,
+        changes=GameChangeSet(new_files=("broken-\udcff-name.bin",)),
+        last_error="cannot read broken-\udcff-name.bin",
+    )
+
+    store.save(UpdateStateDatabase(records={record.game_id: record}))
+    loaded = store.load().records[record.game_id]
+
+    assert loaded.changes.new_files == record.changes.new_files
+    assert loaded.last_error == record.last_error
+    assert "\\udcff" in path.read_text(encoding="utf-8")
+    identity = AppController._update_event_identity(record, None)
+    assert len(identity) == 40
+    assert identity.isascii()
 
 
 @pytest.mark.parametrize("mode", list(AutomaticCompressionMode))

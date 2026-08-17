@@ -87,6 +87,10 @@ QtObject {
         case "queued": return qsTr("Queued")
         case "ready": return qsTr("Ready")
         case "restored": return qsTr("Restored")
+        case "kept": return qsTr("Kept")
+        case "reverted": return qsTr("Reverted")
+        case "pending": return qsTr("Pending")
+        case "not applied": return qsTr("Not applied")
         case "running": return qsTr("Running")
         case "scan incomplete": return qsTr("Scan incomplete")
         case "scanning files": return qsTr("Scanning files")
@@ -448,9 +452,103 @@ QtObject {
             return qsTr("The game library is unavailable")
         case "Compression state requires verification after an interrupted operation":
             return qsTr("Compression state requires verification after an interrupted operation")
+        case "Narrator settings saved":
+            return qsTr("Narrator settings saved")
+        case "Narrator settings could not be saved":
+            return qsTr("Narrator settings could not be saved")
+        case "This narrator component operation is already running":
+            return qsTr("This narrator component operation is already running")
+        case "Stop the narrator before changing its components":
+            return qsTr("Stop the narrator before changing its components")
+        case "Narrator component installed":
+            return qsTr("Narrator component installed")
+        case "Install the verified component through the application":
+            return qsTr("Install the verified component through the application")
+        case "The desktop portal session bus is unavailable":
+            return qsTr("The desktop portal session bus is unavailable")
+        case "The ScreenCast portal is unavailable":
+            return qsTr("The ScreenCast portal is unavailable")
+        case "The ScreenCast portal exposes no monitor or window sources":
+            return qsTr("The ScreenCast portal exposes no monitor or window sources")
+        case "Wayland portal capture is available":
+            return qsTr("Wayland portal capture is available")
+        case "GStreamer PipeWire capture is available":
+            return qsTr("GStreamer PipeWire capture is available")
+        case "The portal transport is provided by the application runtime":
+            return qsTr("The portal transport is provided by the application runtime")
+        case "The Tesseract OCR runtime is unavailable":
+            return qsTr("The Tesseract OCR runtime is unavailable")
+        case "Install the verified English OCR model":
+            return qsTr("Install the verified English OCR model")
+        case "Tesseract English subtitle OCR is ready":
+            return qsTr("Tesseract English subtitle OCR is ready")
+        case "Verified 3.9 MiB English tessdata_fast model":
+            return qsTr("Verified 3.9 MiB English tessdata_fast model")
+        case "Verified 64.2 MiB Argos OPUS model for local CPU translation":
+            return qsTr("Verified 64.2 MiB Argos OPUS model for local CPU translation")
+        case "Verified 60.3 MiB Polish Piper voice for local CPU speech":
+            return qsTr("Verified 60.3 MiB Polish Piper voice for local CPU speech")
+        case "PCM is sent directly to the sandbox audio service":
+            return qsTr("PCM is sent directly to the sandbox audio service")
+        case "Local English to Polish translation is ready":
+            return qsTr("Local English to Polish translation is ready")
+        case "The local CTranslate2 translation runtime is unavailable":
+            return qsTr("The local CTranslate2 translation runtime is unavailable")
+        case "Install the verified English to Polish translation model":
+            return qsTr("Install the verified English to Polish translation model")
+        case "Piper Polish speech synthesis is ready":
+            return qsTr("Piper Polish speech synthesis is ready")
+        case "The Piper CPU runtime is unavailable":
+            return qsTr("The Piper CPU runtime is unavailable")
+        case "Install the verified Polish Piper voice":
+            return qsTr("Install the verified Polish Piper voice")
+        case "The selected game is not running":
+            return qsTr("The selected game is not running")
+        case "Narrator is disabled for this game":
+            return qsTr("Narrator is disabled for this game")
+        case "No game subtitle adapter is available":
+            return qsTr("No game subtitle adapter is available")
+        case "The game exited":
+            return qsTr("The game exited")
+        case "No audio output device is available":
+            return qsTr("No audio output device is available")
+        case "The audio output does not support the narrator PCM format":
+            return qsTr("The audio output does not support the narrator PCM format")
+        case "Narrator PCM playback buffer could not be opened":
+            return qsTr("Narrator PCM playback buffer could not be opened")
+        case "Narrator audio playback failed":
+            return qsTr("Narrator audio playback failed")
+        case "Screen capture permission was cancelled":
+            return qsTr("Screen capture permission was cancelled")
+        case "Screen capture stopped":
+            return qsTr("Screen capture stopped")
         default:
             break
         }
+        match = original.match(/^Narrator components are unavailable: (.+)$/)
+        if (match)
+            return qsTr("Narrator components are unavailable: %1").arg(match[1])
+        match = original.match(/^The selected (OCR|translation|speech) provider is not available: (.+)$/)
+        if (match)
+            return qsTr("The selected %1 provider is not available: %2").arg(match[1]).arg(match[2])
+        match = original.match(/^The selected translation profile is not available: (.+)$/)
+        if (match)
+            return qsTr("The selected translation profile is not available: %1").arg(match[1])
+        match = original.match(/^The selected Polish voice is not available: (.+)$/)
+        if (match)
+            return qsTr("The selected Polish voice is not available: %1").arg(match[1])
+        match = original.match(/^OCR failed: (.+)$/)
+        if (match)
+            return qsTr("OCR failed: %1").arg(match[1])
+        match = original.match(/^Translation failed: (.+)$/)
+        if (match)
+            return qsTr("Translation failed: %1").arg(match[1])
+        match = original.match(/^Speech synthesis failed: (.+)$/)
+        if (match)
+            return qsTr("Speech synthesis failed: %1").arg(match[1])
+        match = original.match(/^Audio playback failed: (.+)$/)
+        if (match)
+            return qsTr("Audio playback failed: %1").arg(match[1])
         match = original.match(/^Game category: (.+)$/)
         if (match)
             return qsTr("Game category: %1").arg(optimizationCategory(match[1]))
@@ -556,5 +654,188 @@ QtObject {
         if (match)
             return qsTr("The Steam appmanifest could not be verified: %1").arg(match[1])
         return original
+    }
+
+    function analysisMessage(value) {
+        var original = text(value)
+        var match
+        switch (original) {
+        case "gpu_bottleneck": return qsTr("GPU bottleneck")
+        case "cpu_bottleneck": return qsTr("CPU bottleneck")
+        case "vram_pressure": return qsTr("VRAM pressure")
+        case "ram_pressure": return qsTr("RAM pressure")
+        case "frame_pacing_problem": return qsTr("Frame pacing problem")
+        case "balanced": return qsTr("Balanced - no obvious bottleneck")
+        case "insufficient_data": return qsTr("Insufficient data")
+        case "Ray tracing": return qsTr("Ray tracing")
+        case "Shadow quality": return qsTr("Shadow quality")
+        case "Effects quality": return qsTr("Effects quality")
+        case "Post-process quality": return qsTr("Post-process quality")
+        case "View distance": return qsTr("View distance")
+        case "Motion blur": return qsTr("Motion blur")
+        case "Shadows": return qsTr("Shadows")
+        case "Effects / volumetrics": return qsTr("Effects / volumetrics")
+        case "Post-processing": return qsTr("Post-processing")
+        case "Visual preference": return qsTr("Visual preference")
+        case "Windows game using Steam compatibility layer":
+            return qsTr("Windows game using Steam compatibility layer")
+        case "Native Linux": return qsTr("Native Linux")
+        case "filesystem signatures": return qsTr("filesystem signatures")
+        case "no reliable signature": return qsTr("no reliable signature")
+        case "manual override": return qsTr("manual override")
+        case "executable not resolved": return qsTr("executable not resolved")
+        case "resolved PE executable": return qsTr("resolved PE executable")
+        case "resolved native executable": return qsTr("resolved native executable")
+        case "active engine configuration": return qsTr("active engine configuration")
+        case "Unity boot configuration": return qsTr("Unity boot configuration")
+        case "no reliable active API setting": return qsTr("no reliable active API setting")
+        case "executable header unavailable": return qsTr("executable header unavailable")
+        case "FPS remained tightly clustered around one stable ceiling":
+            return qsTr("FPS remained tightly clustered around one stable ceiling")
+        case "The upper FPS distribution rarely exceeded that ceiling":
+            return qsTr("The upper FPS distribution rarely exceeded that ceiling")
+        case "Frametime remained clustered around the matching frame interval":
+            return qsTr("Frametime remained clustered around the matching frame interval")
+        case "GPU saturation can explain the observed ceiling without a frame limiter":
+            return qsTr("GPU saturation can explain the observed ceiling without a frame limiter")
+        case "GPU utilization is unavailable": return qsTr("GPU utilization is unavailable")
+        case "Total CPU utilization cannot exclude a single-thread bottleneck":
+            return qsTr("Total CPU utilization cannot exclude a single-thread bottleneck")
+        case "CPU utilization is unavailable": return qsTr("CPU utilization is unavailable")
+        case "The measured ceiling is close to the selected display refresh rate":
+            return qsTr("The measured ceiling is close to the selected display refresh rate")
+        case "FPS and frametime did not form a sufficiently tight stable ceiling":
+            return qsTr("FPS and frametime did not form a sufficiently tight stable ceiling")
+        case "FPS and frametime distribution data is incomplete":
+            return qsTr("FPS and frametime distribution data is incomplete")
+        case "The measured FPS also missed the configured target":
+            return qsTr("The measured FPS also missed the configured target")
+        case "Per-thread CPU utilization is unavailable, so CPU-bound confidence is limited":
+            return qsTr("Per-thread CPU utilization is unavailable, so CPU-bound confidence is limited")
+        case "CPU or GPU utilization is missing from the log":
+            return qsTr("CPU or GPU utilization is missing from the log")
+        case "VRAM pressure could not be calculated":
+            return qsTr("VRAM pressure could not be calculated")
+        case "The available metrics do not show one dominant saturated resource":
+            return qsTr("The available metrics do not show one dominant saturated resource")
+        case "Both sessions must contain representative comparable measurements":
+            return qsTr("Both sessions must contain representative comparable measurements")
+        case "GPU headroom improved while both representative sessions remained frame-limited":
+            return qsTr("GPU headroom improved while both representative sessions remained frame-limited")
+        case "Automatic recommends a conservative one-step test for the measured bottleneck.":
+            return qsTr("Automatic recommends a conservative one-step test for the measured bottleneck.")
+        case "No graphics reductions are recommended because the game appears frame-limited and the hardware has available headroom.":
+            return qsTr("No graphics reductions are recommended because the game appears frame-limited and the hardware has available headroom.")
+        case "No graphics reductions are recommended because the measured workload is balanced.":
+            return qsTr("No graphics reductions are recommended because the measured workload is balanced.")
+        case "The game installation path changed after analysis":
+            return qsTr("The game installation path changed after analysis")
+        case "The analyzed game path is no longer available":
+            return qsTr("The analyzed game path is no longer available")
+        case "The analyzed executable is no longer available":
+            return qsTr("The analyzed executable is no longer available")
+        case "Graphics settings changed after the saved baseline":
+            return qsTr("Graphics settings changed after the saved baseline")
+        case "Test the effect of this supported existing setting; the actual result must be measured":
+            return qsTr("Test the effect of this supported existing setting; the actual result must be measured")
+        case "Reduce the workload associated with this existing setting; the actual effect must be measured":
+            return qsTr("Reduce the workload associated with this existing setting; the actual effect must be measured")
+        case "Low; one existing text setting is changed and backed up":
+            return qsTr("Low - one existing text setting is changed and backed up")
+        case "Uses an existing game configuration value":
+            return qsTr("Uses an existing game configuration value")
+        case "Record a representative baseline before starting Automatic Optimization.":
+            return qsTr("Record a representative baseline before starting Automatic Optimization.")
+        case "No runtime optimization is necessary for the current measured target.":
+            return qsTr("No runtime optimization is necessary for the current measured target.")
+        case "The measured workload already meets the current target and has healthy frame pacing.":
+            return qsTr("The measured workload already meets the current target and has healthy frame pacing.")
+        case "Memory pressure was detected, but Automatic v1 has no safe runtime memory candidate.":
+            return qsTr("Memory pressure was detected, but Automatic v1 has no safe runtime memory candidate.")
+        case "A reversible runtime experiment is available. Its result must be measured before it can be kept.":
+            return qsTr("A reversible runtime experiment is available. Its result must be measured before it can be kept.")
+        case "No safe runtime optimization candidate is currently available.":
+            return qsTr("No safe runtime optimization candidate is currently available.")
+        case "Record representative performance data":
+            return qsTr("Record representative performance data")
+        case "Preserve the current healthy frame target":
+            return qsTr("Preserve the current healthy frame target")
+        case "Improve GPU-limited performance":
+            return qsTr("Improve GPU-limited performance")
+        case "Improve CPU-side consistency and performance":
+            return qsTr("Improve CPU-side consistency and performance")
+        case "Improve frame consistency": return qsTr("Improve frame consistency")
+        case "Reduce measured VRAM pressure": return qsTr("Reduce measured VRAM pressure")
+        case "Reduce measured RAM pressure": return qsTr("Reduce measured RAM pressure")
+        case "Preserve the current balanced workload":
+            return qsTr("Preserve the current balanced workload")
+        case "GameMode": return qsTr("GameMode")
+        case "Test whether GameMode improves CPU-side consistency or frame pacing":
+            return qsTr("Test whether GameMode improves CPU-side consistency or frame pacing")
+        case "Low - the per-game profile can be restored exactly":
+            return qsTr("Low - the per-game profile can be restored exactly")
+        case "None": return qsTr("None")
+        case "The effective runner plan wrapped the measured game command with GameMode":
+            return qsTr("The effective runner plan wrapped the measured game command with GameMode")
+        case "The runner report belongs to a different measurement session":
+            return qsTr("The runner report belongs to a different measurement session")
+        case "The runner did not confirm comparison completion":
+            return qsTr("The runner did not confirm comparison completion")
+        case "GameMode was requested but was absent from the measured runner plan":
+            return qsTr("GameMode was requested but was absent from the measured runner plan")
+        case "Frame consistency improved even though average FPS was not the primary goal":
+            return qsTr("Frame consistency improved even though average FPS was not the primary goal")
+        case "The runtime candidate was not verified in the effective launch plan":
+            return qsTr("The runtime candidate was not verified in the effective launch plan")
+        case "Both measurements must be representative before the candidate is judged":
+            return qsTr("Both measurements must be representative before the candidate is judged")
+        case "Analyze the game and record a representative baseline first":
+            return qsTr("Analyze the game and record a representative baseline first")
+        case "Automatic Optimization requires a current representative baseline":
+            return qsTr("Automatic Optimization requires a current representative baseline")
+        case "Finish the current comparison cycle before starting Automatic Optimization":
+            return qsTr("Finish the current comparison cycle before starting Automatic Optimization")
+        case "The original representative baseline is unavailable":
+            return qsTr("The original representative baseline is unavailable")
+        case "The saved baseline changed after analysis; analyze the game again":
+            return qsTr("The saved baseline changed after analysis; analyze the game again")
+        case "An Automatic Optimization experiment is already active":
+            return qsTr("An Automatic Optimization experiment is already active")
+        case "Record and evaluate a representative comparison before keeping this optimization":
+            return qsTr("Record and evaluate a representative comparison before keeping this optimization")
+        case "The comparison is inconclusive; retry it or revert the optimization":
+            return qsTr("The comparison is inconclusive; retry it or revert the optimization")
+        }
+        match = original.match(/^The stable regime continued for ([0-9.,]+) seconds$/)
+        if (match) return qsTr("The stable regime continued for %1 seconds").arg(match[1])
+        match = original.match(/^GPU load averaged ([0-9.,]+)%, leaving measured headroom$/)
+        if (match) return qsTr("GPU load averaged %1%, leaving measured headroom").arg(match[1])
+        match = original.match(/^Total CPU load averaged ([0-9.,]+)%$/)
+        if (match) return qsTr("Total CPU load averaged %1%").arg(match[1])
+        match = original.match(/^VRAM use reached ([0-9.,]+)% of detected capacity$/)
+        if (match) return qsTr("VRAM use reached %1% of detected capacity").arg(match[1])
+        match = original.match(/^RAM use reached ([0-9.,]+)% of detected capacity$/)
+        if (match) return qsTr("RAM use reached %1% of detected capacity").arg(match[1])
+        match = original.match(/^GPU load averaged ([0-9.,]+)% across the representative segment$/)
+        if (match) return qsTr("GPU load averaged %1% across the representative segment").arg(match[1])
+        match = original.match(/^CPU load averaged ([0-9.,]+)%$/)
+        if (match) return qsTr("CPU load averaged %1%").arg(match[1])
+        match = original.match(/^Total CPU load averaged ([0-9.,]+)% while GPU load was not saturated$/)
+        if (match) return qsTr("Total CPU load averaged %1% while GPU load was not saturated").arg(match[1])
+        match = original.match(/^(.+) changed by ([+-]?[0-9.,]+)%$/)
+        if (match) return qsTr("%1 changed by %2%").arg(analysisMessage(match[1])).arg(match[2])
+        match = original.match(/^(.+) is present in (.+)$/)
+        if (match) return qsTr("%1 is present in %2").arg(match[1]).arg(match[2])
+        match = original.match(/^Existing (.+) setting$/)
+        if (match) return qsTr("Existing %1 setting").arg(analysisMessage(match[1]))
+        return message(original)
+    }
+
+    function joinAnalysis(values, separator) {
+        var translated = []
+        var items = values || []
+        for (var index = 0; index < items.length; ++index)
+            translated.push(analysisMessage(items[index]))
+        return translated.join(separator === undefined ? "; " : separator)
     }
 }

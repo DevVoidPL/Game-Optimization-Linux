@@ -19,6 +19,11 @@
   </categories>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="1.6.0-alpha" date="2026-08-17">
+      <description>
+        <p>Major alpha update with experimental Polish narration, real-game performance analysis and automatic optimization improvements.</p>
+      </description>
+    </release>
     <release version="0.1.4-alpha" date="2026-08-08">
       <description>
         <p>Flatpak host integration no longer requires a host Python runtime.</p>

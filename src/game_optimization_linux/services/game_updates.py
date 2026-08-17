@@ -1083,7 +1083,7 @@ class GameUpdateStateStore:
         try:
             serialized = json.dumps(
                 payload,
-                ensure_ascii=False,
+                ensure_ascii=True,
                 indent=2,
                 sort_keys=True,
             )

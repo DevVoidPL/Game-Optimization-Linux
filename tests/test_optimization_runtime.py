@@ -36,6 +36,8 @@ from game_optimization_linux.services import (
     MangoHudLaunchIntegration,
     MangoHudProfileRepository,
     OptiScalerProfileRepository,
+    OptimizationAnalysisRepository,
+    OptimizationChangeService,
     ProtonTweaksRepository,
     OptimizationAdvisor,
     OptimizationLaunchPlanner,
@@ -337,6 +339,68 @@ def test_gamescope_and_gamemode_are_independent_features(
     assert plan.command[-3:] == [
         "SteamLaunch", "AppId=292030", "REDprelauncher.exe"
     ]
+
+
+def test_automatic_gamemode_experiment_composes_with_private_measurement() -> None:
+    profile = replace(
+        GameOptimizationProfile.default("10"), gamemode_enabled=True
+    )
+    plan = OptimizationLaunchPlanner().build(
+        profile,
+        ["/game/bin/game", "--session"],
+        gamemode=_tool("GameMode", "/host/bin/gamemoderun"),
+        gamescope=RuntimeToolAvailability("Gamescope", False),
+        mangohud_activation_owner="measurement_session",
+        measurement_environment={
+            "MANGOHUD": "1",
+            "MANGOHUD_CONFIG": "read_cfg",
+            "MANGOHUD_CONFIGFILE": "/state/sessions/10/MangoHud-baseline.conf",
+        },
+    )
+
+    assert plan.command == [
+        "/host/bin/gamemoderun", "/game/bin/game", "--session"
+    ]
+    assert plan.wrappers == ("gamemode",)
+    assert plan.mangohud_activation_owner == "measurement_session"
+    assert plan.environment["MANGOHUD_CONFIG"] == "read_cfg"
+    assert plan.environment_sources["MANGOHUD_CONFIGFILE"] == "baseline_measurement"
+
+
+def test_gamescope_baseline_applies_private_mangohud_only_to_game_command() -> None:
+    profile = replace(
+        GameOptimizationProfile.default("10"),
+        gamescope_enabled=True,
+        gamescope_mode="native",
+    )
+    measurement = {
+        "MANGOHUD": "1",
+        "MANGOHUD_CONFIG": "read_cfg",
+        "MANGOHUD_CONFIGFILE": "/state/sessions/10/MangoHud-baseline.conf",
+    }
+    plan = OptimizationLaunchPlanner().build(
+        profile,
+        ["/game/bin/game"],
+        gamemode=RuntimeToolAvailability("GameMode", False),
+        gamescope=_tool(
+            "Gamescope",
+            "gamescope",
+            ("-W", "-H", "-r", "-f", "-b"),
+        ),
+        existing_environment=measurement,
+        mangohud_activation_owner="measurement_session",
+        measurement_environment=measurement,
+    )
+
+    assert set(measurement) <= set(plan.wrapper_environment_removed)
+    wrapper_environment = plan.process_environment(measurement)
+    assert not set(measurement) & set(wrapper_environment)
+    separator = plan.command.index("--")
+    assert plan.command[separator + 1] == "env"
+    restored = set(plan.command[separator + 2:-1])
+    assert restored == {f"{key}={value}" for key, value in measurement.items()}
+    assert plan.command[-1] == "/game/bin/game"
+    assert any("only to the game command" in reason for reason in plan.reasons)
 
 
 def test_coredump_prone_gamescope_plan_is_minimal_and_isolates_host_wrapper() -> None:
@@ -643,7 +707,7 @@ def test_runner_records_single_mangohud_application_activation_owner(
 
 
 def test_runner_records_one_private_mangohud_baseline_without_changing_profile(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     profiles = GameOptimizationProfileRepository(tmp_path / "games")
     profiles.save(GameOptimizationProfile.default("224760"))
@@ -659,9 +723,12 @@ def test_runner_records_one_private_mangohud_baseline_without_changing_profile(
     stored_before = mango.load("224760")
     sessions = BaselineSessionRepository(tmp_path / "sessions")
     created = sessions.create("224760", "steam-224760")
+    monkeypatch.setenv("MANGOHUD_CONFIG", "fps_limit=30,no_display")
     captured: dict[str, str] = {}
 
     def execute(_executable: str, _argv: list[str], environment: dict[str, str]) -> int:
+        assert created.config_path.is_file()
+        assert created.log_directory.is_dir()
         captured.update(environment)
         created.log_directory.joinpath("Game_2026-08-09.csv").write_text(
             "MangoHud v0.8.1\n"
@@ -683,11 +750,16 @@ def test_runner_records_one_private_mangohud_baseline_without_changing_profile(
 
     assert result == 0
     assert captured["MANGOHUD"] == "1"
+    assert captured["MANGOHUD_CONFIG"] == "read_cfg"
     assert captured["MANGOHUD_CONFIGFILE"] == str(created.config_path)
-    assert "autostart_log=1" in created.config_path.read_text(encoding="utf-8")
-    assert "output_folder=" + str(created.log_directory) in created.config_path.read_text(
-        encoding="utf-8"
-    )
+    config_text = created.config_path.read_text(encoding="utf-8")
+    assert "autostart_log=1" in config_text
+    assert "log_interval=100" in config_text
+    assert "output_folder=" + str(created.log_directory) in config_text
+    assert "no_display" not in config_text
+    assert "alpha=0" in config_text
+    assert "background_alpha=0" in config_text
+    assert created.log_directory.is_dir()
     assert sessions.load("224760").status == "processing"
     assert sessions.newest_log("224760").name == "Game_2026-08-09.csv"
     assert mango.load("224760") == stored_before
@@ -695,6 +767,96 @@ def test_runner_records_one_private_mangohud_baseline_without_changing_profile(
     assert report["mangoHudActivationOwner"] == "measurement_session"
     assert report["fpsLimitOwner"] == "none"
     assert report["environmentSources"]["MANGOHUD_CONFIGFILE"] == "baseline_measurement"
+    assert "MANGOHUD_CONFIG" in report["environmentConflicts"]
+
+
+def test_runner_records_baseline_with_gamescope_profile_enabled(
+    tmp_path: Path,
+) -> None:
+    profiles = GameOptimizationProfileRepository(tmp_path / "games")
+    profiles.save(replace(
+        GameOptimizationProfile.default("224760"),
+        gamescope_enabled=True,
+        gamescope_mode="native",
+    ))
+    sessions = BaselineSessionRepository(tmp_path / "sessions")
+    created = sessions.create("224760", "steam-224760")
+    captured: dict[str, object] = {}
+
+    class Detector:
+        @staticmethod
+        def detect():
+            return (
+                RuntimeToolAvailability("GameMode", False),
+                _tool(
+                    "Gamescope",
+                    "gamescope",
+                    ("-W", "-H", "-r", "-f", "-b"),
+                ),
+            )
+
+    def execute(executable: str, argv: list[str], environment: dict[str, str]) -> int:
+        captured.update({
+            "executable": executable,
+            "argv": list(argv),
+            "environment": dict(environment),
+        })
+        created.log_directory.joinpath("Game.csv").write_text(
+            "time,fps,frametime\n0.0,60,16.67\n",
+            encoding="utf-8",
+        )
+        return 0
+
+    result = runner_main(
+        ["--appid", "224760", "--", "/game"],
+        repository=profiles,
+        baseline_sessions=sessions,
+        detector=Detector(),
+        executor=execute,
+        report_root=tmp_path / "reports",
+    )
+
+    assert result == 0
+    assert captured["executable"] == "gamescope"
+    assert not {
+        "MANGOHUD", "MANGOHUD_CONFIG", "MANGOHUD_CONFIGFILE"
+    } & set(captured["environment"])
+    argv = captured["argv"]
+    assert isinstance(argv, list)
+    separator = argv.index("--")
+    assert argv[separator + 1] == "env"
+    assert any(item == "MANGOHUD=1" for item in argv)
+    assert any(item == "MANGOHUD_CONFIG=read_cfg" for item in argv)
+    assert sessions.load("224760").status == "processing"
+
+
+def test_baseline_discovers_dynamic_sample_log_and_ignores_old_and_summary_logs(
+    tmp_path: Path,
+) -> None:
+    sessions = BaselineSessionRepository(tmp_path / "sessions")
+    old = sessions.create("224760", "steam-224760")
+    old.log_directory.joinpath("OldGame_2026-08-01_12-00-00.csv").write_text(
+        "fps,frametime\n60,16.67\n", encoding="utf-8"
+    )
+    sessions.fail("224760", "retry", old.id)
+    current = sessions.create("224760", "steam-224760")
+    summary = current.log_directory / "Game_2026-08-14_15-07-29_summary.csv"
+    summary.write_text(
+        "Average FPS,Average Frame Time\n60,16.67\n", encoding="utf-8"
+    )
+    samples = current.log_directory / "Game Name_2026-08-14_15-07-29.csv"
+    samples.write_text(
+        "fps,frametime,cpu_load,gpu_load\n"
+        "60,16.67,40,90\n"
+        "59,16.95,42,91\n",
+        encoding="utf-8",
+    )
+
+    assert sessions.newest_log("224760") == samples
+    diagnostics = sessions.artifact_diagnostics("224760")
+    assert diagnostics["measurementFile"] == str(samples)
+    assert "MangoHud-baseline.conf" in diagnostics["files"]
+    assert all("OldGame" not in name for name in diagnostics["files"])
 
 
 def test_runner_waits_for_a_real_baseline_child_process(tmp_path: Path) -> None:
@@ -713,6 +875,49 @@ def test_runner_waits_for_a_real_baseline_child_process(tmp_path: Path) -> None:
 
     assert result == 0
     assert sessions.load("224760").status == "processing"
+
+
+def test_multistage_steam_proton_command_claims_the_active_baseline(
+    tmp_path: Path,
+) -> None:
+    app_id = "209000"
+    profiles = GameOptimizationProfileRepository(tmp_path / "games")
+    profiles.save(GameOptimizationProfile.default(app_id))
+    sessions = BaselineSessionRepository(tmp_path / "sessions")
+    created = sessions.create(app_id, f"steam-{app_id}")
+    command = [
+        "/steam/steam-launch-wrapper",
+        "--",
+        "/steam/reaper",
+        "SteamLaunch",
+        f"AppId={app_id}",
+        "--",
+        "/steam/runtime-entry-point",
+        "--verb=waitforexitandrun",
+        "--",
+        "/steam/proton",
+        "waitforexitandrun",
+        "/games/Game/Binaries/Win32/Game.exe",
+    ]
+    observed: list[list[str]] = []
+
+    result = runner_main(
+        ["--appid", app_id, "--", *command],
+        repository=profiles,
+        baseline_sessions=sessions,
+        detector=RuntimeToolDetector(which=lambda _name: None),
+        executor=lambda _executable, argv, _environment: observed.append(argv) or 0,
+        report_root=tmp_path / "reports",
+    )
+
+    recorded = sessions.load(app_id)
+    assert result == 0
+    assert observed == [command]
+    assert recorded is not None
+    assert recorded.id == created.id
+    assert recorded.runner_invocation_count == 1
+    assert recorded.handshake_at is not None
+    assert recorded.status == "processing"
 
 
 def test_reentrant_runner_tracks_wrapper_child_and_completes_session_once(
@@ -1299,6 +1504,11 @@ def test_record_baseline_runs_steam_runner_and_produces_recommendations(
     (config / "DefaultEngine.ini").write_text(
         "r.Streaming.PoolSize=7600\n", encoding="utf-8"
     )
+    settings_config = config / "GameUserSettings.ini"
+    settings_config.write_text(
+        "[ScalabilityGroups]\nsg.ShadowQuality=3\n",
+        encoding="utf-8",
+    )
     game = Game(
         id=f"steam-{app_id}",
         name="Synthetic Unreal",
@@ -1318,6 +1528,9 @@ def test_record_baseline_runs_steam_runner_and_produces_recommendations(
         tmp_path / "games", log_root=tmp_path / "saved-logs"
     )
     sessions = BaselineSessionRepository(tmp_path / "sessions")
+    analysis_repository = OptimizationAnalysisRepository(
+        tmp_path / "analysis-state"
+    )
     runner_path = tmp_path / "game-optimization-run"
     runner_path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     runner_path.chmod(0o755)
@@ -1390,6 +1603,7 @@ def test_record_baseline_runs_steam_runner_and_produces_recommendations(
         mangohud_detector=detector,  # type: ignore[arg-type]
         mangohud_launch_integration=mango_integration,
         optimization_profile_repository=profiles,
+        optimization_analysis_repository=analysis_repository,
         runner_integration=integration,
         proton_tweaks_repository=ProtonTweaksRepository(tmp_path / "games"),
         initial_games=(game,),
@@ -1403,6 +1617,8 @@ def test_record_baseline_runs_steam_runner_and_produces_recommendations(
     try:
         started = controller.recordOptimizationBaseline(game.id)
         assert started["success"] is True
+        assert started["baselineSession"]["expectedRunnerPath"] == str(runner_path)
+        assert len(started["baselineSession"]["expectedRunnerHash"]) == 64
         assert launch_calls == [game.id]
         deadline = time.monotonic() + 5
         result: dict[str, object] = {}
@@ -1414,8 +1630,61 @@ def test_record_baseline_runs_steam_runner_and_produces_recommendations(
             if result.get("baselineSession", {}).get("status") == "completed":
                 break
             time.sleep(0.01)
+        profile_view = controller.getOptimizationProfile(game.id)
+        controller._optimization_change_service = OptimizationChangeService(
+            tmp_path / "optimization-changes",
+            process_checker=lambda _game: False,
+        )
+        detected = next(
+            item
+            for item in result["settingsAnalysis"]["detected"]
+            if item["key"] == "sg.ShadowQuality"
+        )
+        manual_preview = controller.previewGameSettingChange(
+            game.id, detected["instanceId"], "2"
+        )
+        manual_apply = controller.applyGameSettingChange(
+            game.id, detected["instanceId"], "2"
+        )
+        before_measurement = sessions.load_measurement(app_id, slot="before")
+        assert before_measurement is not None
+        sessions.save_measurement(
+            app_id,
+            replace(
+                before_measurement,
+                average_fps=52.0,
+                one_percent_low_fps=51.0,
+                average_frametime_ms=19.2,
+                p95_frametime_ms=20.0,
+                p99_frametime_ms=20.5,
+            ),
+            slot="after",
+        )
+        pending = controller.getGameOptimizationAnalysis(game.id)
+        blocked_second = controller.applyGameSettingChange(
+            game.id, detected["instanceId"], "1"
+        )
+        manual_revert = controller.revertOptimizationChange(
+            game.id, manual_apply.get("change", {}).get("id", "")
+        )
     finally:
         controller.shutdown()
+
+    restarted = AppController(
+        game_provider=DemoGameProvider((game,)),
+        task_service=MockTaskService(),
+        settings_store=SettingsStore(tmp_path / "restarted-settings.json"),
+        optimization_profile_repository=profiles,
+        optimization_analysis_repository=analysis_repository,
+        initial_games=(game,),
+        auto_refresh=False,
+    )
+    restarted._baseline_sessions = sessions
+    try:
+        restored = restarted.getGameOptimizationAnalysis(game.id)
+        restored_profile = restarted.getOptimizationProfile(game.id)
+    finally:
+        restarted.shutdown()
 
     assert result["baselineAvailable"] is True
     assert result["measurement"]["quality"] == "high"
@@ -1426,6 +1695,36 @@ def test_record_baseline_runs_steam_runner_and_produces_recommendations(
         for item in result["candidates"]
     )
     assert sessions.load_measurement(app_id, slot="before") is not None
+    assert profile_view["gameAnalysis"]["baselineAvailable"] is True
+    assert profile_view["recommendation"]["preliminary"] is False
+    assert profile_view["recommendation"]["status"] == (
+        "Recommendation uses saved session measurements"
+    )
+    assert "No saved session measurements" not in profile_view["recommendation"]["reasons"]
+    assert manual_preview["success"] is True
+    assert manual_preview["settingInstanceId"] == detected["instanceId"]
+    assert manual_preview["automaticRecommended"] is False
+    assert manual_preview["currentValue"] == "3"
+    assert manual_preview["proposedValue"] == "2"
+    assert manual_apply["success"] is True
+    assert pending["appliedChange"]["config_key"] == "sg.ShadowQuality"
+    assert pending["beforeMeasurement"]["averageFps"] == 50
+    assert pending["afterMeasurement"]["averageFps"] == 52
+    assert pending["comparison"]["outcome"] in {
+        "improvement", "no_meaningful_change"
+    }
+    assert blocked_second["success"] is False
+    assert "comparison cycle" in blocked_second["error"]
+    assert manual_revert["success"] is True
+    assert "sg.ShadowQuality=3" in settings_config.read_text(encoding="utf-8")
+    assert restored["status"] == "completed"
+    assert restored["analysisCacheState"] == "cached"
+    assert restored["fingerprint"]["engine"]["value"] == "Unreal Engine"
+    assert restored["measurement"]["averageFps"] == 50
+    assert restored["bottleneck"]["conclusion"] == "vram_pressure"
+    assert restored["frameRate"]["state"] == result["frameRate"]["state"]
+    assert restored["settingsAnalysis"]["detected"]
+    assert restored_profile["gameAnalysis"]["baselineAvailable"] is True
 
 
 def test_controller_saves_proton_tweaks_and_updates_combined_preview(

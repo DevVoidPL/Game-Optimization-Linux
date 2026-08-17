@@ -228,7 +228,7 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
     assert '"id": "vibration"' not in couch_settings
     assert "Local Steam manifests" not in sidebar
     assert "updateColumn" not in sidebar
-    for name in ("games", "updates", "tasks", "system", "settings"):
+    for name in ("games", "narrator", "updates", "tasks", "system", "settings"):
         assert f"sidebar-{name}.svg" in sidebar
         assert (qml_root / "resources" / f"sidebar-{name}.svg").is_file()
 
@@ -316,6 +316,20 @@ def test_optimization_desktop_editor_saves_real_appid_profile(tmp_path: Path) ->
     ]
     assert result["optiscaler_install_directory"].endswith("/Binaries/Win64")
     assert result["optiscaler_proxy"] == "dxgi.dll"
+    assert result["manual_setting_preview"] is True
+    assert result["repeat_baseline_enabled"] is True
+    assert result["terminal_baseline_retries"] == {
+        "failed": True,
+        "recorded_unrepresentative": True,
+        "cancelled": True,
+    }
+    assert result["active_baseline_blocks_duplicate"] is True
+    assert result["pending_test_blocks_baseline"] is True
+    assert result["pending_automatic_blocks_baseline"] is True
+    assert result["terminal_comparison_allows_baseline"] is True
+    assert "Runner" in result["record_baseline_rejection"]
+    assert result["automatic_card_visible"] is True
+    assert result["automatic_candidate_visible"] is True
     assert result["save_button_inside"] is True
     assert not any("Unable to assign" in message for message in payload["messages"])
     assert result["screenshot_size"] > 1000

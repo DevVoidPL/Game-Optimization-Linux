@@ -17,12 +17,23 @@ from game_optimization_linux.models import (
 )
 
 
+RUNNER_HANDSHAKE_TIMEOUT_SECONDS = 120
+RUNNER_HEARTBEAT_STALE_SECONDS = 30
+LEGACY_RECORDING_STALE_SECONDS = 6 * 60 * 60
+
+
 class BaselineSessionRepository:
     def __init__(self, root: Path = STATE_DIR / "performance-sessions") -> None:
         self.root = Path(root)
 
     def create(
-        self, app_id: object, game_id: str, *, kind: str = "baseline"
+        self,
+        app_id: object,
+        game_id: str,
+        *,
+        kind: str = "baseline",
+        expected_runner_path: str = "",
+        expected_runner_hash: str = "",
     ) -> BaselineSession:
         key = validate_game_key(app_id)
         current = self.load(key)
@@ -50,6 +61,9 @@ class BaselineSessionRepository:
             logs,
             datetime.now(UTC),
             kind=kind,
+            expected_runner_path=str(expected_runner_path),
+            expected_runner_hash=str(expected_runner_hash),
+            handshake_timeout_seconds=RUNNER_HANDSHAKE_TIMEOUT_SECONDS,
         )
         self._save(session)
         return session
@@ -57,18 +71,42 @@ class BaselineSessionRepository:
     def claim(
         self, app_id: object, *, runner_pid: int | None = None
     ) -> BaselineSession | None:
+        session, _reason = self.claim_with_reason(app_id, runner_pid=runner_pid)
+        return session
+
+    def claim_with_reason(
+        self, app_id: object, *, runner_pid: int | None = None
+    ) -> tuple[BaselineSession | None, str]:
         session = self.load(app_id)
-        if session is None or session.status not in {
+        if session is None:
+            return None, "no baseline session exists for this AppID"
+        if session.status not in {
             "waiting_for_steam", "waiting_for_runner", "recording",
             "waiting_for_game_exit",
         }:
-            return None
+            reason = f"session status is {session.status}"
+            self._save(replace(
+                session,
+                runner_invocation_count=session.runner_invocation_count + 1,
+                runner_rejection=reason,
+            ))
+            return None, reason
         if (
             session.status in {"waiting_for_steam", "waiting_for_runner"}
-            and datetime.now(UTC) - session.created_at > timedelta(minutes=30)
+            and datetime.now(UTC) - session.created_at
+            > timedelta(seconds=session.handshake_timeout_seconds)
         ):
-            self._save(replace(session, status="failed", error="Baseline request expired"))
-            return None
+            reason = "baseline runner handshake arrived after the allowed timeout"
+            self._save(replace(
+                session,
+                status="failed",
+                finished_at=datetime.now(UTC),
+                error=reason,
+                lifecycle_reason=reason,
+                runner_invocation_count=session.runner_invocation_count + 1,
+                runner_rejection=reason,
+            ))
+            return None, reason
         now = datetime.now(UTC)
         token = uuid4().hex
         claimed = replace(
@@ -87,9 +125,22 @@ class BaselineSessionRepository:
                 if session.status in {"recording", "waiting_for_game_exit"}
                 else "Runner handshake completed"
             ),
+            last_heartbeat_at=now,
+            runner_invocation_count=session.runner_invocation_count + 1,
+            runner_rejection="",
         )
         self._save(claimed)
-        return claimed
+        return claimed, "claimed"
+
+    def mark_steam_launched(
+        self, app_id: object, session_id: str, launch_result: str
+    ) -> BaselineSession | None:
+        session = self.load(app_id)
+        if session is None or session.id != session_id:
+            return session
+        updated = replace(session, steam_launch_result=str(launch_result))
+        self._save(updated)
+        return updated
 
     def mark_process_started(
         self,
@@ -115,7 +166,23 @@ class BaselineSessionRepository:
             process_group=process_group,
             observed_processes=(process,),
             lifecycle_reason=f"Waiting for spawned command PID {spawned_pid} to exit",
+            last_heartbeat_at=datetime.now(UTC),
         )
+        self._save(updated)
+        return updated
+
+    def heartbeat(
+        self, app_id: object, session_id: str, runner_token: str
+    ) -> BaselineSession | None:
+        session = self.load(app_id)
+        if (
+            session is None
+            or session.id != session_id
+            or session.runner_token != runner_token
+            or session.status not in {"recording", "waiting_for_game_exit"}
+        ):
+            return session
+        updated = replace(session, last_heartbeat_at=datetime.now(UTC))
         self._save(updated)
         return updated
 
@@ -181,9 +248,57 @@ class BaselineSessionRepository:
                 if status == "processing"
                 else error
             ),
+            last_heartbeat_at=datetime.now(UTC),
         )
         self._save(finished)
         return finished
+
+    def recover_abandoned(
+        self, *, now: datetime | None = None
+    ) -> tuple[BaselineSession, ...]:
+        current_time = now or datetime.now(UTC)
+        recovered: list[BaselineSession] = []
+        try:
+            app_directories = tuple(self.root.iterdir())
+        except OSError:
+            return ()
+        for directory in app_directories:
+            if not directory.is_dir():
+                continue
+            try:
+                session = self.load(directory.name)
+            except ValueError:
+                continue
+            if session is None:
+                continue
+            reason = ""
+            if session.status in {"waiting_for_steam", "waiting_for_runner"}:
+                if (
+                    current_time - session.created_at
+                    > timedelta(seconds=session.handshake_timeout_seconds)
+                ):
+                    reason = "Baseline session was interrupted before the runner handshake"
+            elif session.status in {"recording", "waiting_for_game_exit"}:
+                reference = session.last_heartbeat_at
+                stale_seconds = RUNNER_HEARTBEAT_STALE_SECONDS
+                if reference is None:
+                    reference = session.started_at or session.created_at
+                    stale_seconds = LEGACY_RECORDING_STALE_SECONDS
+                if current_time - reference > timedelta(seconds=stale_seconds):
+                    reason = "Baseline session was interrupted because its runner heartbeat stopped"
+            if not reason:
+                continue
+            failed = replace(
+                session,
+                status="failed",
+                finished_at=current_time,
+                error=reason,
+                lifecycle_reason=reason,
+                runner_rejection="",
+            )
+            self._save(failed)
+            recovered.append(failed)
+        return tuple(recovered)
 
     def finish_from_stable_log(
         self, app_id: object, session_id: str
@@ -246,6 +361,22 @@ class BaselineSessionRepository:
         self._save(completed)
         return completed
 
+    def mark_unrepresentative(
+        self, app_id: object, session_id: str, reason: str
+    ) -> BaselineSession | None:
+        session = self.load(app_id)
+        if session is None or session.id != session_id:
+            return None
+        recorded = replace(
+            session,
+            status="recorded_unrepresentative",
+            error="",
+            finished_at=session.finished_at or datetime.now(UTC),
+            lifecycle_reason=str(reason),
+        )
+        self._save(recorded)
+        return recorded
+
     def import_log(self, app_id: object, game_id: str, source: Path) -> BaselineSession:
         resolved = Path(source).resolve(strict=True)
         if not resolved.is_file() or resolved.stat().st_size > 128 * 1024 * 1024:
@@ -307,6 +438,13 @@ class BaselineSessionRepository:
                 if isinstance(item, str)
             ) if isinstance(raw.get("observedProcesses", ()), list) else (),
             str(raw.get("lifecycleReason") or ""),
+            self._datetime(raw.get("lastHeartbeatAt")),
+            int(raw.get("runnerInvocationCount") or 0),
+            str(raw.get("runnerRejection") or ""),
+            str(raw.get("steamLaunchResult") or ""),
+            str(raw.get("expectedRunnerPath") or ""),
+            str(raw.get("expectedRunnerHash") or ""),
+            int(raw.get("handshakeTimeoutSeconds") or RUNNER_HANDSHAKE_TIMEOUT_SECONDS),
         )
 
     def save_measurement(
@@ -344,20 +482,68 @@ class BaselineSessionRepository:
         except (OSError, ValueError, TypeError, KeyError, json.JSONDecodeError):
             return None
 
+    def clear_measurement(self, app_id: object, *, slot: str) -> None:
+        if slot not in {"before", "after"}:
+            raise ValueError("Unsupported measurement slot")
+        path = self.root / validate_game_key(app_id) / f"{slot}.json"
+        try:
+            path.unlink()
+        except FileNotFoundError:
+            pass
+
     def newest_log(self, app_id: object) -> Path | None:
         session = self.load(app_id)
         if session is None or not session.log_directory.is_dir():
             return None
         candidates = [
             path for path in session.log_directory.glob("*.csv")
-            if path.is_file() and path.stat().st_size > 0
+            if (
+                path.is_file()
+                and not path.name.casefold().endswith("_summary.csv")
+                and path.stat().st_size > 0
+            )
         ]
-        return max(candidates, key=lambda path: path.stat().st_mtime, default=None)
+        return max(
+            candidates,
+            key=lambda path: (path.stat().st_size, path.stat().st_mtime_ns),
+            default=None,
+        )
+
+    def artifact_diagnostics(self, app_id: object) -> dict[str, object]:
+        session = self.load(app_id)
+        if session is None:
+            return {
+                "configPath": "",
+                "configExists": False,
+                "outputDirectory": "",
+                "outputDirectoryExists": False,
+                "files": [],
+                "measurementFile": "",
+            }
+        files: list[str] = []
+        try:
+            files = sorted(
+                str(path.relative_to(session.directory))
+                for path in session.directory.rglob("*")
+                if path.is_file()
+            )[:64]
+        except OSError:
+            pass
+        measurement = self.newest_log(app_id)
+        return {
+            "configPath": str(session.config_path),
+            "configExists": session.config_path.is_file(),
+            "outputDirectory": str(session.log_directory),
+            "outputDirectoryExists": session.log_directory.is_dir(),
+            "files": files,
+            "measurementFile": str(measurement or ""),
+        }
 
     def environment(self, session: BaselineSession) -> dict[str, str]:
         return {
             "MANGOHUD": "1",
             "MANGOHUD_CONFIGFILE": str(session.config_path),
+            "MANGOHUD_CONFIG": "read_cfg",
         }
 
     def _save(self, session: BaselineSession) -> None:
@@ -393,7 +579,8 @@ class BaselineSessionRepository:
             "vram",
             "procmem",
             "proc_vram",
-            "no_display",
+            "alpha=0",
+            "background_alpha=0",
             f"output_folder={log_directory}",
             "autostart_log=1",
             "log_duration=14400",
@@ -403,4 +590,7 @@ class BaselineSessionRepository:
         ))
 
 
-__all__ = ["BaselineSessionRepository"]
+__all__ = [
+    "BaselineSessionRepository",
+    "RUNNER_HANDSHAKE_TIMEOUT_SECONDS",
+]

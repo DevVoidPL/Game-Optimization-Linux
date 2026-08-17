@@ -12,10 +12,10 @@ Export the bundle and install it with the host Flatpak executable:
 
 ```bash
 flatpak build-bundle .flatpak-build-repo \
-  dist/Game-Optimization-Linux-0.1.4-alpha-x86_64.flatpak \
+  dist/Game-Optimization-Linux-1.6.0-alpha-x86_64.flatpak \
   io.github.DevVoidPL.GameOptimizationLinux master
 flatpak install --user --reinstall \
-  dist/Game-Optimization-Linux-0.1.4-alpha-x86_64.flatpak
+  dist/Game-Optimization-Linux-1.6.0-alpha-x86_64.flatpak
 ```
 
 Do not pass `--install` to Flatpak Builder running inside its sandbox. That

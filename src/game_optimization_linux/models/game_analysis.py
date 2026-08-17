@@ -15,6 +15,14 @@ class DetectionEvidence:
     def to_dict(self) -> dict[str, Any]:
         return {"source": self.source, "detail": self.detail, "weight": self.weight}
 
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> DetectionEvidence:
+        return cls(
+            str(value.get("source") or ""),
+            str(value.get("detail") or ""),
+            float(value.get("weight") or 0.0),
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class DetectedValue:
@@ -30,6 +38,20 @@ class DetectedValue:
             "source": self.source,
             "evidence": [item.to_dict() for item in self.evidence],
         }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> DetectedValue:
+        evidence = value.get("evidence")
+        return cls(
+            str(value.get("value") or "Unknown"),
+            float(value.get("confidence") or 0.0),
+            str(value.get("source") or "not detected"),
+            tuple(
+                DetectionEvidence.from_dict(item)
+                for item in evidence
+                if isinstance(item, Mapping)
+            ) if isinstance(evidence, list) else (),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +76,25 @@ class SystemSnapshot:
             "resolutionHeight": self.resolution_height,
             "refreshRate": self.refresh_rate,
         }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> SystemSnapshot:
+        def optional_float(name: str) -> float | None:
+            return float(value[name]) if value.get(name) is not None else None
+
+        def optional_int(name: str) -> int | None:
+            return int(value[name]) if value.get(name) is not None else None
+
+        return cls(
+            str(value.get("cpu") or "Unknown"),
+            str(value.get("gpu") or "Unknown"),
+            optional_float("vramGb"),
+            optional_float("ramGb"),
+            str(value.get("displayName") or ""),
+            optional_int("resolutionWidth"),
+            optional_int("resolutionHeight"),
+            optional_float("refreshRate"),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -103,6 +144,42 @@ class GameFingerprint:
             "analyzedAt": self.analyzed_at.astimezone(UTC).isoformat(),
         }
 
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> GameFingerprint:
+        analyzed = datetime.fromisoformat(
+            str(value.get("analyzedAt") or datetime.now(UTC).isoformat())
+        )
+        if analyzed.tzinfo is None:
+            analyzed = analyzed.replace(tzinfo=UTC)
+        available = value.get("availableGraphicsApis")
+        locations = value.get("configLocations")
+        return cls(
+            str(value.get("gameId") or ""),
+            str(value.get("appId") or ""),
+            str(value.get("title") or ""),
+            str(value.get("provider") or ""),
+            str(value.get("gameRoot") or ""),
+            str(value.get("mainExecutable") or ""),
+            str(value.get("executableDirectory") or ""),
+            DetectedValue.from_dict(value.get("runtime", {})),
+            DetectedValue.from_dict(value.get("architecture", {})),
+            DetectedValue.from_dict(value.get("engine", {})),
+            str(value.get("engineVersion") or ""),
+            DetectedValue.from_dict(value.get("graphicsApi", {})),
+            tuple(
+                DetectedValue.from_dict(item)
+                for item in available
+                if isinstance(item, Mapping)
+            ) if isinstance(available, list) else (),
+            DetectedValue.from_dict(value.get("category", {})),
+            bool(value.get("manualCategoryOverride", False)),
+            tuple(str(item) for item in locations)
+            if isinstance(locations, list) else (),
+            str(value.get("launcher") or ""),
+            SystemSnapshot.from_dict(value.get("system", {})),
+            analyzed,
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class PerformanceMeasurement:
@@ -123,10 +200,21 @@ class PerformanceMeasurement:
     measured_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     quality: str = "medium"
     limitations: tuple[str, ...] = ()
+    total_samples: int = 0
+    excluded_samples: int = 0
+    selected_duration_seconds: float | None = None
+    representative: bool = True
+    selection_reasons: tuple[str, ...] = ()
+    median_fps: float | None = None
+    p10_fps: float | None = None
+    p90_fps: float | None = None
+    p95_fps: float | None = None
+    p99_fps: float | None = None
+    median_frametime_ms: float | None = None
 
     @property
     def available(self) -> bool:
-        return self.samples > 0 and (
+        return self.representative and self.quality != "low" and self.samples > 0 and (
             self.average_fps is not None or self.average_frametime_ms is not None
         )
 
@@ -149,6 +237,21 @@ class PerformanceMeasurement:
             "measuredAt": self.measured_at.astimezone(UTC).isoformat(),
             "quality": self.quality,
             "limitations": list(self.limitations),
+            "totalSamples": self.total_samples or self.samples,
+            "excludedSamples": self.excluded_samples,
+            "usedPercentage": (
+                self.samples / (self.total_samples or self.samples) * 100
+                if (self.total_samples or self.samples) else 0.0
+            ),
+            "selectedDurationSeconds": self.selected_duration_seconds,
+            "representative": self.representative,
+            "selectionReasons": list(self.selection_reasons),
+            "medianFps": self.median_fps,
+            "p10Fps": self.p10_fps,
+            "p90Fps": self.p90_fps,
+            "p95Fps": self.p95_fps,
+            "p99Fps": self.p99_fps,
+            "medianFrametimeMs": self.median_frametime_ms,
         }
 
     @classmethod
@@ -185,6 +288,65 @@ class PerformanceMeasurement:
             measured,
             str(value.get("quality") or "low"),
             tuple(str(item) for item in limitations) if isinstance(limitations, list) else (),
+            int(value.get("totalSamples") or value.get("samples") or 0),
+            int(value.get("excludedSamples") or 0),
+            (
+                float(value["selectedDurationSeconds"])
+                if value.get("selectedDurationSeconds") is not None
+                else parsed["durationSeconds"]
+            ),
+            bool(value.get("representative", True)),
+            tuple(
+                str(item) for item in value.get("selectionReasons", ())
+                if isinstance(item, str)
+            ) if isinstance(value.get("selectionReasons", ()), list) else (),
+            (
+                float(value["medianFps"])
+                if value.get("medianFps") is not None else None
+            ),
+            float(value["p10Fps"]) if value.get("p10Fps") is not None else None,
+            float(value["p90Fps"]) if value.get("p90Fps") is not None else None,
+            float(value["p95Fps"]) if value.get("p95Fps") is not None else None,
+            float(value["p99Fps"]) if value.get("p99Fps") is not None else None,
+            (
+                float(value["medianFrametimeMs"])
+                if value.get("medianFrametimeMs") is not None else None
+            ),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class FrameRateAnalysis:
+    state: str
+    estimated_ceiling_fps: float | None
+    confidence: float
+    evidence: tuple[str, ...]
+    limitations: tuple[str, ...]
+
+    @classmethod
+    def unknown(cls, reason: str = "A representative baseline is required") -> FrameRateAnalysis:
+        return cls("unknown", None, 0.0, (), (reason,))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "state": self.state,
+            "estimatedCeilingFps": self.estimated_ceiling_fps,
+            "confidence": min(1.0, max(0.0, self.confidence)),
+            "evidence": list(self.evidence),
+            "limitations": list(self.limitations),
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> FrameRateAnalysis:
+        return cls(
+            str(value.get("state") or "unknown"),
+            (
+                float(value["estimatedCeilingFps"])
+                if value.get("estimatedCeilingFps") is not None else None
+            ),
+            float(value.get("confidence") or 0.0),
+            tuple(str(item) for item in value.get("evidence", ())),
+            tuple(str(item) for item in value.get("limitations", ())),
         )
 
 
@@ -202,6 +364,15 @@ class BottleneckAnalysis:
             "evidence": list(self.evidence),
             "limitations": list(self.limitations),
         }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> BottleneckAnalysis:
+        return cls(
+            str(value.get("conclusion") or "insufficient_data"),
+            float(value.get("confidence") or 0.0),
+            tuple(str(item) for item in value.get("evidence", ())),
+            tuple(str(item) for item in value.get("limitations", ())),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -223,6 +394,15 @@ class OptimizationCandidate:
     files_to_modify: tuple[str, ...] = ()
     env_changes: Mapping[str, str] = field(default_factory=dict)
     automatically_selected: bool = False
+    setting_id: str = ""
+    setting_label: str = ""
+    setting_category: str = ""
+    performance_impact: str = "unknown"
+    confidence_label: str = "unknown"
+    config_sha256: str = ""
+    config_section: str = ""
+    config_key: str = ""
+    config_adapter: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -243,7 +423,170 @@ class OptimizationCandidate:
             "filesToModify": list(self.files_to_modify),
             "envChanges": dict(self.env_changes),
             "automaticallySelected": self.automatically_selected,
+            "settingId": self.setting_id,
+            "settingLabel": self.setting_label,
+            "settingCategory": self.setting_category,
+            "performanceImpact": self.performance_impact,
+            "confidenceLabel": self.confidence_label,
+            "configSha256": self.config_sha256,
+            "configSection": self.config_section,
+            "configKey": self.config_key,
+            "configAdapter": self.config_adapter,
         }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> OptimizationCandidate:
+        environment = value.get("envChanges")
+        files = value.get("filesToModify")
+        return cls(
+            str(value.get("id") or ""),
+            str(value.get("target") or ""),
+            str(value.get("mechanism") or ""),
+            str(value.get("source") or ""),
+            tuple(str(item) for item in value.get("evidence", ())),
+            str(value.get("currentValue") or ""),
+            str(value.get("proposedValue") or ""),
+            str(value.get("expectedEffect") or ""),
+            str(value.get("qualityImpact") or "unknown"),
+            str(value.get("risk") or "unknown"),
+            bool(value.get("reversible", False)),
+            bool(value.get("requiresMeasurement", False)),
+            str(value.get("engineSupport") or ""),
+            str(value.get("apiSupport") or ""),
+            tuple(str(item) for item in files) if isinstance(files, list) else (),
+            {
+                str(key): str(item)
+                for key, item in environment.items()
+            } if isinstance(environment, Mapping) else {},
+            bool(value.get("automaticallySelected", False)),
+            str(value.get("settingId") or ""),
+            str(value.get("settingLabel") or ""),
+            str(value.get("settingCategory") or ""),
+            str(value.get("performanceImpact") or "unknown"),
+            str(value.get("confidenceLabel") or "unknown"),
+            str(value.get("configSha256") or ""),
+            str(value.get("configSection") or ""),
+            str(value.get("configKey") or ""),
+            str(value.get("configAdapter") or ""),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class DetectedGameSetting:
+    id: str
+    label: str
+    category: str
+    file: str
+    section: str
+    key: str
+    value: str
+    adapter: str
+    modifiable: bool
+    instance_id: str = ""
+    available_values: tuple[str, ...] = ()
+    alternative_values: tuple[str, ...] = ()
+    suggested_value: str = ""
+    performance_impact: str = "unknown"
+    quality_impact: str = "unknown"
+    confidence_label: str = "unknown"
+    automatically_recommended: bool = False
+    automatic_reason: str = ""
+    config_sha256: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "id": self.id,
+            "label": self.label,
+            "category": self.category,
+            "file": self.file,
+            "section": self.section,
+            "key": self.key,
+            "value": self.value,
+            "adapter": self.adapter,
+            "modifiable": self.modifiable,
+            "instanceId": self.instance_id,
+            "availableValues": list(self.available_values),
+            "alternativeValues": list(self.alternative_values),
+            "suggestedValue": self.suggested_value,
+            "performanceImpact": self.performance_impact,
+            "qualityImpact": self.quality_impact,
+            "confidenceLabel": self.confidence_label,
+            "automaticallyRecommended": self.automatically_recommended,
+            "automaticReason": self.automatic_reason,
+            "configSha256": self.config_sha256,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> DetectedGameSetting:
+        return cls(
+            str(value.get("id") or ""),
+            str(value.get("label") or value.get("key") or ""),
+            str(value.get("category") or ""),
+            str(value.get("file") or ""),
+            str(value.get("section") or ""),
+            str(value.get("key") or ""),
+            str(value.get("value") or ""),
+            str(value.get("adapter") or ""),
+            bool(value.get("modifiable", False)),
+            str(value.get("instanceId") or ""),
+            tuple(str(item) for item in value.get("availableValues", ())),
+            tuple(str(item) for item in value.get("alternativeValues", ())),
+            str(value.get("suggestedValue") or ""),
+            str(value.get("performanceImpact") or "unknown"),
+            str(value.get("qualityImpact") or "unknown"),
+            str(value.get("confidenceLabel") or "unknown"),
+            bool(value.get("automaticallyRecommended", False)),
+            str(value.get("automaticReason") or ""),
+            str(value.get("configSha256") or ""),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class GameSettingsAnalysis:
+    status: str
+    engine: str
+    config_files: tuple[str, ...]
+    detected: tuple[DetectedGameSetting, ...]
+    message: str
+    recommendation_state: str = "not_evaluated"
+    analyzed_at: datetime = field(default_factory=lambda: datetime.now(UTC))
+
+    @classmethod
+    def unavailable(cls, message: str = "Settings analysis has not run") -> GameSettingsAnalysis:
+        return cls("unavailable", "", (), (), message)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "status": self.status,
+            "engine": self.engine,
+            "configFiles": list(self.config_files),
+            "detected": [item.to_dict() for item in self.detected],
+            "message": self.message,
+            "recommendationState": self.recommendation_state,
+            "analyzedAt": self.analyzed_at.astimezone(UTC).isoformat(),
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> GameSettingsAnalysis:
+        detected = value.get("detected")
+        analyzed = datetime.fromisoformat(
+            str(value.get("analyzedAt") or datetime.now(UTC).isoformat())
+        )
+        if analyzed.tzinfo is None:
+            analyzed = analyzed.replace(tzinfo=UTC)
+        return cls(
+            str(value.get("status") or "unavailable"),
+            str(value.get("engine") or ""),
+            tuple(str(item) for item in value.get("configFiles", ())),
+            tuple(
+                DetectedGameSetting.from_dict(item)
+                for item in detected
+                if isinstance(item, Mapping)
+            ) if isinstance(detected, list) else (),
+            str(value.get("message") or "Settings analysis is unavailable"),
+            str(value.get("recommendationState") or "not_evaluated"),
+            analyzed,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -252,6 +595,10 @@ class OptimizationAnalysis:
     measurement: PerformanceMeasurement | None
     bottleneck: BottleneckAnalysis
     candidates: tuple[OptimizationCandidate, ...]
+    frame_rate: FrameRateAnalysis = field(default_factory=FrameRateAnalysis.unknown)
+    settings: GameSettingsAnalysis = field(default_factory=GameSettingsAnalysis.unavailable)
+    baseline_stale: bool = False
+    stale_reasons: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -259,9 +606,35 @@ class OptimizationAnalysis:
             "measurement": self.measurement.to_dict() if self.measurement else {},
             "baselineAvailable": bool(self.measurement and self.measurement.available),
             "bottleneck": self.bottleneck.to_dict(),
+            "frameRate": self.frame_rate.to_dict(),
+            "settingsAnalysis": self.settings.to_dict(),
             "candidates": [item.to_dict() for item in self.candidates],
             "noSafeRecommendations": not self.candidates,
+            "baselineStale": self.baseline_stale,
+            "staleReasons": list(self.stale_reasons),
         }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> OptimizationAnalysis:
+        measurement = value.get("measurement")
+        candidates = value.get("candidates")
+        return cls(
+            GameFingerprint.from_dict(value.get("fingerprint", {})),
+            (
+                PerformanceMeasurement.from_dict(measurement)
+                if isinstance(measurement, Mapping) and measurement else None
+            ),
+            BottleneckAnalysis.from_dict(value.get("bottleneck", {})),
+            tuple(
+                OptimizationCandidate.from_dict(item)
+                for item in candidates
+                if isinstance(item, Mapping)
+            ) if isinstance(candidates, list) else (),
+            FrameRateAnalysis.from_dict(value.get("frameRate", {})),
+            GameSettingsAnalysis.from_dict(value.get("settingsAnalysis", {})),
+            bool(value.get("baselineStale", False)),
+            tuple(str(item) for item in value.get("staleReasons", ())),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -301,6 +674,13 @@ class BaselineSession:
     runner_completed_at: datetime | None = None
     observed_processes: tuple[str, ...] = ()
     lifecycle_reason: str = ""
+    last_heartbeat_at: datetime | None = None
+    runner_invocation_count: int = 0
+    runner_rejection: str = ""
+    steam_launch_result: str = ""
+    expected_runner_path: str = ""
+    expected_runner_hash: str = ""
+    handshake_timeout_seconds: int = 120
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -336,6 +716,16 @@ class BaselineSession:
             ),
             "observedProcesses": list(self.observed_processes),
             "lifecycleReason": self.lifecycle_reason,
+            "lastHeartbeatAt": (
+                self.last_heartbeat_at.astimezone(UTC).isoformat()
+                if self.last_heartbeat_at else ""
+            ),
+            "runnerInvocationCount": self.runner_invocation_count,
+            "runnerRejection": self.runner_rejection,
+            "steamLaunchResult": self.steam_launch_result,
+            "expectedRunnerPath": self.expected_runner_path,
+            "expectedRunnerHash": self.expected_runner_hash,
+            "handshakeTimeoutSeconds": self.handshake_timeout_seconds,
         }
 
 
@@ -345,6 +735,9 @@ __all__ = [
     "DetectedValue",
     "DetectionEvidence",
     "GameFingerprint",
+    "GameSettingsAnalysis",
+    "DetectedGameSetting",
+    "FrameRateAnalysis",
     "OptimizationAnalysis",
     "OptimizationCandidate",
     "PerformanceComparison",

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import logging
 import os
 from pathlib import Path
@@ -27,9 +28,15 @@ class RunnerStatus:
     path: Path
     installed: bool
     message: str
+    sha256: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        return {"path": str(self.path), "installed": self.installed, "message": self.message}
+        return {
+            "path": str(self.path),
+            "installed": self.installed,
+            "message": self.message,
+            "sha256": self.sha256,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -96,9 +103,16 @@ class RunnerIntegration:
 
     def status(self) -> RunnerStatus:
         installed = self.path.is_file() and self.path.stat().st_mode & 0o111 != 0
+        digest = ""
+        if installed:
+            try:
+                digest = hashlib.sha256(self.path.read_bytes()).hexdigest()
+            except OSError:
+                installed = False
         return RunnerStatus(
             self.path, installed,
             "Game Optimization Runner is installed" if installed else "Install the Game Optimization Runner for this user",
+            digest,
         )
 
     def steam_command(self, app_id: object) -> str:

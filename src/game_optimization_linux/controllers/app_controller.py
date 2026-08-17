@@ -84,12 +84,18 @@ from ..services import (
     GameUpdateRecord,
     GameArtworkResolver,
     GameAnalyzer,
+    GameSettingsAdvisor,
     GameRecommendationEngine,
     GameOptimizationProfileRepository,
+    OptimizationAnalysisRepository,
+    AutomaticOptimizationEvaluator,
+    AutomaticOptimizationRepository,
+    RuntimeCandidateRegistry,
     DisplayDetector,
     OptimizationAdvisor,
     OptimizationChangeService,
     BottleneckAnalyzer,
+    FrameRateAnalyzer,
     BaselineSessionRepository,
     MangoHudLogParser,
     OptimizationLaunchPlanner,
@@ -102,6 +108,16 @@ from ..services import (
     MangoHudDetector,
     MangoHudLaunchIntegration,
     MangoHudProfileRepository,
+    NarratorComponentManager,
+    NarratorGameActivityDetector,
+    NarratorPipeline,
+    NarratorSettingsRepository,
+    ArgosCTranslate2TranslationProvider,
+    PiperPolishTtsProvider,
+    PortalScreenCaptureProvider,
+    QtPortalScreenCastBackend,
+    QtNarratorAudioOutput,
+    TesseractOcrProvider,
     SettingsStore,
     PrivilegedMeasurementClient,
     ProtonTweaksRepository,
@@ -110,6 +126,7 @@ from ..services import (
     SteamLauncher,
     UiSoundService,
     UnavailableBackupService,
+    UnavailableOcrProvider,
     UpdateDisplayStateStore,
     uses_flatpak_steam,
 )
@@ -125,6 +142,7 @@ from .games_model import GamesListModel
 from .library_controller import LibraryController
 from .library_scanner import LibraryScanner
 from .mangohud_controller import MangoHudController
+from .narrator_controller import NarratorController
 from .optimization_controller import OptimizationController
 from .optiscaler_controller import OptiScalerController
 from .settings_controller import SettingsController
@@ -144,7 +162,15 @@ _TERMINAL_STATUSES = {
     TaskStatus.CANCELLED.value,
     TaskStatus.INTERRUPTED.value,
 }
-_VALID_PAGES = {"games", "updates", "tasks", "system", "settings", "gameDetails"}
+_VALID_PAGES = {
+    "games",
+    "updates",
+    "tasks",
+    "narrator",
+    "system",
+    "settings",
+    "gameDetails",
+}
 
 
 class GameProviderLike(Protocol):
@@ -268,6 +294,8 @@ class AppController(QObject):
     optiScalerChanged = Signal(str)
     protonTweaksChanged = Signal(str)
     optimizationAnalysisChanged = Signal(str)
+    narratorChanged = Signal(str)
+    narratorComponentsChanged = Signal()
 
     toastRequested = Signal(str, str)
     toastDismissRequested = Signal(str)
@@ -298,6 +326,8 @@ class AppController(QObject):
         mangohud_detector: MangoHudDetector | None = None,
         mangohud_launch_integration: MangoHudLaunchIntegration | None = None,
         optimization_profile_repository: GameOptimizationProfileRepository | None = None,
+        optimization_analysis_repository: OptimizationAnalysisRepository | None = None,
+        automatic_optimization_repository: AutomaticOptimizationRepository | None = None,
         runtime_tool_detector: RuntimeToolDetector | None = None,
         display_detector: DisplayDetector | None = None,
         optimization_advisor: OptimizationAdvisor | None = None,
@@ -305,6 +335,9 @@ class AppController(QObject):
         optiscaler_service: OptiScalerService | None = None,
         optiscaler_release_client: OptiScalerReleaseClient | None = None,
         proton_tweaks_repository: ProtonTweaksRepository | None = None,
+        narrator_settings_repository: NarratorSettingsRepository | None = None,
+        narrator_component_manager: NarratorComponentManager | None = None,
+        narrator_pipeline: NarratorPipeline | None = None,
         initial_games: Sequence[Game] | None = None,
         demo_mode: bool | None = None,
         auto_refresh: bool = True,
@@ -316,6 +349,7 @@ class AppController(QObject):
         self._compression_controller = CompressionController(self)
         self._updates_controller = UpdatesController(self)
         self._mangohud_controller = MangoHudController(self)
+        self._narrator_controller = NarratorController(self)
         self._optiscaler_controller = OptiScalerController(self)
         self._optimization_controller = OptimizationController(self)
         self._settings_controller = SettingsController(self)
@@ -467,6 +501,15 @@ class AppController(QObject):
         self._optimization_profile_repository = (
             optimization_profile_repository or GameOptimizationProfileRepository()
         )
+        self._optimization_analysis_repository = (
+            optimization_analysis_repository or OptimizationAnalysisRepository()
+        )
+        self._automatic_optimization_repository = (
+            automatic_optimization_repository or AutomaticOptimizationRepository()
+        )
+        self._optimization_analysis_persistence_enabled = bool(
+            optimization_analysis_repository is not None or not self._demo_mode
+        )
         self._runtime_tool_detector = runtime_tool_detector or RuntimeToolDetector(
             host_service=host_service
         )
@@ -475,10 +518,14 @@ class AppController(QObject):
         self._game_analyzer = GameAnalyzer(
             self._mangohud_launch_integration.executable_resolver
         )
+        self._game_settings_advisor = GameSettingsAdvisor()
         self._mangohud_log_parser = MangoHudLogParser()
         self._baseline_sessions = BaselineSessionRepository()
         self._bottleneck_analyzer = BottleneckAnalyzer()
+        self._frame_rate_analyzer = FrameRateAnalyzer()
         self._game_recommendation_engine = GameRecommendationEngine()
+        self._runtime_candidate_registry = RuntimeCandidateRegistry()
+        self._automatic_optimization_evaluator = AutomaticOptimizationEvaluator()
         self._optimization_change_service = OptimizationChangeService(
             DATA_DIR / "games" / "optimization-changes"
         )
@@ -494,6 +541,82 @@ class AppController(QObject):
         self._proton_tweaks_repository = (
             proton_tweaks_repository or ProtonTweaksRepository()
         )
+        self._narrator_settings_repository = (
+            narrator_settings_repository or NarratorSettingsRepository()
+        )
+        self._narrator_component_manager = (
+            narrator_component_manager or NarratorComponentManager()
+        )
+        if narrator_pipeline is None:
+            narrator_backend = QtPortalScreenCastBackend(parent=self)
+            narrator_capture = PortalScreenCaptureProvider(narrator_backend)
+            narrator_audio = QtNarratorAudioOutput(parent=self)
+            narrator_pipeline = NarratorPipeline(
+                narrator_capture,
+                TesseractOcrProvider(),
+                ArgosCTranslate2TranslationProvider(),
+                PiperPolishTtsProvider(),
+                narrator_audio,
+                NarratorGameActivityDetector(
+                    lambda game_key: self._narrator_controller.game_for_key(game_key)
+                ),
+            )
+        self._narrator_pipeline = narrator_pipeline
+        capture_status = narrator_pipeline.capture.capabilities()
+        self._narrator_component_manager.set_runtime_state(
+            "capture.portal-pipewire",
+            capture_status.available,
+            capture_status.message,
+        )
+        self._narrator_component_manager.set_runtime_state(
+            "ocr.english-local",
+            narrator_pipeline.ocr.available,
+            str(
+                getattr(
+                    narrator_pipeline.ocr,
+                    "status_message",
+                    (
+                        "Local English OCR is ready"
+                        if narrator_pipeline.ocr.available
+                        else "No local English OCR provider is installed"
+                    ),
+                )
+            ),
+        )
+        self._narrator_component_manager.set_runtime_state(
+            "translation.opus-en-pl",
+            narrator_pipeline.translator.available,
+            (
+                "Local English to Polish translation is ready"
+                if narrator_pipeline.translator.available
+                else "No local English to Polish translation provider is installed"
+            ),
+        )
+        self._narrator_component_manager.set_runtime_state(
+            "tts.polish-voice",
+            narrator_pipeline.tts.available,
+            (
+                "A local Polish voice is ready"
+                if narrator_pipeline.tts.available
+                else "No local Polish voice is installed"
+            ),
+        )
+        self._narrator_component_manager.set_runtime_state(
+            "audio.qt-pcm",
+            narrator_pipeline.audio.available,
+            (
+                "Qt PCM audio output is available"
+                if narrator_pipeline.audio.available
+                else "No sandbox audio output is available"
+            ),
+        )
+        for component_id in (
+            "ocr.english-local",
+            "translation.opus-en-pl",
+            "tts.polish-voice",
+            "audio.qt-pcm",
+        ):
+            self._narrator_controller._refresh_component_runtime(component_id)
         self._ui_sound_service = UiSoundService(parent=self)
         self._ui_sound_service.set_enabled(self._settings_model.interface_sounds)
         self._gamepad_service = gamepad_service or GamepadService(parent=self)
@@ -540,6 +663,8 @@ class AppController(QObject):
         self._operational_tasks: dict[str, dict[str, Any]] = {}
         self._reported_terminal_tasks: set[str] = set()
         self._timer_error_reported = False
+        self._task_poll_active = False
+        self._task_poll_error_signature = ""
         self._manual_game_number = 1
         self._shutdown_requested = False
         self._consume_gamepad_action = ""
@@ -579,6 +704,15 @@ class AppController(QObject):
         self._optimization_applied_changes: dict[str, dict[str, Any]] = {}
         self._active_baseline_games: set[str] = set()
         self._baseline_statuses: dict[str, str] = {}
+        for recovered_session in self._baseline_sessions.recover_abandoned():
+            logger.warning(
+                "Recovered abandoned baseline session: session=%s appId=%s "
+                "gameId=%s reason=%s",
+                recovered_session.id,
+                recovered_session.app_id,
+                recovered_session.game_id,
+                recovered_session.error,
+            )
         self._inventory_completion_pending = bool(
             self._update_tracker is not None
             and not self._update_tracker.initial_inventory_complete
@@ -804,6 +938,10 @@ class AppController(QObject):
     @Property("QVariantMap", notify=settingsChanged)
     def settings(self) -> dict[str, Any]:
         return self._settings
+
+    @Property("QVariantList", notify=narratorComponentsChanged)
+    def narratorComponents(self) -> list[dict[str, Any]]:
+        return self._narrator_controller.components()
 
     @Property(str, constant=True)
     def appName(self) -> str:
@@ -1519,6 +1657,31 @@ class AppController(QObject):
             game_id, candidate_id
         )
 
+    @Slot(str, result="QVariantMap")
+    @Slot(str, str, result="QVariantMap")
+    def startAutomaticOptimization(
+        self, game_id: str, candidate_id: str = ""
+    ) -> dict[str, Any]:
+        return self._optimization_controller.startAutomaticOptimization(
+            game_id, candidate_id
+        )
+
+    @Slot(str, str, str, result="QVariantMap")
+    def previewGameSettingChange(
+        self, game_id: str, instance_id: str, proposed_value: str
+    ) -> dict[str, Any]:
+        return self._optimization_controller.previewGameSettingChange(
+            game_id, instance_id, proposed_value
+        )
+
+    @Slot(str, str, str, result="QVariantMap")
+    def applyGameSettingChange(
+        self, game_id: str, instance_id: str, proposed_value: str
+    ) -> dict[str, Any]:
+        return self._optimization_controller.applyGameSettingChange(
+            game_id, instance_id, proposed_value
+        )
+
     @Slot(str, str, result="QVariantMap")
     def revertOptimizationChange(
         self, game_id: str, change_id: str
@@ -1526,6 +1689,48 @@ class AppController(QObject):
         return self._optimization_controller.revertOptimizationChange(
             game_id, change_id
         )
+
+    @Slot(str, str, result="QVariantMap")
+    def keepOptimizationChange(
+        self, game_id: str, change_id: str
+    ) -> dict[str, Any]:
+        return self._optimization_controller.keepOptimizationChange(
+            game_id, change_id
+        )
+
+    @Slot(str, result="QVariantMap")
+    def getNarratorGameSettings(self, game_id: str) -> dict[str, Any]:
+        return self._narrator_controller.get_settings(game_id)
+
+    @Slot(str, "QVariantMap", result=bool)
+    def saveNarratorGameSettings(
+        self, game_id: str, values: Mapping[str, Any]
+    ) -> bool:
+        return self._narrator_controller.save_settings(game_id, values)
+
+    @Slot(str, result="QVariantMap")
+    def getNarratorSessionState(self, game_id: str) -> dict[str, Any]:
+        return self._narrator_controller.session_state(game_id)
+
+    @Slot(str, result=bool)
+    def startNarrator(self, game_id: str) -> bool:
+        return self._narrator_controller.start(game_id)
+
+    @Slot(result=bool)
+    def stopNarrator(self) -> bool:
+        return self._narrator_controller.stop()
+
+    @Slot(str, result=bool)
+    def installNarratorComponent(self, component_id: str) -> bool:
+        return self._narrator_controller.install_component(component_id)
+
+    @Slot(str, result=bool)
+    def updateNarratorComponent(self, component_id: str) -> bool:
+        return self._narrator_controller.update_component(component_id)
+
+    @Slot(str, result=bool)
+    def removeNarratorComponent(self, component_id: str) -> bool:
+        return self._narrator_controller.remove_component(component_id)
 
     @Slot(str)
     @Slot(str, str)
@@ -1547,6 +1752,15 @@ class AppController(QObject):
             self._gamepad_service.stop()
         if hasattr(self, "_ui_sound_service"):
             self._ui_sound_service.stop()
+        narrator_controller = getattr(self, "_narrator_controller", None)
+        if narrator_controller is not None:
+            narrator_controller.shutdown()
+        narrator_pipeline = getattr(self, "_narrator_pipeline", None)
+        if narrator_pipeline is not None:
+            try:
+                narrator_pipeline.shutdown()
+            except Exception:
+                logger.exception("Could not stop narrator workers cleanly")
         if hasattr(self, "_library_scanner"):
             try:
                 self._library_scanner.shutdown(timeout_ms=2000)
@@ -2067,7 +2281,7 @@ class AppController(QObject):
             change_signature = hashlib.blake2b(
                 json.dumps(
                     change_payload,
-                    ensure_ascii=False,
+                    ensure_ascii=True,
                     sort_keys=True,
                     separators=(",", ":"),
                 ).encode("utf-8"),
@@ -2082,7 +2296,7 @@ class AppController(QObject):
         return hashlib.blake2b(
             json.dumps(
                 payload,
-                ensure_ascii=False,
+                ensure_ascii=True,
                 sort_keys=True,
                 separators=(",", ":"),
             ).encode("utf-8"),
@@ -2238,6 +2452,7 @@ class AppController(QObject):
         self._compression_controller._poll_tasks()
         self._optimization_controller._poll_baseline_sessions()
         self._optimization_controller._poll_analysis_jobs()
+        self._narrator_controller.poll()
 
     def _remember_analysis_report(self, task: Task) -> None:
         return self._compression_controller._remember_analysis_report(task)
@@ -2349,6 +2564,7 @@ class AppController(QObject):
             "games": "games",
             "updates": "updates",
             "tasks": "tasks",
+            "narrator": "narrator",
             "system": "system",
             "settings": "settings",
             "gamedetails": "gameDetails",

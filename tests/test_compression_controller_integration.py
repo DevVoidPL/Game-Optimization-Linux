@@ -5,12 +5,14 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from threading import Event
 import time
+from types import SimpleNamespace
 from typing import Any, Sequence
 
 import pytest
 from PySide6.QtCore import QCoreApplication
 
 from game_optimization_linux.controllers import AppController
+from game_optimization_linux.controllers.compression_controller import CompressionController
 from game_optimization_linux.models import (
     AppSettings,
     AutomaticCompressionMode,
@@ -41,6 +43,60 @@ from game_optimization_linux.services import (
 
 
 _QT_APPLICATION = QCoreApplication.instance() or QCoreApplication([])
+
+
+def test_task_poll_error_toast_is_deduplicated_and_resets_after_recovery() -> None:
+    failing = [True]
+    toasts: list[tuple[str, str]] = []
+
+    def poll_updates() -> None:
+        if failing[0]:
+            raise UnicodeEncodeError("utf-8", "\udcff", 0, 1, "surrogate")
+
+    class Tasks:
+        @staticmethod
+        def list_tasks() -> tuple[object, ...]:
+            return ()
+
+    class Signal:
+        def emit(self, *_args: object) -> None:
+            pass
+
+    app = SimpleNamespace(
+        _shutdown_requested=False,
+        _task_poll_active=False,
+        _task_poll_error_signature="",
+        _timer_error_reported=False,
+        _poll_update_jobs=poll_updates,
+        _poll_optiscaler_jobs=lambda: None,
+        _update_tracker=None,
+        _update_jobs={},
+        _demo_mode=False,
+        _task_service=Tasks(),
+        _operational_tasks={},
+        _bounded_task_rows=lambda rows: rows,
+        _tasks=[],
+        _updates_dirty=False,
+        _reported_terminal_tasks=set(),
+        _emit_toast=lambda message, level: toasts.append((message, level)),
+        tasksChanged=Signal(),
+    )
+    controller = CompressionController(app)
+
+    controller._poll_tasks()
+    controller._poll_tasks()
+    assert toasts == [("The task list could not be updated", "error")]
+
+    failing[0] = False
+    controller._poll_tasks()
+    assert app._task_poll_error_signature == ""
+
+    failing[0] = True
+    controller._poll_tasks()
+    assert toasts == [
+        ("The task list could not be updated", "error"),
+        ("The task list could not be updated", "error"),
+    ]
 
 
 class _GameProvider:

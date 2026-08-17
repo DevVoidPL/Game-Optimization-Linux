@@ -21,6 +21,45 @@ finish-args:
   - --talk-name=org.freedesktop.Flatpak
 
 modules:
+  # ScreenCast frames are consumed through the GStreamer PipeWire plugins from
+  # the Freedesktop runtime. Tesseract is bundled, while its English model is a
+  # separately managed, SHA-256 verified narrator component.
+  - name: leptonica
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DBUILD_PROG=OFF
+      - -DBUILD_SHARED_LIBS=ON
+    cleanup:
+      - /include
+      - /lib/cmake
+      - /lib/pkgconfig
+      - /share
+    sources:
+      - type: git
+        url: https://github.com/DanBloomberg/leptonica.git
+        tag: 1.86.0
+        commit: dbb48b0fd0e10e943ecd9bab7439701842894733
+
+  - name: tesseract-ocr
+    buildsystem: cmake-ninja
+    builddir: true
+    config-opts:
+      - -DBUILD_TRAINING_TOOLS=OFF
+      - -DBUILD_TESTS=OFF
+      - -DDISABLE_ARCHIVE=ON
+      - -DDISABLE_CURL=ON
+    cleanup:
+      - /include
+      - /lib/cmake
+      - /lib/pkgconfig
+      - /share/man
+    sources:
+      - type: git
+        url: https://github.com/tesseract-ocr/tesseract.git
+        tag: 5.5.2
+        commit: 6e1d56a847e697de07b38619356550e5cf4e8633
+
   # py7zr validates and handles ordinary 7z releases. Official OptiScaler
   # archives may additionally use the BCJ2 filter, which py7zr deliberately
   # does not implement. Bundle the upstream standalone decoder at a fixed
@@ -83,7 +122,7 @@ modules:
   - name: python-runtime-dependencies
     buildsystem: simple
     build-commands:
-      - python3 -m pip install --no-index --find-links=file://${PWD}/wheels --prefix=${FLATPAK_DEST} PySide6==6.11.1 py7zr==1.1.3
+      - python3 -m pip install --no-index --find-links=file://${PWD}/wheels --prefix=${FLATPAK_DEST} PySide6==6.11.1 dbus-next==0.2.3 py7zr==1.1.3 ctranslate2==4.8.1 sacremoses==0.1.1 subword-nmt==0.3.8 regex==2026.7.19 click==8.4.2 joblib==1.5.3 tqdm==4.70.0 mock==5.2.0 piper-tts==1.7.0 onnxruntime==1.28.0 numpy==2.5.2 PyYAML==6.0.3 protobuf==7.35.1 flatbuffers==25.12.19 pathvalidate==3.3.1
     sources:
       - type: file
         url: https://files.pythonhosted.org/packages/d8/de/af89d71410c83b10654d86ff9aff2a4f87c30163658f1cc145242e222526/pyside6-6.11.1-cp310-abi3-manylinux_2_34_x86_64.whl
@@ -100,6 +139,10 @@ modules:
       - type: file
         url: https://files.pythonhosted.org/packages/c7/9b/e0355d8897b5c150770f1d95718aad17d432fcc9c035c04f3f58427d4693/shiboken6-6.11.1-cp310-abi3-manylinux_2_34_x86_64.whl
         sha256: 9a8bccfafc8805254cabcfa1edfaf55cd52889f4998c91ad0d9a4433fb1bcdbe
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/d2/fc/c0a3f4c4eaa5a22fbef91713474666e13d0ea2a69c84532579490a9f2cc8/dbus_next-0.2.3-py3-none-any.whl
+        sha256: 58948f9aff9db08316734c0be2a120f6dc502124d9642f55e90ac82ffb16a18b
         dest: wheels
       - type: file
         url: https://files.pythonhosted.org/packages/88/40/dc7f804abd0ea167ea8d4d9b3f5455321aaf671d040fcef647e9e952e714/py7zr-1.1.3-py3-none-any.whl
@@ -141,6 +184,72 @@ modules:
         url: https://files.pythonhosted.org/packages/24/99/4772b8e00a136f3e01236de33b0efda31ee7077203ba5967fcc76da94d65/texttable-1.7.0-py2.py3-none-any.whl
         sha256: 72227d592c82b3d7f672731ae73e4d1f88cd8e2ef5b075a7a7f01a23a3743917
         dest: wheels
+      # CPU-only narrator runtimes. Translation and voice model data remain
+      # optional, verified user components and are not bundled here.
+      - type: file
+        url: https://files.pythonhosted.org/packages/99/4a/21f325a9d0925d8ad24b04249adf29bf9909442967603634f7f6d4acbb79/ctranslate2-4.8.1-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 4242a7f8e285f922525f4cffd5b1fb43cbacc61d0611cf54832e9c447d030840
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/0b/f0/89ee2bc9da434bd78464f288fdb346bc2932f2ee80a90b2a4bbbac262c74/sacremoses-0.1.1-py3-none-any.whl
+        sha256: 31e04c98b169bfd902144824d191825cd69220cdb4ae4bcf1ec58a7db5587b1a
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/1b/9a/488ecac22d78eb429928b9ee4f6b6c692e116ca4bd43ef42a475698def32/subword_nmt-0.3.8-py3-none-any.whl
+        sha256: d22526b557752f35ac15e8ea384ea7773e50a51d966b8752d023d16cb87eac36
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/2a/be/ff61f28f9273658cfe23acbbac5217221f6519960ed401e61dfdab12bc35/regex-2026.7.19-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+        sha256: c0d702548d89d572b2929879bc883bb7a4c4709efafe4512cadee56c55c9bd15
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/fb/e2/79c688af8b210d232694e31e59da9f6ec747bae31c3f5946e4e9b98860d5/click-8.4.2-py3-none-any.whl
+        sha256: e6f9f66136c816745b9d65817da91d61d957fb16e02e4dcd0552553c5a197b76
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/7b/91/984aca2ec129e2757d1e4e3c81c3fcda9d0f85b74670a094cc443d9ee949/joblib-1.5.3-py3-none-any.whl
+        sha256: 5fc3c5039fc5ca8c0276333a188bbd59d6b7ab37fe6632daa76bc7f9ec18e713
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/f9/1c/01bfd571a64e7f270e6bab5e33777debe0edc56759233ce84f27dec92d14/tqdm-4.70.0-py3-none-any.whl
+        sha256: 7f585706bfddbdebf89daac705b2dfcc16890130727d3197ca62c732b4310953
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/bd/d9/617e6af809bf3a1d468e0d58c3997b1dc219a9a9202e650d30c2fc85d481/mock-5.2.0-py3-none-any.whl
+        sha256: 7ba87f72ca0e915175596069dbbcc7c75af7b5e9b9bc107ad6349ede0819982f
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/a4/29/9123b168249b8a37be150847a3853ea000d22895265e384f754ace50bb1a/piper_tts-1.7.0-cp39-abi3-manylinux_2_17_x86_64.manylinux2014_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 72adc623b977bdbbdf3d6f6bf88d66eda7cfe2ee8e7919a74a5952acb77a339e
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/78/b6/8c5396e7894e77c5a7d1e026f3acb9dd39c4b5644e412e37a0055eaa3bc5/onnxruntime-1.28.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 54fa221d669282bd8f582708ce4c96010a7e9fb0661f9006b37fe2fedafb73fe
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/7b/44/59a1eb68e773c4098d107ef34a0dbdeca501d72ffcfbff9a7707343921ce/numpy-2.5.2-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 29b86ff8a6cc556b47ec6b64b194815cc80e6bf5eedcc6cddfd65318cb0b4eee
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/74/27/e5b8f34d02d9995b80abcef563ea1f8b56d20134d8f4e5e81733b1feceb2/pyyaml-6.0.3-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 0f29edc409a6392443abf94b9cf89ce99889a1dd5376d94316ae5145dfedd5d6
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/e4/be/5b3cfe508bfab6761414ff944e3366eb13be4fd71efcd69450f89ba39f43/protobuf-7.35.1-cp310-abi3-manylinux2014_x86_64.whl
+        sha256: 74758715c53d7158fb76caf4f0cfdacc5329a4b1bb994f865d6cf302d413a1c4
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/e8/2d/d2a548598be01649e2d46231d151a6c56d10b964d94043a335ae56ea2d92/flatbuffers-25.12.19-py2.py3-none-any.whl
+        sha256: 7634f50c427838bb021c2d66a3d1168e9d199b0607e6329399f04846d42e20b4
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/63/34/ba1c580383c9eada3711951fef0795c80b829a078d72188184bcab9dd527/packaging-26.3-py3-none-any.whl
+        sha256: d7193f7c8e4e93f444fde0262bf90af30e16fa0ad0ad44cb553c87339b23cd1c
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/9a/70/875f4a23bfc4731703a5835487d0d2fb999031bd415e7d17c0ae615c18b7/pathvalidate-3.3.1-py3-none-any.whl
+        sha256: 5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f
+        dest: wheels
 
   - name: game-optimization-linux
     buildsystem: simple
@@ -148,6 +257,7 @@ modules:
       - python3 -m pip install --no-index --no-deps --no-build-isolation --prefix=${FLATPAK_DEST} .
       - install -Dm644 data/io.github.DevVoidPL.GameOptimizationLinux.desktop ${FLATPAK_DEST}/share/applications/io.github.DevVoidPL.GameOptimizationLinux.desktop
       - install -Dm644 data/io.github.DevVoidPL.GameOptimizationLinux.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.DevVoidPL.GameOptimizationLinux.metainfo.xml
+      - install -Dm644 docs/narrator-components.md ${FLATPAK_DEST}/share/doc/game-optimization-linux/narrator-components.md
       - install -Dm755 scripts/install-game-optimization-runner.sh ${FLATPAK_DEST}/bin/game-optimization-install-runner
       - install -Dm755 libexec/game-optimization-run-host ${FLATPAK_DEST}/libexec/game-optimization-run-host
       - install -Dm644 data/icons/hicolor/256x256/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/io.github.DevVoidPL.GameOptimizationLinux.png

@@ -385,7 +385,9 @@ class OptimizationLaunchPlanner:
                 reasons.append(
                     f"OptiScaler Proton override: {optiscaler_override}"
                 )
-        allowed_measurement_keys = {"MANGOHUD", "MANGOHUD_CONFIGFILE"}
+        allowed_measurement_keys = {
+            "MANGOHUD", "MANGOHUD_CONFIG", "MANGOHUD_CONFIGFILE"
+        }
         for raw_key, raw_value in sorted((measurement_environment or {}).items()):
             key = str(raw_key)
             value = str(raw_value)
@@ -393,6 +395,8 @@ class OptimizationLaunchPlanner:
                 raise ValueError("invalid MangoHud baseline environment")
             if key == "MANGOHUD_CONFIGFILE" and not Path(value).is_absolute():
                 raise ValueError("MangoHud baseline config path must be absolute")
+            if key == "MANGOHUD_CONFIG" and value != "read_cfg":
+                raise ValueError("MangoHud baseline inline config must load the private config")
             if key in inherited and str(inherited[key]) != value:
                 environment_conflicts.append(key)
                 warnings.append(
@@ -466,9 +470,17 @@ class OptimizationLaunchPlanner:
 
                 game_environment = dict(inherited)
                 game_environment.update(environment)
-                restore, wrapper_environment_removed, wrapper_environment_overrides = (
+                restore, removed, wrapper_environment_overrides = (
                     _gamescope_environment_boundary(game_environment)
                 )
+                measurement_keys = {
+                    key
+                    for key in allowed_measurement_keys
+                    if environment_sources.get(key) == "baseline_measurement"
+                }
+                for key in measurement_keys:
+                    restore[key] = environment[key]
+                wrapper_environment_removed = tuple(sorted({*removed, *measurement_keys}))
                 environment_restore_keys = tuple(sorted(restore))
                 if restore:
                     inner = [
@@ -478,6 +490,10 @@ class OptimizationLaunchPlanner:
                     ]
                     reasons.append(
                         "Steam Runtime loader variables are isolated from the host Gamescope process and restored for the game"
+                    )
+                if measurement_keys:
+                    reasons.append(
+                        "Private MangoHud measurement variables are applied only to the game command"
                     )
                 gamescope_wrapper = [gamescope.executable, *flags, "--"]
                 inner = [gamescope.executable, *flags, "--", *inner]

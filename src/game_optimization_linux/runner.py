@@ -31,6 +31,20 @@ _STEAM_ENV_DIRECTORY = Path(".local/share/game-optimization-linux/run-env")
 _MAX_STEAM_ENV_BYTES = 1024 * 1024
 
 
+def _wait_for_baseline_process(
+    process: subprocess.Popen[bytes],
+    sessions: BaselineSessionRepository,
+    app_id: str,
+    session_id: str,
+    runner_token: str,
+) -> int:
+    while True:
+        try:
+            return int(process.wait(timeout=5))
+        except subprocess.TimeoutExpired:
+            sessions.heartbeat(app_id, session_id, runner_token)
+
+
 def _write_report(app_id: str, payload: dict[str, object], root: Path = STATE_DIR / "launch-reports") -> None:
     root.mkdir(parents=True, exist_ok=True)
     target = root / f"{app_id}.json"
@@ -210,18 +224,17 @@ def main(
         active_detector = detector or RuntimeToolDetector(host_service=host_service)
         gamemode, gamescope = active_detector.detect()
         sessions = baseline_sessions or BaselineSessionRepository()
-        baseline_session = sessions.claim(app_id, runner_pid=os.getpid())
+        baseline_session, baseline_claim_reason = sessions.claim_with_reason(
+            app_id, runner_pid=os.getpid()
+        )
+        if baseline_session is None and baseline_claim_reason != "no baseline session exists for this AppID":
+            print(
+                "game-optimization-run: baseline invocation rejected "
+                f"appId={app_id} reason={baseline_claim_reason}",
+                file=sys.stderr,
+            )
         measurement_environment: dict[str, str] = {}
         if baseline_session is not None:
-            if profile.gamescope_enabled and profile.gamescope_mode != "disabled":
-                sessions.fail(
-                    app_id,
-                    "Baseline recording currently requires Gamescope to be disabled",
-                    baseline_session.id,
-                )
-                raise ValueError(
-                    "baseline recording currently requires Gamescope to be disabled"
-                )
             measurement_environment = sessions.environment(baseline_session)
         plan = OptimizationLaunchPlanner().build(
             profile, game_argv, gamemode=gamemode, gamescope=gamescope,
@@ -378,7 +391,13 @@ def main(
                     f"processGroup={process_group} state=recording",
                     file=sys.stderr,
                 )
-                result = int(process.wait())
+                result = _wait_for_baseline_process(
+                    process,
+                    sessions,
+                    app_id,
+                    baseline_session.id,
+                    baseline_session.runner_token,
+                )
             else:
                 result = os.execvpe(flatpak_spawn, host_command, os.environ.copy())
         else:
@@ -418,7 +437,13 @@ def main(
                     f"processGroup={process_group} state=recording",
                     file=sys.stderr,
                 )
-                result = int(process.wait())
+                result = _wait_for_baseline_process(
+                    process,
+                    sessions,
+                    app_id,
+                    baseline_session.id,
+                    baseline_session.runner_token,
+                )
             else:
                 result = os.execvpe(plan.executable, plan.command, process_environment)
         exit_code = int(result) if isinstance(result, int) else 0
@@ -435,11 +460,13 @@ def main(
                 and finished.runner_token == baseline_session.runner_token
                 and finished.status in {"processing", "failed"}
             )
+            artifacts = sessions.artifact_diagnostics(app_id)
             report.update({
                 "status": "baseline_finished" if completion_received else "baseline_superseded",
                 "baselineCompletionReceived": completion_received,
                 "baselineExitCode": exit_code,
                 "baselineLogExists": sessions.newest_log(app_id) is not None,
+                "baselineArtifacts": artifacts,
             })
             _write_report(app_id, report, report_root or STATE_DIR / "launch-reports")
             print(
@@ -447,7 +474,13 @@ def main(
                 f"session={baseline_session.id} appId={app_id} "
                 f"spawnedPid={process.pid if process is not None else 'executor'} "
                 f"completion={completion_received} exitCode={exit_code} "
-                f"logExists={sessions.newest_log(app_id) is not None}",
+                f"logExists={sessions.newest_log(app_id) is not None} "
+                f"config={artifacts['configPath']} "
+                f"configExists={artifacts['configExists']} "
+                f"outputDirectory={artifacts['outputDirectory']} "
+                f"outputDirectoryExists={artifacts['outputDirectoryExists']} "
+                f"files={artifacts['files']} "
+                f"measurementFile={artifacts['measurementFile'] or 'none'}",
                 file=sys.stderr,
             )
         return exit_code

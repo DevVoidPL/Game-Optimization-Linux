@@ -32,6 +32,10 @@ _TERMINAL_STATUSES = {
 logger = logging.getLogger(__name__)
 
 
+def _display_text(value: object) -> str:
+    return str(value).encode("utf-8", errors="replace").decode("utf-8")
+
+
 class UpdatesController:
     def __init__(self, app: AppController) -> None:
         self._app = app
@@ -246,9 +250,13 @@ class UpdatesController:
             "canIgnore": bool(attention and available and task is None),
             "requiresFullAnalysis": bool(record.requires_full_analysis),
             "installationDetected": bool(record.installation_detected),
-            "newFiles": list(record.changes.new_files),
-            "modifiedFiles": list(record.changes.modified_files),
-            "deletedFiles": list(record.changes.deleted_files),
+            "newFiles": [_display_text(value) for value in record.changes.new_files],
+            "modifiedFiles": [
+                _display_text(value) for value in record.changes.modified_files
+            ],
+            "deletedFiles": [
+                _display_text(value) for value in record.changes.deleted_files
+            ],
             "changedFileCount": (
                 len(record.changes.new_files)
                 + len(record.changes.modified_files)
@@ -266,7 +274,7 @@ class UpdatesController:
             "recommendedProfile": (
                 self._app._settings_model.automatic_compression_profile.value
             ),
-            "error": str(record.last_error),
+            "error": _display_text(record.last_error),
             "ignored": record.status is GameUpdateStatus.IGNORED,
             "canDismiss": task is None,
         }
