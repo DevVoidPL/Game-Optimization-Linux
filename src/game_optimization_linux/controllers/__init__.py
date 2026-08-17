@@ -6,6 +6,7 @@ from .couch_navigation import CouchNavigationController
 from .library_controller import LibraryController
 from .library_scanner import LibraryScanner
 from .mangohud_controller import MangoHudController
+from .narrator_controller import NarratorController
 from .optimization_controller import OptimizationController
 from .optiscaler_controller import OptiScalerController
 from .settings_controller import SettingsController
@@ -19,6 +20,7 @@ __all__ = [
     "LibraryController",
     "LibraryScanner",
     "MangoHudController",
+    "NarratorController",
     "OptimizationController",
     "OptiScalerController",
     "SettingsController",

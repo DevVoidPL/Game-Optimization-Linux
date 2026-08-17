@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 APP_NAME = "Game Optimization Linux"
-APP_VERSION = "0.1.4-alpha"
+APP_VERSION = "1.6.0-alpha"
 APP_ID = "io.github.DevVoidPL.GameOptimizationLinux"
 ORGANIZATION_NAME = APP_NAME
 ORGANIZATION_DOMAIN = "game-optimization-linux.local"
@@ -75,6 +75,13 @@ LOG_FILE = LOG_DIR / "game-optimization-linux.log"
 GAMES_CONFIG_DIR = CONFIG_DIR / "games"
 MANGOHUD_LOG_DIR = STATE_DIR / "mangohud-logs"
 OPTISCALER_DATA_DIR = DATA_DIR / "games"
+NARRATOR_COMPONENTS_DIR = DATA_DIR / "narrator" / "components"
+NARRATOR_TRANSLATION_CACHE_FILE = (
+    CACHE_DIR / "narrator" / "translation-cache-v1.sqlite3"
+)
+NARRATOR_CAPTURE_GRANTS_FILE = (
+    CONFIG_DIR / "narrator" / "capture-grants-v1.json"
+)
 
 
 __all__ = [
@@ -98,6 +105,9 @@ __all__ = [
     "LOG_FILE",
     "MANGOHUD_LOG_DIR",
     "OPTISCALER_DATA_DIR",
+    "NARRATOR_CAPTURE_GRANTS_FILE",
+    "NARRATOR_COMPONENTS_DIR",
+    "NARRATOR_TRANSLATION_CACHE_FILE",
     "LIBRARY_CACHE_FILE",
     "LOCAL_EXECUTABLE_CHOICES_FILE",
     "MAIN_QML",

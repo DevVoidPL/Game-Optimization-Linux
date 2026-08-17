@@ -2297,6 +2297,7 @@ def probe_close_during_compression(
         name: bool(_named(window, name)[0].property("active"))
         for name in (
             "gamesPageLoader",
+            "narratorPageLoader",
             "updatesPageLoader",
             "tasksPageLoader",
             "systemPageLoader",
@@ -2519,8 +2520,11 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     (game_root / "Probe/Content/Paks").mkdir(parents=True)
     (game_root / "Probe/Content/Paks/probe.pak").write_bytes(b"pak")
     (game_root / "Config").mkdir()
-    (game_root / "Config/DefaultEngine.ini").write_text(
-        "DefaultGraphicsRHI=DefaultGraphicsRHI_DX12\n", encoding="utf-8"
+    (game_root / "Config/Engine.ini").write_text(
+        "DefaultGraphicsRHI=DefaultGraphicsRHI_DX12\n"
+        "[ScalabilityGroups]\n"
+        "sg.ShadowQuality=4\n",
+        encoding="utf-8",
     )
     archive = temporary_root / "OptiScaler_v0.7.7.7z"
     import py7zr
@@ -2632,6 +2636,160 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     rendered_analysis = _variant(root.property("gameAnalysis")) or {}
     if rendered_analysis.get("status") != "completed":
         raise AssertionError(f"Optimization QML did not refresh its analysis: {rendered_analysis!r}")
+    rendered_analysis["measurement"] = {"representative": True}
+    rendered_analysis["frameRate"] = {
+        "state": "likely_capped",
+        "estimatedCeilingFps": 117.0,
+        "confidence": 0.91,
+        "evidence": ["Synthetic stable ceiling"],
+        "limitations": [],
+    }
+    rendered_analysis["settingsAnalysis"]["recommendationState"] = (
+        "capped_with_headroom"
+    )
+    rendered_analysis["candidates"] = []
+    rendered_analysis["noSafeRecommendations"] = True
+    root.setProperty("gameAnalysis", rendered_analysis)
+    _settle(application, 4)
+    detected_setting = rendered_analysis["settingsAnalysis"]["detected"][0]
+    _invoke_qml(
+        root,
+        "previewSetting",
+        str(detected_setting["instanceId"]),
+        str(detected_setting["suggestedValue"]),
+    )
+    _settle(application, 4)
+    setting_preview = _variant(root.property("settingPreview")) or {}
+    if (
+        not setting_preview.get("success")
+        or setting_preview.get("currentValue") != "4"
+        or setting_preview.get("proposedValue") != "3"
+    ):
+        raise AssertionError(
+            f"Manual setting preview was not rendered: {setting_preview!r}"
+        )
+    root.setProperty("settingPreview", {})
+    _settle(application, 2)
+    rendered_analysis["baselineSession"] = {"status": "completed"}
+    rendered_analysis["appliedChange"] = {}
+    root.setProperty("gameAnalysis", rendered_analysis)
+    _settle(application, 2)
+    baseline_button = _item(root, "recordOptimizationBaselineButton")
+    repeat_baseline_enabled = bool(baseline_button.property("enabled"))
+    terminal_baseline_retries = {}
+    for terminal_status in ("failed", "recorded_unrepresentative", "cancelled"):
+        rendered_analysis["baselineSession"] = {"status": terminal_status}
+        root.setProperty("gameAnalysis", dict(rendered_analysis))
+        _settle(application, 2)
+        terminal_baseline_retries[terminal_status] = bool(
+            baseline_button.property("enabled")
+        )
+    rendered_analysis["baselineSession"] = {"status": "processing"}
+    root.setProperty("gameAnalysis", dict(rendered_analysis))
+    _settle(application, 2)
+    active_baseline_blocks_duplicate = not bool(baseline_button.property("enabled"))
+    rendered_analysis["baselineSession"] = {"status": "completed"}
+    rendered_analysis["appliedChange"] = {
+        "id": "pending-setting-test",
+        "state": "applied",
+        "config_adapter": "unreal_ini",
+    }
+    root.setProperty("gameAnalysis", rendered_analysis)
+    _settle(application, 2)
+    pending_test_blocks_baseline = not bool(baseline_button.property("enabled"))
+    rendered_analysis["appliedChange"] = {
+        "id": "pending-automatic-test",
+        "state": "applied",
+        "kind": "runtime_profile",
+    }
+    root.setProperty("gameAnalysis", dict(rendered_analysis))
+    _settle(application, 2)
+    pending_automatic_blocks_baseline = not bool(baseline_button.property("enabled"))
+    rendered_analysis["appliedChange"] = {
+        "id": "finished-automatic-test",
+        "state": "reverted",
+        "kind": "runtime_profile",
+    }
+    root.setProperty("gameAnalysis", dict(rendered_analysis))
+    _settle(application, 2)
+    terminal_comparison_allows_baseline = bool(baseline_button.property("enabled"))
+    rendered_analysis["appliedChange"] = {}
+    root.setProperty("gameAnalysis", rendered_analysis)
+    _settle(application, 2)
+    _invoke_qml(root, "recordBaseline")
+    _settle(application, 2)
+    record_baseline_rejection = str(root.property("errorMessage"))
+    empty_recommendation = str(
+        _item(root, "emptyOptimizationRecommendation").property("text")
+    )
+    if "frame-limited" not in empty_recommendation:
+        raise AssertionError(
+            f"Capped workload explanation was not rendered: {empty_recommendation!r}"
+        )
+    rendered_analysis["candidates"] = [{
+        "id": "game_setting:unreal_ini:unreal_shadow_quality:probe",
+        "mechanism": "Existing Shadow quality setting",
+        "evidence": ["Synthetic GPU bottleneck"],
+        "currentValue": "4",
+        "proposedValue": "3",
+        "expectedEffect": "Measure the actual effect after applying",
+        "performanceImpact": "medium",
+        "qualityImpact": "medium",
+        "confidenceLabel": "high",
+        "risk": "low",
+        "reversible": True,
+        "filesToModify": [str(game_root / "Config/Engine.ini")],
+    }]
+    rendered_analysis["noSafeRecommendations"] = False
+    rendered_analysis["automaticOptimization"] = {
+        "problem": {
+            "kind": "frame_pacing",
+            "confidence": 0.82,
+            "target": "Improve frame consistency",
+        },
+        "availableCandidates": [{
+            "id": "gamemode_runtime",
+            "name": "GameMode",
+            "expectedGoal": "Test CPU-side consistency",
+            "risk": "Low",
+            "qualityImpact": "None",
+        }],
+        "unavailableCandidates": [],
+        "availableCount": 1,
+        "message": "A reversible runtime experiment is available. Its result must be measured before it can be kept.",
+        "canStart": True,
+        "session": {},
+        "history": [],
+    }
+    root.setProperty("gameAnalysis", rendered_analysis)
+    _settle(application, 4)
+    automatic_card_visible = bool(
+        _item(root, "automaticOptimizationCard").property("visible")
+    )
+    root.setProperty("automaticPreviewOpen", True)
+    _settle(application, 3)
+    automatic_candidate_visible = bool(
+        _item(root, "startAutomaticOptimizationButton").property("visible")
+    )
+    frame_rate_limit_text = str(
+        _item(root, "frameRateLimitValue").property("value")
+    )
+    frame_rate_confidence_text = str(
+        _item(root, "frameRateConfidenceValue").property("value")
+    )
+    if frame_rate_limit_text != "Likely ~117 FPS" or frame_rate_confidence_text != "91%":
+        raise AssertionError(
+            "Optimization frame-rate state was not rendered: "
+            f"{frame_rate_limit_text!r}, {frame_rate_confidence_text!r}"
+        )
+    candidate_card = _item(root, "optimizationCandidateCard")
+    candidate_card.setProperty("previewOpen", True)
+    _settle(application, 3)
+    candidate_apply_visible = bool(
+        _item(root, "optimizationCandidateApplyButton").property("visible")
+    )
+    if not candidate_apply_visible:
+        raise AssertionError("Optimization candidate preview did not reveal Apply and test")
     _invoke_qml(root, "choosePreset", "quiet")
     _settle(application, 8)
     _invoke_qml(root, "saveProfile")
@@ -2724,6 +2882,22 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
         "analysis_engine": analysis["fingerprint"]["engine"]["value"],
         "analysis_api": analysis["fingerprint"]["graphicsApi"]["value"],
         "analysis_baseline_available": analysis.get("baselineAvailable"),
+        "settings_analysis_status": analysis["settingsAnalysis"]["status"],
+        "detected_settings": len(analysis["settingsAnalysis"]["detected"]),
+        "manual_setting_preview": bool(setting_preview.get("success")),
+        "repeat_baseline_enabled": repeat_baseline_enabled,
+        "terminal_baseline_retries": terminal_baseline_retries,
+        "active_baseline_blocks_duplicate": active_baseline_blocks_duplicate,
+        "pending_test_blocks_baseline": pending_test_blocks_baseline,
+        "pending_automatic_blocks_baseline": pending_automatic_blocks_baseline,
+        "terminal_comparison_allows_baseline": terminal_comparison_allows_baseline,
+        "record_baseline_rejection": record_baseline_rejection,
+        "candidate_preview_apply_visible": candidate_apply_visible,
+        "automatic_card_visible": automatic_card_visible,
+        "automatic_candidate_visible": automatic_candidate_visible,
+        "empty_recommendation": empty_recommendation,
+        "frame_rate_limit": frame_rate_limit_text,
+        "frame_rate_confidence": frame_rate_confidence_text,
         "save_button_inside": True,
         "screenshot": str(screenshot),
         "screenshot_size": screenshot.stat().st_size,

@@ -135,11 +135,12 @@ class OptimizationAdvisor:
         *,
         gamemode_available: bool,
         gamescope_available: bool,
+        measurements: SessionPerformanceData | None = None,
         system_info: Mapping[str, Any] | None = None,
     ) -> OptimizationPresetPlan:
         preset = profile.preset
         recommendation = self.recommend(
-            profile, display, system_info=system_info
+            profile, display, measurements, system_info=system_info
         )
         if preset == "custom":
             return OptimizationPresetPlan(

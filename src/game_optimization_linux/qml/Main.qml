@@ -77,6 +77,7 @@ ApplicationWindow {
         App.PopupCoordinator.closeActive()
         closeCompressionDialog.close()
         gamesLoader.active = false
+        narratorLoader.active = false
         updatesLoader.active = false
         tasksLoader.active = false
         systemLoader.active = false
@@ -100,6 +101,8 @@ ApplicationWindow {
     }
 
     function pageSource(pageName) {
+        if (pageName === "narrator")
+            return Qt.resolvedUrl("pages/NarratorPage.qml")
         if (pageName === "updates")
             return Qt.resolvedUrl("pages/UpdatesPage.qml")
         if (pageName === "tasks")
@@ -114,22 +117,25 @@ ApplicationWindow {
     }
 
     function pageIndex(pageName) {
-        if (pageName === "updates")
+        if (pageName === "narrator")
             return 1
-        if (pageName === "tasks")
+        if (pageName === "updates")
             return 2
-        if (pageName === "system")
+        if (pageName === "tasks")
             return 3
-        if (pageName === "settings")
+        if (pageName === "system")
             return 4
-        if (pageName === "gameDetails" || pageName === "game" || pageName === "details")
+        if (pageName === "settings")
             return 5
+        if (pageName === "gameDetails" || pageName === "game" || pageName === "details")
+            return 6
         return 0
     }
 
     function activeDesktopLoader() {
         var loaders = [
             gamesLoader,
+            narratorLoader,
             updatesLoader,
             tasksLoader,
             systemLoader,
@@ -195,6 +201,14 @@ ApplicationWindow {
                     objectName: "gamesPageLoader"
                     asynchronous: false
                     source: Qt.resolvedUrl("pages/GamesPage.qml")
+                    onLoaded: if (item && item.hasOwnProperty("controller")) item.controller = window.controller
+                }
+
+                Loader {
+                    id: narratorLoader
+                    objectName: "narratorPageLoader"
+                    asynchronous: false
+                    source: Qt.resolvedUrl("pages/NarratorPage.qml")
                     onLoaded: if (item && item.hasOwnProperty("controller")) item.controller = window.controller
                 }
 
@@ -384,6 +398,7 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+3"; onActivated: window.navigate("system") }
     Shortcut { sequence: "Ctrl+4"; onActivated: window.navigate("settings") }
     Shortcut { sequence: "Ctrl+5"; onActivated: window.navigate("updates") }
+    Shortcut { sequence: "Ctrl+6"; onActivated: window.navigate("narrator") }
     Shortcut {
         sequence: "F11"
         onActivated: {

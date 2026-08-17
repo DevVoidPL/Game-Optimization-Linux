@@ -21,6 +21,11 @@ from game_optimization_linux.models import (
     OptimizationCandidate,
     PerformanceMeasurement,
 )
+from .game_settings import (
+    is_allowed_config_path,
+    parse_assignments,
+    replace_existing_setting,
+)
 
 
 _UNREAL_POOL = re.compile(
@@ -57,92 +62,6 @@ class GameRecommendationEngine:
                         "automatic", "maximum_performance"
                     },
                 ))
-        if (
-            bottleneck.conclusion == "gpu_bottleneck"
-            and gamescope_available
-            and fingerprint.system.resolution_width
-            and fingerprint.system.resolution_height
-        ):
-            width = max(640, int(fingerprint.system.resolution_width * 0.75) // 2 * 2)
-            height = max(360, int(fingerprint.system.resolution_height * 0.75) // 2 * 2)
-            results.append(
-                OptimizationCandidate(
-                    id="gamescope_gpu_scaling",
-                    target="GPU load",
-                    mechanism="Gamescope render scaling",
-                    source="MangoHud baseline and selected display",
-                    evidence=bottleneck.evidence,
-                    current_value=f"{fingerprint.system.resolution_width}x{fingerprint.system.resolution_height}",
-                    proposed_value=f"{width}x{height}",
-                    expected_effect="Reduce the number of pixels rendered by the game",
-                    quality_impact="Moderate; image sharpness can decrease",
-                    risk="Low; the runner profile can be reverted",
-                    reversible=True,
-                    requires_measurement=True,
-                    engine_support="Engine independent",
-                    api_support="Gamescope compatible runtime required",
-                    env_changes={"gamescopeMode": "performance"},
-                    automatically_selected=profile.preset in {
-                        "automatic", "maximum_performance"
-                    },
-                )
-            )
-        if (
-            bottleneck.conclusion == "cpu_bottleneck"
-            and bottleneck.confidence >= 0.60
-            and measurement is not None
-            and measurement.quality in {"medium", "high"}
-            and gamemode_available
-        ):
-            results.append(
-                OptimizationCandidate(
-                    id="gamemode_cpu_schedule",
-                    target="CPU scheduling",
-                    mechanism="GameMode wrapper",
-                    source="MangoHud baseline and host GameMode diagnostic",
-                    evidence=bottleneck.evidence,
-                    current_value="Disabled" if not profile.gamemode_enabled else "Enabled",
-                    proposed_value="Enabled",
-                    expected_effect="Allow GameMode to apply its configured per-game scheduling policy",
-                    quality_impact="None",
-                    risk="Low; no global settings are written by Game Optimization",
-                    reversible=True,
-                    requires_measurement=True,
-                    engine_support="Engine independent",
-                    api_support="Not graphics-API specific",
-                    env_changes={"wrapper": "gamemoderun"},
-                    automatically_selected=profile.preset == "automatic",
-                )
-            )
-        if (
-            profile.user_goal == "low_power"
-            and measurement is not None
-            and measurement.average_fps is not None
-            and measurement.average_fps > profile.target_fps * 1.10
-        ):
-            results.append(
-                OptimizationCandidate(
-                    id="quiet_fps_target",
-                    target="GPU and CPU load",
-                    mechanism="Existing runner FPS limiter owner",
-                    source="User goal and MangoHud baseline",
-                    evidence=(
-                        f"Measured average was {measurement.average_fps:.1f} FPS",
-                        f"Configured quiet target is {profile.target_fps} FPS",
-                    ),
-                    current_value="Unlimited or above target",
-                    proposed_value=f"{profile.target_fps} FPS",
-                    expected_effect="Reduce sustained load while keeping the selected target",
-                    quality_impact="Motion is limited to the selected frame rate",
-                    risk="Low; the per-game profile is reversible",
-                    reversible=True,
-                    requires_measurement=True,
-                    engine_support="Engine independent",
-                    api_support="Requires an available configured limiter",
-                    env_changes={"fpsLimit": str(profile.target_fps)},
-                    automatically_selected=profile.preset in {"automatic", "quiet"},
-                )
-            )
         return tuple(results)
 
     @staticmethod
@@ -221,37 +140,64 @@ class OptimizationChangeService:
             raise RuntimeError("The game is running")
         if game.update_in_progress:
             raise RuntimeError("Steam is updating the game")
-        if candidate.id != "unreal_streaming_pool" or len(candidate.files_to_modify) != 1:
+        if self.active_change(game) is not None:
+            raise RuntimeError(
+                "Finish the current comparison cycle before applying another change"
+            )
+        settings_change = bool(candidate.config_adapter and candidate.setting_id)
+        if (
+            not settings_change
+            and candidate.id != "unreal_streaming_pool"
+        ) or len(candidate.files_to_modify) != 1:
             raise ValueError("This candidate does not modify a supported config file")
         root = game.install_path.resolve(strict=True)
         path = Path(candidate.files_to_modify[0])
         if path.is_symlink():
             raise ValueError("Config symlinks are not modified")
         resolved = path.resolve(strict=True)
-        try:
-            relative = resolved.relative_to(root)
-        except ValueError as error:
-            raise ValueError("Config path is outside the game root") from error
+        if settings_change:
+            if not is_allowed_config_path(game, resolved):
+                raise ValueError("Config path is outside the game or its Proton prefix")
+            try:
+                relative = resolved.relative_to(root).as_posix()
+            except ValueError:
+                relative = ""
+        else:
+            try:
+                relative = resolved.relative_to(root).as_posix()
+            except ValueError as error:
+                raise ValueError("Config path is outside the game root") from error
         before = resolved.read_bytes()
-        text = before.decode("utf-8")
-        matches = list(_UNREAL_POOL.finditer(text))
-        if len(matches) != 1 or matches[0].group("value") != candidate.current_value:
-            raise RuntimeError("The config changed after analysis")
+        before_hash = hashlib.sha256(before).hexdigest()
+        if settings_change:
+            if not candidate.config_sha256 or before_hash != candidate.config_sha256:
+                raise RuntimeError("The config changed after analysis")
+            updated = replace_existing_setting(
+                before,
+                section=candidate.config_section,
+                key=candidate.config_key,
+                current=candidate.current_value,
+                proposed=candidate.proposed_value,
+            )
+        else:
+            text = before.decode("utf-8")
+            matches = list(_UNREAL_POOL.finditer(text))
+            if len(matches) != 1 or matches[0].group("value") != candidate.current_value:
+                raise RuntimeError("The config changed after analysis")
+            match = matches[0]
+            updated = (
+                text[: match.start("value")]
+                + candidate.proposed_value
+                + text[match.end("value") :]
+            ).encode("utf-8")
         if self._process_checker(game) or game.update_in_progress:
             raise RuntimeError("The game started or Steam began updating it")
-        match = matches[0]
-        updated = (
-            text[: match.start("value")]
-            + candidate.proposed_value
-            + text[match.end("value") :]
-        ).encode("utf-8")
         change_id = uuid4().hex
         directory = self._data_root / str(game.steam_app_id or game.id) / change_id
         directory.mkdir(parents=True, exist_ok=False)
         backup = directory / "original"
         backup.write_bytes(before)
         shutil.copystat(resolved, backup, follow_symlinks=False)
-        before_hash = hashlib.sha256(before).hexdigest()
         after_hash = hashlib.sha256(updated).hexdigest()
         manifest = {
             "schema_version": 1,
@@ -260,12 +206,18 @@ class OptimizationChangeService:
             "app_id": str(game.steam_app_id or game.id),
             "candidate_id": candidate.id,
             "game_root": os.fspath(root),
-            "relative_path": relative.as_posix(),
+            "relative_path": relative,
+            "target_path": os.fspath(resolved) if settings_change else "",
             "backup": "original",
             "before_sha256": before_hash,
             "after_sha256": after_hash,
             "current_value": candidate.current_value,
             "proposed_value": candidate.proposed_value,
+            "setting_id": candidate.setting_id,
+            "setting_label": candidate.setting_label,
+            "config_section": candidate.config_section,
+            "config_key": candidate.config_key,
+            "config_adapter": candidate.config_adapter,
             "created_at": datetime.now(UTC).isoformat(),
             "state": "applied",
         }
@@ -274,9 +226,15 @@ class OptimizationChangeService:
             self._atomic_write(resolved, updated, original_mode)
             if hashlib.sha256(resolved.read_bytes()).hexdigest() != after_hash:
                 raise RuntimeError("Config hash verification failed")
+            if settings_change and self._read_setting_value(
+                resolved, candidate.config_section, candidate.config_key
+            ) != candidate.proposed_value:
+                raise RuntimeError("The modified setting failed read-back verification")
             self._atomic_json(directory / "manifest.json", manifest)
         except BaseException:
             self._atomic_write(resolved, before, original_mode)
+            if hashlib.sha256(resolved.read_bytes()).hexdigest() != before_hash:
+                raise RuntimeError("The original config could not be restored")
             raise
         return manifest
 
@@ -287,18 +245,85 @@ class OptimizationChangeService:
         if manifest.get("game_id") != game.id or manifest.get("state") != "applied":
             raise ValueError("Optimization change manifest is not applicable")
         root = game.install_path.resolve(strict=True)
-        target = (root / str(manifest["relative_path"])).resolve(strict=True)
-        target.relative_to(root)
+        if manifest.get("config_adapter"):
+            target = Path(str(manifest.get("target_path") or "")).resolve(strict=True)
+            if not is_allowed_config_path(game, target):
+                raise ValueError("Config path is outside the game or its Proton prefix")
+        else:
+            target = (root / str(manifest["relative_path"])).resolve(strict=True)
+            target.relative_to(root)
         if hashlib.sha256(target.read_bytes()).hexdigest() != manifest["after_sha256"]:
             raise RuntimeError("The config was changed outside Game Optimization")
         original = (directory / str(manifest["backup"])).read_bytes()
         if hashlib.sha256(original).hexdigest() != manifest["before_sha256"]:
             raise RuntimeError("Optimization backup hash verification failed")
         self._atomic_write(target, original, target.stat().st_mode)
+        if hashlib.sha256(target.read_bytes()).hexdigest() != manifest["before_sha256"]:
+            raise RuntimeError("Restored config hash verification failed")
+        if manifest.get("config_adapter") and self._read_setting_value(
+            target,
+            str(manifest.get("config_section") or ""),
+            str(manifest.get("config_key") or ""),
+        ) != str(manifest.get("current_value") or ""):
+            raise RuntimeError("The restored setting failed read-back verification")
         manifest["state"] = "reverted"
         manifest["reverted_at"] = datetime.now(UTC).isoformat()
         self._atomic_json(manifest_path, manifest)
         return manifest
+
+    def keep(
+        self,
+        game: Game,
+        change_id: str,
+        *,
+        comparison: Mapping[str, Any] | None = None,
+        before_measurement: Mapping[str, Any] | None = None,
+        after_measurement: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        directory = self._data_root / str(game.steam_app_id or game.id) / str(change_id)
+        manifest_path = directory / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("game_id") != game.id or manifest.get("state") != "applied":
+            raise ValueError("Optimization change manifest is not applicable")
+        manifest["state"] = "kept"
+        manifest["kept_at"] = datetime.now(UTC).isoformat()
+        if comparison:
+            manifest["comparison"] = dict(comparison)
+        if before_measurement:
+            manifest["before_measurement"] = dict(before_measurement)
+        if after_measurement:
+            manifest["after_measurement"] = dict(after_measurement)
+        self._atomic_json(manifest_path, manifest)
+        return manifest
+
+    def active_change(self, game: Game) -> dict[str, Any] | None:
+        root = self._data_root / str(game.steam_app_id or game.id)
+        try:
+            manifests = tuple(root.glob("*/manifest.json"))
+        except OSError:
+            return None
+        for path in sorted(manifests, key=lambda item: item.parent.name, reverse=True):
+            try:
+                value = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                continue
+            if value.get("game_id") == game.id and value.get("state") == "applied":
+                return value
+        return None
+
+    @staticmethod
+    def _read_setting_value(path: Path, section: str, key: str) -> str | None:
+        try:
+            text = path.read_bytes().decode("utf-8-sig")
+        except (OSError, UnicodeError):
+            return None
+        matches = [
+            value
+            for value in parse_assignments(text)
+            if value[0].casefold() == section.casefold()
+            and value[1].casefold() == key.casefold()
+        ]
+        return matches[0][2] if len(matches) == 1 else None
 
     def record_runtime_change(
         self,
@@ -307,6 +332,14 @@ class OptimizationChangeService:
         before: GameOptimizationProfile,
         after: GameOptimizationProfile,
     ) -> dict[str, Any]:
+        if self._process_checker(game):
+            raise RuntimeError("The game is running")
+        if game.update_in_progress:
+            raise RuntimeError("Steam is updating the game")
+        if self.active_change(game) is not None:
+            raise RuntimeError(
+                "Finish the current comparison cycle before applying another change"
+            )
         change_id = uuid4().hex
         directory = self._data_root / str(game.steam_app_id or game.id) / change_id
         directory.mkdir(parents=True, exist_ok=False)

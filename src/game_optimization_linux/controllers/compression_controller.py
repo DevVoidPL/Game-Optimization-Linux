@@ -529,8 +529,9 @@ class CompressionController:
             self._app.tasksChanged.emit()
 
     def _poll_tasks(self) -> None:
-        if self._app._shutdown_requested:
+        if self._app._shutdown_requested or self._app._task_poll_active:
             return
+        self._app._task_poll_active = True
         try:
             self._app._poll_update_jobs()
             self._app._poll_optiscaler_jobs()
@@ -549,6 +550,7 @@ class CompressionController:
                 service_tasks + list(self._app._operational_tasks.values())
             )
         except KeyboardInterrupt:
+            self._app._task_poll_active = False
             logger.info("Keyboard interrupt received while polling tasks")
             self._app.shutdown()
             application = QCoreApplication.instance()
@@ -556,13 +558,21 @@ class CompressionController:
                 application.quit()
             return
         except Exception as error:
-            logger.exception("Task status timer failed: %s", error)
-            if not self._app._timer_error_reported:
-                self._app._emit_toast("The task list could not be updated", "error")
+            signature = f"{type(error).__name__}: {error}"
+            repeated = signature == self._app._task_poll_error_signature
+            if repeated:
+                logger.debug("Repeated task status timer failure suppressed: %s", signature)
+            else:
+                logger.exception("Task status timer failed: %s", error)
+                self._app._task_poll_error_signature = signature
                 self._app._timer_error_reported = True
+                self._app._emit_toast("The task list could not be updated", "error")
+            self._app._task_poll_active = False
             return
 
+        self._app._task_poll_active = False
         self._app._timer_error_reported = False
+        self._app._task_poll_error_signature = ""
         if updated != self._app._tasks:
             self._app._tasks = updated
             self._app.tasksChanged.emit()
