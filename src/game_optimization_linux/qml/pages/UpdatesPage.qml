@@ -540,7 +540,7 @@ Item {
                                                  updateCard.updateData,
                                                  ["canDismiss", "can_dismiss"],
                                                  false)
-                                    symbol: "⌫"
+                                    iconSource: App.UiIcons.actionRemove
                                     toolTip: qsTr("Remove this entry")
                                     onClicked: {
                                         var rowId = String(page.value(
@@ -589,7 +589,7 @@ Item {
                                     objectName: "analyzeChangesButton"
                                     compact: true
                                     text: qsTr("Analyze changes")
-                                    iconText: "⌕"
+                                    iconSource: App.UiIcons.actionAnalyze
                                     enabled: page.booleanValue(updateCard.updateData, [
                                         "canAnalyze", "can_analyze"
                                     ], false)
@@ -603,7 +603,7 @@ Item {
                                     objectName: "compressChangesButton"
                                     compact: true
                                     text: qsTr("Compress changes")
-                                    iconText: "↓"
+                                    iconSource: App.UiIcons.actionApply
                                     kind: "primary"
                                     busy: ["compressing", "queued"].indexOf(
                                         updateCard.updateState.toLowerCase()) >= 0
@@ -662,20 +662,6 @@ Item {
 
             contentItem: RowLayout {
                 spacing: 14
-
-                Rectangle {
-                    Layout.preferredWidth: 42
-                    Layout.preferredHeight: 42
-                    radius: 13
-                    color: App.Theme.accentSoft
-                    Label {
-                        anchors.centerIn: parent
-                        text: "GF"
-                        color: App.Theme.accent
-                        font.pixelSize: 13
-                        font.weight: Font.Black
-                    }
-                }
 
                 ColumnLayout {
                     Layout.fillWidth: true

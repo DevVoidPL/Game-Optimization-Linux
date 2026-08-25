@@ -39,6 +39,8 @@ from .keyvalues import (
 )
 from .linux_filesystem import LinuxFilesystemProvider
 from .linux_system import LinuxSystemProvider
+from .heroic import HeroicGameProvider, HeroicRoot
+from .lutris import LutrisGameProvider, LutrisRoot
 from .gamepad import (
     FakeGamepadProvider,
     GamepadProvider,
@@ -76,6 +78,10 @@ __all__ = [
     "FakeGamepadProvider",
     "LinuxFilesystemProvider",
     "LinuxSystemProvider",
+    "HeroicGameProvider",
+    "HeroicRoot",
+    "LutrisGameProvider",
+    "LutrisRoot",
     "SDL3GamepadProvider",
     "SDL3Unavailable",
     "UnavailableGamepadProvider",

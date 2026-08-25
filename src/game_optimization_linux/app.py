@@ -17,6 +17,7 @@ from PySide6.QtQml import QQmlApplicationEngine, QQmlError
 from .config import (
     APP_ID,
     APP_ICON,
+    APP_ICON_SVG,
     APP_ICON_VARIANTS,
     APP_NAME,
     APP_VERSION,
@@ -99,12 +100,14 @@ def _prepare_qml_shutdown(engine: QQmlApplicationEngine) -> None:
 
 
 def _application_icon() -> QIcon:
-    """Build the window icon with native assets for every advertised size."""
+    """Build the window icon from the supplied Monolithic Core assets."""
 
     icon = QIcon()
     for size, path in sorted(APP_ICON_VARIANTS.items()):
         if path.is_file():
             icon.addFile(str(path), QSize(size, size), QIcon.Normal, QIcon.Off)
+    if APP_ICON_SVG.is_file():
+        icon.addFile(str(APP_ICON_SVG), QSize(), QIcon.Normal, QIcon.Off)
     if icon.isNull() and APP_ICON.is_file():
         icon.addFile(str(APP_ICON))
     return icon
@@ -200,6 +203,10 @@ def run(argv: Sequence[str] | None = None) -> int:
     requested_signal: list[int | None] = [None]
     try:
         application = QGuiApplication(qt_arguments)
+        # Set this on the live application as well as before construction.  On
+        # Wayland the compositor uses the desktop-file identity, rather than
+        # the window icon pixels, to resolve the taskbar/dock icon.
+        application.setDesktopFileName(APP_ID)
         requested_signal, previous_handlers = _install_termination_handlers(application)
         icon = _application_icon()
         if not icon.isNull():

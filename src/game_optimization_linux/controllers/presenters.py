@@ -269,9 +269,15 @@ def game_to_qml(
         library_available
         and game_status not in {"Drive disconnected", "Missing files"}
     )
+    provider_launch_available = bool(raw.get("launch_available", True))
     local_game = bool(
         str(raw.get("launcher", "")).casefold() == "manual"
         and str(raw.get("data_source", "")).casefold() == "local"
+    )
+    custom_manual_game = bool(
+        str(raw.get("launcher", "")).casefold() == "manual"
+        and str(raw.get("id", "")).startswith("manual-")
+        and str(raw.get("data_source", "")).casefold() == "manual"
     )
     report_available = bool(
         normalized_report
@@ -311,6 +317,14 @@ def game_to_qml(
         "name": str(raw.get("name", "Unknown game")),
         "title": str(raw.get("name", "Unknown game")),
         "launcher": str(raw.get("launcher", "Unknown")),
+        "launcherGameId": str(raw.get("launcher_game_id") or ""),
+        "customManualGame": custom_manual_game,
+        "store": str(raw.get("store") or "unknown"),
+        "launchUri": str(raw.get("launch_uri") or ""),
+        "launcherVariant": str(raw.get("launcher_variant") or ""),
+        "runner": str(raw.get("runner") or ""),
+        "winePrefix": str(raw.get("wine_prefix") or ""),
+        "workingDirectory": str(raw.get("working_directory") or ""),
         "size": _size_label(logical_size),
         "logicalSize": _size_label(logical_size),
         "logicalSizeGb": logical_size,
@@ -385,7 +399,7 @@ def game_to_qml(
         "libraryAvailable": library_available,
         "availabilityStatus": "" if library_available else "Library unavailable",
         "launchAllowed": bool(
-            actionable
+            actionable and provider_launch_available
             and (
                 not local_game
                 or (
@@ -395,7 +409,9 @@ def game_to_qml(
             )
         ),
         "launchUnavailableReason": (
-            "Choose the main executable first"
+            str(raw.get("launch_unavailable_reason") or "")
+            if not provider_launch_available
+            else "Choose the main executable first"
             if local_game and not str(raw.get("executable_path") or "")
             else "A compatible Proton runner is not configured"
             if local_game and str(raw.get("executable_path") or "").casefold().endswith(".exe")

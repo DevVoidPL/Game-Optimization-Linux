@@ -19,7 +19,7 @@ from game_optimization_linux.app import _set_application_metadata  # noqa: E402
 from game_optimization_linux.config import APP_ID  # noqa: E402
 
 
-ICON_SIZES = (16, 22, 24, 32, 48, 64, 128, 256)
+ICON_SIZES = (16, 32, 48, 64, 128, 256, 512)
 
 
 def data_roots() -> tuple[Path, ...]:
@@ -73,10 +73,15 @@ def main() -> int:
         else:
             print(f"icon {size}x{size}: {installed} ({alpha_bounds(installed)})")
 
+    scalable_relative = Path("icons/hicolor/scalable/apps") / f"{APP_ID}.svg"
+    scalable = next(
+        (root / scalable_relative for root in roots if (root / scalable_relative).is_file()),
+        None,
+    )
+    print(f"icon scalable: {scalable or 'NOT FOUND'}")
+
     source_icon = PROJECT_ROOT / "src/game_optimization_linux/resources/GameOptimizationLinuxIcon.png"
     print(f"source icon: {source_icon} ({alpha_bounds(source_icon)})")
-    contact_sheet = PROJECT_ROOT / "reports/ui/game-optimization-icon-contact-sheet.png"
-    print(f"contact sheet: {contact_sheet} ({alpha_bounds(contact_sheet)})")
     return 0
 
 

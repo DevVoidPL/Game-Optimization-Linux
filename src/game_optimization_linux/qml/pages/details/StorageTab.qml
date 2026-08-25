@@ -831,20 +831,6 @@ Item {
                         Layout.fillWidth: true
                         spacing: 12
 
-                        Rectangle {
-                            Layout.preferredWidth: 48
-                            Layout.preferredHeight: 48
-                            radius: 15
-                            color: tab.reportReady ? App.Theme.accentSoft : App.Theme.backgroundElevated
-                            Label {
-                                anchors.centerIn: parent
-                                text: "B"
-                                color: tab.reportReady ? App.Theme.accent : App.Theme.textSecondary
-                                font.pixelSize: 20
-                                font.weight: Font.Black
-                            }
-                        }
-
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 2
@@ -879,7 +865,7 @@ Item {
                         AppButton {
                             objectName: "analyzeCompressionButton"
                             text: tab.analysisActive ? qsTr("Analyzing…") : qsTr("Analyze compression")
-                            iconText: "⌕"
+                            iconSource: App.UiIcons.btrfsAnalyzeCompression
                             kind: "primary"
                             busy: tab.analysisActive
                             enabled: Boolean(tab.gameId.length > 0
@@ -894,7 +880,7 @@ Item {
                         AppButton {
                             visible: tab.analysisActive
                             text: qsTr("Cancel analysis")
-                            iconText: "×"
+                            iconSource: App.UiIcons.actionCancel
                             kind: "danger"
                             onClicked: {
                                 if (tab.controller && tab.controller.cancelTask)
@@ -907,7 +893,7 @@ Item {
                             text: tab.verificationActive
                                   ? qsTr("Verifying…")
                                   : qsTr("Verify compression")
-                            iconText: "✓"
+                            iconSource: App.UiIcons.btrfsVerifyCompression
                             kind: "secondary"
                             busy: tab.verificationActive
                             enabled: Boolean(tab.gameId.length > 0
@@ -930,7 +916,7 @@ Item {
                                   && tab.verificationMode === "exact"
                                   ? qsTr("Waiting for authorization…")
                                   : qsTr("Exact measurement")
-                            iconText: "≋"
+                            iconSource: App.UiIcons.btrfsExactMeasurement
                             kind: "secondary"
                             busy: tab.verificationActive
                                   && tab.verificationMode === "exact"
@@ -1850,7 +1836,7 @@ Item {
                         AppButton {
                             objectName: "compressGameButton"
                             text: qsTr("Compress Game")
-                            iconText: "↓"
+                            iconSource: App.UiIcons.actionApply
                             kind: "primary"
                             busy: tab.preparingPlan
                             enabled: Boolean(tab.compressPrerequisitesReady

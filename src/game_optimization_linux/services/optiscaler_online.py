@@ -102,13 +102,15 @@ class OptiScalerReleaseAsset:
 
 @dataclass(frozen=True, slots=True)
 class OptiScalerRelease:
-    """Latest stable release and the archive selected for installation."""
+    """Validated official release and the archive selected for installation."""
 
     tag_name: str
     version: str
     html_url: str
     published_at: str
     asset: OptiScalerReleaseAsset
+    channel: str = "stable"
+    fidelityfx_upscaler_version: str = ""
     source: str = "network"
     stale: bool = False
 
@@ -119,6 +121,8 @@ class OptiScalerRelease:
             "html_url": self.html_url,
             "published_at": self.published_at,
             "asset": self.asset.to_dict(),
+            "channel": self.channel,
+            "fidelityfx_upscaler_version": self.fidelityfx_upscaler_version,
         }
 
     @classmethod
@@ -133,6 +137,10 @@ class OptiScalerRelease:
                 html_url=str(raw["html_url"]),
                 published_at=str(raw.get("published_at", "")),
                 asset=OptiScalerReleaseAsset.from_dict(asset_raw),
+                channel=str(raw.get("channel") or "stable"),
+                fidelityfx_upscaler_version=str(
+                    raw.get("fidelityfx_upscaler_version") or ""
+                ),
                 source="cache",
             )
         except (KeyError, TypeError, ValueError) as error:
@@ -210,6 +218,14 @@ def _validate_release(release: OptiScalerRelease) -> None:
         raise OptiScalerMetadataError(
             "release page does not belong to the official OptiScaler repository"
         )
+    if release.channel not in {"stable", "edge"}:
+        raise OptiScalerMetadataError("release has an unsupported channel")
+    if release.fidelityfx_upscaler_version and not re.fullmatch(
+        r"\d+(?:\.\d+){1,2}", release.fidelityfx_upscaler_version
+    ):
+        raise OptiScalerMetadataError(
+            "release has an invalid FidelityFX upscaler version"
+        )
     _validate_asset(release.asset)
 
 
@@ -249,18 +265,26 @@ def _parse_asset(raw: Mapping[str, Any]) -> OptiScalerReleaseAsset | None:
     return candidate
 
 
-def parse_latest_stable_release(payload: object) -> OptiScalerRelease:
-    """Select the first stable release with a supported official asset."""
+def parse_release(payload: object, *, channel: str = "stable") -> OptiScalerRelease:
+    """Select a stable or prerelease build from the official repository."""
 
     if not isinstance(payload, Sequence) or isinstance(payload, (str, bytes)):
         raise OptiScalerMetadataError("GitHub release metadata must be a JSON array")
-    stable_release_seen = False
+    selected_channel = str(channel or "stable").strip().casefold()
+    if selected_channel not in {"stable", "edge"}:
+        raise OptiScalerMetadataError("unsupported OptiScaler release channel")
+    matching_release_seen = False
     for raw_release in payload:
         if not isinstance(raw_release, Mapping):
             continue
-        if bool(raw_release.get("draft")) or bool(raw_release.get("prerelease")):
+        if bool(raw_release.get("draft")):
             continue
-        stable_release_seen = True
+        prerelease = bool(raw_release.get("prerelease"))
+        if (selected_channel == "stable" and prerelease) or (
+            selected_channel == "edge" and not prerelease
+        ):
+            continue
+        matching_release_seen = True
         raw_assets = raw_release.get("assets", ())
         if not isinstance(raw_assets, Sequence) or isinstance(
             raw_assets, (str, bytes)
@@ -282,14 +306,31 @@ def parse_latest_stable_release(payload: object) -> OptiScalerRelease:
             html_url=str(raw_release.get("html_url", "")),
             published_at=str(raw_release.get("published_at", "")),
             asset=selected,
+            channel=selected_channel,
+            fidelityfx_upscaler_version=_release_fsr_version(
+                str(raw_release.get("body", ""))
+            ),
         )
         _validate_release(release)
         return release
-    if stable_release_seen:
+    if matching_release_seen:
         raise OptiScalerMetadataError(
-            "the latest stable OptiScaler releases have no supported ZIP or 7z asset"
+            f"the latest {selected_channel} OptiScaler releases have no supported ZIP or 7z asset"
         )
-    raise OptiScalerMetadataError("no stable OptiScaler release is available")
+    raise OptiScalerMetadataError(
+        f"no {selected_channel} OptiScaler release is available"
+    )
+
+
+def _release_fsr_version(body: str) -> str:
+    match = re.search(r"(?i)\bFSR\s*[-v]?\s*(4(?:\.\d+){1,2})\b", body)
+    return match.group(1) if match else ""
+
+
+def parse_latest_stable_release(payload: object) -> OptiScalerRelease:
+    """Backward-compatible stable release selector."""
+
+    return parse_release(payload, channel="stable")
 
 
 def _atomic_json_write(path: Path, payload: Mapping[str, Any]) -> None:
@@ -364,11 +405,20 @@ class OptiScalerReleaseClient:
     def metadata_cache_path(self) -> Path:
         return self.cache_root / "latest-stable.json"
 
+    def metadata_cache_path_for(self, channel: str) -> Path:
+        selected = str(channel or "stable").strip().casefold()
+        if selected not in {"stable", "edge"}:
+            raise OptiScalerMetadataError("unsupported OptiScaler release channel")
+        return self.cache_root / f"latest-{selected}.json"
+
     def _open(self, request: Request) -> BinaryIO:
         return self._opener(request, timeout=self.timeout)
 
-    def _load_cached_release(self) -> tuple[OptiScalerRelease, float] | None:
-        path = self.metadata_cache_path
+    def _load_cached_release(
+        self, channel: str = "stable"
+    ) -> tuple[OptiScalerRelease, float] | None:
+        selected = str(channel or "stable").strip().casefold()
+        path = self.metadata_cache_path_for(selected)
         if not path.is_file():
             return None
         try:
@@ -384,6 +434,8 @@ class OptiScalerReleaseClient:
             if not isinstance(release_raw, Mapping):
                 raise TypeError("release must be an object")
             release = OptiScalerRelease.from_dict(release_raw)
+            if release.channel != selected:
+                return None
         except (
             OSError,
             json.JSONDecodeError,
@@ -395,10 +447,10 @@ class OptiScalerReleaseClient:
             return None
         return release, cached_at
 
-    def cached_release(self) -> OptiScalerRelease | None:
+    def cached_release(self, channel: str = "stable") -> OptiScalerRelease | None:
         """Read validated cached metadata without making a network request."""
 
-        cached = self._load_cached_release()
+        cached = self._load_cached_release(channel)
         if cached is None:
             return None
         release, cached_at = cached
@@ -411,7 +463,7 @@ class OptiScalerReleaseClient:
 
     def _save_release(self, release: OptiScalerRelease) -> None:
         _atomic_json_write(
-            self.metadata_cache_path,
+            self.metadata_cache_path_for(release.channel),
             {
                 "schema_version": METADATA_CACHE_SCHEMA_VERSION,
                 "repository": OFFICIAL_REPOSITORY,
@@ -420,7 +472,7 @@ class OptiScalerReleaseClient:
             },
         )
 
-    def _fetch_release_metadata(self) -> OptiScalerRelease:
+    def _fetch_release_metadata(self, channel: str = "stable") -> OptiScalerRelease:
         request = Request(
             OFFICIAL_RELEASES_URL,
             headers={
@@ -464,24 +516,28 @@ class OptiScalerReleaseClient:
             raise OptiScalerMetadataError(
                 "GitHub returned invalid OptiScaler release metadata"
             ) from error
-        return parse_latest_stable_release(raw)
+        return parse_release(raw, channel=channel)
 
     def latest_release(
         self,
         *,
+        channel: str = "stable",
         force_refresh: bool = False,
         allow_stale_cache: bool = True,
     ) -> OptiScalerRelease:
-        """Return the latest stable release, using cache only when appropriate."""
+        """Return the selected official channel, using validated cache when possible."""
 
-        cached = self._load_cached_release()
+        selected = str(channel or "stable").strip().casefold()
+        if selected not in {"stable", "edge"}:
+            raise OptiScalerMetadataError("unsupported OptiScaler release channel")
+        cached = self._load_cached_release(selected)
         if cached is not None and not force_refresh:
             release, cached_at = cached
             age = max(0.0, self._clock() - cached_at)
             if age <= self.metadata_max_age:
                 return replace(release, source="cache", stale=False)
         try:
-            release = self._fetch_release_metadata()
+            release = self._fetch_release_metadata(selected)
             self._save_release(release)
             return release
         except (OptiScalerNetworkError, OptiScalerMetadataError):
@@ -643,7 +699,6 @@ class OptiScalerReleaseClient:
                                 final_host == "github.com"
                                 or final_host == "release-assets.githubusercontent.com"
                                 or final_host == "objects.githubusercontent.com"
-                                or final_host.endswith(".githubusercontent.com")
                             )
                         ):
                             raise OptiScalerDownloadError(
@@ -736,4 +791,5 @@ __all__ = [
     "OptiScalerReleaseClient",
     "SUPPORTED_ARCHIVE_SUFFIXES",
     "parse_latest_stable_release",
+    "parse_release",
 ]

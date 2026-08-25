@@ -9,6 +9,7 @@ import shutil
 import struct
 import subprocess
 import sys
+import threading
 import time
 
 import pytest
@@ -1086,7 +1087,7 @@ def test_runner_plan_only_does_not_execute(tmp_path: Path) -> None:
     assert called == []
 
 
-def test_flatpak_runner_executes_complete_plan_on_host_without_host_python(
+def test_flatpak_runner_requires_host_preparation_instead_of_flatpak_spawn(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
@@ -1114,7 +1115,6 @@ def test_flatpak_runner_executes_complete_plan_on_host_without_host_python(
                 "diagnostic_message": "available",
             }
 
-    executed: list[object] = []
     steam_environment = {
         "LD_LIBRARY_PATH": "/fake/steam-runtime/pinned_libs_64",
         "LD_PRELOAD": "/fake/gameoverlayrenderer.so",
@@ -1131,51 +1131,18 @@ def test_flatpak_runner_executes_complete_plan_on_host_without_host_python(
     monkeypatch.setattr(
         runner_module,
         "_load_steam_environment",
-        lambda _environment: dict(steam_environment),
+        lambda _environment, **_kwargs: dict(steam_environment),
     )
     monkeypatch.setattr(runner_module, "HostServiceClient", Host)
-    monkeypatch.setattr(
-        runner_module.shutil,
-        "which",
-        lambda name: "/app/bin/flatpak-spawn" if name == "flatpak-spawn" else None,
-    )
-    monkeypatch.setattr(
-        runner_module.os,
-        "execvpe",
-        lambda executable, argv, environment: executed.extend(
-            (executable, list(argv), dict(environment))
-        ) or 0,
-    )
 
     result = runner_main(
         ["--appid", "292030", "--", "/nix/store/game/bin/game", "a b"],
         repository=repository,
         report_root=tmp_path / "reports",
     )
-    assert result == 0
-    assert executed[0] == "/app/bin/flatpak-spawn"
-    argv = executed[1]
-    assert isinstance(argv, list)
-    assert argv[:2] == ["/app/bin/flatpak-spawn", "--host"]
-    assert "gamescope" in argv
-    assert "gamemoderun" in argv
-    assert "/nix/store/game/bin/game" in argv
-    assert not any("python" in item.casefold() for item in argv)
-    for key in (
-        "LD_LIBRARY_PATH", "LD_PRELOAD", "PRESSURE_VESSEL_RUNTIME", "STEAM_RUNTIME"
-    ):
-        assert not any(value.startswith(f"--env={key}=") for value in argv)
-        assert f"{key}={steam_environment[key]}" in argv
-    for key in (
-        "SteamAppId", "SteamGameId", "STEAM_COMPAT_APP_ID", "STEAM_COMPAT_DATA_PATH"
-    ):
-        assert f"--env={key}={steam_environment[key]}" in argv
-    helper_environment = executed[2]
-    assert isinstance(helper_environment, dict)
-    assert "LD_LIBRARY_PATH" not in helper_environment
-    assert "LD_PRELOAD" not in helper_environment
+    assert result == 2
     report = json.loads((tmp_path / "reports/292030.json").read_text())
-    assert report["executionTransport"] == "flatpak-spawn-host"
+    assert report["executionTransport"] == "native"
     assert report["steamContextAppId"] == "292030"
     assert report["steamContextGameId"] == "292030"
     assert report["steamCommand"] == ["/nix/store/game/bin/game", "a b"]
@@ -1190,6 +1157,232 @@ def test_flatpak_runner_executes_complete_plan_on_host_without_host_python(
     assert "Gamescope wrapper: gamescope" in diagnostics
     assert "host wrapper environment isolation" in diagnostics
     assert "pinned_libs_64" not in diagnostics
+    assert "installed host runner is outdated" in diagnostics
+    source = inspect.getsource(runner_module)
+    assert "flatpak-spawn --host" not in source
+    assert 'exec "$@"' in source
+
+
+def test_prepared_launcher_keeps_original_steam_argv_out_of_payload_and_orders_wrappers(
+    tmp_path: Path,
+) -> None:
+    original = (
+        "/home/user/.local/share/Steam/compatibilitytools.d/Proton-GE Latest/proton",
+        "waitforexitandrun",
+        "/games/Game With Spaces/game.exe",
+        "--label=a b",
+    )
+    profile = replace(
+        GameOptimizationProfile.default("292030"),
+        gamemode_enabled=True,
+        gamescope_enabled=True,
+        gamescope_mode="native",
+    )
+    plan = OptimizationLaunchPlanner().build(
+        profile,
+        original,
+        gamemode=_tool("GameMode", "/usr/bin/gamemoderun"),
+        gamescope=_tool(
+            "Gamescope", "/usr/bin/gamescope", ("-W", "-H", "-r", "-f", "-b")
+        ),
+    )
+
+    payload = runner_module._host_launcher_payload(plan, {})
+    text = payload.decode("utf-8")
+
+    assert original[0] not in text
+    assert original[2] not in text
+    assert text.rstrip().endswith('/usr/bin/gamemoderun "$@"')
+    assert text.index("/usr/bin/gamescope") < text.index("/usr/bin/gamemoderun")
+    assert "flatpak-spawn" not in text
+
+
+def _host_launch_handoff(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    app_id: str,
+) -> Path:
+    home = tmp_path / "home"
+    root = home / ".local/share/game-optimization-linux/run-env"
+    root.mkdir(parents=True, mode=0o700)
+    root.chmod(0o700)
+    directory = root / "launch.test1234"
+    directory.mkdir(mode=0o700)
+    snapshot = directory / "steam.env"
+    snapshot.write_bytes(
+        f"SteamAppId={app_id}\0SteamGameId={app_id}\0".encode()
+        + f"STEAM_COMPAT_APP_ID={app_id}\0".encode()
+        + f"STEAM_COMPAT_DATA_PATH=/steam/compatdata/{app_id}\0".encode()
+    )
+    snapshot.chmod(0o600)
+    monkeypatch.setattr(runner_module, "host_home_directory", lambda _env: home)
+    monkeypatch.setenv("FLATPAK_ID", "io.github.DevVoidPL.GameOptimizationLinux")
+    monkeypatch.setenv("GAME_OPTIMIZATION_STEAM_ENV_FILE", str(snapshot))
+    return directory
+
+
+def _wait_for_file(path: Path, timeout: float = 3.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not path.is_file():
+        if time.monotonic() >= deadline:
+            pytest.fail(f"timed out waiting for {path}")
+        time.sleep(0.01)
+
+
+@pytest.mark.parametrize("expected_exit_code", (0, 37))
+def test_prepared_host_baseline_claims_starts_heartbeats_and_records_real_exit(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    expected_exit_code: int,
+) -> None:
+    app_id = "292030"
+    directory = _host_launch_handoff(tmp_path, monkeypatch, app_id)
+    profiles = GameOptimizationProfileRepository(tmp_path / "games")
+    profiles.save(GameOptimizationProfile.default(app_id))
+
+    class CountingSessions(BaselineSessionRepository):
+        def __init__(self, root: Path) -> None:
+            super().__init__(root)
+            self.heartbeat_count = 0
+
+        def heartbeat(self, app_id: object, session_id: str, runner_token: str):
+            self.heartbeat_count += 1
+            return super().heartbeat(app_id, session_id, runner_token)
+
+    sessions = CountingSessions(tmp_path / "sessions")
+    created = sessions.create(app_id, f"steam-{app_id}")
+    child = tmp_path / "game with spaces.py"
+    child.write_text(
+        "from pathlib import Path\n"
+        "import os\n"
+        "import sys\n"
+        "import time\n"
+        "assert sys.argv[1:3] == ['argument with spaces', 'No. 7']\n"
+        "assert os.environ['MANGOHUD'] == '1'\n"
+        "assert os.environ['MANGOHUD_CONFIG'] == 'read_cfg'\n"
+        "assert os.environ['MANGOHUD_CONFIGFILE'] == sys.argv[3]\n"
+        "exit_code = int(sys.argv[5])\n"
+        "if exit_code == 0:\n"
+        "    Path(sys.argv[4]).write_text('time,fps,frametime\\n0.0,60,16.67\\n', encoding='utf-8')\n"
+        "time.sleep(0.35)\n"
+        "raise SystemExit(exit_code)\n",
+        encoding="utf-8",
+    )
+    command = [
+        sys.executable,
+        str(child),
+        "argument with spaces",
+        "No. 7",
+        str(created.config_path),
+        str(created.log_directory / "Game 2026.csv"),
+        str(expected_exit_code),
+    ]
+    monkeypatch.setattr(runner_module, "_HOST_LAUNCH_HEARTBEAT_SECONDS", 0.03)
+    results: list[int] = []
+    worker = threading.Thread(
+        target=lambda: results.append(
+            runner_main(
+                [
+                    "--appid", app_id,
+                    "--prepare-host-launch", str(directory),
+                    "--", *command,
+                ],
+                repository=profiles,
+                baseline_sessions=sessions,
+                detector=RuntimeToolDetector(which=lambda _name: None),
+                report_root=tmp_path / "reports",
+            )
+        )
+    )
+    worker.start()
+    _wait_for_file(directory / "ready")
+    launcher_text = (directory / "launcher").read_text(encoding="utf-8")
+    assert str(child) not in launcher_text
+    process = subprocess.Popen([str(directory / "launcher"), *command])
+    runner_module._atomic_protocol_write(
+        directory, "started", f"{process.pid}\n".encode()
+    )
+    child_status = process.wait(timeout=3)
+    runner_module._atomic_protocol_write(
+        directory, "completed", f"{child_status}\n".encode()
+    )
+    worker.join(timeout=3)
+
+    assert not worker.is_alive()
+    assert results == [0]
+    assert child_status == expected_exit_code
+    finished = sessions.load(app_id)
+    assert finished is not None
+    assert finished.id == created.id
+    assert finished.runner_invocation_count == 1
+    assert finished.handshake_at is not None
+    assert finished.spawned_pid == process.pid
+    assert finished.runner_completed_at is not None
+    assert finished.exit_code == expected_exit_code
+    assert finished.observed_processes == (
+        f"pid={process.pid} state=exited code={expected_exit_code}",
+    )
+    assert finished.status == (
+        "processing" if expected_exit_code == 0 else "failed"
+    )
+    assert sessions.heartbeat_count >= 1
+    assert sessions.newest_log(app_id) == (
+        created.log_directory / "Game 2026.csv"
+        if expected_exit_code == 0
+        else None
+    )
+    report = json.loads((tmp_path / f"reports/{app_id}.json").read_text())
+    assert report["executionTransport"] == "steam-host-runner"
+    assert report["baselineCompletionReceived"] is True
+    assert report["baselineExitCode"] == expected_exit_code
+    assert report["baselineLogExists"] is (expected_exit_code == 0)
+
+
+def test_prepared_host_normal_launch_waits_for_real_exit_without_claiming_baseline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    app_id = "224760"
+    directory = _host_launch_handoff(tmp_path, monkeypatch, app_id)
+    profiles = GameOptimizationProfileRepository(tmp_path / "games")
+    profiles.save(GameOptimizationProfile.default(app_id))
+    sessions = BaselineSessionRepository(tmp_path / "sessions")
+    results: list[int] = []
+    command = [sys.executable, "-c", "raise SystemExit(23)", "argument with spaces"]
+    worker = threading.Thread(
+        target=lambda: results.append(
+            runner_main(
+                [
+                    "--appid", app_id,
+                    "--prepare-host-launch", str(directory),
+                    "--", *command,
+                ],
+                repository=profiles,
+                baseline_sessions=sessions,
+                detector=RuntimeToolDetector(which=lambda _name: None),
+                report_root=tmp_path / "reports",
+            )
+        )
+    )
+    worker.start()
+    _wait_for_file(directory / "ready")
+    process = subprocess.Popen([str(directory / "launcher"), *command])
+    runner_module._atomic_protocol_write(
+        directory, "started", f"{process.pid}\n".encode()
+    )
+    child_status = process.wait(timeout=3)
+    runner_module._atomic_protocol_write(
+        directory, "completed", f"{child_status}\n".encode()
+    )
+    worker.join(timeout=3)
+
+    assert not worker.is_alive()
+    assert child_status == 23
+    assert results == [0]
+    assert sessions.load(app_id) is None
+    report = json.loads((tmp_path / f"reports/{app_id}.json").read_text())
+    assert report["executionTransport"] == "steam-host-runner"
+    assert report["baselineSessionId"] == ""
 
 
 def _null_environment(path: Path) -> dict[str, str]:
@@ -1252,42 +1445,90 @@ def test_runner_replaces_only_zero_steam_context_with_requested_appid() -> None:
 
 
 @pytest.mark.parametrize(
-    ("steam_installation", "game_command"),
+    ("steam_installation", "command_kind"),
     (
-        ("native", ("/games/native-game", "--windowed")),
-        ("native", ("/compatibilitytools.d/Proton/proton", "waitforexitandrun", "Game.exe")),
-        ("flatpak", ("/games/native-game", "--windowed")),
-        ("flatpak", ("/compatibilitytools.d/Proton/proton", "waitforexitandrun", "Game.exe")),
+        ("native", "native"),
+        ("native", "proton"),
+        ("flatpak", "native"),
+        ("flatpak", "proton"),
     ),
 )
 def test_host_runner_isolates_flatpak_env_and_preserves_steam_context(
     tmp_path: Path,
     steam_installation: str,
-    game_command: tuple[str, ...],
+    command_kind: str,
 ) -> None:
     root = Path(__file__).resolve().parents[1]
     wrapper = root / "libexec/game-optimization-run-host"
     home = tmp_path / "home"
     home.mkdir()
+    run_root = home / ".local/share/game-optimization-linux/run-env"
+    run_root.mkdir(parents=True, mode=0o700)
+    run_root.chmod(0o700)
+    stale_launch = run_root / "launch.stale1234"
+    stale_launch.mkdir(mode=0o700)
+    (stale_launch / "owner").write_text("99999999\n", encoding="ascii")
+    (stale_launch / "completed").write_text("0\n", encoding="ascii")
+    (stale_launch / "owner").chmod(0o600)
+    (stale_launch / "completed").chmod(0o600)
     tools = tmp_path / "tools"
     tools.mkdir()
     clean_environment_file = tmp_path / "flatpak-environment"
     original_environment_file = tmp_path / "original-environment"
     arguments_file = tmp_path / "flatpak-arguments"
+    child_result_file = tmp_path / "child-result.json"
+    executable_directory = tmp_path / "Proton-GE Latest"
+    executable_directory.mkdir()
+    executable = executable_directory / (
+        "proton" if command_kind == "proton" else "game executable"
+    )
+    executable.write_text(
+        f"#!{sys.executable}\n"
+        "import json\n"
+        "import os\n"
+        "import sys\n"
+        "payload = {\n"
+        "    'argv': sys.argv,\n"
+        "    'context': os.environ.get('STEAM_CONTEXT_ONLY', ''),\n"
+        "    'descriptor': os.read(int(os.environ['STEAM_CONTEXT_FD']), 64).decode(),\n"
+        "    'ld_library_path': os.environ.get('LD_LIBRARY_PATH', ''),\n"
+        "}\n"
+        "with open(os.environ['STEAM_CONTEXT_RESULT'], 'w', encoding='utf-8') as stream:\n"
+        "    json.dump(payload, stream)\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    game_command = (
+        (str(executable), "waitforexitandrun", "/games/Game With Spaces/Game.exe")
+        if command_kind == "proton"
+        else (str(executable), "--window title", "Game With Spaces")
+    )
     transport = "flatpak" if steam_installation == "native" else "flatpak-spawn"
     transport_script = tools / transport
     transport_script.write_text(
         "#!/bin/sh\n"
         f"/usr/bin/env -0 > {clean_environment_file!s}\n"
         "snapshot=\n"
+        "launch_directory=\n"
+        "previous=\n"
         "for value in \"$@\"; do\n"
+        "  if [ \"$previous\" = prepare ]; then launch_directory=$value; fi\n"
+        "  previous=\n"
         "  case \"$value\" in\n"
         "    --env=GAME_OPTIMIZATION_STEAM_ENV_FILE=*) "
         "snapshot=${value#--env=GAME_OPTIMIZATION_STEAM_ENV_FILE=} ;;\n"
+        "    --prepare-host-launch) previous=prepare ;;\n"
         "  esac\n"
         "done\n"
         f"/usr/bin/printf '%s\\n' \"$@\" > {arguments_file!s}\n"
-        f"/usr/bin/cp \"$snapshot\" {original_environment_file!s}\n",
+        f"/usr/bin/cp \"$snapshot\" {original_environment_file!s}\n"
+        "/usr/bin/printf '#!/bin/sh\\nexec \"$@\"\\n' > \"$launch_directory/.launcher.tmp\"\n"
+        "/usr/bin/chmod 0700 \"$launch_directory/.launcher.tmp\"\n"
+        "/usr/bin/mv \"$launch_directory/.launcher.tmp\" \"$launch_directory/launcher\"\n"
+        "/usr/bin/printf '1\\n' > \"$launch_directory/.ready.tmp\"\n"
+        "/usr/bin/chmod 0600 \"$launch_directory/.ready.tmp\"\n"
+        "/usr/bin/mv \"$launch_directory/.ready.tmp\" \"$launch_directory/ready\"\n"
+        "while [ ! -f \"$launch_directory/completed\" ]; do /usr/bin/sleep 0.01; done\n",
         encoding="utf-8",
     )
     transport_script.chmod(0o755)
@@ -1313,25 +1554,35 @@ def test_host_runner_isolates_flatpak_env_and_preserves_steam_context(
         "STEAM_COMPAT_DATA_PATH": "/fake/compatdata/292030",
         "XDG_RUNTIME_DIR": str(tmp_path / "runtime"),
         "LANG": "C.UTF-8",
+        "STEAM_CONTEXT_ONLY": "inherited-from-original-runner",
+        "STEAM_CONTEXT_RESULT": str(child_result_file),
     }
     if steam_installation == "flatpak":
         environment["FLATPAK_ID"] = "com.valvesoftware.Steam"
 
-    completed = subprocess.run(
-        [
-            "/bin/sh",
-            str(wrapper),
-            "--appid",
-            "292030",
-            "--",
-            *game_command,
-        ],
-        check=False,
-        capture_output=True,
-        text=True,
-        env=environment,
-        timeout=10,
-    )
+    read_descriptor, write_descriptor = os.pipe()
+    try:
+        os.write(write_descriptor, b"inherited-file-descriptor")
+        os.close(write_descriptor)
+        environment["STEAM_CONTEXT_FD"] = str(read_descriptor)
+        completed = subprocess.run(
+            [
+                "/bin/sh",
+                str(wrapper),
+                "--appid",
+                "292030",
+                "--",
+                *game_command,
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+            env=environment,
+            pass_fds=(read_descriptor,),
+            timeout=10,
+        )
+    finally:
+        os.close(read_descriptor)
 
     assert completed.returncode == 0, completed.stderr
     clean_environment = _null_environment(clean_environment_file)
@@ -1348,9 +1599,18 @@ def test_host_runner_isolates_flatpak_env_and_preserves_steam_context(
     assert original_environment["SteamGameId"] == "292030"
     assert original_environment["STEAM_COMPAT_DATA_PATH"].endswith("compatdata/292030")
     assert "compatdata/0" not in original_environment["STEAM_COMPAT_DATA_PATH"]
-    arguments = arguments_file.read_text(encoding="utf-8")
-    assert "--appid\n292030\n--\n" in arguments
-    assert all(value in arguments for value in game_command)
+    child_result = json.loads(child_result_file.read_text(encoding="utf-8"))
+    assert child_result["argv"] == list(game_command)
+    assert child_result["context"] == "inherited-from-original-runner"
+    assert child_result["descriptor"] == "inherited-file-descriptor"
+    assert child_result["ld_library_path"].endswith("pinned_libs_64")
+    assert not stale_launch.exists()
+    assert not tuple(run_root.glob("launch.*"))
+    arguments = arguments_file.read_text(encoding="utf-8").splitlines()
+    app_id_index = arguments.index("--appid")
+    separator_index = arguments.index("--", app_id_index)
+    assert arguments[app_id_index + 1] == "292030"
+    assert arguments[separator_index + 1:] == list(game_command)
 
 
 def test_runner_and_launch_planner_never_use_a_shell() -> None:

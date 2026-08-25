@@ -206,7 +206,7 @@ def test_library_cache_migrates_v1_game_with_safe_update_defaults(
 
     restored = LibraryCache(path).load()[0]
 
-    assert CACHE_FORMAT_VERSION == 2
+    assert CACHE_FORMAT_VERSION == 3
     assert restored.steam_build_id is None
     assert restored.update_in_progress is True
 

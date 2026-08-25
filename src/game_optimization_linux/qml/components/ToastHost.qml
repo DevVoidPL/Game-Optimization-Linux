@@ -38,6 +38,13 @@ Item {
         return App.Theme.info
     }
 
+    function iconFor(tone) {
+        if (tone === "success") return App.UiIcons.statusSuccess
+        if (tone === "warning") return App.UiIcons.statusWarning
+        if (tone === "error") return App.UiIcons.statusError
+        return App.UiIcons.statusInformation
+    }
+
     ListModel { id: toastModel }
 
     ListView {
@@ -73,13 +80,16 @@ Item {
                 anchors.margins: 11
                 spacing: 10
 
-                Rectangle {
-                    Layout.preferredWidth: 8
-                    Layout.fillHeight: true
-                    Layout.maximumHeight: 30
+                Image {
+                    Layout.preferredWidth: 20
+                    Layout.preferredHeight: 20
                     Layout.alignment: Qt.AlignVCenter
-                    radius: 4
-                    color: host.colorFor(toast.tone)
+                    source: host.iconFor(toast.tone)
+                    sourceSize.width: 20
+                    sourceSize.height: 20
+                    fillMode: Image.PreserveAspectFit
+                    cache: true
+                    smooth: true
                 }
 
                 Label {
@@ -91,7 +101,7 @@ Item {
                 }
 
                 IconButton {
-                    symbol: "×"
+                    iconSource: App.UiIcons.actionCancel
                     toolTip: qsTr("Dismiss")
                     onClicked: toastModel.remove(toast.index)
                 }

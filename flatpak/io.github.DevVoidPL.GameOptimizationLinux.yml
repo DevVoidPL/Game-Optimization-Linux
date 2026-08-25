@@ -15,6 +15,14 @@ finish-args:
   - --device=dri
   - --device=input
   - --filesystem=home
+  # Flatpak deliberately hides other applications' ~/.var/app trees from a
+  # generic home grant. These narrow, read-only exceptions expose only local
+  # launcher metadata/artwork used for installed-game discovery.
+  - --filesystem=~/.var/app/com.heroicgameslauncher.hgl/config/heroic:ro
+  - --filesystem=~/.var/app/com.heroicgameslauncher.hgl/config/legendary:ro
+  - --filesystem=~/.var/app/net.lutris.Lutris/config/lutris:ro
+  - --filesystem=~/.var/app/net.lutris.Lutris/data/lutris:ro
+  - --filesystem=~/.var/app/net.lutris.Lutris/cache/lutris:ro
   - --filesystem=/run/media
   - --filesystem=/media
   - --filesystem=/mnt
@@ -260,13 +268,13 @@ modules:
       - install -Dm644 docs/narrator-components.md ${FLATPAK_DEST}/share/doc/game-optimization-linux/narrator-components.md
       - install -Dm755 scripts/install-game-optimization-runner.sh ${FLATPAK_DEST}/bin/game-optimization-install-runner
       - install -Dm755 libexec/game-optimization-run-host ${FLATPAK_DEST}/libexec/game-optimization-run-host
+      - install -Dm644 src/game_optimization_linux/assets/branding/game-optimization-linux-app-icon.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.DevVoidPL.GameOptimizationLinux.svg
+      - install -Dm644 data/icons/hicolor/512x512/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/512x512/apps/io.github.DevVoidPL.GameOptimizationLinux.png
       - install -Dm644 data/icons/hicolor/256x256/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/256x256/apps/io.github.DevVoidPL.GameOptimizationLinux.png
       - install -Dm644 data/icons/hicolor/128x128/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/128x128/apps/io.github.DevVoidPL.GameOptimizationLinux.png
       - install -Dm644 data/icons/hicolor/64x64/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/64x64/apps/io.github.DevVoidPL.GameOptimizationLinux.png
       - install -Dm644 data/icons/hicolor/48x48/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/48x48/apps/io.github.DevVoidPL.GameOptimizationLinux.png
       - install -Dm644 data/icons/hicolor/32x32/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/32x32/apps/io.github.DevVoidPL.GameOptimizationLinux.png
-      - install -Dm644 data/icons/hicolor/24x24/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/24x24/apps/io.github.DevVoidPL.GameOptimizationLinux.png
-      - install -Dm644 data/icons/hicolor/22x22/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/22x22/apps/io.github.DevVoidPL.GameOptimizationLinux.png
       - install -Dm644 data/icons/hicolor/16x16/apps/io.github.DevVoidPL.GameOptimizationLinux.png ${FLATPAK_DEST}/share/icons/hicolor/16x16/apps/io.github.DevVoidPL.GameOptimizationLinux.png
     sources:
       - type: dir
@@ -278,8 +286,11 @@ modules:
           - .flatpak-builder
           - .flatpak-build-*
           - .flatpak-repo-*
+          - build
           - build-flatpak
           - dist
+          - GrafikiProgramu
           - reports
           - tests
+          - '*.egg-info'
           - '**/__pycache__'

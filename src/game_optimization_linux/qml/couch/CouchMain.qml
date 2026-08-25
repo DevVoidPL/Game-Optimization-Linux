@@ -239,7 +239,6 @@ FocusScope {
             Rectangle {
                 Layout.preferredWidth: 48 * couch.couchScale; Layout.preferredHeight: 48 * couch.couchScale; radius: 13 * couch.couchScale; color: App.Theme.surfaceRaised; clip: true
                 Image { id: logoImage; anchors.fill: parent; anchors.margins: 4 * couch.couchScale; source: couch.controller ? String(couch.controller.appLogoUrl || "") : ""; fillMode: Image.PreserveAspectFit; visible: status === Image.Ready }
-                Label { anchors.centerIn: parent; text: "GF"; color: App.Theme.accent; font.pixelSize: 16 * couch.couchScale; font.weight: Font.Bold; visible: !logoImage.visible }
             }
             ColumnLayout {
                 spacing: 0

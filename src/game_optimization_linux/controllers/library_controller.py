@@ -7,6 +7,7 @@ import logging
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from ..models import (
     BackupStatus,
@@ -15,6 +16,7 @@ from ..models import (
     GameStatus,
     Launcher,
     OptimizationProfile,
+    ManualGameConfig,
     SizeScanStatus,
     TextureCompatibility,
 )
@@ -335,6 +337,82 @@ class LibraryController:
         self._app._emit_toast(f"Added {game.name} to the demo library", "success")
         return True
 
+    def manualGameConfig(self, game_id: str) -> dict[str, Any]:
+        getter = getattr(self._app._game_provider, "manual_config", None)
+        if not callable(getter):
+            return {"success": False, "error": "Manual game storage is unavailable"}
+        try:
+            configuration = getter(str(game_id))
+        except Exception as error:
+            logger.exception("Could not load manual game configuration %s", game_id)
+            return {"success": False, "error": str(error) or type(error).__name__}
+        if configuration is None:
+            return {"success": False, "error": "Manual game was not found"}
+        return configuration.to_qml()
+
+    def saveManualGame(self, values: Mapping[str, Any]) -> dict[str, Any]:
+        saver = getattr(self._app._game_provider, "save_manual_config", None)
+        if not callable(saver):
+            message = "Manual game storage is unavailable"
+            self._app._emit_toast(message, "error")
+            return {"success": False, "error": message}
+        requested_id = str(values.get("id", "")).strip()
+        identifier = requested_id or f"manual-{uuid4()}"
+        if requested_id:
+            existing = getattr(self._app._game_provider, "manual_config", lambda _id: None)(
+                requested_id
+            )
+            if existing is None:
+                message = "Only an existing custom game can be edited"
+                self._app._emit_toast(message, "error")
+                return {"success": False, "error": message}
+        try:
+            configuration = ManualGameConfig.from_qml(values, identifier=identifier)
+            game = saver(configuration)
+        except Exception as error:
+            logger.exception("Could not save manual game %s", identifier)
+            message = str(error).strip() or type(error).__name__
+            self._app._emit_toast(message, "error")
+            return {"success": False, "error": message}
+
+        self._app._artwork_resolver.invalidate()
+        self._app._domain_games[game.id] = self._app._resolve_game_artwork(game)
+        self._app._save_library_cache()
+        self._app._reload_games(reason="manual_game_saved")
+        if self._app._selected_game_id == game.id:
+            self.openGame(game.id)
+        action = "Updated" if requested_id else "Added"
+        self._app._emit_toast(f"{action} {game.name}", "success")
+        result = configuration.to_qml()
+        result["game"] = self._app._present_game(self._app._domain_games[game.id])
+        return result
+
+    def removeManualGame(self, game_id: str) -> bool:
+        remover = getattr(self._app._game_provider, "remove_manual_config", None)
+        getter = getattr(self._app._game_provider, "manual_config", None)
+        if not callable(remover) or not callable(getter):
+            self._app._emit_toast("Manual game storage is unavailable", "error")
+            return False
+        try:
+            configuration = getter(str(game_id))
+            if configuration is None:
+                raise ValueError("Only a custom game can be removed")
+            remover(str(game_id))
+        except Exception as error:
+            logger.exception("Could not remove manual game %s", game_id)
+            self._app._emit_toast(str(error).strip() or type(error).__name__, "error")
+            return False
+        self._app._domain_games.pop(str(game_id), None)
+        if self._app._selected_game_id == str(game_id):
+            self._app._selected_game_id = ""
+            self._app._selected_game = {}
+            self._app.selectedGameChanged.emit()
+            self._app._set_current_page("games")
+        self._app._save_library_cache()
+        self._app._reload_games(reason="manual_game_removed")
+        self._app._emit_toast(f"Removed {configuration.name}", "success")
+        return True
+
     def openGame(self, game_id: str) -> bool:
         game = self._app._find_game(game_id)
         if game is None:
@@ -385,11 +463,13 @@ class LibraryController:
         return True
 
     def _create_steam_provider(self) -> GameProviderLike:
-        """Build Linux read-only integrations lazily for normal operation."""
+        """Build the unified read-only launcher provider set lazily."""
 
         # Imported only outside Demo mode so GUI fixtures have no host coupling.
         from ..providers.linux_filesystem import LinuxFilesystemProvider
         from ..providers.local import ConfiguredGameProvider, LocalGameProvider
+        from ..providers.heroic import HeroicGameProvider
+        from ..providers.lutris import LutrisGameProvider
         from ..providers.steam import SteamGameProvider
         from ..services.directory_size import DirectorySizeScanner
         from ..config import LOCAL_EXECUTABLE_CHOICES_FILE
@@ -406,8 +486,14 @@ class LibraryController:
             self._app._filesystem_provider,
             self._app._settings_model.library_directories,
             choices_path=LOCAL_EXECUTABLE_CHOICES_FILE,
+            manual_store=self._app._manual_game_store,
         )
-        return ConfiguredGameProvider(steam, local)
+        return ConfiguredGameProvider(
+            steam,
+            local,
+            heroic=HeroicGameProvider(self._app._filesystem_provider),
+            lutris=LutrisGameProvider(self._app._filesystem_provider),
+        )
 
     def _initial_games(self, initial_games: Sequence[Game] | None) -> list[Game]:
         if initial_games is not None:
@@ -416,7 +502,7 @@ class LibraryController:
             try:
                 cached_games = list(self._app._library_cache.load())
             except Exception as error:
-                logger.warning("Could not load the Steam library cache: %s", error)
+                logger.warning("Could not load the game library cache: %s", error)
             else:
                 if cached_games:
                     logger.info(
@@ -491,6 +577,8 @@ class LibraryController:
         if not self._app._demo_mode:
             games = self._app._merge_unavailable_cached_games(games)
 
+        self._app._update_provider_diagnostics()
+
         self._app._set_domain_games(
             games,
             reason="library_scan_inventory",
@@ -523,10 +611,10 @@ class LibraryController:
             )
         self._app._set_scan_state(
             status="error",
-            message=f"Steam library scan failed: {readable}",
+            message=f"Game library scan failed: {readable}",
         )
         self._app._emit_toast(
-            "Steam library scan failed; cached games remain available",
+            "Game library scan failed; cached games remain available",
             "error",
         )
 
@@ -668,12 +756,18 @@ class LibraryController:
         if self._app._demo_mode:
             status = "demo"
             message = f"Demo library ready · {len(self._app._domain_games)} games"
-        elif not self._app._steam_found and not self._app._domain_games:
+        elif (
+            not self._app._steam_found
+            and not self._app._domain_games
+            and not hasattr(self._app._game_provider, "last_reports")
+        ):
+            # Preserve the public status contract for injected/legacy Steam-only
+            # providers while the real aggregate reports all launcher sources.
             status = "steam-not-found"
             message = "Steam was not found in standard or configured locations"
         elif not self._app._domain_games:
             status = "empty"
-            message = "Steam was found, but no installed games were detected"
+            message = "No installed games were detected in configured launcher locations"
         else:
             status = "ready"
             message = f"Game library ready · {len(self._app._domain_games)} games"
@@ -698,7 +792,7 @@ class LibraryController:
         self._app._scan_retry_pending = False
         self._app._set_scan_state(
             status="scan-queued",
-            message="A coalesced Steam library refresh is queued",
+            message="A coalesced game library refresh is queued",
             is_scanning=True,
         )
         if not self._app._scan_debounce_timer.isActive():
@@ -812,7 +906,7 @@ class LibraryController:
         self,
         discovered_games: Sequence[Game],
     ) -> list[Game]:
-        """Retain only cached games whose Steam library is known unavailable.
+        """Retain cached games only when their provider or library is unavailable.
 
         A normal refresh remains authoritative for accessible libraries, so an
         uninstalled game is not resurrected from cache.  The exception is a
@@ -823,13 +917,28 @@ class LibraryController:
         inaccessible = self._app._provider_inaccessible_paths()
         configured = self._app._provider_configured_library_paths()
         retained = 0
+        failed_launchers = set(
+            getattr(self._app._game_provider, "failed_launchers", ()) or ()
+        )
         for game in self._app._domain_games.values():
-            if game.launcher is not Launcher.STEAM:
-                continue
             if game.id in merged:
                 merged[game.id] = self._app._preserve_cached_artwork(
                     merged[game.id], game
                 )
+                continue
+            if game.launcher in failed_launchers:
+                merged[game.id] = replace(
+                    game,
+                    status=GameStatus.DRIVE_DISCONNECTED,
+                    compression_available=False,
+                    library_available=False,
+                    is_writable=False,
+                    size_scan_status=SizeScanStatus.NOT_REQUESTED,
+                    size_scan_error=None,
+                )
+                retained += 1
+                continue
+            if game.launcher is not Launcher.STEAM:
                 continue
             belongs_to_inaccessible = any(
                 self._app._path_is_within_library(game, root) for root in inaccessible
@@ -851,7 +960,7 @@ class LibraryController:
             retained += 1
         if retained:
             logger.info(
-                "Retained %d cached games from unavailable Steam libraries",
+                "Retained %d cached games from unavailable launcher libraries",
                 retained,
             )
         self._app._log_library_decisions(discovered_games)
@@ -1022,7 +1131,60 @@ class LibraryController:
         try:
             self._app._library_cache.save(tuple(self._app._domain_games.values()))
         except Exception as error:
-            logger.warning("Could not save the Steam library cache: %s", error)
+            logger.warning("Could not save the game library cache: %s", error)
+
+    def _update_provider_diagnostics(self) -> None:
+        reports = getattr(self._app._game_provider, "last_reports", {})
+        errors = getattr(self._app._game_provider, "provider_errors", {})
+        rows: list[dict[str, Any]] = []
+        seen_launchers: set[str] = set()
+        if isinstance(reports, Mapping):
+            for launcher, report in reports.items():
+                seen_launchers.add(str(launcher))
+                roots = getattr(report, "roots", ())
+                rows.append(
+                    {
+                        "launcher": str(launcher),
+                        "gamesFound": int(getattr(report, "games_found", 0)),
+                        "malformedRecords": int(
+                            getattr(report, "malformed_records", 0)
+                        ),
+                        "duplicateGames": int(getattr(report, "duplicate_games", 0)),
+                        "elapsedSeconds": float(
+                            getattr(report, "elapsed_seconds", 0.0)
+                        ),
+                        "roots": [
+                            {
+                                "path": str(getattr(root, "path", "")),
+                                "variant": str(getattr(root, "variant", "")),
+                                "state": str(getattr(root, "state", "unknown")),
+                                "message": str(getattr(root, "message", "")),
+                            }
+                            for root in roots
+                        ],
+                        "error": str(errors.get(launcher, ""))
+                        if isinstance(errors, Mapping)
+                        else "",
+                    }
+                )
+        if isinstance(errors, Mapping):
+            for launcher, message in errors.items():
+                if str(launcher) in seen_launchers:
+                    continue
+                rows.append(
+                    {
+                        "launcher": str(launcher),
+                        "gamesFound": 0,
+                        "malformedRecords": 0,
+                        "duplicateGames": 0,
+                        "elapsedSeconds": 0.0,
+                        "roots": [],
+                        "error": str(message),
+                    }
+                )
+        if rows != self._app._library_provider_diagnostics:
+            self._app._library_provider_diagnostics = rows
+            self._app.libraryProviderDiagnosticsChanged.emit()
 
     def _provider_steam_found(self, games: Sequence[Game]) -> bool:
         if any(game.launcher is Launcher.STEAM for game in games):

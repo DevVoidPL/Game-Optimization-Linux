@@ -22,10 +22,12 @@ PACKAGE_DIR = Path(__file__).resolve().parent
 QML_DIR = PACKAGE_DIR / "qml"
 MAIN_QML = QML_DIR / "Main.qml"
 RESOURCES_DIR = PACKAGE_DIR / "resources"
+BRANDING_DIR = PACKAGE_DIR / "assets" / "branding"
 APP_ICON = RESOURCES_DIR / "GameOptimizationLinuxIcon.png"
+APP_ICON_SVG = BRANDING_DIR / "game-optimization-linux-app-icon.svg"
 APP_ICON_VARIANTS = {
     size: RESOURCES_DIR / "app-icons" / f"{size}x{size}.png"
-    for size in (16, 22, 24, 32, 48, 64, 128, 256)
+    for size in (16, 32, 48, 64, 128, 256, 512)
 }
 TRANSLATIONS_DIR = PACKAGE_DIR / "translations"
 COMPRESSION_BENCHMARK_REPORTS_DIR = (
@@ -65,6 +67,7 @@ SETTINGS_FILE = CONFIG_DIR / "settings.json"
 GAMEPAD_MAPPINGS_FILE = CONFIG_DIR / "gamecontrollerdb.txt"
 LIBRARY_CACHE_FILE = CACHE_DIR / "library-v1.json"
 LOCAL_EXECUTABLE_CHOICES_FILE = CONFIG_DIR / "local-executables-v1.json"
+MANUAL_GAMES_FILE = CONFIG_DIR / "manual-games-v1.json"
 ANALYSIS_CACHE_FILE = CACHE_DIR / "compression-analysis-v1.json"
 COMPRESSION_HISTORY_FILE = STATE_DIR / "compression-history-v2.json"
 TASK_HISTORY_FILE = STATE_DIR / "task-history-v1.json"
@@ -87,6 +90,7 @@ NARRATOR_CAPTURE_GRANTS_FILE = (
 __all__ = [
     "APP_ID",
     "APP_ICON",
+    "APP_ICON_SVG",
     "APP_ICON_VARIANTS",
     "APP_NAME",
     "APP_VERSION",
@@ -101,6 +105,7 @@ __all__ = [
     "GAMES_CONFIG_DIR",
     "CACHE_DIR",
     "CACHE_HOME",
+    "BRANDING_DIR",
     "LOG_DIR",
     "LOG_FILE",
     "MANGOHUD_LOG_DIR",
@@ -110,6 +115,7 @@ __all__ = [
     "NARRATOR_TRANSLATION_CACHE_FILE",
     "LIBRARY_CACHE_FILE",
     "LOCAL_EXECUTABLE_CHOICES_FILE",
+    "MANUAL_GAMES_FILE",
     "MAIN_QML",
     "ORGANIZATION_DOMAIN",
     "ORGANIZATION_NAME",

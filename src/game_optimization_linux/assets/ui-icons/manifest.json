@@ -1,0 +1,224 @@
+[
+  {
+    "filename": "btrfs-analyze-compression.svg",
+    "semantic_name": "Analyze compression",
+    "category": "btrfs",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "btrfs-verify-compression.svg",
+    "semantic_name": "Verify compression",
+    "category": "btrfs",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "btrfs-exact-measurement.svg",
+    "semantic_name": "Exact measurement",
+    "category": "btrfs",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "remaster-classic.svg",
+    "semantic_name": "Classic Enhancement",
+    "category": "graphics-remaster",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "remaster-light-ai.svg",
+    "semantic_name": "Light AI",
+    "category": "graphics-remaster",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "remaster-quality-ai.svg",
+    "semantic_name": "Quality AI",
+    "category": "graphics-remaster",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "overview-logical-size.svg",
+    "semantic_name": "Logical size",
+    "category": "overview",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "overview-physical-size.svg",
+    "semantic_name": "Physical size",
+    "category": "overview",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "overview-saved-space.svg",
+    "semantic_name": "Saved space",
+    "category": "overview",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "overview-optimization-profile.svg",
+    "semantic_name": "Optimization profile",
+    "category": "overview",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "sidebar-games.svg",
+    "semantic_name": "Games",
+    "category": "sidebar",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "sidebar-narrator.svg",
+    "semantic_name": "Narrator",
+    "category": "sidebar",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "sidebar-updates.svg",
+    "semantic_name": "Updates",
+    "category": "sidebar",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "sidebar-tasks.svg",
+    "semantic_name": "Tasks",
+    "category": "sidebar",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "sidebar-system.svg",
+    "semantic_name": "System",
+    "category": "sidebar",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "sidebar-settings.svg",
+    "semantic_name": "Settings",
+    "category": "sidebar",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-analyze.svg",
+    "semantic_name": "Analyze",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-verify.svg",
+    "semantic_name": "Verify",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-measure.svg",
+    "semantic_name": "Measure",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-scan.svg",
+    "semantic_name": "Scan",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-download.svg",
+    "semantic_name": "Download",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-install.svg",
+    "semantic_name": "Install",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-remove.svg",
+    "semantic_name": "Remove",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-restore.svg",
+    "semantic_name": "Restore",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-launch.svg",
+    "semantic_name": "Launch game",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-refresh.svg",
+    "semantic_name": "Refresh",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "status-success.svg",
+    "semantic_name": "Success",
+    "category": "status",
+    "default_color": "#34d399"
+  },
+  {
+    "filename": "status-warning.svg",
+    "semantic_name": "Warning",
+    "category": "status",
+    "default_color": "#f5c451"
+  },
+  {
+    "filename": "status-error.svg",
+    "semantic_name": "Error",
+    "category": "status",
+    "default_color": "#f2685f"
+  },
+  {
+    "filename": "status-information.svg",
+    "semantic_name": "Information",
+    "category": "status",
+    "default_color": "#5b9df5"
+  },
+  {
+    "filename": "status-experimental.svg",
+    "semantic_name": "Experimental",
+    "category": "status",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "file-folder.svg",
+    "semantic_name": "Folder",
+    "category": "file",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "file-file.svg",
+    "semantic_name": "File",
+    "category": "file",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-search.svg",
+    "semantic_name": "Search",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-advanced-settings.svg",
+    "semantic_name": "Advanced settings",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-apply.svg",
+    "semantic_name": "Apply",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  },
+  {
+    "filename": "action-cancel.svg",
+    "semantic_name": "Cancel",
+    "category": "action",
+    "default_color": "#4fd7c6"
+  }
+]

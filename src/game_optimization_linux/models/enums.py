@@ -15,6 +15,7 @@ class StringEnum(str, Enum):
 class Launcher(StringEnum):
     STEAM = "Steam"
     HEROIC = "Heroic"
+    LUTRIS = "Lutris"
     MANUAL = "Manual"
 
 

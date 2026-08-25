@@ -241,7 +241,7 @@ SurfaceCard {
 
             IconButton {
                 visible: card.isTerminal()
-                symbol: "⌫"
+                iconSource: App.UiIcons.actionRemove
                 toolTip: qsTr("Remove finished task")
                 onClicked: card.removeRequested(String(card.value(["id"], "")))
             }
@@ -249,7 +249,7 @@ SurfaceCard {
             IconButton {
                 visible: Boolean(card.value(["cancellable"], true))
                          && String(card.value(["status"], "")).toLowerCase() === "paused"
-                symbol: "▶"
+                iconSource: App.UiIcons.actionLaunch
                 toolTip: qsTr("Resume task")
                 onClicked: card.resumeRequested(String(card.value(["id"], "")))
             }
@@ -267,7 +267,7 @@ SurfaceCard {
                 visible: Boolean(card.value(["cancellable"], true))
                 enabled: !card.isTerminal()
                 danger: true
-                symbol: "×"
+                iconSource: App.UiIcons.actionCancel
                 toolTip: qsTr("Cancel task")
                 onClicked: card.cancelRequested(
                     String(card.value(["id"], "")),

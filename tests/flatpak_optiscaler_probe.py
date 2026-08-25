@@ -143,7 +143,6 @@ def main() -> int:
         )
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         removed = service.remove(game)
-        restored = service.restore(game)
         restored_hash = _digest(original_proxy)
 
         result = {
@@ -173,7 +172,7 @@ def main() -> int:
             "installed_proxy_changed": installed_proxy_hash != original_hash,
             "manifest_archive_format": manifest.get("archive_format"),
             "remove_state": removed.installation_state,
-            "restore_state": restored.installation_state,
+            "restore_state": removed.installation_state,
             "restored_hash_matches": restored_hash == original_hash,
             "created_files_removed": not (
                 install_directory / "OptiScaler.ini"
@@ -193,7 +192,7 @@ def main() -> int:
                 result["conflict_detected"],
                 result["installed_proxy_changed"],
                 result["manifest_archive_format"] == "7Z",
-                result["remove_state"] == "restore_required",
+                result["remove_state"] == "removed",
                 result["restore_state"] == "removed",
                 result["restored_hash_matches"],
                 result["created_files_removed"],

@@ -29,13 +29,14 @@ from PySide6.QtCore import (
 
 from ..config import (
     ANALYSIS_CACHE_FILE,
-    APP_ICON,
+    APP_ICON_SVG,
     APP_NAME,
     APP_VERSION,
     COMPRESSION_HISTORY_FILE,
     COMPRESSION_BENCHMARK_REPORTS_DIR,
     DATA_DIR,
     LIBRARY_CACHE_FILE,
+    MANUAL_GAMES_FILE,
     SETTINGS_FILE,
     STATE_DIR,
     TASK_HISTORY_FILE,
@@ -108,6 +109,7 @@ from ..services import (
     MangoHudDetector,
     MangoHudLaunchIntegration,
     MangoHudProfileRepository,
+    ManualGameStore,
     NarratorComponentManager,
     NarratorGameActivityDetector,
     NarratorPipeline,
@@ -284,6 +286,7 @@ class AppController(QObject):
     updateStatusChanged = Signal()
     libraryScanStatusChanged = Signal()
     libraryScanMessageChanged = Signal()
+    libraryProviderDiagnosticsChanged = Signal()
     steamFoundChanged = Signal()
     isScanningChanged = Signal()
     gamepadAvailableChanged = Signal()
@@ -292,6 +295,7 @@ class AppController(QObject):
     interfaceModeChanged = Signal()
     mangoHudProfileChanged = Signal(str)
     optiScalerChanged = Signal(str)
+    optiScalerStatusChanged = Signal(str, object)
     protonTweaksChanged = Signal(str)
     optimizationAnalysisChanged = Signal(str)
     narratorChanged = Signal(str)
@@ -314,6 +318,9 @@ class AppController(QObject):
         system_provider: SystemProviderLike | None = None,
         optimization_provider: OptimizationProviderLike | None = None,
         game_launcher: GameLauncherLike | None = None,
+        launcher_native: GameLauncherLike | None = None,
+        manual_game_store: ManualGameStore | None = None,
+        manual_game_launcher: Any | None = None,
         filesystem_provider: FilesystemProviderLike | None = None,
         directory_size_scanner: DirectorySizeScannerLike | None = None,
         library_cache: LibraryCacheLike | None = None,
@@ -383,6 +390,9 @@ class AppController(QObject):
                 demo_mode = os.environ.get("GAME_OPTIMIZATION_DEMO", "").strip() == "1"
         self._demo_mode = bool(demo_mode)
         self._show_system_mounts = False
+        self._manual_game_store = manual_game_store or ManualGameStore(
+            MANUAL_GAMES_FILE
+        )
 
         self._filesystem_provider = filesystem_provider
         self._directory_size_scanner = directory_size_scanner
@@ -485,6 +495,16 @@ class AppController(QObject):
         self._game_launcher = game_launcher or SteamLauncher(
             host_service=host_service,
             environment=os.environ,
+        )
+        from ..services.launcher_native import LauncherNativeLauncher
+
+        self._launcher_native = launcher_native or LauncherNativeLauncher(
+            environment=os.environ
+        )
+        from ..services.launcher_native import ManualGameLauncher
+
+        self._manual_game_launcher = manual_game_launcher or ManualGameLauncher(
+            environment=os.environ
         )
         self._mangohud_repository = (
             mangohud_repository or MangoHudProfileRepository()
@@ -666,6 +686,11 @@ class AppController(QObject):
         self._task_poll_active = False
         self._task_poll_error_signature = ""
         self._manual_game_number = 1
+        self._manual_launch_executor = ThreadPoolExecutor(
+            max_workers=2,
+            thread_name_prefix="game-optimization-manual-launch",
+        )
+        self._manual_launch_jobs: dict[str, Future[Any]] = {}
         self._shutdown_requested = False
         self._consume_gamepad_action = ""
         self._last_launch_request: dict[str, float] = {}
@@ -689,6 +714,10 @@ class AppController(QObject):
         self._optiscaler_executor = ThreadPoolExecutor(
             max_workers=1,
             thread_name_prefix="game-optimization-optiscaler",
+        )
+        self._optiscaler_status_executor = ThreadPoolExecutor(
+            max_workers=1,
+            thread_name_prefix="game-optimization-optiscaler-status",
         )
         self._optiscaler_jobs: dict[
             str, tuple[Future[OptiScalerProfile], Event, str]
@@ -756,11 +785,12 @@ class AppController(QObject):
             "Using safe demonstration data"
             if self._demo_mode
             else (
-                f"Showing {len(domain_games)} cached games while Steam is scanned"
+                f"Showing {len(domain_games)} cached games while launchers are scanned"
                 if domain_games
-                else "Waiting to scan local Steam libraries"
+                else "Waiting to scan local game launchers"
             )
         )
+        self._library_provider_diagnostics: list[dict[str, Any]] = []
         self._active_scan_generation = 0
 
         self._library_scanner = LibraryScanner(self)
@@ -954,7 +984,7 @@ class AppController(QObject):
     @Property(str, constant=True)
     def appLogoUrl(self) -> str:
         try:
-            return APP_ICON.as_uri() if APP_ICON.is_file() else ""
+            return APP_ICON_SVG.as_uri() if APP_ICON_SVG.is_file() else ""
         except (OSError, ValueError):
             return ""
 
@@ -969,6 +999,10 @@ class AppController(QObject):
     @Property(str, notify=libraryScanMessageChanged)
     def libraryScanMessage(self) -> str:
         return self._library_scan_message
+
+    @Property("QVariantList", notify=libraryProviderDiagnosticsChanged)
+    def libraryProviderDiagnostics(self) -> list[dict[str, Any]]:
+        return [dict(row) for row in self._library_provider_diagnostics]
 
     @Property(bool, constant=True)
     def demoMode(self) -> bool:
@@ -1123,6 +1157,18 @@ class AppController(QObject):
     @Slot(result=bool)
     def addManualGame(self) -> bool:
         return self._library_controller.addManualGame()
+
+    @Slot(str, result="QVariantMap")
+    def manualGameConfig(self, game_id: str) -> dict[str, Any]:
+        return self._library_controller.manualGameConfig(game_id)
+
+    @Slot("QVariantMap", result="QVariantMap")
+    def saveManualGame(self, values: Mapping[str, Any]) -> dict[str, Any]:
+        return self._library_controller.saveManualGame(values)
+
+    @Slot(str, result=bool)
+    def removeManualGame(self, game_id: str) -> bool:
+        return self._library_controller.removeManualGame(game_id)
 
     @Slot(str, result=bool)
     def openGame(self, game_id: str) -> bool:
@@ -1372,8 +1418,17 @@ class AppController(QObject):
         game = self._resolve_game(game_id)
         if game is None:
             return False
-        if not self._game_actions_allowed(game):
-            self._emit_toast(f"Library unavailable for {game.name}", "warning")
+        explicit_manual = bool(
+            game.launcher is Launcher.MANUAL
+            and game.id.startswith("manual-")
+            and game.data_source.casefold() == "manual"
+        )
+        if not self._game_actions_allowed(game) and not explicit_manual:
+            self._emit_toast(
+                game.launch_unavailable_reason
+                or f"Library unavailable for {game.name}",
+                "warning",
+            )
             return False
         now = time.monotonic()
         if now - self._last_launch_request.get(game.id, -1e9) < 1.25:
@@ -1383,6 +1438,39 @@ class AppController(QObject):
         if self._demo_mode:
             logger.info("Demo launch requested for %s; no process was started", game.id)
             self._emit_toast(f"Demo launch requested for {game.name}", "info")
+            return True
+        if explicit_manual:
+            from ..services.launcher_native import ManualLaunchError
+
+            getter = getattr(self._game_provider, "manual_config", None)
+            configuration = getter(game.id) if callable(getter) else None
+            if configuration is None:
+                self._emit_toast("Manual game launch configuration was not found", "error")
+                return False
+            if game.id in self._manual_launch_jobs:
+                self._emit_toast(f"{game.name} is already being monitored", "info")
+                return False
+            try:
+                plan = self._manual_game_launcher.prepare(configuration)
+            except ManualLaunchError as error:
+                logger.warning("Could not prepare manual game %s: %s", game.id, error)
+                self._emit_toast(str(error), "error")
+                return False
+            except Exception as error:
+                logger.exception("Unexpected manual launch preparation error for %s", game.id)
+                self._emit_toast(str(error).strip() or type(error).__name__, "error")
+                return False
+            logger.info(
+                "Starting manual game lifecycle: game=%s argv=%r environmentNames=%s",
+                game.id,
+                list(plan.game_command),
+                sorted(key for key, _value in plan.environment),
+            )
+            self._manual_launch_jobs[game.id] = self._manual_launch_executor.submit(
+                self._manual_game_launcher.execute, plan
+            )
+            self._emit_toast(f"Starting {game.name}", "success")
+            self.windowActionRequested.emit("stay")
             return True
         if game.launcher is Launcher.MANUAL and game.data_source.casefold() == "local":
             try:
@@ -1395,6 +1483,30 @@ class AppController(QObject):
             self._emit_toast(f"Starting {game.name}", "success")
             self.windowActionRequested.emit("stay")
             return bool(command)
+        if game.launcher in {Launcher.HEROIC, Launcher.LUTRIS}:
+            from ..services.launcher_native import LauncherNativeError
+
+            try:
+                command = self._launcher_native.launch(game)
+            except LauncherNativeError as error:
+                logger.warning("Could not launch %s: %s", game.id, error)
+                self._emit_toast(str(error), "error")
+                return False
+            except Exception as error:
+                logger.exception("Unexpected launcher-native error for %s", game.id)
+                self._emit_toast(
+                    f"Could not start {game.launcher.value}: {error}", "error"
+                )
+                return False
+            logger.info(
+                "Started %s launch for %s using argv=%r",
+                game.launcher.value,
+                game.id,
+                list(command),
+            )
+            self._emit_toast(f"Starting {game.name}", "success")
+            self.windowActionRequested.emit("stay")
+            return True
         try:
             activation = None
             profile = self._mangohud_profile_for_game(game)
@@ -1476,6 +1588,14 @@ class AppController(QObject):
     def getOptiScalerStatus(self, game_id: str) -> dict[str, Any]:
         return self._optiscaler_controller.getOptiScalerStatus(game_id)
 
+    @Slot(str, bool, result="QVariantMap")
+    def requestOptiScalerStatus(
+        self, game_id: str, force_refresh: bool = False
+    ) -> dict[str, Any]:
+        return self._optiscaler_controller.requestOptiScalerStatus(
+            game_id, force_refresh
+        )
+
     @staticmethod
     def _normalized_release_version(value: str) -> str:
         return str(value or "").strip().casefold().removeprefix("v")
@@ -1493,6 +1613,20 @@ class AppController(QObject):
         self, game_id: str, executable_value: str
     ) -> dict[str, Any]:
         return self._optiscaler_controller.rememberOptiScalerExecutable(game_id, executable_value)
+
+    @Slot(str, str, result="QVariantMap")
+    def setOptiScalerChannel(
+        self, game_id: str, channel: str
+    ) -> dict[str, Any]:
+        return self._optiscaler_controller.setOptiScalerChannel(game_id, channel)
+
+    @Slot(str, "QVariantMap", result="QVariantMap")
+    def configureOptiScalerUpscaling(
+        self, game_id: str, values: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._optiscaler_controller.configureOptiScalerUpscaling(
+            game_id, values
+        )
 
     @Slot(str, bool, result=bool)
     def refreshOptiScalerRelease(self, game_id: str, force_refresh: bool) -> bool:
@@ -1519,6 +1653,27 @@ class AppController(QObject):
         allow_anticheat_risk: bool,
     ) -> bool:
         return self._optiscaler_controller.installOnlineOptiScaler(game_id, executable, injection_dll, operation_name, allow_replace_conflicts, allow_anticheat_risk)
+
+    @Slot(str, str, str, str, bool, bool, "QVariantMap", result=bool)
+    def installAndConfigureOnlineOptiScaler(
+        self,
+        game_id: str,
+        executable: str,
+        injection_dll: str,
+        operation_name: str,
+        allow_replace_conflicts: bool,
+        allow_anticheat_risk: bool,
+        configuration: Mapping[str, Any],
+    ) -> bool:
+        return self._optiscaler_controller.installOnlineOptiScaler(
+            game_id,
+            executable,
+            injection_dll,
+            operation_name,
+            allow_replace_conflicts,
+            allow_anticheat_risk,
+            configuration,
+        )
 
     @Slot(str, str, str, str, result="QVariantMap")
     def inspectOptiScalerArchive(
@@ -1559,8 +1714,8 @@ class AppController(QObject):
     def restoreOptiScalerFiles(self, game_id: str) -> bool:
         return self._optiscaler_controller.restoreOptiScalerFiles(game_id)
 
-    @Slot(str, result="QVariantMap")
-    def verifyOptiScaler(self, game_id: str) -> dict[str, Any]:
+    @Slot(str, result=bool)
+    def verifyOptiScaler(self, game_id: str) -> bool:
         return self._optiscaler_controller.verifyOptiScaler(game_id)
 
     @Slot(str, result=bool)
@@ -1766,6 +1921,16 @@ class AppController(QObject):
                 self._library_scanner.shutdown(timeout_ms=2000)
             except Exception:
                 logger.exception("Could not stop library workers cleanly")
+        manual_jobs = getattr(self, "_manual_launch_jobs", {})
+        for future in tuple(manual_jobs.values()):
+            future.cancel()
+        manual_executor = getattr(self, "_manual_launch_executor", None)
+        if manual_executor is not None:
+            try:
+                manual_executor.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                logger.exception("Could not stop manual game launch workers")
+        self._manual_launch_jobs = {}
         update_jobs = getattr(self, "_update_jobs", {})
         for future, cancel_event in tuple(update_jobs.values()):
             cancel_event.set()
@@ -1804,6 +1969,20 @@ class AppController(QObject):
             except Exception:
                 logger.exception("Could not stop the OptiScaler executor")
         self._optiscaler_jobs = {}
+        status_executor = getattr(self, "_optiscaler_status_executor", None)
+        status_jobs = tuple(
+            future
+            for future, _game_id, _generation in getattr(
+                self._optiscaler_controller, "_status_jobs", {}
+            ).values()
+        )
+        for future in status_jobs:
+            future.cancel()
+        if status_executor is not None:
+            try:
+                status_executor.shutdown(wait=False, cancel_futures=True)
+            except Exception:
+                logger.exception("Could not stop the OptiScaler status executor")
         optimization_jobs = getattr(self, "_optimization_jobs", {})
         for future in tuple(optimization_jobs.values()):
             future.cancel()
@@ -2129,6 +2308,9 @@ class AppController(QObject):
     def _provider_steam_found(self, games: Sequence[Game]) -> bool:
         return self._library_controller._provider_steam_found(games)
 
+    def _update_provider_diagnostics(self) -> None:
+        self._library_controller._update_provider_diagnostics()
+
     @staticmethod
     def _size_result_gb(result: object) -> tuple[float, float]:
         if isinstance(result, Mapping):
@@ -2450,9 +2632,33 @@ class AppController(QObject):
 
     def _poll_tasks(self) -> None:
         self._compression_controller._poll_tasks()
+        self._poll_manual_launch_jobs()
+        self._optiscaler_controller._poll_status_jobs()
         self._optimization_controller._poll_baseline_sessions()
         self._optimization_controller._poll_analysis_jobs()
         self._narrator_controller.poll()
+
+    def _poll_manual_launch_jobs(self) -> None:
+        for game_id, future in tuple(self._manual_launch_jobs.items()):
+            if not future.done():
+                continue
+            self._manual_launch_jobs.pop(game_id, None)
+            game = self._domain_games.get(game_id)
+            name = game.name if game is not None else "Manual game"
+            try:
+                result = future.result()
+            except Exception as error:
+                logger.exception("Manual game lifecycle failed for %s", game_id)
+                self._emit_toast(
+                    f"{name}: {str(error).strip() or type(error).__name__}", "error"
+                )
+                continue
+            if result.error:
+                logger.warning("Manual game lifecycle for %s: %s", game_id, result.error)
+                self._emit_toast(f"{name}: {result.error}", "error")
+            else:
+                logger.info("Manual game lifecycle completed: game=%s exit=%s", game_id, result.game_exit_code)
+                self._emit_toast(f"{name} finished", "success")
 
     def _remember_analysis_report(self, task: Task) -> None:
         return self._compression_controller._remember_analysis_report(task)

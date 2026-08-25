@@ -465,13 +465,6 @@ FocusScope {
                                 720 * page.couchScale)
                 spacing: 12 * page.couchScale
                 Label {
-                    Layout.alignment: Qt.AlignHCenter
-                    text: "GF"
-                    color: App.Theme.accent
-                    font.pixelSize: 52 * page.couchScale
-                    font.weight: Font.Bold
-                }
-                Label {
                     Layout.fillWidth: true
                     text: qsTr("No games found")
                     color: App.Theme.text

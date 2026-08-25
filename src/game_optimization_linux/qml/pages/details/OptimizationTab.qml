@@ -10,6 +10,7 @@ import "../.." as App
 Item {
     id: tab
     signal toastRequested(string message, string tone)
+    signal optiScalerRequested()
     property var controller
     property var gameData: ({})
     readonly property string gameId: String(gameData && gameData.id || "")
@@ -1583,11 +1584,12 @@ Item {
                 }
             }
 
-            OptiScalerSection {
-                objectName: "optiScalerSection"
+            OptiScalerSummaryCard {
+                objectName: "optiScalerSummaryCard"
                 Layout.fillWidth: true
                 controller: tab.controller
                 gameData: tab.gameData
+                onOpenRequested: tab.optiScalerRequested()
             }
 
             ProtonTweaksSection {
@@ -1714,17 +1716,28 @@ Item {
 
             Label { Layout.fillWidth: true; visible: tab.errorMessage.length > 0; text: tab.errorMessage; color: App.Theme.danger; wrapMode: Text.WordWrap }
             RowLayout { Layout.fillWidth: true; Item { Layout.fillWidth: true }
-                AppButton { objectName: "saveOptimizationProfileButton"; text: qsTr("Apply profile"); enabled: tab.dirty && tab.recommendationAnalyzed; onClicked: tab.saveProfile() }
+                AppButton { objectName: "saveOptimizationProfileButton"; text: qsTr("Apply profile"); iconSource: App.UiIcons.actionApply; enabled: tab.dirty && tab.recommendationAnalyzed; onClicked: tab.saveProfile() }
             }
             Item { Layout.preferredHeight: 4 }
         }
     }
 
+    function scheduleProfileLoad() {
+        profileLoadTimer.restart()
+    }
+
+    Timer {
+        id: profileLoadTimer
+        interval: 35
+        repeat: false
+        onTriggered: tab.loadProfile()
+    }
+
     onGameIdChanged: {
         settingPreview = ({})
-        loadProfile()
+        scheduleProfileLoad()
     }
-    Component.onCompleted: loadProfile()
+    Component.onCompleted: scheduleProfileLoad()
 
     FileDialog {
         id: baselineLogDialog

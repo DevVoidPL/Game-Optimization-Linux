@@ -65,11 +65,18 @@ Item {
             return
         incrementalGamesModel.setFilters(
                     searchField.text,
-                    launcherFilter.currentIndex > 0
-                        ? launcherFilter.currentText : "",
+                    launcherFilterValue(),
                     filesystemFilter.currentIndex > 0
                         ? filesystemFilter.currentText : "",
                     sortFilter.currentIndex)
+    }
+
+    function launcherFilterValue() {
+        if (launcherFilter.currentIndex <= 0)
+            return ""
+        if (launcherFilter.currentIndex === 4)
+            return "Manual"
+        return String(launcherFilter.currentText)
     }
 
     WheelHandler {
@@ -148,7 +155,9 @@ Item {
         return result
     }
 
-    readonly property var launcherOptions: buildOptions(["launcher", "provider"], false)
+    readonly property var launcherOptions: [
+        qsTr("All"), "Steam", "Heroic", "Lutris", qsTr("Manual/Custom")
+    ]
     // A disconnected cached installation is useful in the game list, but its
     // stale filesystem must not advertise a currently usable filter.
     readonly property var filesystemOptions: buildOptions(
@@ -156,7 +165,7 @@ Item {
                                                   "file_system"], true)
     readonly property var filteredGames: {
         var query = searchField.text.trim().toLowerCase()
-        var launcher = launcherFilter.currentText
+        var launcher = launcherFilterValue()
         var filesystem = filesystemFilter.currentText
         var result = []
         var source = gamesData || []
@@ -286,7 +295,7 @@ Item {
 
             AppButton {
                 text: page.isScanning ? qsTr("Scanning…") : qsTr("Refresh")
-                iconText: "↻"
+                iconSource: App.UiIcons.actionRefresh
                 kind: "secondary"
                 compact: page.width < 1040
                 enabled: !page.isScanning
@@ -300,14 +309,12 @@ Item {
             }
 
             AppButton {
+                objectName: "addManualGameButton"
                 text: qsTr("Add game")
                 iconText: "+"
                 kind: "primary"
-                visible: page.demoMode
-                onClicked: {
-                    if (page.controller && page.controller.addManualGame)
-                        page.controller.addManualGame()
-                }
+                visible: true
+                onClicked: manualGameDialog.openForAdd()
             }
         }
 
@@ -836,16 +843,9 @@ Item {
                      : page.isScanning ? qsTr("Games appear here as soon as local metadata is ready.")
                      : App.I18n.scanMessage(page.scanMessage)
             symbol: page.scanStatus === "error" ? "!" : page.isScanning ? "↻" : "▦"
-            actionText: filtersHideGames || page.isScanning ? ""
-                        : page.demoMode ? qsTr("Add a game") : qsTr("Refresh")
+            actionText: filtersHideGames || page.isScanning ? "" : qsTr("Add a game")
             onActionTriggered: {
-                if (page.demoMode && page.controller && page.controller.addManualGame)
-                    page.controller.addManualGame()
-                else if (page.controller && page.controller.requestLibraryScan)
-                    page.controller.requestLibraryScan(
-                                "games_empty_state", "", "manual")
-                else if (page.controller && page.controller.refreshGames)
-                    page.controller.refreshGames()
+                manualGameDialog.openForAdd()
             }
         }
     }
@@ -859,5 +859,12 @@ Item {
             page.pendingForgetPath = ""
         }
         onClosed: page.pendingForgetPath = ""
+    }
+
+    ManualGameDialog {
+        id: manualGameDialog
+        objectName: "manualGameDialog"
+        controller: page.controller
+        onSaved: function(gameId) { page.openGame(gameId) }
     }
 }

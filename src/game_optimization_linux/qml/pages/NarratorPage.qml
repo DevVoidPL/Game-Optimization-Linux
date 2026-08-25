@@ -1105,6 +1105,10 @@ Item {
                                             ? qsTr("Remove") : qsTr("Install")
                                     kind: componentCard.componentState === "available" && componentCard.managed
                                           ? "danger" : "secondary"
+                                    iconSource: componentCard.componentState === "update_available"
+                                                ? App.UiIcons.actionDownload
+                                                : componentCard.componentState === "available" && componentCard.managed
+                                                  ? App.UiIcons.actionRemove : App.UiIcons.actionInstall
                                     enabled: !page.sessionActive
                                              && (componentCard.componentState === "update_available"
                                                  || (componentCard.componentState === "available" && componentCard.managed)

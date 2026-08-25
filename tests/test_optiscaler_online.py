@@ -29,6 +29,7 @@ from game_optimization_linux.services.optiscaler_online import (
     OptiScalerNetworkError,
     OptiScalerReleaseClient,
     parse_latest_stable_release,
+    parse_release,
 )
 
 
@@ -42,11 +43,21 @@ class _Response(BytesIO):
         return self._url
 
 
-def _archive_bytes(*, traversal: bool = False) -> bytes:
+def _archive_bytes(*, traversal: bool = False, fsr4: bool = False) -> bytes:
     output = BytesIO()
     with ZipFile(output, "w") as archive:
         archive.writestr("OptiScaler/OptiScaler.dll", b"dll")
-        archive.writestr("OptiScaler/OptiScaler.ini", b"[OptiScaler]\n")
+        archive.writestr(
+            "OptiScaler/OptiScaler.ini",
+            (
+                b"[FSR]\nFsr4Update=auto\nFsr4ForceEnableInt8=auto\n"
+                b"FsrAgilitySDKUpgrade=auto\nFsr4EnableWatermark=auto\n"
+                b"[Upscalers]\nDx11Upscaler=auto\nDx12Upscaler=auto\n"
+                b"VulkanUpscaler=auto\n"
+                if fsr4
+                else b"[OptiScaler]\n"
+            ),
+        )
         if traversal:
             archive.writestr("../escape.dll", b"escape")
     return output.getvalue()
@@ -60,6 +71,7 @@ def _metadata(archive: bytes, *, digest: str | None = None) -> bytes:
                 "tag_name": "v1.2.3",
                 "html_url": "https://github.com/optiscaler/OptiScaler/releases/tag/v1.2.3",
                 "published_at": "2026-01-01T12:00:00Z",
+                "body": "Bundled FFX 2.3 SDK with FSR 4.1.1.",
                 "draft": False,
                 "prerelease": False,
                 "assets": [
@@ -79,7 +91,7 @@ def _metadata(archive: bytes, *, digest: str | None = None) -> bytes:
 def test_official_release_is_downloaded_validated_and_reused_from_cache(
     tmp_path: Path,
 ) -> None:
-    archive = _archive_bytes()
+    archive = _archive_bytes(fsr4=True)
     calls: list[str] = []
 
     def opener(request, **_kwargs):
@@ -97,6 +109,7 @@ def test_official_release_is_downloaded_validated_and_reused_from_cache(
     second = client.ensure_archive(release)
 
     assert release.version == "1.2.3"
+    assert release.fidelityfx_upscaler_version == "4.1.1"
     assert first.path.is_file()
     assert first.sha256 == sha256(archive).hexdigest()
     assert first.from_cache is False
@@ -189,6 +202,53 @@ def test_unofficial_asset_is_rejected() -> None:
         )
 
 
+def test_official_edge_channel_accepts_only_official_prerelease_assets() -> None:
+    payload = [
+        {
+            "tag_name": "v2.0.0-edge",
+            "html_url": "https://github.com/optiscaler/OptiScaler/releases/tag/v2.0.0-edge",
+            "draft": False,
+            "prerelease": True,
+            "body": "FSR 4.1.1 edge",
+            "assets": [
+                {
+                    "name": "OptiScaler_edge.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler/releases/download/v2.0.0-edge/OptiScaler_edge.7z",
+                    "size": 42,
+                }
+            ],
+        }
+    ]
+    release = parse_release(payload, channel="edge")
+    assert release.channel == "edge"
+    assert release.fidelityfx_upscaler_version == "4.1.1"
+
+    payload[0]["assets"][0]["browser_download_url"] = (
+        "https://github.com/benjamimgois/OptiScaler-builds/releases/download/"
+        "edge/OptiScaler_edge.7z"
+    )
+    with pytest.raises(OptiScalerMetadataError):
+        parse_release(payload, channel="edge")
+
+
+def test_archive_redirect_outside_explicit_github_asset_hosts_is_rejected(
+    tmp_path: Path,
+) -> None:
+    archive = _archive_bytes()
+
+    def opener(request, **_kwargs):
+        if request.full_url.endswith("/releases"):
+            return _Response(_metadata(archive), url=request.full_url)
+        return _Response(
+            archive,
+            url="https://raw.githubusercontent.com/optiscaler/OptiScaler/archive.zip",
+        )
+
+    client = OptiScalerReleaseClient(tmp_path / "cache", opener=opener)
+    with pytest.raises(OptiScalerDownloadError, match="redirected outside"):
+        client.ensure_archive(client.latest_release())
+
+
 def test_download_rejects_path_traversal_before_cache_publish(tmp_path: Path) -> None:
     archive = _archive_bytes(traversal=True)
 
@@ -227,7 +287,7 @@ def test_download_rejects_github_digest_mismatch(tmp_path: Path) -> None:
 def test_controller_online_plan_and_install_use_validated_cache(
     tmp_path: Path,
 ) -> None:
-    archive = _archive_bytes()
+    archive = _archive_bytes(fsr4=True)
 
     def opener(request, **_kwargs):
         if request.full_url.endswith("/releases"):
@@ -290,13 +350,22 @@ def test_controller_online_plan_and_install_use_validated_cache(
         )
         assert plan["success"] is True
         assert plan["officialRelease"] is True
-        assert controller.installOnlineOptiScaler(
+        assert controller.installAndConfigureOnlineOptiScaler(
             game.id,
             plan["executable"],
             "dxgi.dll",
             "install",
             False,
             False,
+            {
+                "fsr4Mode": "force_int8",
+                "effectiveFsr4Mode": "force_int8",
+                "fsrAgilitySdkUpgrade": False,
+                "fsr4Watermark": False,
+                "dx11Upscaler": "auto",
+                "dx12Upscaler": "auto",
+                "vulkanUpscaler": "auto",
+            },
         ) is True
         deadline = time.monotonic() + 3.0
         while time.monotonic() < deadline:
@@ -308,6 +377,35 @@ def test_controller_online_plan_and_install_use_validated_cache(
         assert installed["installed"] is True
         assert installed["installedVersion"] == "1.2.3"
         assert installed["onlineState"] == "installed"
+        assert installed["sourceIdentity"] == "official_optiscaler"
+        assert installed["fidelityFxUpscalerVersion"] == "4.1.1"
+        ini = executable.parent / "OptiScaler.ini"
+        assert "Fsr4EnableWatermark=auto" in ini.read_text(encoding="utf-8")
+        assert "Fsr4ForceEnableInt8=true" in ini.read_text(encoding="utf-8")
+
+        ini.write_text(
+            ini.read_text(encoding="utf-8").replace(
+                "Fsr4EnableWatermark=auto", "Fsr4EnableWatermark=true"
+            ),
+            encoding="utf-8",
+        )
+        service.verify(game)
+        assert controller.installOnlineOptiScaler(
+            game.id,
+            plan["executable"],
+            "dxgi.dll",
+            "repair",
+            True,
+            False,
+        ) is True
+        deadline = time.monotonic() + 3.0
+        while time.monotonic() < deadline:
+            controller._poll_tasks()
+            if not controller._optiscaler_jobs:
+                break
+            time.sleep(0.01)
+        assert "Fsr4EnableWatermark=auto" in ini.read_text(encoding="utf-8")
+        assert "Fsr4ForceEnableInt8=true" in ini.read_text(encoding="utf-8")
     finally:
         controller.shutdown()
 

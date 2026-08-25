@@ -338,6 +338,13 @@ Item {
 
         Rectangle {
             anchors.fill: parent
+            color: App.Theme.backgroundElevated
+            visible: artworkRoot.showPlaceholder
+        }
+
+        Rectangle {
+            anchors.fill: parent
+            visible: !artworkRoot.showPlaceholder
             gradient: Gradient {
                 orientation: Gradient.Horizontal
                 GradientStop { position: 0.0; color: artworkRoot.accentA }

@@ -4,7 +4,7 @@ import json
 from dataclasses import replace
 from pathlib import Path
 
-from game_optimization_linux.models import GameStatus, SizeScanStatus
+from game_optimization_linux.models import GameStatus, Launcher, SizeScanStatus
 from game_optimization_linux.providers import DemoGameProvider
 from game_optimization_linux.services.library_cache import (
     CACHE_FORMAT_VERSION,
@@ -87,3 +87,25 @@ def test_library_cache_round_trips_disconnected_library_state(tmp_path: Path) ->
     assert restored.status is GameStatus.DRIVE_DISCONNECTED
     assert restored.library_available is False
     assert restored.compression_available is False
+
+
+def test_library_cache_round_trips_launcher_neutral_metadata(tmp_path: Path) -> None:
+    cache_path = tmp_path / "library.json"
+    source = replace(
+        DemoGameProvider().list_games()[0],
+        id="heroic-gog-product",
+        launcher=Launcher.HEROIC,
+        launcher_game_id="product",
+        store="GOG",
+        launch_uri="heroic://launch?appName=product&runner=gog",
+        launcher_variant="flatpak",
+        runner="gog",
+        wine_prefix=tmp_path / "prefix",
+        working_directory=tmp_path / "game",
+    )
+    LibraryCache(cache_path).save((source,))
+    restored = LibraryCache(cache_path).load()[0]
+    assert restored.launcher_game_id == "product"
+    assert restored.store == "GOG"
+    assert restored.launch_uri == source.launch_uri
+    assert restored.wine_prefix == tmp_path / "prefix"

@@ -29,10 +29,55 @@ def test_runtime_metadata_is_centralized() -> None:
     assert config.MAIN_QML.parent == config.QML_DIR
     assert config.APP_ICON.name == "GameOptimizationLinuxIcon.png"
     assert config.APP_ICON.is_file()
-    assert tuple(config.APP_ICON_VARIANTS) == (16, 22, 24, 32, 48, 64, 128, 256)
+    assert config.APP_ICON_SVG.name == "game-optimization-linux-app-icon.svg"
+    assert config.APP_ICON_SVG.is_file()
+    assert tuple(config.APP_ICON_VARIANTS) == (16, 32, 48, 64, 128, 256, 512)
     desktop_entry = render_desktop_entry()
     assert f"Name={config.APP_NAME}\n" in desktop_entry
     assert f"Icon={config.APP_ID}\n" in desktop_entry
+
+
+def test_monolithic_core_branding_is_packaged_without_mascot_assets() -> None:
+    project_root = Path(__file__).resolve().parents[1]
+    qml_root = config.QML_DIR
+    runtime_sources = [
+        *qml_root.rglob("*.qml"),
+        project_root / "pyproject.toml",
+        project_root / "flatpak" / f"{config.APP_ID}.yml",
+    ]
+    for path in runtime_sources:
+        source = path.read_text(encoding="utf-8")
+        assert "App.Branding" not in source, path
+        assert "pingwin-" not in source, path
+        assert "pingwin" not in source.lower(), path
+    assert not (qml_root / "Branding.qml").exists()
+    branding_dir = config.PACKAGE_DIR / "assets" / "branding"
+    expected = {
+        "game-optimization-linux-app-icon.svg",
+        "game-optimization-linux-horizontal-dark.svg",
+        "game-optimization-linux-horizontal.svg",
+        "game-optimization-linux-monochrome.svg",
+        "game-optimization-linux-symbol.svg",
+        *{
+            f"game-optimization-linux-{size}x{size}.png"
+            for size in (16, 32, 48, 64, 128, 256, 512)
+        },
+    }
+    assert {path.name for path in branding_dir.iterdir()} == expected
+    assert config.APP_ICON.read_bytes() == (
+        branding_dir / "game-optimization-linux-512x512.png"
+    ).read_bytes()
+    scalable = (
+        project_root
+        / "data/icons/hicolor/scalable/apps"
+        / f"{config.APP_ID}.svg"
+    )
+    assert scalable.read_bytes() == config.APP_ICON_SVG.read_bytes()
+    package_data = tomllib.loads(
+        (project_root / "pyproject.toml").read_text(encoding="utf-8")
+    )["tool"]["setuptools"]["package-data"]["game_optimization_linux"]
+    assert "assets/branding/*.svg" in package_data
+    assert "assets/branding/*.png" in package_data
 
 
 def test_desktop_entry_and_opt_in_installer_use_the_same_app_id() -> None:
@@ -46,6 +91,7 @@ def test_desktop_entry_and_opt_in_installer_use_the_same_app_id() -> None:
     assert f'app_id="{config.APP_ID}"' in installer_source
     assert "$data_home/applications/$app_id.desktop" in installer_source
     assert "$data_home/icons/hicolor/${size}x${size}/apps/$app_id.png" in installer_source
+    assert "$data_home/icons/hicolor/scalable/apps/$app_id.svg" in installer_source
     assert "$data_home/metainfo/$app_id.metainfo.xml" in installer_source
     assert "sudo" not in installer_source
     assert "--dev" in installer_source
@@ -64,6 +110,9 @@ def test_desktop_entry_and_opt_in_installer_use_the_same_app_id() -> None:
         project_root / "flatpak" / f"{config.APP_ID}.yml"
     ).read_text(encoding="utf-8")
     assert "command: game-optimization-linux\n" in manifest
+    assert (
+        f"share/icons/hicolor/scalable/apps/{config.APP_ID}.svg" in manifest
+    )
     project = tomllib.loads(
         (project_root / "pyproject.toml").read_text(encoding="utf-8")
     )
@@ -160,8 +209,12 @@ def test_desktop_installer_uses_a_working_launcher_in_temporary_xdg_home(
     assert completed.returncode == 0, completed.stdout + completed.stderr
     desktop = data_home / "applications" / f"{config.APP_ID}.desktop"
     icon = data_home / "icons" / "hicolor" / "256x256" / "apps" / f"{config.APP_ID}.png"
+    scalable_icon = (
+        data_home / "icons" / "hicolor" / "scalable" / "apps" / f"{config.APP_ID}.svg"
+    )
     assert desktop.is_file()
     assert icon.is_file()
+    assert scalable_icon.read_bytes() == config.APP_ICON_SVG.read_bytes()
     assert f'Exec="{launcher}"' in desktop.read_text(encoding="utf-8")
     diagnostic = subprocess.run(
         [
@@ -188,6 +241,7 @@ def test_desktop_installer_dev_mode_prefers_project_virtual_environment(
     (project / "scripts").mkdir(parents=True)
     (project / "data").mkdir()
     (project / "src" / "game_optimization_linux" / "resources").mkdir(parents=True)
+    (project / "src" / "game_optimization_linux" / "assets").mkdir(parents=True)
     (project / ".venv" / "bin").mkdir(parents=True)
     shutil.copy2(source_root / "scripts" / "install-desktop-entry.sh", project / "scripts")
     shutil.copy2(
@@ -199,6 +253,10 @@ def test_desktop_installer_dev_mode_prefers_project_virtual_environment(
         project / "data",
     )
     shutil.copytree(source_root / "data" / "icons", project / "data" / "icons")
+    shutil.copytree(
+        source_root / "src" / "game_optimization_linux" / "assets" / "branding",
+        project / "src" / "game_optimization_linux" / "assets" / "branding",
+    )
     launcher = project / ".venv" / "bin" / "game-optimization-linux"
     launcher.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
     launcher.chmod(0o755)
@@ -223,7 +281,7 @@ def test_desktop_installer_dev_mode_prefers_project_virtual_environment(
 
 def test_hicolor_icons_are_square_native_variants_and_appstream_id_matches() -> None:
     project_root = Path(__file__).resolve().parents[1]
-    for size in (16, 22, 24, 32, 48, 64, 128, 256):
+    for size in (16, 32, 48, 64, 128, 256, 512):
         path = (
             project_root
             / "data"
@@ -236,6 +294,10 @@ def test_hicolor_icons_are_square_native_variants_and_appstream_id_matches() -> 
         image = QImage(str(path))
         assert not image.isNull()
         assert (image.width(), image.height()) == (size, size)
+        supplied = (
+            config.BRANDING_DIR / f"game-optimization-linux-{size}x{size}.png"
+        )
+        assert path.read_bytes() == supplied.read_bytes()
         opaque = [
             (x, y)
             for y in range(size)
@@ -256,21 +318,19 @@ def test_hicolor_icons_are_square_native_variants_and_appstream_id_matches() -> 
     assert f">{config.APP_ID}.desktop</launchable>" in metainfo
 
 
-def test_small_icon_mark_variants_and_multi_size_qicon_are_diagnostic_ready() -> None:
+def test_monolithic_core_variants_and_multi_size_qicon_are_diagnostic_ready() -> None:
     os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
     application = QGuiApplication.instance() or QGuiApplication(
         ["game-optimization-icon-test"]
     )
-    small_bytes: list[bytes] = []
-    for size in (16, 22, 24, 32, 48):
+    branding_dir = config.BRANDING_DIR
+    assert not QImage(str(config.APP_ICON_SVG)).isNull()
+    for size in config.APP_ICON_VARIANTS:
         path = config.APP_ICON_VARIANTS[size]
         image = QImage(str(path))
         assert not image.isNull()
-        small_bytes.append(path.read_bytes())
-        # The center/right pixels belong to the bold G rather than transparent
-        # padding from the detailed sidebar logo.
-        assert image.pixelColor(size // 2, size // 2).alpha() > 0
-    assert len(set(small_bytes)) == 5
+        supplied = branding_dir / f"game-optimization-linux-{size}x{size}.png"
+        assert path.read_bytes() == supplied.read_bytes()
 
     icon = _application_icon()
     assert not icon.isNull()

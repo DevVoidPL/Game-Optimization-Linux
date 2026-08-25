@@ -65,7 +65,14 @@ if command -v desktop-file-validate >/dev/null 2>&1; then
 fi
 
 install -Dm644 "$temporary_desktop" "$desktop_target"
-for size in 16 22 24 32 48 64 128 256; do
+scalable_icon_source="$project_dir/src/game_optimization_linux/assets/branding/game-optimization-linux-app-icon.svg"
+scalable_icon_target="$data_home/icons/hicolor/scalable/apps/$app_id.svg"
+if [ ! -f "$scalable_icon_source" ]; then
+    echo "Game Optimization scalable icon asset is missing: $scalable_icon_source" >&2
+    exit 1
+fi
+install -Dm644 "$scalable_icon_source" "$scalable_icon_target"
+for size in 16 32 48 64 128 256 512; do
     icon_source="$project_dir/data/icons/hicolor/${size}x${size}/apps/$app_id.png"
     icon_target="$data_home/icons/hicolor/${size}x${size}/apps/$app_id.png"
     if [ ! -f "$icon_source" ]; then
@@ -95,6 +102,7 @@ elif command -v kbuildsycoca5 >/dev/null 2>&1; then
 fi
 
 echo "Installed: $desktop_target"
-echo "Installed hicolor icons: 16, 22, 24, 32, 48, 64, 128, and 256 px"
+echo "Installed hicolor icon: scalable SVG"
+echo "Installed hicolor icons: 16, 32, 48, 64, 128, 256, and 512 px"
 echo "Installed: $metainfo_target"
 echo "Launcher: $launcher"

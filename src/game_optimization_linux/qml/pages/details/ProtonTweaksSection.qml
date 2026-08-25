@@ -142,6 +142,8 @@ SurfaceCard {
                         StatusBadge {
                             text: section.categoryLabel(String(tweakRow.modelData.category || "experimental"))
                             status: String(tweakRow.modelData.category || "") === "experimental" ? "warning" : "neutral"
+                            iconSource: String(tweakRow.modelData.category || "") === "experimental"
+                                        ? App.UiIcons.statusExperimental : ""
                         }
                         AppSwitch {
                             checked: Boolean(section.toggles[tweakRow.tweakId])
@@ -160,19 +162,6 @@ SurfaceCard {
                     wrapMode: Text.WordWrap
                 }
                 Divider { Layout.fillWidth: true }
-            }
-        }
-
-        SettingRow {
-            Layout.fillWidth: true
-            title: qsTr("OptiScaler FSR 4 update")
-            description: qsTr("Writes Fsr4Update=true only to an intact OptiScaler.ini managed for this game. Experimental and hardware dependent.")
-            RowLayout {
-                StatusBadge { text: qsTr("Experimental"); status: "warning" }
-                AppSwitch {
-                    checked: section.optiscalerFsr4Update
-                    onToggled: { section.optiscalerFsr4Update = checked; section.dirty = true }
-                }
             }
         }
 

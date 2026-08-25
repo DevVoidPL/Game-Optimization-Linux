@@ -40,6 +40,8 @@ def test_normal_startup_constructs_configured_library_provider(tmp_path: Path) -
     )
     try:
         assert isinstance(controller._game_provider, ConfiguredGameProvider)
+        assert controller._game_provider.heroic is not None
+        assert controller._game_provider.lutris is not None
         assert isinstance(controller._filesystem_provider, LinuxFilesystemProvider)
         assert isinstance(controller._directory_size_scanner, DirectorySizeScanner)
         assert controller.demoMode is False

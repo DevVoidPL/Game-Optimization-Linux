@@ -63,6 +63,10 @@ FocusScope {
     ]
     readonly property var profileNames: ["Fast", "Balanced", "Maximum", "Auto"]
     readonly property var actionModel: actionsForTab()
+    readonly property bool launcherIntegrationSupported: {
+        var launcher = String(value(["launcher"], ""))
+        return launcher !== "Heroic" && launcher !== "Lutris"
+    }
     signal backRequested()
 
     function restoreActiveFocus() {
@@ -112,6 +116,12 @@ FocusScope {
             { "id": "profile", "symbol": "◈", "title": qsTr("Profile: %1").arg(selectedProfile), "subtitle": boolValue(["analysisProfilesUnlocked"], false) ? qsTr("Choose a planned profile") : qsTr("Analyze the game first"), "enabled": boolValue(["analysisProfilesUnlocked"], false) },
             { "id": "compress", "symbol": "↓", "title": qsTr("Start compression"), "subtitle": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) ? qsTr("Review the verified plan") : qsTr("A verified Btrfs plan is required"), "enabled": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) }
         ]
+        if (selectedTab === 3 && !launcherIntegrationSupported) return [{
+                "id": "unavailable", "symbol": "i",
+                "title": qsTr("Launcher integration unavailable"),
+                "subtitle": qsTr("Full optimization launch integration for this launcher is planned for a later update"),
+                "enabled": false
+            }]
         if (selectedTab === 3) return [
             { "id": "optimization-profile", "symbol": "◐", "title": qsTr("Profile: %1").arg(optimizationPresetLabel()), "enabled": true },
             { "id": "gamemode", "symbol": "⚡", "title": "GameMode: " + (gameModeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
@@ -197,6 +207,7 @@ FocusScope {
         return optimizationDisplays.length ? String(optimizationDisplays[0].name || qsTr("Monitor")) : qsTr("Unavailable")
     }
     function loadOptimizationProfile() {
+        if (!launcherIntegrationSupported) { optimizationData = ({}); return }
         if (!controller || !controller.getOptimizationProfile || !game.id) return
         var result = controller.getOptimizationProfile(String(game.id)) || ({})
         if (!result.success) return
@@ -214,11 +225,15 @@ FocusScope {
             optimizationDisplayId = String(optimizationDisplays[0].id || "")
     }
     function loadOptiScalerStatus() {
-        if (!controller || !controller.getOptiScalerStatus || !game.id) return
-        var result = controller.getOptiScalerStatus(String(game.id)) || ({})
+        if (!launcherIntegrationSupported) { optiScalerData = ({}); return }
+        if (!controller || !game.id) return
+        var result = controller.requestOptiScalerStatus
+                ? controller.requestOptiScalerStatus(String(game.id), false) || ({})
+                : controller.getOptiScalerStatus(String(game.id)) || ({})
         optiScalerData = result.success ? result : ({})
     }
     function loadProtonTweaks() {
+        if (!launcherIntegrationSupported) { protonTweaksData = ({}); return }
         if (!controller || !controller.getProtonTweaks || !game.id) return
         var result = controller.getProtonTweaks(String(game.id)) || ({})
         protonTweaksData = result.success ? result : ({})
@@ -283,6 +298,7 @@ FocusScope {
         return mangoHudFontSize <= 18 ? qsTr("Small") : mangoHudFontSize >= 32 ? qsTr("Large") : qsTr("Medium")
     }
     function loadMangoHudProfile() {
+        if (!launcherIntegrationSupported) { mangoHudProfile = ({}); return }
         if (!controller || !controller.getMangoHudProfile || !game.id) return
         var result = controller.getMangoHudProfile(String(game.id)) || ({})
         mangoHudProfile = result
@@ -508,6 +524,11 @@ FocusScope {
         function onOptiScalerChanged(appId) {
             if (String(appId) === String(page.game.steamAppId || ""))
                 page.loadOptiScalerStatus()
+        }
+        function onOptiScalerStatusChanged(changedGameId, result) {
+            if (String(changedGameId) === String(page.game.id || "")
+                    && result && result.success)
+                page.optiScalerData = result
         }
         function onProtonTweaksChanged(appId) {
             if (String(appId) === String(page.game.steamAppId || ""))

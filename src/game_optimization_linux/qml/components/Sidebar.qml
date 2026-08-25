@@ -26,13 +26,13 @@ Rectangle {
     }
 
     readonly property var destinations: [
-        { "page": "games", "label": qsTr("Games"), "icon": Qt.resolvedUrl("../resources/sidebar-games.svg") },
-        { "page": "narrator", "label": qsTr("Narrator"), "icon": Qt.resolvedUrl("../resources/sidebar-narrator.svg") },
-        { "page": "updates", "label": qsTr("Updates"), "icon": Qt.resolvedUrl("../resources/sidebar-updates.svg"),
+        { "page": "games", "label": qsTr("Games"), "icon": App.UiIcons.sidebarGames },
+        { "page": "narrator", "label": qsTr("Narrator"), "icon": App.UiIcons.sidebarNarrator },
+        { "page": "updates", "label": qsTr("Updates"), "icon": App.UiIcons.sidebarUpdates,
           "count": Math.max(0, sidebar.updatesPendingCount) },
-        { "page": "tasks", "label": qsTr("Tasks"), "icon": Qt.resolvedUrl("../resources/sidebar-tasks.svg") },
-        { "page": "system", "label": qsTr("System"), "icon": Qt.resolvedUrl("../resources/sidebar-system.svg") },
-        { "page": "settings", "label": qsTr("Settings"), "icon": Qt.resolvedUrl("../resources/sidebar-settings.svg") }
+        { "page": "tasks", "label": qsTr("Tasks"), "icon": App.UiIcons.sidebarTasks },
+        { "page": "system", "label": qsTr("System"), "icon": App.UiIcons.sidebarSystem },
+        { "page": "settings", "label": qsTr("Settings"), "icon": App.UiIcons.sidebarSettings }
     ]
 
     function isSelected(page) {
@@ -50,6 +50,11 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: 64
 
+            HoverHandler { id: brandHover }
+            ToolTip.visible: brandHover.hovered
+            ToolTip.text: sidebar.appName
+            ToolTip.delay: 500
+
             RowLayout {
                 anchors.fill: parent
                 spacing: 11
@@ -59,29 +64,17 @@ Rectangle {
                     Layout.preferredHeight: sidebar.logoExtent
                     Layout.alignment: Qt.AlignVCenter
                     radius: sidebar.collapsed ? 12 : 15
-                    color: App.Theme.accent
+                    color: "transparent"
                     clip: true
 
                     Image {
-                        id: appLogo
                         anchors.fill: parent
-                        anchors.margins: 1
                         source: sidebar.logoSource
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         cache: true
                         smooth: true
                         mipmap: true
-                        visible: status === Image.Ready
-                    }
-
-                    Label {
-                        anchors.centerIn: parent
-                        text: "GF"
-                        visible: appLogo.status !== Image.Ready
-                        color: App.Theme.textOnAccent
-                        font.pixelSize: sidebar.collapsed ? 13 : 16
-                        font.weight: Font.Black
                     }
                 }
 
@@ -91,11 +84,10 @@ Rectangle {
                     spacing: 0
 
                     Label {
-                        text: sidebar.appName
+                        text: "GameOpti"
                         color: App.Theme.text
                         font.pixelSize: 16
                         font.weight: Font.Bold
-                        elide: Text.ElideRight
                         Layout.fillWidth: true
                     }
 
@@ -134,15 +126,17 @@ Rectangle {
                     contentItem: RowLayout {
                         spacing: 12
 
-                        Image {
+                        UiIcon {
                             Layout.preferredWidth: 46
                             Layout.preferredHeight: 22
                             source: navButton.modelData.icon
                             sourceSize.width: 22
                             sourceSize.height: 22
-                            fillMode: Image.PreserveAspectFit
-                            smooth: true
-                            opacity: sidebar.isSelected(navButton.modelData.page) ? 1.0 : 0.72
+                            tintEnabled: !App.Theme.dark
+                            tintColor: sidebar.isSelected(navButton.modelData.page)
+                                       ? App.Theme.accent : App.Theme.textSecondary
+                            opacity: sidebar.isSelected(navButton.modelData.page)
+                                     ? 1.0 : (App.Theme.dark ? 0.72 : 0.88)
                         }
 
                         Label {

@@ -1487,6 +1487,35 @@ def probe_game_popups(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+def probe_manual_game_editor(application: QGuiApplication) -> dict[str, Any]:
+    view, root = _view(application, "pages/GamesPage.qml", 1180, 820)
+    matches = _named(root, "manualGameDialog")
+    if not matches:
+        raise AssertionError("Games page did not instantiate the manual game dialog")
+    dialog = matches[0]
+    _invoke_qml(dialog, "openForAdd")
+    _settle(application, 20)
+    if not bool(dialog.property("visible")):
+        raise AssertionError("Add game action did not open the manual game dialog")
+    name = _item(root, "manualGameNameField")
+    executable = _item(root, "manualGameExecutableField")
+    save = _item(root, "saveManualGameButton")
+    name.setProperty("text", "Custom Game")
+    executable.setProperty("text", "/tmp/Game With Spaces/game binary")
+    _settle(application, 6)
+    if not save.isEnabled():
+        raise AssertionError("Valid required manual game fields did not enable Save")
+    result = {
+        "dialogVisible": bool(dialog.property("visible")),
+        "saveEnabled": save.isEnabled(),
+        "width": float(dialog.property("width")),
+        "height": float(dialog.property("height")),
+    }
+    dialog.setProperty("visible", False)
+    view.close()
+    return result
+
+
 def probe_artwork_reuse(application: QGuiApplication) -> dict[str, Any]:
     lifecycle_message_start = len(MESSAGES)
     with tempfile.TemporaryDirectory(prefix="game-optimization-artwork-reuse-") as raw_dir:
@@ -2805,7 +2834,13 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     })
     _invoke_qml(root, "applyResult", gamescope_preview)
     _settle(application, 6)
-    optiscaler_section = _item(root, "optiScalerSection")
+    optiscaler_view, optiscaler_root = _view(
+        application, "pages/details/OptiScalerTab.qml", 1400, 1000
+    )
+    optiscaler_root.setProperty("controller", controller)
+    optiscaler_root.setProperty("gameData", controller.games[0])
+    _settle(application, 20)
+    optiscaler_section = _item(optiscaler_root, "optiScalerPageContent")
     if not controller.refreshOptiScalerRelease(game.id, True):
         raise AssertionError("Online OptiScaler check did not start")
     deadline = time.monotonic() + 3.0
@@ -2823,6 +2858,66 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     optiscaler_picker_filters = _variant(
         optiscaler_section.property("archiveNameFilters")
     ) or []
+    if not controller.installOptiScaler(
+        game.id,
+        str(archive),
+        str(optiscaler_plan.get("executable", "")),
+        "dxgi.dll",
+        False,
+    ):
+        raise AssertionError("OptiScaler lifecycle install did not start")
+    deadline = time.monotonic() + 4.0
+    while time.monotonic() < deadline:
+        controller._poll_tasks()
+        _settle(application, 1)
+        if (
+            not controller._optiscaler_jobs
+            and not controller._optiscaler_controller._status_jobs
+            and str(
+                (_variant(optiscaler_section.property("statusData")) or {}).get(
+                    "snapshotState", ""
+                )
+            )
+            == "installed"
+        ):
+            break
+    installed_visible_without_navigation = str(
+        (_variant(optiscaler_section.property("statusData")) or {}).get(
+            "snapshotState", ""
+        )
+    ) == "installed"
+    if not installed_visible_without_navigation:
+        raise AssertionError(
+            "Visible OptiScaler QML did not receive installed status: "
+            f"qml={_variant(optiscaler_section.property('statusData'))!r} "
+            f"cache={controller._optiscaler_controller._status_cache!r} "
+            f"statusJobs={list(controller._optiscaler_controller._status_jobs)!r} "
+            f"operationJobs={list(controller._optiscaler_jobs)!r}"
+        )
+    if not controller.removeOptiScaler(game.id):
+        raise AssertionError("OptiScaler lifecycle remove did not start")
+    deadline = time.monotonic() + 4.0
+    while time.monotonic() < deadline:
+        controller._poll_tasks()
+        _settle(application, 1)
+        if (
+            not controller._optiscaler_jobs
+            and not controller._optiscaler_controller._status_jobs
+            and str(
+                (_variant(optiscaler_section.property("statusData")) or {}).get(
+                    "snapshotState", ""
+                )
+            )
+            == "not_installed"
+        ):
+            break
+    removed_visible_without_navigation = str(
+        (_variant(optiscaler_section.property("statusData")) or {}).get(
+            "snapshotState", ""
+        )
+    ) == "not_installed"
+    if not removed_visible_without_navigation:
+        raise AssertionError("Visible OptiScaler QML did not receive removed status")
     proton_saved = controller.saveProtonTweaks(
         game.id,
         {
@@ -2871,6 +2966,8 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
         "optiscaler_install_directory": str(optiscaler_plan.get("installDirectory", "")),
         "optiscaler_proxy": str(optiscaler_plan.get("injectionDll", "")),
         "optiscaler_online_ready": bool(online_plan.get("officialRelease")),
+        "optiscaler_install_signal_visible": installed_visible_without_navigation,
+        "optiscaler_remove_signal_visible": removed_visible_without_navigation,
         "optiscaler_available_version": str(
             (_variant(optiscaler_section.property("statusData")) or {}).get(
                 "availableVersion", ""
@@ -2902,6 +2999,7 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
         "screenshot": str(screenshot),
         "screenshot_size": screenshot.stat().st_size,
     }
+    optiscaler_view.close()
     view.close()
     controller.shutdown()
     return result
@@ -3515,6 +3613,7 @@ def main() -> int:
             "artwork",
             "artwork_refresh",
             "incremental_games",
+            "manual_game",
         ),
     )
     parser.add_argument("--width", type=int, default=1280)
@@ -3555,6 +3654,8 @@ def main() -> int:
         result = probe_artwork_refresh(application)
     elif args.mode == "incremental_games":
         result = probe_incremental_games_model(application)
+    elif args.mode == "manual_game":
+        result = probe_manual_game_editor(application)
     else:
         result = probe_updates(application, args.width, args.height, args.scenario)
 

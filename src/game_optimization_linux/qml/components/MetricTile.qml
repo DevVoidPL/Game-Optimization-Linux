@@ -9,6 +9,7 @@ Rectangle {
     property string label: qsTr("Metric")
     property string value: "-"
     property string symbol: "◈"
+    property url iconSource: ""
     property color tone: App.Theme.accent
 
     implicitWidth: 160
@@ -30,11 +31,25 @@ Rectangle {
             color: Qt.rgba(tile.tone.r, tile.tone.g, tile.tone.b, 0.16)
 
             Label {
+                visible: tile.iconSource.toString().length === 0
                 anchors.centerIn: parent
                 text: tile.symbol
                 color: tile.tone
                 font.pixelSize: 17
                 font.weight: Font.Bold
+            }
+
+
+            UiIcon {
+                visible: tile.iconSource.toString().length > 0
+                anchors.centerIn: parent
+                width: 20
+                height: 20
+                source: tile.iconSource
+                sourceSize.width: 20
+                sourceSize.height: 20
+                tintEnabled: !App.Theme.dark
+                tintColor: tile.tone
             }
         }
 

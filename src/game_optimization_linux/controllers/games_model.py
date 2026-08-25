@@ -20,6 +20,10 @@ _PRESENTATION_FIELDS = (
     "id",
     "name",
     "launcher",
+    "launcherGameId",
+    "store",
+    "runner",
+    "launcherVariant",
     "dataSource",
     "path",
     "installPath",
@@ -48,6 +52,8 @@ _PRESENTATION_FIELDS = (
     "sizeScanError",
     "updateInProgress",
     "isSteamTool",
+    "launchAllowed",
+    "launchUnavailableReason",
 )
 
 

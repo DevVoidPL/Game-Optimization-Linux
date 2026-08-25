@@ -126,17 +126,7 @@ class OptimizationController:
         if game is None or not app_id:
             return {"success": False, "error": "Proton Tweaks require a supported game"}
         try:
-            current = self._app._proton_tweaks_repository.load(app_id)
             updated = self._app._proton_tweaks_repository.from_payload(app_id, values)
-            if (
-                updated.optiscaler_fsr4_update
-                != current.optiscaler_fsr4_update
-            ):
-                optiscaler = self._app._optiscaler_service.profile_repository.load(app_id)
-                if optiscaler.enabled and optiscaler.installation_state == "installed":
-                    self._app._optiscaler_service.configure_fsr4_update(
-                        game, updated.optiscaler_fsr4_update
-                    )
             self._app._proton_tweaks_repository.save(updated)
             self._app.protonTweaksChanged.emit(app_id)
             return self._app._proton_tweaks_to_qml(app_id)

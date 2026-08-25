@@ -220,6 +220,7 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
     settings = (qml_root / "pages" / "SettingsPage.qml").read_text(encoding="utf-8")
     couch_settings = (qml_root / "couch" / "CouchSettings.qml").read_text(encoding="utf-8")
     sidebar = (qml_root / "components" / "Sidebar.qml").read_text(encoding="utf-8")
+    ui_icons = (qml_root / "UiIcons.qml").read_text(encoding="utf-8")
 
     assert 'title: qsTr("CPU usage limit")' not in settings
     assert 'title: qsTr("GPU usage limit")' not in settings
@@ -228,9 +229,17 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
     assert '"id": "vibration"' not in couch_settings
     assert "Local Steam manifests" not in sidebar
     assert "updateColumn" not in sidebar
-    for name in ("games", "narrator", "updates", "tasks", "system", "settings"):
-        assert f"sidebar-{name}.svg" in sidebar
-        assert (qml_root / "resources" / f"sidebar-{name}.svg").is_file()
+    for name, property_name in (
+        ("games", "sidebarGames"),
+        ("narrator", "sidebarNarrator"),
+        ("updates", "sidebarUpdates"),
+        ("tasks", "sidebarTasks"),
+        ("system", "sidebarSystem"),
+        ("settings", "sidebarSettings"),
+    ):
+        assert f"App.UiIcons.{property_name}" in sidebar
+        assert f'assets/ui-icons/sidebar-{name}.svg' in ui_icons
+        assert (qml_root.parent / "assets" / "ui-icons" / f"sidebar-{name}.svg").is_file()
 
 
 def test_kde_breeze_read_only_preview_has_no_textarea_warning(tmp_path: Path) -> None:
@@ -330,6 +339,8 @@ def test_optimization_desktop_editor_saves_real_appid_profile(tmp_path: Path) ->
     assert "Runner" in result["record_baseline_rejection"]
     assert result["automatic_card_visible"] is True
     assert result["automatic_candidate_visible"] is True
+    assert result["optiscaler_install_signal_visible"] is True
+    assert result["optiscaler_remove_signal_visible"] is True
     assert result["save_button_inside"] is True
     assert not any("Unable to assign" in message for message in payload["messages"])
     assert result["screenshot_size"] > 1000

@@ -8,6 +8,7 @@ Button {
 
     property string kind: "secondary" // primary, secondary, ghost, danger
     property string iconText: ""
+    property url iconSource: ""
     property bool compact: false
     property bool busy: false
     property string toolTip: ""
@@ -51,11 +52,24 @@ Button {
         }
 
         Label {
-            visible: !control.busy && control.iconText.length > 0
+            visible: !control.busy && control.iconSource.toString().length === 0
+                     && control.iconText.length > 0
             text: control.iconText
             color: control.enabled ? control.foregroundColor : App.Theme.textMuted
             font.pixelSize: control.compact ? 14 : 16
             horizontalAlignment: Text.AlignHCenter
+        }
+
+        UiIcon {
+            visible: !control.busy && control.iconSource.toString().length > 0
+            source: control.iconSource
+            sourceSize.width: control.compact ? 16 : 18
+            sourceSize.height: control.compact ? 16 : 18
+            Layout.preferredWidth: sourceSize.width
+            Layout.preferredHeight: sourceSize.height
+            tintEnabled: !App.Theme.dark || control.kind === "primary"
+                         || control.kind === "danger"
+            tintColor: control.enabled ? control.foregroundColor : App.Theme.textMuted
         }
 
         Label {

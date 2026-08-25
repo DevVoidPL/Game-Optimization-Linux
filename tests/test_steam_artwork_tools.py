@@ -386,7 +386,8 @@ def test_qml_artwork_components_clip_and_keep_fallbacks() -> None:
     assert '"cover"' in grid_qml and '"cover"' in list_qml
     assert "collapsed ? 42 : 54" in sidebar_qml
     assert "sourceClipRect" not in sidebar_qml
-    assert 'text: "GF"' in sidebar_qml
+    assert 'text: "GF"' not in sidebar_qml
+    assert "source: sidebar.logoSource" in sidebar_qml
     assert "Image.PreserveAspectFit" in sidebar_qml
 
 

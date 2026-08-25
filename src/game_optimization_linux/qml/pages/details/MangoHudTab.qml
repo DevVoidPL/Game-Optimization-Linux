@@ -560,7 +560,7 @@ Item {
                             }
                             Label { Layout.fillWidth: true; text: qsTr("Profile: %1").arg(tab.profilePath || "-"); color: App.Theme.textMuted; elide: Text.ElideMiddle; ToolTip.visible: profileHover.hovered; ToolTip.text: text; HoverHandler { id: profileHover } }
                             Label { Layout.fillWidth: true; text: qsTr("Configuration: %1").arg(tab.configPath || "-"); color: App.Theme.textMuted; elide: Text.ElideMiddle; ToolTip.visible: configHover.hovered; ToolTip.text: text; HoverHandler { id: configHover } }
-                            AppButton { text: qsTr("Open directory"); iconText: "↗"; kind: "secondary"; onClicked: if (tab.controller && tab.controller.openMangoHudDirectory) tab.controller.openMangoHudDirectory(tab.gameId) }
+                            AppButton { text: qsTr("Open directory"); iconSource: App.UiIcons.fileFolder; kind: "secondary"; onClicked: if (tab.controller && tab.controller.openMangoHudDirectory) tab.controller.openMangoHudDirectory(tab.gameId) }
                             Label { Layout.fillWidth: true; text: qsTr("No shell commands or global MangoHud configuration are edited."); color: App.Theme.textSecondary; wrapMode: Text.WordWrap }
                         }
                     }

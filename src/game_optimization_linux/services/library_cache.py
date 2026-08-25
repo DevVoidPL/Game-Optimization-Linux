@@ -1,4 +1,4 @@
-"""Versioned, metadata-only cache for the discovered Steam library."""
+"""Versioned, metadata-only cache for the unified game library."""
 
 from __future__ import annotations
 
@@ -26,8 +26,8 @@ from game_optimization_linux.providers.steam_tools import is_steam_tool_name
 
 
 logger = logging.getLogger(__name__)
-CACHE_FORMAT_VERSION = 2
-_LEGACY_CACHE_FORMAT_VERSIONS = frozenset({1})
+CACHE_FORMAT_VERSION = 3
+_LEGACY_CACHE_FORMAT_VERSIONS = frozenset({1, 2})
 _EnumT = TypeVar("_EnumT", bound=Enum)
 
 
@@ -63,7 +63,7 @@ def _optional_non_negative_int(value: Any) -> int | None:
 
 
 class LibraryCache:
-    """Atomically persist only game metadata, never Steam file contents."""
+    """Atomically persist only normalized game metadata."""
 
     def __init__(self, path: Path) -> None:
         self._path = Path(path)
@@ -80,20 +80,20 @@ class LibraryCache:
         try:
             payload = json.loads(self._path.read_text(encoding="utf-8"))
         except (OSError, UnicodeError, json.JSONDecodeError) as error:
-            logger.warning("Ignoring unreadable Steam library cache %s: %s", self._path, error)
+            logger.warning("Ignoring unreadable game library cache %s: %s", self._path, error)
             return []
         if not isinstance(payload, dict):
-            logger.warning("Ignoring malformed Steam library cache at %s", self._path)
+            logger.warning("Ignoring malformed game library cache at %s", self._path)
             return []
         version = payload.get("version")
         if version not in {CACHE_FORMAT_VERSION, *_LEGACY_CACHE_FORMAT_VERSIONS}:
-            logger.info("Ignoring unsupported Steam library cache format at %s", self._path)
+            logger.info("Ignoring unsupported game library cache format at %s", self._path)
             return []
         if version in _LEGACY_CACHE_FORMAT_VERSIONS:
-            logger.info("Loading legacy Steam library cache format %s", version)
+            logger.info("Loading legacy game library cache format %s", version)
         raw_games = payload.get("games")
         if not isinstance(raw_games, list):
-            logger.warning("Ignoring malformed Steam library cache at %s", self._path)
+            logger.warning("Ignoring malformed game library cache at %s", self._path)
             return []
 
         games: list[Game] = []
@@ -133,7 +133,7 @@ class LibraryCache:
             except OSError:
                 logger.debug("Could not clean cache temporary file", exc_info=True)
             raise LibraryCacheError(
-                f"could not save Steam library cache to {self._path}: {error}"
+                f"could not save game library cache to {self._path}: {error}"
             ) from error
 
     @staticmethod
@@ -288,6 +288,23 @@ class LibraryCache:
                 raw.get("executable_resolution") or "not_scanned"
             ),
             executable_candidates=tuple(executable_candidates),
+            launcher_game_id=str(raw.get("launcher_game_id") or "").strip() or None,
+            store=str(raw.get("store") or "unknown"),
+            launch_uri=str(raw.get("launch_uri") or ""),
+            launcher_variant=str(raw.get("launcher_variant") or ""),
+            runner=str(raw.get("runner") or ""),
+            wine_prefix=(
+                Path(str(raw["wine_prefix"])) if raw.get("wine_prefix") else None
+            ),
+            working_directory=(
+                Path(str(raw["working_directory"]))
+                if raw.get("working_directory")
+                else None
+            ),
+            launch_available=bool(raw.get("launch_available", True)),
+            launch_unavailable_reason=str(
+                raw.get("launch_unavailable_reason") or ""
+            ),
         )
 
 

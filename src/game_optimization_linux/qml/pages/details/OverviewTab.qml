@@ -73,7 +73,7 @@ Item {
                     Layout.fillWidth: true
                     label: qsTr("Logical size")
                     value: tab.value(["logicalSize", "size"], "-")
-                    symbol: "□"
+                    iconSource: App.UiIcons.overviewLogicalSize
                     tone: App.Theme.info
                 }
 
@@ -81,7 +81,7 @@ Item {
                     Layout.fillWidth: true
                     label: qsTr("Physical size")
                     value: tab.value(["physicalSize"], "-")
-                    symbol: "▣"
+                    iconSource: App.UiIcons.overviewPhysicalSize
                     tone: App.Theme.secondary
                 }
 
@@ -89,7 +89,7 @@ Item {
                     Layout.fillWidth: true
                     label: qsTr("Space saved")
                     value: tab.value(["savedSpace"], "0 GB")
-                    symbol: "↓"
+                    iconSource: App.UiIcons.overviewSavedSpace
                     tone: App.Theme.success
                 }
 
@@ -98,7 +98,7 @@ Item {
                     label: qsTr("Optimization profile")
                     value: App.I18n.profile(
                                tab.value(["optimizationStatus"], qsTr("Not configured")))
-                    symbol: "⚡"
+                    iconSource: App.UiIcons.overviewOptimizationProfile
                     tone: App.Theme.warning
                 }
             }
@@ -395,7 +395,7 @@ Item {
                         AppButton {
                             text: !tab.demoMode ? qsTr("Coming soon")
                                   : tab.analysisActive ? qsTr("In progress") : qsTr("Analyze Game")
-                            iconText: "⌕"
+                            iconSource: App.UiIcons.actionAnalyze
                             kind: "primary"
                             busy: tab.analysisActive && tab.analysisStatus.toLowerCase() !== "paused"
                             enabled: tab.demoMode && !tab.analysisActive
@@ -479,7 +479,15 @@ Item {
                             required property var modelData
                             Layout.fillWidth: true
                             spacing: 9
-                            Label { text: "✓"; color: App.Theme.success; font.weight: Font.Bold }
+                            Image {
+                                Layout.preferredWidth: 18
+                                Layout.preferredHeight: 18
+                                source: App.UiIcons.statusSuccess
+                                sourceSize.width: 18
+                                sourceSize.height: 18
+                                fillMode: Image.PreserveAspectFit
+                                cache: true
+                            }
                             Label {
                                 Layout.fillWidth: true
                                 text: String(modelData)

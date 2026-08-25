@@ -806,7 +806,7 @@ Item {
                                 }
 
                                 IconButton {
-                                    symbol: "×"
+                                    iconSource: App.UiIcons.actionRemove
                                     danger: true
                                     toolTip: qsTr("Remove additional Steam location")
                                     onClicked: {
@@ -898,6 +898,7 @@ Item {
                                 AppButton {
                                     compact: true
                                     text: qsTr("Restore")
+                                    iconSource: App.UiIcons.actionRestore
                                     onClicked: {
                                         if (page.controller
                                                 && page.controller.restoreIgnoredLibrary)
@@ -986,7 +987,7 @@ Item {
                                 }
 
                                 IconButton {
-                                    symbol: "×"
+                                    iconSource: App.UiIcons.actionRemove
                                     danger: true
                                     toolTip: qsTr("Remove library directory")
                                     onClicked: {
@@ -1031,6 +1032,7 @@ Item {
 
                         AppButton {
                             text: qsTr("Rescan")
+                            iconSource: App.UiIcons.actionScan
                             enabled: page.libraryDirectories.length > 0
                             onClicked: {
                                 if (page.controller && page.controller.requestLibraryScan)

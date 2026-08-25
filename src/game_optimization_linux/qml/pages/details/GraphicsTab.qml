@@ -14,9 +14,9 @@ Item {
     signal toastRequested(string message, string tone)
 
     readonly property var modes: [
-        { "value": "Classic Enhance", "label": qsTr("Classic Enhance"), "symbol": "◇", "description": qsTr("Conservative sharpening and cleanup with low overhead.") },
-        { "value": "AI Lite", "label": qsTr("AI Lite"), "symbol": "✦", "description": qsTr("Lightweight inference for a balanced output preview.") },
-        { "value": "AI Quality", "label": qsTr("AI Quality"), "symbol": "◆", "description": qsTr("Highest preview quality with greater VRAM and size estimates.") }
+        { "value": "Classic Enhance", "label": qsTr("Classic Enhance"), "icon": App.UiIcons.remasterClassic, "description": qsTr("Conservative sharpening and cleanup with low overhead.") },
+        { "value": "AI Lite", "label": qsTr("AI Lite"), "icon": App.UiIcons.remasterLightAi, "description": qsTr("Lightweight inference for a balanced output preview.") },
+        { "value": "AI Quality", "label": qsTr("AI Quality"), "icon": App.UiIcons.remasterQualityAi, "description": qsTr("Highest preview quality with greater VRAM and size estimates.") }
     ]
 
     function modeLabel(mode) {
@@ -61,20 +61,6 @@ Item {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 12
-
-                        Rectangle {
-                            Layout.preferredWidth: 45
-                            Layout.preferredHeight: 45
-                            radius: 14
-                            color: App.Theme.infoSoft
-                            Label {
-                                anchors.centerIn: parent
-                                text: "✦"
-                                color: App.Theme.info
-                                font.pixelSize: 21
-                                font.weight: Font.Bold
-                            }
-                        }
 
                         ColumnLayout {
                             Layout.fillWidth: true
@@ -149,10 +135,15 @@ Item {
                                 contentItem: ColumnLayout {
                                     spacing: 6
                                     RowLayout {
-                                        Label {
-                                            text: modeButton.modelData.symbol
-                                            color: modeButton.active ? App.Theme.accent : App.Theme.textSecondary
-                                            font.pixelSize: 16
+                                        UiIcon {
+                                            Layout.preferredWidth: 20
+                                            Layout.preferredHeight: 20
+                                            source: modeButton.modelData.icon
+                                            sourceSize.width: 20
+                                            sourceSize.height: 20
+                                            tintEnabled: !App.Theme.dark
+                                            tintColor: modeButton.active
+                                                       ? App.Theme.accent : App.Theme.textSecondary
                                         }
                                         Label {
                                             Layout.fillWidth: true
@@ -377,7 +368,7 @@ Item {
                         }
                         AppButton {
                             text: qsTr("Refresh preview")
-                            iconText: "↻"
+                            iconSource: App.UiIcons.actionRefresh
                             kind: "secondary"
                             compact: true
                             onClicked: {

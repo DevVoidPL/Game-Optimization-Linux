@@ -61,6 +61,13 @@ from .game import (
     TextureOptions,
     TexturePreview,
 )
+from .manual_game import (
+    MANUAL_GAME_SCHEMA_VERSION,
+    ManualGameConfig,
+    local_path,
+    normalize_environment,
+    parse_command_line,
+)
 from .settings import AppSettings
 from .mangohud import (
     MANGOHUD_METRICS,
@@ -102,9 +109,14 @@ from .optimization_profile import (
     GameOptimizationProfile,
 )
 from .optiscaler import (
+    OPTISCALER_CHANNELS,
+    OPTISCALER_FSR4_MODES,
     OPTISCALER_PROXY_DLLS,
+    OPTISCALER_RUNTIME_VERIFICATION_STATES,
     OPTISCALER_SCHEMA_VERSION,
+    OPTISCALER_SOURCE_IDENTITIES,
     OPTISCALER_STATES,
+    OPTISCALER_UPSCALER_VALUES,
     OptiScalerProfile,
 )
 from .proton_tweaks import (
@@ -142,6 +154,8 @@ __all__ = [
     "FilesystemInfo",
     "FilesystemType",
     "Game",
+    "MANUAL_GAME_SCHEMA_VERSION",
+    "ManualGameConfig",
     "GameFingerprint",
     "FrameRateAnalysis",
     "DetectedGameSetting",
@@ -200,9 +214,14 @@ __all__ = [
     "OptimizationCompatibility",
     "OptimizationOptions",
     "OptimizationProfile",
+    "OPTISCALER_CHANNELS",
+    "OPTISCALER_FSR4_MODES",
     "OPTISCALER_PROXY_DLLS",
+    "OPTISCALER_RUNTIME_VERIFICATION_STATES",
     "OPTISCALER_SCHEMA_VERSION",
+    "OPTISCALER_SOURCE_IDENTITIES",
     "OPTISCALER_STATES",
+    "OPTISCALER_UPSCALER_VALUES",
     "OptiScalerProfile",
     "PostLaunchBehavior",
     "PRESET_METRICS",
@@ -222,4 +241,7 @@ __all__ = [
     "button_hints",
     "validate_app_id",
     "validate_game_key",
+    "local_path",
+    "normalize_environment",
+    "parse_command_line",
 ]

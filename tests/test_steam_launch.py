@@ -92,11 +92,22 @@ def test_flatpak_launcher_resolves_steam_on_host_path_and_uses_spawn(tmp_path: P
         which=lambda name: "/app/bin/flatpak-spawn" if name == "flatpak-spawn" else None,
         popen=popen,
         host_service=Host(),
-        environment={"FLATPAK_ID": "io.github.DevVoidPL.GameOptimizationLinux"},
+        environment={
+            "FLATPAK_ID": "io.github.DevVoidPL.GameOptimizationLinux",
+            "LD_LIBRARY_PATH": "/app/lib:/run/host/usr/lib",
+            "PYTHONPATH": "/app/lib/python3.13/site-packages",
+        },
     )
     command = launcher.launch(game)
     assert command == [
-        "/app/bin/flatpak-spawn", "--host", "steam", "-applaunch", "4242"
+        "/app/bin/flatpak-spawn",
+        "--host",
+        "--unset-env=FLATPAK_ID",
+        "--unset-env=LD_LIBRARY_PATH",
+        "--unset-env=PYTHONPATH",
+        "steam",
+        "-applaunch",
+        "4242",
     ]
     assert calls[0][0] == command
     assert "shell" not in calls[0][1]

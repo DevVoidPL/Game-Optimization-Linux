@@ -9,10 +9,11 @@ import json
 import os
 from pathlib import Path
 import shlex
-import shutil
 import stat
 import subprocess
 import sys
+import time
+from uuid import uuid4
 
 from .config import STATE_DIR
 from .models import validate_game_key
@@ -29,6 +30,12 @@ from .services.performance_session import BaselineSessionRepository
 _STEAM_ENV_FILE = "GAME_OPTIMIZATION_STEAM_ENV_FILE"
 _STEAM_ENV_DIRECTORY = Path(".local/share/game-optimization-linux/run-env")
 _MAX_STEAM_ENV_BYTES = 1024 * 1024
+_HOST_LAUNCH_PREFIX = "launch."
+_HOST_LAUNCH_PROTOCOL_FILES = frozenset(
+    {"steam.env", "launcher", "ready", "owner", "started", "completed"}
+)
+_HOST_LAUNCH_START_TIMEOUT_SECONDS = 60.0
+_HOST_LAUNCH_HEARTBEAT_SECONDS = 5.0
 
 
 def _wait_for_baseline_process(
@@ -43,6 +50,71 @@ def _wait_for_baseline_process(
             return int(process.wait(timeout=5))
         except subprocess.TimeoutExpired:
             sessions.heartbeat(app_id, session_id, runner_token)
+
+
+def _wait_for_host_launch(
+    directory: Path,
+    sessions: BaselineSessionRepository,
+    app_id: str,
+    baseline_session: object | None,
+    report: dict[str, object],
+    report_root: Path,
+    *,
+    command_name: str,
+    clock: Callable[[], float] = time.monotonic,
+    sleeper: Callable[[float], None] = time.sleep,
+) -> int:
+    deadline = clock() + _HOST_LAUNCH_START_TIMEOUT_SECONDS
+    spawned_pid: int | None = None
+    while spawned_pid is None:
+        spawned_pid = _read_protocol_integer(directory, "started")
+        if spawned_pid is not None:
+            break
+        if clock() >= deadline:
+            raise OSError("the host runner did not report process start")
+        sleeper(0.1)
+
+    if baseline_session is not None:
+        sessions.mark_process_started(
+            app_id,
+            str(getattr(baseline_session, "id")),
+            str(getattr(baseline_session, "runner_token")),
+            spawned_pid=spawned_pid,
+            process_group=None,
+            command_name=command_name,
+        )
+        report.update(
+            {
+                "baselineSpawnedPid": spawned_pid,
+                "baselineProcessGroup": None,
+                "baselineObservedProcesses": [
+                    f"pid={spawned_pid} command={command_name} state=running"
+                ],
+            }
+        )
+        _write_report(app_id, report, report_root)
+        print(
+            "game-optimization-run: baseline lifecycle "
+            f"session={getattr(baseline_session, 'id')} appId={app_id} "
+            f"runnerPid={os.getpid()} spawnedPid={spawned_pid} "
+            "processGroup=host-inherited state=recording",
+            file=sys.stderr,
+        )
+
+    next_heartbeat = clock() + _HOST_LAUNCH_HEARTBEAT_SECONDS
+    while True:
+        exit_code = _read_protocol_integer(directory, "completed")
+        if exit_code is not None:
+            return exit_code
+        now = clock()
+        if baseline_session is not None and now >= next_heartbeat:
+            sessions.heartbeat(
+                app_id,
+                str(getattr(baseline_session, "id")),
+                str(getattr(baseline_session, "runner_token")),
+            )
+            next_heartbeat = now + _HOST_LAUNCH_HEARTBEAT_SECONDS
+        sleeper(0.2)
 
 
 def _write_report(app_id: str, payload: dict[str, object], root: Path = STATE_DIR / "launch-reports") -> None:
@@ -60,7 +132,7 @@ def _write_report(app_id: str, payload: dict[str, object], root: Path = STATE_DI
         temporary.unlink(missing_ok=True)
 
 
-def _arguments(argv: Sequence[str]) -> tuple[str, bool, list[str]]:
+def _arguments(argv: Sequence[str]) -> tuple[str, bool, Path | None, list[str]]:
     values = list(argv)
     try:
         separator = values.index("--")
@@ -69,19 +141,213 @@ def _arguments(argv: Sequence[str]) -> tuple[str, bool, list[str]]:
     parser = argparse.ArgumentParser(prog="game-optimization-run")
     parser.add_argument("--appid", required=True)
     parser.add_argument("--plan-only", action="store_true")
+    parser.add_argument("--prepare-host-launch", default="")
     namespace = parser.parse_args(values[:separator])
-    return validate_game_key(namespace.appid), bool(namespace.plan_only), values[separator + 1:]
+    host_launch = str(namespace.prepare_host_launch).strip()
+    if namespace.plan_only and host_launch:
+        raise ValueError("plan-only and host-launch preparation are mutually exclusive")
+    return (
+        validate_game_key(namespace.appid),
+        bool(namespace.plan_only),
+        Path(host_launch) if host_launch else None,
+        values[separator + 1:],
+    )
 
 
-def _load_steam_environment(environment: Mapping[str, str]) -> dict[str, str]:
+def _validate_host_launch_directory(
+    environment: Mapping[str, str], requested: Path
+) -> Path:
+    root = host_home_directory(environment) / _STEAM_ENV_DIRECTORY
+    directory = Path(requested)
+    if (
+        not directory.is_absolute()
+        or directory.parent != root
+        or not directory.name.startswith(_HOST_LAUNCH_PREFIX)
+        or not directory.name.removeprefix(_HOST_LAUNCH_PREFIX).isalnum()
+    ):
+        raise ValueError("the host launch handoff path is invalid")
+    try:
+        root_info = root.lstat()
+        directory_info = directory.lstat()
+    except OSError as error:
+        raise ValueError("the host launch handoff directory is unavailable") from error
+    for info, label in (
+        (root_info, "root"),
+        (directory_info, "directory"),
+    ):
+        if (
+            not stat.S_ISDIR(info.st_mode)
+            or stat.S_ISLNK(info.st_mode)
+            or info.st_uid != os.getuid()
+            or info.st_mode & 0o077
+        ):
+            raise ValueError(f"the host launch handoff {label} is not private")
+    return directory
+
+
+def _open_private_directory(directory: Path) -> int:
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_DIRECTORY", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = os.open(directory, flags)
+    info = os.fstat(descriptor)
+    if (
+        not stat.S_ISDIR(info.st_mode)
+        or info.st_uid != os.getuid()
+        or info.st_mode & 0o077
+    ):
+        os.close(descriptor)
+        raise ValueError("the host launch handoff directory is not private")
+    return descriptor
+
+
+def _atomic_protocol_write(
+    directory: Path,
+    name: str,
+    payload: bytes,
+    *,
+    mode: int = 0o600,
+) -> None:
+    if name not in _HOST_LAUNCH_PROTOCOL_FILES:
+        raise ValueError("unsupported host launch protocol file")
+    directory_fd = _open_private_directory(directory)
+    temporary = f".{name}.{uuid4().hex}.tmp"
+    flags = (
+        os.O_WRONLY
+        | os.O_CREAT
+        | os.O_EXCL
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    descriptor = -1
+    try:
+        descriptor = os.open(temporary, flags, mode, dir_fd=directory_fd)
+        view = memoryview(payload)
+        while view:
+            written = os.write(descriptor, view)
+            view = view[written:]
+        os.fsync(descriptor)
+        os.fchmod(descriptor, mode)
+        os.close(descriptor)
+        descriptor = -1
+        os.replace(
+            temporary,
+            name,
+            src_dir_fd=directory_fd,
+            dst_dir_fd=directory_fd,
+        )
+        os.fsync(directory_fd)
+    finally:
+        if descriptor >= 0:
+            os.close(descriptor)
+        try:
+            os.unlink(temporary, dir_fd=directory_fd)
+        except FileNotFoundError:
+            pass
+        os.close(directory_fd)
+
+
+def _read_protocol_integer(directory: Path, name: str) -> int | None:
+    if name not in {"started", "completed"}:
+        raise ValueError("unsupported host launch status file")
+    directory_fd = _open_private_directory(directory)
+    flags = (
+        os.O_RDONLY
+        | getattr(os, "O_CLOEXEC", 0)
+        | getattr(os, "O_NOFOLLOW", 0)
+    )
+    try:
+        try:
+            descriptor = os.open(name, flags, dir_fd=directory_fd)
+        except FileNotFoundError:
+            return None
+        try:
+            info = os.fstat(descriptor)
+            if (
+                not stat.S_ISREG(info.st_mode)
+                or info.st_uid != os.getuid()
+                or info.st_mode & 0o077
+                or info.st_size > 32
+            ):
+                raise ValueError(f"the host launch {name} status is invalid")
+            payload = os.read(descriptor, 33)
+        finally:
+            os.close(descriptor)
+    finally:
+        os.close(directory_fd)
+    value = payload.decode("ascii", errors="strict").strip()
+    if not value or not value.removeprefix("-").isdecimal():
+        raise ValueError(f"the host launch {name} status is invalid")
+    parsed = int(value)
+    if name == "started" and parsed <= 0:
+        raise ValueError("the host launch PID is invalid")
+    if name == "completed" and not 0 <= parsed <= 255:
+        raise ValueError("the host launch exit status is invalid")
+    return parsed
+
+
+def _shell_assignment(name: str, value: str) -> list[str]:
+    if (
+        not name
+        or not name.isascii()
+        or not name.replace("_", "A").isalnum()
+        or not (name[0].isalpha() or name[0] == "_")
+        or "\0" in value
+        or "\n" in name
+    ):
+        raise ValueError(f"invalid launch environment variable: {name!r}")
+    return [f"{name}={shlex.quote(value)}", f"export {name}"]
+
+
+def _host_launcher_payload(
+    plan: object,
+    environment_overrides: Mapping[str, str],
+) -> bytes:
+    command = [str(value) for value in getattr(plan, "command")]
+    steam_command = tuple(str(value) for value in getattr(plan, "steam_command"))
+    if (
+        not steam_command
+        or len(command) < len(steam_command)
+        or tuple(command[-len(steam_command):]) != steam_command
+    ):
+        raise ValueError("the launch plan does not preserve the Steam command suffix")
+    prefix = command[:-len(steam_command)]
+    lines = ["#!/bin/sh", "set -eu"]
+    for key, value in sorted(environment_overrides.items()):
+        lines.extend(_shell_assignment(str(key), str(value)))
+    for key in getattr(plan, "wrapper_environment_removed"):
+        _shell_assignment(str(key), "")
+        lines.append(f"unset {key}")
+    for key, value in sorted(getattr(plan, "wrapper_environment_overrides").items()):
+        lines.extend(_shell_assignment(str(key), str(value)))
+    quoted_prefix = " ".join(shlex.quote(value) for value in prefix)
+    lines.append(f"exec {quoted_prefix} \"$@\"" if prefix else 'exec "$@"')
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def _load_steam_environment(
+    environment: Mapping[str, str],
+    *,
+    host_launch_directory: Path | None = None,
+) -> dict[str, str]:
     raw_path = str(environment.get(_STEAM_ENV_FILE, "")).strip()
     if not raw_path:
         return dict(environment)
 
     expected_directory = host_home_directory(environment) / _STEAM_ENV_DIRECTORY
     snapshot = Path(raw_path)
-    if not snapshot.is_absolute() or snapshot.parent != expected_directory:
+    allowed_parent = (
+        host_launch_directory
+        if host_launch_directory is not None
+        else expected_directory
+    )
+    if not snapshot.is_absolute() or snapshot.parent != allowed_parent:
         raise ValueError("the Steam environment handoff path is invalid")
+    if host_launch_directory is not None and snapshot.name != "steam.env":
+        raise ValueError("the Steam environment handoff filename is invalid")
     try:
         directory_info = expected_directory.lstat()
     except OSError as error:
@@ -95,9 +361,20 @@ def _load_steam_environment(environment: Mapping[str, str]) -> dict[str, str]:
         raise ValueError("the Steam environment handoff directory is not private")
 
     flags = os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0)
+    directory_fd = (
+        _open_private_directory(host_launch_directory)
+        if host_launch_directory is not None
+        else None
+    )
     try:
-        descriptor = os.open(snapshot, flags)
+        descriptor = os.open(
+            snapshot.name if directory_fd is not None else snapshot,
+            flags,
+            dir_fd=directory_fd,
+        )
     except OSError as error:
+        if directory_fd is not None:
+            os.close(directory_fd)
         raise ValueError("the Steam environment handoff file is unavailable") from error
     try:
         info = os.fstat(descriptor)
@@ -119,9 +396,14 @@ def _load_steam_environment(environment: Mapping[str, str]) -> dict[str, str]:
     finally:
         os.close(descriptor)
         try:
-            snapshot.unlink()
+            if directory_fd is not None:
+                os.unlink(snapshot.name, dir_fd=directory_fd)
+            else:
+                snapshot.unlink()
         except OSError:
             pass
+        if directory_fd is not None:
+            os.close(directory_fd)
 
     result: dict[str, str] = {}
     for entry in bytes(data).split(b"\0"):
@@ -176,10 +458,21 @@ def main(
     baseline_sessions: BaselineSessionRepository | None = None,
 ) -> int:
     try:
-        app_id, plan_only, game_argv = _arguments(sys.argv[1:] if argv is None else argv)
+        app_id, plan_only, requested_host_launch, game_argv = _arguments(
+            sys.argv[1:] if argv is None else argv
+        )
+        host_launch_directory = (
+            _validate_host_launch_directory(os.environ, requested_host_launch)
+            if requested_host_launch is not None
+            else None
+        )
+        original_steam_environment = _load_steam_environment(
+            os.environ,
+            host_launch_directory=host_launch_directory,
+        )
         steam_environment = _restore_steam_app_context(
             app_id,
-            _load_steam_environment(os.environ),
+            original_steam_environment,
         )
         profiles = repository or GameOptimizationProfileRepository()
         profile = profiles.load(app_id)
@@ -301,7 +594,9 @@ def main(
             "fpsLimitOwner": plan.fps_limit_owner,
             "fpsLimit": plan.fps_limit or 0,
             "mangoHudActivationOwner": plan.mangohud_activation_owner,
-            "executionTransport": "flatpak-spawn-host" if in_flatpak else "native",
+            "executionTransport": (
+                "steam-host-runner" if host_launch_directory is not None else "native"
+            ),
             "steamContextAppId": str(steam_environment.get("SteamAppId", "")),
             "steamContextGameId": str(steam_environment.get("SteamGameId", "")),
             "steamCommand": list(plan.steam_command),
@@ -335,71 +630,44 @@ def main(
                     baseline_session.id,
                 )
             return 0
+        if in_flatpak and host_launch_directory is None:
+            raise ValueError(
+                "the installed host runner is outdated; reopen Game Optimization Linux "
+                "to refresh it before launching the game"
+            )
         environment = steam_environment.copy()
         environment.update(plan.environment)
         process_environment = plan.process_environment(environment)
         process: subprocess.Popen[bytes] | None = None
         if executor is not None:
             result = executor(plan.executable, plan.command, process_environment)
-        elif in_flatpak:
-            flatpak_spawn = shutil.which("flatpak-spawn")
-            if not flatpak_spawn:
-                raise OSError("flatpak-spawn is unavailable in the sandbox")
-            host_environment = [
-                f"--env={key}={value}"
-                for key, value in sorted(process_environment.items())
-            ]
-            host_command = [
-                flatpak_spawn,
-                "--host",
-                *host_environment,
-                *plan.command,
-            ]
-            if baseline_session is not None:
-                process = subprocess.Popen(
-                    host_command,
-                    stdin=subprocess.DEVNULL,
-                    shell=False,
-                    env=os.environ.copy(),
-                )
-                try:
-                    process_group = os.getpgid(process.pid)
-                except OSError:
-                    process_group = None
-                sessions.mark_process_started(
-                    app_id,
-                    baseline_session.id,
-                    baseline_session.runner_token,
-                    spawned_pid=process.pid,
-                    process_group=process_group,
-                    command_name=Path(host_command[0]).name,
-                )
-                report.update({
-                    "baselineSpawnedPid": process.pid,
-                    "baselineProcessGroup": process_group,
-                    "baselineObservedProcesses": [
-                        f"pid={process.pid} command={Path(host_command[0]).name} state=running"
-                    ],
-                })
-                _write_report(
-                    app_id, report, report_root or STATE_DIR / "launch-reports"
-                )
-                print(
-                    "game-optimization-run: baseline lifecycle "
-                    f"session={baseline_session.id} appId={app_id} "
-                    f"runnerPid={os.getpid()} spawnedPid={process.pid} "
-                    f"processGroup={process_group} state=recording",
-                    file=sys.stderr,
-                )
-                result = _wait_for_baseline_process(
-                    process,
-                    sessions,
-                    app_id,
-                    baseline_session.id,
-                    baseline_session.runner_token,
-                )
-            else:
-                result = os.execvpe(flatpak_spawn, host_command, os.environ.copy())
+        elif host_launch_directory is not None:
+            launch_environment = dict(plan.environment)
+            for key in (
+                "SteamAppId",
+                "SteamGameId",
+                "STEAM_COMPAT_APP_ID",
+                "STEAM_COMPAT_DATA_PATH",
+            ):
+                if key in steam_environment:
+                    launch_environment[key] = steam_environment[key]
+            launcher = _host_launcher_payload(plan, launch_environment)
+            _atomic_protocol_write(
+                host_launch_directory,
+                "launcher",
+                launcher,
+                mode=0o700,
+            )
+            _atomic_protocol_write(host_launch_directory, "ready", b"1\n")
+            result = _wait_for_host_launch(
+                host_launch_directory,
+                sessions,
+                app_id,
+                baseline_session,
+                report,
+                report_root or STATE_DIR / "launch-reports",
+                command_name=Path(plan.command[0]).name,
+            )
         else:
             if baseline_session is not None:
                 process = subprocess.Popen(
@@ -472,7 +740,8 @@ def main(
             print(
                 "game-optimization-run: baseline lifecycle "
                 f"session={baseline_session.id} appId={app_id} "
-                f"spawnedPid={process.pid if process is not None else 'executor'} "
+                "spawnedPid="
+                f"{process.pid if process is not None else report.get('baselineSpawnedPid', 'executor')} "
                 f"completion={completion_received} exitCode={exit_code} "
                 f"logExists={sessions.newest_log(app_id) is not None} "
                 f"config={artifacts['configPath']} "
@@ -483,7 +752,7 @@ def main(
                 f"measurementFile={artifacts['measurementFile'] or 'none'}",
                 file=sys.stderr,
             )
-        return exit_code
+        return 0 if host_launch_directory is not None else exit_code
     except (OSError, ValueError, OptiScalerError) as error:
         try:
             if baseline_session is not None:

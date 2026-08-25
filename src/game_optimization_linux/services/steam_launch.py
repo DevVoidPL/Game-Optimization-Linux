@@ -22,6 +22,51 @@ NATIVE_STEAM_ENVIRONMENT_ERROR = (
     "Close Steam completely, then launch the game from Game Optimization."
 )
 
+_SANDBOX_RUNTIME_ENVIRONMENT_KEYS = frozenset(
+    {
+        "FLATPAK_ID",
+        "FLATPAK_SANDBOX_DIR",
+        "GIO_EXTRA_MODULES",
+        "GI_TYPELIB_PATH",
+        "GST_PLUGIN_PATH",
+        "GST_PLUGIN_SYSTEM_PATH",
+        "LD_AUDIT",
+        "LD_LIBRARY_PATH",
+        "LD_PRELOAD",
+        "LIBGL_DRIVERS_PATH",
+        "MESA_LOADER_DRIVER_OVERRIDE",
+        "PYTHONHOME",
+        "PYTHONPATH",
+        "QML2_IMPORT_PATH",
+        "QT_PLUGIN_PATH",
+        "VK_ADD_LAYER_PATH",
+        "VK_DRIVER_FILES",
+        "VK_ICD_FILENAMES",
+        "VK_INSTANCE_LAYERS",
+        "VK_LAYER_PATH",
+        "VK_LOADER_LAYERS_DISABLE",
+        "VK_LOADER_LAYERS_ENABLE",
+        "container",
+    }
+)
+_SANDBOX_RUNTIME_ENVIRONMENT_PREFIXES = (
+    "PRESSURE_VESSEL_",
+    "STEAM_RUNTIME_",
+)
+
+
+def _sandbox_runtime_environment_keys(
+    environment: Mapping[str, str],
+) -> tuple[str, ...]:
+    return tuple(
+        sorted(
+            key
+            for key in environment
+            if key in _SANDBOX_RUNTIME_ENVIRONMENT_KEYS
+            or key.startswith(_SANDBOX_RUNTIME_ENVIRONMENT_PREFIXES)
+        )
+    )
+
 
 def running_native_steam_environment() -> Mapping[str, str] | None:
     """Return the active user's Steam environment, or ``None`` if not running.
@@ -274,7 +319,17 @@ class SteamLauncher:
             host_environment = [
                 f"--env={key}={value}" for key, value in sorted(plan.environment.items())
             ]
-            launch_command = [spawn, "--host", *host_environment, *command]
+            sandbox_unsets = [
+                f"--unset-env={key}"
+                for key in _sandbox_runtime_environment_keys(self._environment)
+            ]
+            launch_command = [
+                spawn,
+                "--host",
+                *sandbox_unsets,
+                *host_environment,
+                *command,
+            ]
         try:
             self._popen(
                 launch_command,

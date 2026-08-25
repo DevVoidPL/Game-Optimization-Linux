@@ -2,19 +2,125 @@
 set -eu
 
 app_id="io.github.DevVoidPL.GameOptimizationLinux"
-snapshot_directory="${HOME}/.local/share/game-optimization-linux/run-env"
-
-umask 077
-mkdir -p "$snapshot_directory"
-chmod 0700 "$snapshot_directory"
-snapshot="$(mktemp "$snapshot_directory/steam-env.XXXXXX")"
+run_directory="${HOME}/.local/share/game-optimization-linux/run-env"
+planner_pid=""
+child_pid=""
+launch_directory=""
 
 cleanup() {
-    rm -f "$snapshot"
+    if [ -n "$child_pid" ]; then
+        kill -TERM "$child_pid" 2>/dev/null || true
+    fi
+    if [ -n "$planner_pid" ]; then
+        kill -TERM "$planner_pid" 2>/dev/null || true
+    fi
+    if [ -n "$launch_directory" ]; then
+        rm -f \
+            "$launch_directory/steam.env" \
+            "$launch_directory/launcher" \
+            "$launch_directory/ready" \
+            "$launch_directory/owner" \
+            "$launch_directory/started" \
+            "$launch_directory/completed" \
+            "$launch_directory"/.launcher.*.tmp \
+            "$launch_directory"/.ready.*.tmp \
+            "$launch_directory"/.started.*.tmp \
+            "$launch_directory"/.completed.*.tmp
+        rmdir "$launch_directory" 2>/dev/null || true
+    fi
 }
-trap cleanup EXIT HUP INT TERM
 
+terminate() {
+    code="$1"
+    if [ -n "$child_pid" ]; then
+        kill -TERM "$child_pid" 2>/dev/null || true
+    fi
+    if [ -n "$planner_pid" ]; then
+        kill -TERM "$planner_pid" 2>/dev/null || true
+    fi
+    exit "$code"
+}
+
+trap cleanup EXIT
+trap 'terminate 129' HUP
+trap 'terminate 130' INT
+trap 'terminate 143' TERM
+
+if [ "$#" -lt 4 ] || [ "$1" != "--appid" ]; then
+    echo "game-optimization-run: expected --appid APPID -- GAME_COMMAND" >&2
+    exit 2
+fi
+steam_app_id="$2"
+case "$steam_app_id" in
+    ""|*[!0-9]*)
+        echo "game-optimization-run: Steam AppID must be numeric" >&2
+        exit 2
+        ;;
+esac
+shift 2
+if [ "$1" != "--" ]; then
+    echo "game-optimization-run: missing -- before the Steam game command" >&2
+    exit 2
+fi
+shift
+if [ "$#" -eq 0 ] || [ -z "$1" ]; then
+    echo "game-optimization-run: Steam did not provide the game command" >&2
+    exit 2
+fi
+
+umask 077
+if [ -L "$run_directory" ] || { [ -e "$run_directory" ] && [ ! -d "$run_directory" ]; }; then
+    echo "game-optimization-run: private run directory is invalid" >&2
+    exit 2
+fi
+mkdir -p "$run_directory"
+if [ -L "$run_directory" ] || [ ! -d "$run_directory" ]; then
+    echo "game-optimization-run: private run directory is invalid" >&2
+    exit 2
+fi
+chmod 0700 "$run_directory"
+
+# A completed handoff is stale only when the host shim that owned it is gone.
+# Incomplete handoffs are left alone because their game process may still be alive.
+for stale_directory in "$run_directory"/launch.*; do
+    if [ ! -d "$stale_directory" ] || [ -L "$stale_directory" ]; then
+        continue
+    fi
+    if [ ! -f "$stale_directory/completed" ] || [ -L "$stale_directory/completed" ]; then
+        continue
+    fi
+    if [ ! -f "$stale_directory/owner" ] || [ -L "$stale_directory/owner" ]; then
+        continue
+    fi
+    stale_owner=""
+    IFS= read -r stale_owner < "$stale_directory/owner" || true
+    case "$stale_owner" in
+        ""|*[!0-9]*) continue ;;
+    esac
+    if kill -0 "$stale_owner" 2>/dev/null; then
+        continue
+    fi
+    rm -f \
+        "$stale_directory/steam.env" \
+        "$stale_directory/launcher" \
+        "$stale_directory/ready" \
+        "$stale_directory/owner" \
+        "$stale_directory/started" \
+        "$stale_directory/completed" \
+        "$stale_directory"/.launcher.*.tmp \
+        "$stale_directory"/.ready.*.tmp \
+        "$stale_directory"/.started.*.tmp \
+        "$stale_directory"/.completed.*.tmp
+    rmdir "$stale_directory" 2>/dev/null || true
+done
+
+launch_directory="$(mktemp -d "$run_directory/launch.XXXXXXXX")"
+chmod 0700 "$launch_directory"
+printf '%s\n' "$$" > "$launch_directory/owner"
+chmod 0600 "$launch_directory/owner"
+snapshot="$launch_directory/steam.env"
 env -0 > "$snapshot"
+chmod 0600 "$snapshot"
 
 safe_path=""
 old_ifs=$IFS
@@ -72,21 +178,85 @@ run_flatpak() {
 if [ -n "${FLATPAK_ID-}" ] && [ -n "$flatpak_spawn" ]; then
     run_flatpak "$flatpak_spawn" --host flatpak run \
         "--env=GAME_OPTIMIZATION_STEAM_ENV_FILE=$snapshot" \
-        --command=game-optimization-run "$app_id" "$@"
-    status=$?
+        --command=game-optimization-run "$app_id" \
+        --appid "$steam_app_id" \
+        --prepare-host-launch "$launch_directory" \
+        -- "$@" &
 elif [ -n "$flatpak_executable" ]; then
     run_flatpak "$flatpak_executable" run \
         "--env=GAME_OPTIMIZATION_STEAM_ENV_FILE=$snapshot" \
-        --command=game-optimization-run "$app_id" "$@"
-    status=$?
+        --command=game-optimization-run "$app_id" \
+        --appid "$steam_app_id" \
+        --prepare-host-launch "$launch_directory" \
+        -- "$@" &
 elif [ -n "$flatpak_spawn" ]; then
     run_flatpak "$flatpak_spawn" --host flatpak run \
         "--env=GAME_OPTIMIZATION_STEAM_ENV_FILE=$snapshot" \
-        --command=game-optimization-run "$app_id" "$@"
-    status=$?
+        --command=game-optimization-run "$app_id" \
+        --appid "$steam_app_id" \
+        --prepare-host-launch "$launch_directory" \
+        -- "$@" &
 else
     echo "game-optimization-run: flatpak and flatpak-spawn are unavailable" >&2
-    status=127
+    exit 127
+fi
+planner_pid=$!
+
+attempt=0
+while [ ! -f "$launch_directory/ready" ]; do
+    if ! kill -0 "$planner_pid" 2>/dev/null; then
+        if wait "$planner_pid"; then
+            planner_status=2
+        else
+            planner_status=$?
+        fi
+        planner_pid=""
+        echo "game-optimization-run: Flatpak launch preparation failed" >&2
+        exit "$planner_status"
+    fi
+    attempt=$((attempt + 1))
+    if [ "$attempt" -ge 600 ]; then
+        kill -TERM "$planner_pid" 2>/dev/null || true
+        wait "$planner_pid" 2>/dev/null || true
+        planner_pid=""
+        echo "game-optimization-run: Flatpak launch preparation timed out" >&2
+        exit 2
+    fi
+    sleep 0.1
+done
+
+launcher="$launch_directory/launcher"
+if [ ! -f "$launcher" ] || [ -L "$launcher" ] || [ ! -x "$launcher" ]; then
+    echo "game-optimization-run: prepared host launcher is invalid" >&2
+    exit 2
 fi
 
-exit "$status"
+write_status() {
+    name="$1"
+    value="$2"
+    temporary="$launch_directory/.${name}.$$.tmp"
+    printf '%s\n' "$value" > "$temporary"
+    chmod 0600 "$temporary"
+    mv -f "$temporary" "$launch_directory/$name"
+}
+
+"$launcher" "$@" <&0 &
+child_pid=$!
+write_status started "$child_pid"
+
+if wait "$child_pid"; then
+    child_status=0
+else
+    child_status=$?
+fi
+child_pid=""
+write_status completed "$child_status"
+
+if wait "$planner_pid"; then
+    :
+else
+    planner_status=$?
+    echo "game-optimization-run: Flatpak launch monitor exited with status $planner_status" >&2
+fi
+planner_pid=""
+exit "$child_status"

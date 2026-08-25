@@ -10,6 +10,7 @@ Control {
     property color toneColor: App.Theme.statusColor(status)
     property color fillColor: App.Theme.statusSurface(status)
     property bool showDot: true
+    property url iconSource: ""
 
     implicitWidth: badgeRow.implicitWidth + leftPadding + rightPadding
     implicitHeight: 26
@@ -22,11 +23,24 @@ Control {
         anchors.centerIn: parent
 
         Rectangle {
-            visible: control.showDot
+            visible: control.showDot && control.iconSource.toString().length === 0
             width: 6
             height: 6
             radius: 3
             color: control.toneColor
+            anchors.verticalCenter: parent.verticalCenter
+        }
+
+        Image {
+            visible: control.iconSource.toString().length > 0
+            width: 16
+            height: 16
+            sourceSize.width: 16
+            sourceSize.height: 16
+            source: control.iconSource
+            fillMode: Image.PreserveAspectFit
+            cache: true
+            smooth: true
             anchors.verticalCenter: parent.verticalCenter
         }
 

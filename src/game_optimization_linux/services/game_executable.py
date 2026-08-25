@@ -66,6 +66,32 @@ class GameExecutableResolver:
 
     def __init__(self, *, maximum_files: int = 50000) -> None:
         self.maximum_files = max(1, int(maximum_files))
+        self._resolution_cache: dict[
+            tuple[str, int, str, str, str, str], ExecutableResolution
+        ] = {}
+
+    def invalidate(self, game: Game | None = None) -> None:
+        """Discard stable discovery results after a relevant game change."""
+
+        if game is None:
+            self._resolution_cache.clear()
+            return
+        root = str(game.install_path.resolve(strict=False))
+        self._resolution_cache = {
+            key: value
+            for key, value in self._resolution_cache.items()
+            if key[0] != root
+        }
+
+    def _remember(
+        self,
+        key: tuple[str, int, str, str, str, str],
+        result: ExecutableResolution,
+    ) -> ExecutableResolution:
+        self._resolution_cache[key] = result
+        while len(self._resolution_cache) > 32:
+            self._resolution_cache.pop(next(iter(self._resolution_cache)))
+        return result
 
     @staticmethod
     def _root(game: Game) -> Path | None:
@@ -186,6 +212,21 @@ class GameExecutableResolver:
         root = self._root(game)
         if root is None:
             return ExecutableResolution("not_found", message="Game directory is unavailable")
+        try:
+            root_mtime = root.stat().st_mtime_ns
+        except OSError:
+            root_mtime = 0
+        cache_key = (
+            str(root),
+            root_mtime,
+            str(game.steam_build_id or ""),
+            game.name,
+            game.data_source.casefold(),
+            str(selected_relative_path or ""),
+        )
+        cached = self._resolution_cache.get(cache_key)
+        if cached is not None:
+            return cached
         saved_candidate = (
             self.validate_selected(game, selected_relative_path)
             if selected_relative_path else None
@@ -237,28 +278,33 @@ class GameExecutableResolver:
                     for item in visible_candidates
                 ):
                     visible_candidates = (*visible_candidates, saved_candidate)
-                return ExecutableResolution(
+                result = ExecutableResolution(
                     "selected", tuple(visible_candidates), saved_candidate, automatic=False,
                     message="Saved executable selected",
                 )
-            return ExecutableResolution(
+                return self._remember(cache_key, result)
+            result = ExecutableResolution(
                 "saved_invalid", candidates, message="Saved executable is no longer available"
             )
+            return self._remember(cache_key, result)
         if not candidates:
-            return ExecutableResolution("not_found", message="No game executable was detected")
+            result = ExecutableResolution("not_found", message="No game executable was detected")
+            return self._remember(cache_key, result)
         first = candidates[0]
         second_score = candidates[1].score if len(candidates) > 1 else -1000
         if len(candidates) == 1 or (
             first.score >= 65 and first.score - second_score >= 18
         ):
-            return ExecutableResolution(
+            result = ExecutableResolution(
                 "confident", candidates, first, automatic=True,
                 message="Game executable detected",
             )
-        return ExecutableResolution(
+            return self._remember(cache_key, result)
+        result = ExecutableResolution(
             "ambiguous", candidates,
             message="Choose the main game executable",
         )
+        return self._remember(cache_key, result)
 
 
 __all__ = [

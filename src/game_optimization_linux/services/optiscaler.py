@@ -23,12 +23,21 @@ from game_optimization_linux.models import (
     Game,
     OptiScalerProfile,
     OPTISCALER_PROXY_DLLS,
+    OPTISCALER_SCHEMA_VERSION,
 )
 
 from .btrfs_analysis import BtrfsCompressionAnalyzer
 from .archive_reader import ArchiveEntry, ArchiveReadError, open_archive
 from .game_executable import ExecutableCandidate, GameExecutableResolver
 from .mangohud import _atomic_write
+from .optiscaler_fsr4 import (
+    OptiScalerIniCapabilities,
+    inspect_optiscaler_ini,
+    inspect_optiscaler_ini_state,
+    managed_ini_differences,
+    managed_ini_updates,
+    update_ini_text,
+)
 
 
 PROFILE_FILE_NAME = "optiscaler.json"
@@ -59,6 +68,11 @@ LOADER_MARKERS = (
     "vkbasalt.dll",
     "vkbasalt.conf",
 )
+MUTABLE_MANAGED_FILES = frozenset({"optiscaler.ini"})
+
+
+def _is_mutable_configuration(relative_path: object) -> bool:
+    return Path(str(relative_path or "")).name.casefold() in MUTABLE_MANAGED_FILES
 
 
 class OptiScalerError(RuntimeError):
@@ -71,6 +85,45 @@ class OptiScalerCancelled(OptiScalerError):
 
 class OptiScalerConflictError(OptiScalerError):
     pass
+
+
+@dataclass(frozen=True, slots=True)
+class OptiScalerVerificationResult:
+    """Completed verification report while retaining the installed profile."""
+
+    profile: OptiScalerProfile
+    state: str
+    summary: str
+    payload_valid: bool | None
+    configuration_drift: bool
+    managed_configuration_drift: bool
+    backup_valid: bool | None
+    issues: tuple[dict[str, Any], ...] = ()
+
+    @property
+    def app_id(self) -> str:
+        return self.profile.app_id
+
+    @property
+    def installation_state(self) -> str:
+        return self.profile.installation_state
+
+    def to_dict(self) -> dict[str, Any]:
+        data = self.profile.to_dict()
+        data.update(
+            {
+                "installationVerificationState": self.state,
+                "installationVerificationSummary": self.summary,
+                "installationVerificationCompleted": self.state
+                != "verification_error",
+                "installationPayloadValid": self.payload_valid,
+                "configurationDrift": self.configuration_drift,
+                "managedConfigurationDrift": self.managed_configuration_drift,
+                "backupValid": self.backup_valid,
+                "verificationIssues": list(self.issues),
+            }
+        )
+        return data
 
 
 @dataclass(frozen=True, slots=True)
@@ -363,6 +416,65 @@ class OptiScalerService:
         version = self._detect_version(archive_path)
         return reader.format_name, version, tuple(mapped)
 
+    def archive_ini_capabilities(
+        self, archive_path: Path
+    ) -> OptiScalerIniCapabilities:
+        """Inspect the shipped INI without executing or installing the archive."""
+
+        try:
+            reader = open_archive(Path(archive_path))
+            with tempfile.TemporaryDirectory(
+                prefix="game-optimization-optiscaler-capabilities-"
+            ) as temporary_directory:
+                root = Path(temporary_directory).resolve(strict=True)
+                reader.extract_to(root)
+                dlls = [
+                    PurePosixPath(entry.relative_path)
+                    for entry in reader.entries
+                    if not entry.is_directory
+                    and PurePosixPath(entry.relative_path).name.casefold()
+                    == "optiscaler.dll"
+                ]
+                if len(dlls) != 1:
+                    raise OptiScalerError(
+                        "archive must contain exactly one OptiScaler.dll"
+                    )
+                ini_entries = [
+                    PurePosixPath(entry.relative_path)
+                    for entry in reader.entries
+                    if not entry.is_directory
+                    and PurePosixPath(entry.relative_path).parent == dlls[0].parent
+                    and PurePosixPath(entry.relative_path).name.casefold()
+                    == "optiscaler.ini"
+                ]
+                if len(ini_entries) != 1:
+                    raise OptiScalerError(
+                        "archive must contain exactly one OptiScaler.ini"
+                    )
+                target = self._target(root, ini_entries[0].as_posix())
+                capabilities = inspect_optiscaler_ini(
+                    target.read_text(encoding="utf-8-sig")
+                )
+                has_agility_payload = any(
+                    "d3d12_optiscaler" in {
+                        part.casefold()
+                        for part in PurePosixPath(entry.relative_path).parts[:-1]
+                    }
+                    for entry in reader.entries
+                    if not entry.is_directory
+                )
+                if capabilities.agility_sdk_upgrade and not has_agility_payload:
+                    capabilities = replace(
+                        capabilities, agility_sdk_upgrade=False
+                    )
+                return capabilities
+        except ArchiveReadError as error:
+            raise OptiScalerError(str(error)) from error
+        except (OSError, UnicodeError) as error:
+            raise OptiScalerError(
+                "archive OptiScaler.ini could not be inspected"
+            ) from error
+
     @staticmethod
     def _detect_version(archive_path: Path) -> str:
         import re
@@ -410,6 +522,22 @@ class OptiScalerService:
             executable=selected.relative_path,
             updated_at=now,
         )
+        self.profile_repository.save(updated)
+        return updated
+
+    def set_channel(self, game: Game, channel: str) -> OptiScalerProfile:
+        """Select an official release channel without changing installed files."""
+
+        profile = self.profile_repository.load(self.game_key(game))
+        now = datetime.now(UTC)
+        try:
+            updated = replace(
+                profile,
+                channel=str(channel or "").strip().casefold(),
+                updated_at=now,
+            )
+        except ValueError as error:
+            raise OptiScalerError(str(error)) from error
         self.profile_repository.save(updated)
         return updated
 
@@ -465,6 +593,7 @@ class OptiScalerService:
         executable: str = "",
         injection_dll: str = "auto",
         allow_anticheat_risk: bool = False,
+        version_override: str = "",
     ) -> OptiScalerInstallPlan:
         game_key = self.game_key(game)
         root = self._canonical_game_root(game)
@@ -483,6 +612,11 @@ class OptiScalerService:
         archive_format, version, archive_files = self._archive_payload(
             Path(archive_path), proxy
         )
+        if version_override:
+            selected_version = str(version_override).strip()
+            if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,99}", selected_version):
+                raise OptiScalerError("invalid OptiScaler release version")
+            version = selected_version
         active_manifest: dict[str, Any] = {}
         if profile.manifest_id:
             try:
@@ -490,13 +624,27 @@ class OptiScalerService:
             except OptiScalerError:
                 pass
         managed_hashes = {
-            str(item.get("relative_path", "")): str(item.get("after_sha256", ""))
+            str(item.get("relative_path", "")).casefold(): str(
+                item.get("after_sha256", "")
+            )
             for item in active_manifest.get("installed_files", [])
             if isinstance(item, Mapping)
+        }
+        existing_by_name = {
+            item.name.casefold(): item
+            for item in install_directory.iterdir()
         }
         files: list[OptiScalerFilePlan] = []
         conflicts: list[OptiScalerConflict] = []
         for entry, relative, digest in archive_files:
+            relative_path = PurePosixPath(relative)
+            existing_root_entry = (
+                existing_by_name.get(relative_path.name.casefold())
+                if relative_path.parent == PurePosixPath(".")
+                else None
+            )
+            if existing_root_entry is not None:
+                relative = existing_root_entry.name
             target = self._target(install_directory, relative)
             existing_hash = ""
             exists = target.exists() or target.is_symlink()
@@ -509,7 +657,14 @@ class OptiScalerService:
                         relative,
                         existing_hash,
                         "existing_proxy" if relative.casefold() == proxy else "existing_file",
-                        managed_hashes.get(relative) == existing_hash,
+                        bool(
+                            relative.casefold() in managed_hashes
+                            and (
+                                managed_hashes.get(relative.casefold())
+                                == existing_hash
+                                or _is_mutable_configuration(relative)
+                            )
+                        ),
                     )
                 )
             files.append(
@@ -523,10 +678,6 @@ class OptiScalerService:
                 )
             )
         planned_targets = {item.target_relative_path.casefold() for item in files}
-        existing_by_name = {
-            item.name.casefold(): item
-            for item in install_directory.iterdir()
-        }
         inspected_markers: set[str] = set()
         for name in (*OPTISCALER_PROXY_DLLS, *LOADER_MARKERS):
             folded_name = name.casefold()
@@ -540,7 +691,8 @@ class OptiScalerService:
                         target.name,
                         self._hash_file(target),
                         "other_loader",
-                        managed_hashes.get(target.name) == self._hash_file(target),
+                        managed_hashes.get(target.name.casefold())
+                        == self._hash_file(target),
                     )
                 )
             elif target.is_dir():
@@ -675,6 +827,10 @@ class OptiScalerService:
         cancel_event: Event | None = None,
         progress: Callable[[str, float], None] | None = None,
         expected_archive_sha256: str = "",
+        source_identity: str = "local_archive",
+        channel: str = "stable",
+        fidelityfx_upscaler_version: str = "",
+        release_version: str = "",
     ) -> OptiScalerProfile:
         """Install from a local archive or a verified private snapshot.
 
@@ -696,6 +852,10 @@ class OptiScalerService:
                 allow_anticheat_risk=allow_anticheat_risk,
                 cancel_event=cancel_event,
                 progress=progress,
+                source_identity=source_identity,
+                channel=channel,
+                fidelityfx_upscaler_version=fidelityfx_upscaler_version,
+                release_version=release_version,
             )
         if not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
             raise OptiScalerError("invalid expected OptiScaler archive SHA-256")
@@ -730,6 +890,10 @@ class OptiScalerService:
                 progress=progress,
                 archive_path_for_manifest=source_archive,
                 archive_sha256=actual_hash,
+                source_identity=source_identity,
+                channel=channel,
+                fidelityfx_upscaler_version=fidelityfx_upscaler_version,
+                release_version=release_version,
             )
 
     def _install_from_archive(
@@ -746,6 +910,10 @@ class OptiScalerService:
         progress: Callable[[str, float], None] | None = None,
         archive_path_for_manifest: Path | None = None,
         archive_sha256: str = "",
+        source_identity: str = "local_archive",
+        channel: str = "stable",
+        fidelityfx_upscaler_version: str = "",
+        release_version: str = "",
     ) -> OptiScalerProfile:
         emit = progress or (lambda _stage, _value: None)
         emit("Validation", 0.05)
@@ -755,6 +923,7 @@ class OptiScalerService:
             executable=executable,
             injection_dll=injection_dll,
             allow_anticheat_risk=allow_anticheat_risk,
+            version_override=release_version,
         )
         self._check_cancel(cancel_event)
         if plan.blockers:
@@ -770,7 +939,8 @@ class OptiScalerService:
         has_active_installation = bool(
             previous_profile.enabled
             and previous_profile.manifest_id
-            and previous_profile.installation_state in {"installed", "corrupt"}
+            and previous_profile.installation_state
+            in {"installed", "corrupt", "partial"}
         )
         if previous_profile.installation_state == "restore_required":
             raise OptiScalerError(
@@ -947,10 +1117,18 @@ class OptiScalerService:
                         and previous_expected
                         and current_hash == previous_expected
                     )
+                    previous_is_mutable_configuration = bool(
+                        previous_item is not None
+                        and _is_mutable_configuration(item.target_relative_path)
+                    )
                     carry_created = bool(
                         previous_item is not None
                         and item.target_relative_path in previous_created
-                        and (previous_is_intact or not current_exists)
+                        and (
+                            previous_is_intact
+                            or previous_is_mutable_configuration
+                            or not current_exists
+                        )
                     )
                     carry_replaced = bool(
                         previous_item is not None
@@ -1088,7 +1266,12 @@ class OptiScalerService:
                             f"previously managed target is no longer a regular file: {relative}"
                         )
                     current_hash = self._hash_file(target) if exists else ""
-                    if exists and current_hash != expected:
+                    mutable_configuration = _is_mutable_configuration(relative)
+                    if (
+                        exists
+                        and current_hash != expected
+                        and not mutable_configuration
+                    ):
                         reconciled_files.append(
                             {"relative_path": relative, "action": "preserved_foreign_change"}
                         )
@@ -1164,6 +1347,11 @@ class OptiScalerService:
                     else Path(plan.archive_path).resolve(strict=False)
                 ),
                 "archive_sha256": str(archive_sha256 or ""),
+                "source_identity": str(source_identity or "local_archive"),
+                "channel": str(channel or "stable"),
+                "fidelityfx_upscaler_version": str(
+                    fidelityfx_upscaler_version or ""
+                ),
                 "backup_directory": str(backup_root),
                 "installed_at": installed_at.isoformat(),
                 "operation": effective_operation,
@@ -1181,14 +1369,31 @@ class OptiScalerService:
                 + "\n",
             )
             profile = OptiScalerProfile(
-                schema_version=1,
+                schema_version=OPTISCALER_SCHEMA_VERSION,
                 app_id=plan.app_id,
                 enabled=True,
                 executable=plan.executable,
                 install_directory=plan.install_directory,
                 installed_version=plan.version,
+                channel=str(channel or "stable"),
+                source_identity=str(source_identity or "local_archive"),
+                fidelityfx_upscaler_version=str(
+                    fidelityfx_upscaler_version or ""
+                ),
                 injection_dll=plan.injection_dll,
                 proton_override=plan.proton_override,
+                fsr4_mode=previous_profile.fsr4_mode,
+                effective_fsr4_mode="disabled",
+                automatic_reason="",
+                fsr_agility_sdk_upgrade=(
+                    previous_profile.fsr_agility_sdk_upgrade
+                ),
+                fsr4_watermark=previous_profile.fsr4_watermark,
+                dx11_upscaler=previous_profile.dx11_upscaler,
+                dx12_upscaler=previous_profile.dx12_upscaler,
+                vulkan_upscaler=previous_profile.vulkan_upscaler,
+                configuration_applied=False,
+                runtime_verification_status="not_verified",
                 manifest_id=manifest_id,
                 installation_state="installed",
                 last_verified_at=installed_at,
@@ -1231,10 +1436,18 @@ class OptiScalerService:
         if self._process_detector(root):
             raise OptiScalerError("The game is currently running")
 
-    def verify(self, game: Game) -> OptiScalerProfile:
+    def verify(self, game: Game) -> OptiScalerVerificationResult:
         profile = self.profile_repository.load(self.game_key(game))
         if not profile.manifest_id:
-            return profile
+            return OptiScalerVerificationResult(
+                profile,
+                "not_verified",
+                "OptiScaler is not installed",
+                None,
+                False,
+                False,
+                None,
+            )
         manifest = self._load_manifest(profile)
         install_root = Path(str(manifest["install_directory"])).resolve(strict=False)
         expected_root = self._canonical_game_root(game)
@@ -1242,18 +1455,276 @@ class OptiScalerService:
             install_root.relative_to(expected_root)
         except ValueError as error:
             raise OptiScalerError("manifest install directory is outside this game") from error
-        intact = True
+        issues: list[dict[str, Any]] = []
+        installed_relatives: set[str] = set()
+        payload_missing = False
+        payload_corrupt = False
+        payload_partial = False
+        verification_error = False
+        configuration_changed = False
+        managed_configuration_drift = False
+        replacement_before_hashes = {
+            str(item.get("relative_path", "")).casefold(): str(
+                item.get("before_sha256", "")
+            )
+            for item in manifest.get("replaced_files", [])
+            if isinstance(item, Mapping)
+        }
         for item in manifest.get("installed_files", []):
             if not isinstance(item, Mapping):
-                intact = False
+                verification_error = True
+                issues.append(
+                    {
+                        "kind": "verification_error",
+                        "path": "",
+                        "message": "The manifest contains an invalid managed file entry",
+                    }
+                )
                 continue
-            target = self._target(install_root, str(item.get("relative_path", "")))
-            if not target.is_file() or self._hash_file(target) != item.get("after_sha256"):
-                intact = False
+            relative = str(item.get("relative_path", ""))
+            installed_relatives.add(relative.casefold())
+            is_ini = Path(relative).name.casefold() == "optiscaler.ini"
+            try:
+                target = self._target(install_root, relative)
+            except OptiScalerError as error:
+                verification_error = True
+                issues.append(
+                    {
+                        "kind": "verification_error",
+                        "path": relative,
+                        "message": str(error),
+                    }
+                )
+                continue
+            if target.is_symlink():
+                payload_corrupt = True
+                issues.append(
+                    {
+                        "kind": "unsafe_managed_path",
+                        "path": relative,
+                        "message": f"Managed file is a symbolic link: {relative}",
+                    }
+                )
+                continue
+            if not target.is_file():
+                if is_ini:
+                    managed_configuration_drift = True
+                    issues.append(
+                        {
+                            "kind": "configuration_missing",
+                            "path": relative,
+                            "message": "Managed OptiScaler.ini is missing",
+                        }
+                    )
+                else:
+                    payload_missing = True
+                    issues.append(
+                        {
+                            "kind": "managed_file_missing",
+                            "path": relative,
+                            "message": f"Managed payload file is missing: {relative}",
+                        }
+                    )
+                continue
+            try:
+                observed_hash = self._hash_file(target)
+            except OSError as error:
+                verification_error = True
+                issues.append(
+                    {
+                        "kind": "verification_error",
+                        "path": relative,
+                        "message": f"Could not read {relative}: {error}",
+                    }
+                )
+                continue
+            expected_hash = str(item.get("after_sha256", ""))
+            if not expected_hash or observed_hash == expected_hash:
+                continue
+            if is_ini:
+                try:
+                    ini_text = target.read_text(encoding="utf-8-sig")
+                except (OSError, UnicodeError) as error:
+                    verification_error = True
+                    issues.append(
+                        {
+                            "kind": "verification_error",
+                            "path": relative,
+                            "message": f"Could not inspect OptiScaler.ini: {error}",
+                        }
+                    )
+                    continue
+                settings = manifest.get("managed_settings", {})
+                differences = managed_ini_differences(
+                    ini_text, settings if isinstance(settings, Mapping) else {}
+                )
+                if differences:
+                    managed_configuration_drift = True
+                    for difference in differences:
+                        issues.append(
+                            {
+                                "kind": "managed_configuration_drift",
+                                "path": relative,
+                                "message": (
+                                    f"{difference['key']} is {difference['actual']}; "
+                                    f"expected {difference['expected']}"
+                                ),
+                                **difference,
+                            }
+                        )
+                else:
+                    configuration_changed = True
+                    issues.append(
+                        {
+                            "kind": "configuration_changed",
+                            "path": relative,
+                            "message": (
+                                "OptiScaler.ini changed after installation, but managed "
+                                "settings still match"
+                            ),
+                        }
+                    )
+                continue
+            before_hash = replacement_before_hashes.get(relative.casefold(), "")
+            if before_hash and observed_hash == before_hash:
+                payload_partial = True
+                issues.append(
+                    {
+                        "kind": "original_file_already_restored",
+                        "path": relative,
+                        "message": (
+                            "The verified original game file is already restored: "
+                            f"{relative}"
+                        ),
+                        "expectedSha256": expected_hash,
+                        "observedSha256": observed_hash,
+                    }
+                )
+                continue
+            payload_corrupt = True
+            issues.append(
+                {
+                    "kind": "managed_file_hash_mismatch",
+                    "path": relative,
+                    "message": f"Managed payload hash mismatch: {relative}",
+                    "expectedSha256": expected_hash,
+                    "observedSha256": observed_hash,
+                }
+            )
+
+        backup_invalid = False
+        backup_root = self.backup_root(profile.app_id, profile.manifest_id)
+        for item in manifest.get("replaced_files", []):
+            if not isinstance(item, Mapping):
+                backup_invalid = True
+                issues.append(
+                    {
+                        "kind": "backup_invalid",
+                        "path": "",
+                        "message": "The manifest contains invalid restore metadata",
+                    }
+                )
+                continue
+            relative = str(item.get("relative_path", ""))
+            backup_relative = str(item.get("backup_relative_path", relative))
+            expected_hash = str(item.get("before_sha256", ""))
+            try:
+                backup = self._target(backup_root, backup_relative)
+                valid = bool(
+                    expected_hash
+                    and not backup.is_symlink()
+                    and backup.is_file()
+                    and self._hash_file(backup) == expected_hash
+                )
+            except (OSError, OptiScalerError):
+                valid = False
+            if not valid:
+                backup_invalid = True
+                issues.append(
+                    {
+                        "kind": "backup_invalid",
+                        "path": relative,
+                        "message": f"Original-file backup is missing or corrupt: {relative}",
+                    }
+                )
+
+        unmanaged_conflicts: list[str] = []
+        for proxy_name in OPTISCALER_PROXY_DLLS:
+            if proxy_name.casefold() in installed_relatives:
+                continue
+            candidate = install_root / proxy_name
+            if candidate.exists() or candidate.is_symlink():
+                unmanaged_conflicts.append(proxy_name)
+                issues.append(
+                    {
+                        "kind": "unmanaged_conflict",
+                        "path": proxy_name,
+                        "message": f"Unmanaged injection proxy is also present: {proxy_name}",
+                    }
+                )
+
+        if verification_error:
+            verification_state = "verification_error"
+            summary = "Verification could not inspect every managed file"
+        elif payload_missing:
+            verification_state = "missing_files"
+            summary = "Managed OptiScaler payload files are missing"
+        elif payload_corrupt:
+            verification_state = "corrupt_files"
+            summary = "Managed OptiScaler payload files failed hash verification"
+        elif payload_partial:
+            verification_state = "partial"
+            summary = "OptiScaler is partially removed; original game files are safe"
+        elif backup_invalid:
+            verification_state = "backup_invalid"
+            summary = "Installation payload is valid, but restore backups are unavailable"
+        elif managed_configuration_drift:
+            verification_state = "managed_configuration_drift"
+            summary = "Installation verified; managed configuration changed"
+        elif configuration_changed:
+            verification_state = "configuration_changed"
+            summary = "Installation verified; OptiScaler.ini was changed by the user or runtime"
+        elif unmanaged_conflicts:
+            verification_state = "unmanaged_conflict"
+            summary = "Installation verified; another unmanaged injection proxy is present"
+        else:
+            verification_state = "verified"
+            summary = "Installation verified"
+
         now = datetime.now(UTC)
-        state = "installed" if intact and profile.enabled else profile.installation_state
-        if profile.enabled and not intact:
+        payload_valid = not (
+            payload_missing or payload_corrupt or payload_partial or verification_error
+        )
+        state = "installed" if payload_valid and profile.enabled else profile.installation_state
+        if profile.enabled and payload_partial and not (
+            payload_missing or payload_corrupt or verification_error
+        ):
+            state = "partial"
+        elif profile.enabled and not payload_valid and not verification_error:
             state = "corrupt"
+        manifest["last_verification"] = {
+            "state": verification_state,
+            "summary": summary,
+            "completed": not verification_error,
+            "payload_valid": payload_valid,
+            "configuration_drift": configuration_changed
+            or managed_configuration_drift,
+            "managed_configuration_drift": managed_configuration_drift,
+            "backup_valid": not backup_invalid,
+            "unmanaged_conflicts": unmanaged_conflicts,
+            "issues": issues,
+            "verified_at": now.isoformat(),
+        }
+        try:
+            _atomic_write(
+                self.manifest_path(profile.app_id, profile.manifest_id),
+                json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
+                + "\n",
+            )
+        except OSError as error:
+            raise OptiScalerError(
+                f"verification completed but its result could not be saved: {error}"
+            ) from error
         updated = replace(
             profile,
             installation_state=state,
@@ -1261,24 +1732,23 @@ class OptiScalerService:
             updated_at=now,
         )
         self.profile_repository.save(updated)
-        return updated
+        return OptiScalerVerificationResult(
+            updated,
+            verification_state,
+            summary,
+            payload_valid,
+            configuration_changed or managed_configuration_drift,
+            managed_configuration_drift,
+            not backup_invalid,
+            tuple(issues),
+        )
 
-    def configure_fsr4_update(
-        self, game: Game, enabled: bool
-    ) -> OptiScalerProfile:
-        """Set the managed OptiScaler INI flag without losing manifest safety.
-
-        This is deliberately separate from Proton environment variables.  The
-        INI is changed only when it belongs to an intact Game Optimization
-        installation, and every manifest hash is updated atomically.
-        """
-
-        if not isinstance(enabled, bool):
-            raise OptiScalerError("Fsr4Update must be a boolean")
-        self._assert_mutation_allowed(game)
+    def _managed_ini_context(
+        self, game: Game
+    ) -> tuple[OptiScalerProfile, dict[str, Any], Path, str, bytes, str]:
         profile = self.profile_repository.load(self.game_key(game))
         if not profile.enabled or profile.installation_state != "installed":
-            return profile
+            raise OptiScalerError("OptiScaler is not installed for this game")
         manifest = self._load_manifest(profile)
         install_root = Path(str(manifest.get("install_directory", ""))).resolve(
             strict=True
@@ -1298,70 +1768,216 @@ class OptiScalerService:
             == "optiscaler.ini"
         ]
         if len(installed_entries) != 1:
-            raise OptiScalerError(
-                "the managed OptiScaler.ini entry is unavailable"
-            )
+            raise OptiScalerError("the managed OptiScaler.ini entry is unavailable")
         relative = str(installed_entries[0].get("relative_path", ""))
         target = self._target(install_root, relative)
-        if not target.is_file():
+        if target.is_symlink() or not target.is_file():
             raise OptiScalerError("the managed OptiScaler.ini is unavailable")
-        original = target.read_bytes()
-        original_hash = sha256(original).hexdigest()
-        if original_hash != str(installed_entries[0].get("after_sha256", "")):
-            raise OptiScalerConflictError(
-                "OptiScaler.ini changed outside Game Optimization"
-            )
         try:
+            original = target.read_bytes()
             text = original.decode("utf-8-sig")
         except UnicodeDecodeError as error:
             raise OptiScalerError("OptiScaler.ini is not valid UTF-8") from error
-        expression = re.compile(r"(?im)^(\s*Fsr4Update\s*=\s*).*$")
-        value = "true" if enabled else "false"
-        if expression.search(text):
-            updated_text = expression.sub(lambda match: match.group(1) + value, text)
-        elif enabled:
-            updated_text = text.rstrip("\r\n") + f"\nFsr4Update={value}\n"
-        else:
-            return profile
-        updated_bytes = updated_text.encode("utf-8")
-        if updated_bytes == original:
-            return profile
+        except OSError as error:
+            raise OptiScalerError("the managed OptiScaler.ini is unavailable") from error
+        return profile, manifest, target, relative, original, text
+
+    def ini_capabilities(self, game: Game) -> OptiScalerIniCapabilities:
+        """Inspect features advertised by the installed OptiScaler INI."""
+
+        _profile, _manifest, _target, _relative, _original, text = (
+            self._managed_ini_context(game)
+        )
+        return inspect_optiscaler_ini(text)
+
+    def _apply_managed_ini(
+        self,
+        game: Game,
+        *,
+        updates: Mapping[tuple[str, str], str],
+        profile_changes: Mapping[str, Any],
+        settings_record: Mapping[str, Any],
+    ) -> OptiScalerProfile:
+        """Atomically update owned keys while preserving every other INI line."""
+
+        self._assert_mutation_allowed(game)
+        profile, manifest, target, relative, original, text = (
+            self._managed_ini_context(game)
+        )
+        had_bom = original.startswith(b"\xef\xbb\xbf")
+        rendered = update_ini_text(text, updates)
+        updated_bytes = rendered.encode("utf-8")
+        if had_bom:
+            updated_bytes = b"\xef\xbb\xbf" + updated_bytes
         updated_hash = sha256(updated_bytes).hexdigest()
+        original_manifest_path = self.manifest_path(
+            profile.app_id, profile.manifest_id
+        )
         try:
-            self._copy_atomic(BytesIO(updated_bytes), target)
-            if self._hash_file(target) != updated_hash:
-                raise OptiScalerError("OptiScaler.ini hash verification failed")
-            for collection_name in (
-                "installed_files", "created_files", "replaced_files"
+            original_manifest = original_manifest_path.read_bytes()
+        except OSError as error:
+            raise OptiScalerError("OptiScaler installation manifest is unavailable") from error
+        original_hash = sha256(original).hexdigest()
+        expected_hash = ""
+        for item in manifest.get("installed_files", []):
+            if (
+                isinstance(item, Mapping)
+                and str(item.get("relative_path", "")) == relative
             ):
-                for item in manifest.get(collection_name, []):
-                    if (
-                        isinstance(item, dict)
-                        and str(item.get("relative_path", "")) == relative
-                    ):
-                        item["after_sha256"] = updated_hash
-            settings = manifest.setdefault("managed_settings", {})
-            if not isinstance(settings, dict):
-                settings = {}
-                manifest["managed_settings"] = settings
-            settings["Fsr4Update"] = enabled
+                expected_hash = str(item.get("after_sha256", ""))
+                break
+        if expected_hash and expected_hash != original_hash:
+            history = manifest.setdefault("managed_ini_history", [])
+            if not isinstance(history, list):
+                history = []
+                manifest["managed_ini_history"] = history
+            history.append(
+                {
+                    "observed_sha256": original_hash,
+                    "previous_managed_sha256": expected_hash,
+                    "preserved_external_settings": True,
+                    "recorded_at": datetime.now(UTC).isoformat(),
+                }
+            )
+            del history[:-20]
+        for collection_name in (
+            "installed_files", "created_files", "replaced_files"
+        ):
+            for item in manifest.get(collection_name, []):
+                if (
+                    isinstance(item, dict)
+                    and str(item.get("relative_path", "")) == relative
+                ):
+                    item["after_sha256"] = updated_hash
+        settings = manifest.setdefault("managed_settings", {})
+        if not isinstance(settings, dict):
+            settings = {}
+            manifest["managed_settings"] = settings
+        settings.update(dict(settings_record))
+        manifest["managed_settings_updated_at"] = datetime.now(UTC).isoformat()
+        now = datetime.now(UTC)
+        updated_profile = replace(
+            profile,
+            **dict(profile_changes),
+            configuration_applied=True,
+            runtime_verification_status="not_verified",
+            last_verified_at=now,
+            updated_at=now,
+        )
+        try:
+            if updated_bytes != original:
+                self._copy_atomic(BytesIO(updated_bytes), target)
+                if self._hash_file(target) != updated_hash:
+                    raise OptiScalerError("OptiScaler.ini hash verification failed")
             _atomic_write(
-                self.manifest_path(profile.app_id, profile.manifest_id),
+                original_manifest_path,
                 json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
                 + "\n",
             )
+            self.profile_repository.save(updated_profile)
         except Exception:
             try:
                 self._copy_atomic(BytesIO(original), target)
+                self._copy_atomic(BytesIO(original_manifest), original_manifest_path)
             except OSError:
                 pass
             raise
-        now = datetime.now(UTC)
-        updated_profile = replace(
-            profile, last_verified_at=now, updated_at=now
-        )
-        self.profile_repository.save(updated_profile)
         return updated_profile
+
+    def configure_upscaling(
+        self,
+        game: Game,
+        *,
+        fsr4_mode: str,
+        effective_fsr4_mode: str | None = None,
+        automatic_reason: str = "",
+        fsr_agility_sdk_upgrade: bool,
+        fsr4_watermark: bool,
+        dx11_upscaler: str,
+        dx12_upscaler: str,
+        vulkan_upscaler: str,
+    ) -> OptiScalerProfile:
+        """Apply the user-selected keys supported by the installed release."""
+
+        if not isinstance(fsr_agility_sdk_upgrade, bool):
+            raise OptiScalerError("FsrAgilitySDKUpgrade must be a boolean")
+        if not isinstance(fsr4_watermark, bool):
+            raise OptiScalerError("Fsr4EnableWatermark must be a boolean")
+        _profile, manifest, _target, _relative, _original, text = (
+            self._managed_ini_context(game)
+        )
+        capabilities = inspect_optiscaler_ini(text)
+        if fsr_agility_sdk_upgrade and not any(
+            "d3d12_optiscaler" in {
+                part.casefold()
+                for part in PurePosixPath(
+                    str(item.get("relative_path", ""))
+                ).parts[:-1]
+            }
+            for item in manifest.get("installed_files", [])
+            if isinstance(item, Mapping)
+        ):
+            raise OptiScalerError(
+                "FsrAgilitySDKUpgrade requires the D3D12_OptiScaler payload"
+            )
+        try:
+            applied_mode = str(effective_fsr4_mode or fsr4_mode).casefold()
+            updates = managed_ini_updates(
+                fsr4_mode=applied_mode,
+                agility_sdk_upgrade=fsr_agility_sdk_upgrade,
+                watermark=fsr4_watermark,
+                dx11_upscaler=dx11_upscaler,
+                dx12_upscaler=dx12_upscaler,
+                vulkan_upscaler=vulkan_upscaler,
+                capabilities=capabilities,
+            )
+        except ValueError as error:
+            raise OptiScalerError(str(error)) from error
+        mode = str(fsr4_mode).casefold()
+        profile_changes = {
+            "fsr4_mode": mode,
+            "effective_fsr4_mode": applied_mode,
+            "automatic_reason": str(automatic_reason or ""),
+            "fsr_agility_sdk_upgrade": fsr_agility_sdk_upgrade,
+            "fsr4_watermark": fsr4_watermark,
+            "dx11_upscaler": str(dx11_upscaler).casefold(),
+            "dx12_upscaler": str(dx12_upscaler).casefold(),
+            "vulkan_upscaler": str(vulkan_upscaler).casefold(),
+        }
+        record: dict[str, Any] = {
+            "fsr4Mode": mode,
+            "effectiveFsr4Mode": applied_mode,
+            "automaticReason": str(automatic_reason or ""),
+            "FsrAgilitySDKUpgrade": fsr_agility_sdk_upgrade,
+            "Fsr4EnableWatermark": fsr4_watermark,
+            "Dx11Upscaler": str(dx11_upscaler).casefold(),
+            "Dx12Upscaler": str(dx12_upscaler).casefold(),
+            "VulkanUpscaler": str(vulkan_upscaler).casefold(),
+        }
+        record.update({key: value for (_section, key), value in updates.items()})
+        return self._apply_managed_ini(
+            game,
+            updates=updates,
+            profile_changes=profile_changes,
+            settings_record=record,
+        )
+
+    def configure_fsr4_update(
+        self, game: Game, enabled: bool
+    ) -> OptiScalerProfile:
+        """Compatibility API for the former single managed FSR4 switch."""
+
+        if not isinstance(enabled, bool):
+            raise OptiScalerError("Fsr4Update must be a boolean")
+        return self._apply_managed_ini(
+            game,
+            updates={("FSR", "Fsr4Update"): "true" if enabled else "false"},
+            profile_changes={
+                "fsr4_mode": "normal" if enabled else "disabled",
+                "effective_fsr4_mode": "normal" if enabled else "disabled",
+            },
+            settings_record={"Fsr4Update": enabled},
+        )
 
     def remove(
         self,
@@ -1375,31 +1991,267 @@ class OptiScalerService:
         profile = self.profile_repository.load(self.game_key(game))
         manifest = self._load_manifest(profile)
         install_root = Path(str(manifest["install_directory"])).resolve(strict=True)
-        created = [item for item in manifest.get("created_files", []) if isinstance(item, Mapping)]
-        emit("Removing managed files", 0.1)
-        for index, item in enumerate(created):
-            self._check_cancel(cancel_event)
-            target = self._target(install_root, str(item.get("relative_path", "")))
-            if not target.exists():
-                continue
-            if not target.is_file() or self._hash_file(target) != item.get("after_sha256"):
-                raise OptiScalerConflictError(
-                    f"managed file changed and was not removed: {item.get('relative_path', '')}"
-                )
-            target.unlink()
-            emit("Removing managed files", 0.1 + 0.75 * (index + 1) / max(1, len(created)))
-        replacements = [
-            item for item in manifest.get("replaced_files", []) if isinstance(item, Mapping)
+        game_root = self._canonical_game_root(game)
+        try:
+            install_root.relative_to(game_root)
+        except ValueError as error:
+            raise OptiScalerError(
+                "manifest install directory is outside this game"
+            ) from error
+        backup_root = self.backup_root(profile.app_id, profile.manifest_id)
+        manifest_path = self.manifest_path(profile.app_id, profile.manifest_id)
+        try:
+            original_manifest = manifest_path.read_bytes()
+        except OSError as error:
+            raise OptiScalerError(
+                f"could not snapshot the active OptiScaler manifest: {error}"
+            ) from error
+        created = [
+            item
+            for item in manifest.get("created_files", [])
+            if isinstance(item, Mapping)
         ]
-        now = datetime.now(UTC)
-        updated = replace(
-            profile,
-            enabled=False,
-            installation_state="restore_required" if replacements else "removed",
-            last_verified_at=now,
-            updated_at=now,
+        replacements = [
+            item
+            for item in manifest.get("replaced_files", [])
+            if isinstance(item, Mapping)
+        ]
+        # Preflight every blocking conflict and every restore backup before
+        # mutating the game directory. Mutable OptiScaler.ini content is
+        # deliberately allowed to drift; executable payloads are not.
+        actions: list[dict[str, Any]] = []
+        emit("Checking removal safety", 0.08)
+        for item in created:
+            self._check_cancel(cancel_event)
+            relative = str(item.get("relative_path", ""))
+            target = self._target(install_root, relative)
+            exists = target.exists() or target.is_symlink()
+            if exists and (target.is_symlink() or not target.is_file()):
+                raise OptiScalerConflictError(
+                    f"managed path is not a regular file and was not removed: {relative}"
+                )
+            observed_hash = self._hash_file(target) if exists else ""
+            expected_hash = str(item.get("after_sha256", ""))
+            mutable = _is_mutable_configuration(relative)
+            if exists and observed_hash != expected_hash and not mutable:
+                raise OptiScalerConflictError(
+                    f"modified immutable managed file blocks removal: {relative}"
+                )
+            actions.append(
+                {
+                    "action": "remove",
+                    "relative": relative,
+                    "target": target,
+                    "observed_hash": observed_hash,
+                    "mutable": mutable,
+                    "preserve": bool(
+                        mutable and exists and observed_hash != expected_hash
+                    ),
+                }
+            )
+        for item in replacements:
+            self._check_cancel(cancel_event)
+            relative = str(item.get("relative_path", ""))
+            target = self._target(install_root, relative)
+            exists = target.exists() or target.is_symlink()
+            if exists and (target.is_symlink() or not target.is_file()):
+                raise OptiScalerConflictError(
+                    f"managed path is not a regular file and was not restored: {relative}"
+                )
+            observed_hash = self._hash_file(target) if exists else ""
+            expected_hash = str(item.get("after_sha256", ""))
+            mutable = _is_mutable_configuration(relative)
+            backup_relative = str(item.get("backup_relative_path", relative))
+            backup = self._target(backup_root, backup_relative)
+            before_hash = str(item.get("before_sha256", ""))
+            if (
+                not before_hash
+                or backup.is_symlink()
+                or not backup.is_file()
+                or self._hash_file(backup) != before_hash
+            ):
+                raise OptiScalerError(
+                    f"original-file backup is missing or corrupt: {relative}"
+                )
+            already_restored = bool(
+                exists and before_hash and observed_hash == before_hash
+            )
+            if (
+                exists
+                and observed_hash != expected_hash
+                and not mutable
+                and not already_restored
+            ):
+                raise OptiScalerConflictError(
+                    f"modified immutable managed file blocks restoration: {relative}"
+                )
+            actions.append(
+                {
+                    "action": "already_restored" if already_restored else "restore",
+                    "relative": relative,
+                    "target": target,
+                    "backup": backup,
+                    "before_hash": before_hash,
+                    "observed_hash": observed_hash,
+                    "mutable": mutable,
+                    "preserve": bool(
+                        mutable and exists and observed_hash != expected_hash
+                    ),
+                }
+            )
+
+        self._check_cancel(cancel_event)
+        preserved_records: list[dict[str, str]] = []
+        preservation_root = (
+            backup_root
+            / ".preserved-configurations"
+            / f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%SZ')}-{uuid4().hex[:8]}"
         )
-        self.profile_repository.save(updated)
+        rollback_errors: list[str] = []
+        total = max(1, len(actions))
+        backup_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix=".remove-rollback-", dir=backup_root
+        ) as rollback_directory:
+            rollback_root = Path(rollback_directory)
+            snapshots: list[tuple[Path, Path | None]] = []
+            try:
+                emit("Preparing removal rollback", 0.15)
+                for action in actions:
+                    target = action["target"]
+                    relative = str(action["relative"])
+                    exists = target.exists() or target.is_symlink()
+                    observed_hash = str(action["observed_hash"])
+                    if exists != bool(observed_hash):
+                        raise OptiScalerConflictError(
+                            f"managed file changed during removal preflight: {relative}"
+                        )
+                    snapshot: Path | None = None
+                    if exists:
+                        if (
+                            target.is_symlink()
+                            or not target.is_file()
+                            or self._hash_file(target) != observed_hash
+                        ):
+                            raise OptiScalerConflictError(
+                                f"managed file changed during removal preflight: {relative}"
+                            )
+                        snapshot = self._target(rollback_root, relative)
+                        self._copy_atomic(target, snapshot)
+                        if self._hash_file(snapshot) != observed_hash:
+                            raise OptiScalerError(
+                                f"removal rollback snapshot failed: {relative}"
+                            )
+                        if bool(action["preserve"]):
+                            preserved = self._target(preservation_root, relative)
+                            self._copy_atomic(target, preserved)
+                            preserved_records.append(
+                                {
+                                    "relative_path": relative,
+                                    "sha256": observed_hash,
+                                    "preserved_path": str(preserved),
+                                }
+                            )
+                    snapshots.append((target, snapshot))
+
+                emit("Removing OptiScaler", 0.3)
+                for index, action in enumerate(actions):
+                    self._check_cancel(cancel_event)
+                    target = action["target"]
+                    relative = str(action["relative"])
+                    if action["action"] == "remove":
+                        if target.exists():
+                            target.unlink()
+                    elif action["action"] == "restore":
+                        self._copy_atomic(action["backup"], target)
+                        if self._hash_file(target) != action["before_hash"]:
+                            raise OptiScalerError(
+                                f"restored original file hash mismatch: {relative}"
+                            )
+                    emit(
+                        "Removing OptiScaler",
+                        0.3 + 0.55 * (index + 1) / total,
+                    )
+
+                now = datetime.now(UTC)
+                manifest["last_removal"] = {
+                    "state": "removed",
+                    "removed_at": now.isoformat(),
+                    "preserved_configurations": preserved_records,
+                }
+                if preserved_records:
+                    history = manifest.setdefault("preserved_configurations", [])
+                    if isinstance(history, list):
+                        history.extend(preserved_records)
+                        del history[:-20]
+                _atomic_write(
+                    manifest_path,
+                    json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True)
+                    + "\n",
+                )
+                updated = replace(
+                    profile,
+                    enabled=False,
+                    installation_state="removed",
+                    configuration_applied=False,
+                    last_verified_at=now,
+                    updated_at=now,
+                )
+                self.profile_repository.save(updated)
+            except Exception as error:
+                for target, snapshot in reversed(snapshots):
+                    try:
+                        if snapshot is None:
+                            if target.exists() or target.is_symlink():
+                                if target.is_symlink() or not target.is_file():
+                                    raise OSError("rollback target is not a regular file")
+                                target.unlink()
+                        else:
+                            self._copy_atomic(snapshot, target)
+                    except Exception as rollback_error:
+                        rollback_errors.append(
+                            f"{target.name}: {rollback_error or type(rollback_error).__name__}"
+                        )
+                try:
+                    self._copy_atomic(BytesIO(original_manifest), manifest_path)
+                except Exception as rollback_error:
+                    rollback_errors.append(f"manifest: {rollback_error}")
+                if rollback_errors:
+                    partial_now = datetime.now(UTC)
+                    manifest["last_removal"] = {
+                        "state": "partial",
+                        "failed_at": partial_now.isoformat(),
+                        "error": str(error) or type(error).__name__,
+                        "rollback_errors": rollback_errors,
+                    }
+                    try:
+                        _atomic_write(
+                            manifest_path,
+                            json.dumps(
+                                manifest,
+                                ensure_ascii=False,
+                                indent=2,
+                                sort_keys=True,
+                            )
+                            + "\n",
+                        )
+                        self.profile_repository.save(
+                            replace(
+                                profile,
+                                enabled=True,
+                                installation_state="partial",
+                                updated_at=partial_now,
+                            )
+                        )
+                    except Exception:
+                        pass
+                    raise OptiScalerError(
+                        "OptiScaler removal failed and rollback was incomplete: "
+                        f"{str(error) or type(error).__name__}; "
+                        + "; ".join(rollback_errors)
+                    ) from error
+                shutil.rmtree(preservation_root, ignore_errors=True)
+                raise
         emit("Completed", 1.0)
         return updated
 
@@ -1459,18 +2311,143 @@ class OptiScalerService:
         resolution = self.executable_resolver.resolve(game, profile.executable)
         selected = resolution.selected
         manifest: dict[str, Any] = {}
+        manifest_error = ""
         if profile.manifest_id:
             try:
                 manifest = self._load_manifest(profile)
-            except OptiScalerError:
-                pass
+            except OptiScalerError as error:
+                manifest_error = str(error)
+        legacy_settings = manifest.get("managed_settings", {})
+        if (
+            not profile.configuration_applied
+            and isinstance(legacy_settings, Mapping)
+            and isinstance(legacy_settings.get("Fsr4Update"), bool)
+        ):
+            legacy_enabled = bool(legacy_settings["Fsr4Update"])
+            profile = replace(
+                profile,
+                fsr4_mode="normal" if legacy_enabled else "disabled",
+                effective_fsr4_mode=(
+                    "normal" if legacy_enabled else "disabled"
+                ),
+                configuration_applied=True,
+            )
+            self.profile_repository.save(profile)
+        empty_capabilities = OptiScalerIniCapabilities(
+            False, "none", False, False, (), (), ()
+        )
+        capabilities = empty_capabilities
+        ini_state = inspect_optiscaler_ini_state("")
+        ini_error = ""
+        if profile.enabled and manifest:
+            try:
+                install_root = Path(
+                    str(manifest.get("install_directory", ""))
+                ).resolve(strict=True)
+                ini_entries = [
+                    item
+                    for item in manifest.get("installed_files", [])
+                    if isinstance(item, Mapping)
+                    and Path(str(item.get("relative_path", ""))).name.casefold()
+                    == "optiscaler.ini"
+                ]
+                if len(ini_entries) == 1:
+                    ini_target = self._target(
+                        install_root, str(ini_entries[0].get("relative_path", ""))
+                    )
+                    ini_text = ini_target.read_text(encoding="utf-8-sig")
+                    capabilities = inspect_optiscaler_ini(ini_text)
+                    ini_state = inspect_optiscaler_ini_state(ini_text)
+            except (OSError, UnicodeError, OptiScalerError) as error:
+                ini_error = str(error)
+        installed_files = list(manifest.get("installed_files", []))
+        verification = manifest.get("last_verification", {})
+        if not isinstance(verification, Mapping):
+            verification = {}
+        if manifest_error:
+            verification = {
+                "state": "verification_error",
+                "summary": f"Verification unavailable: {manifest_error}",
+                "completed": False,
+                "issues": [
+                    {
+                        "kind": "verification_error",
+                        "path": "",
+                        "message": manifest_error,
+                    }
+                ],
+            }
+        fidelityfx_assets = [
+            str(item.get("relative_path", ""))
+            for item in installed_files
+            if isinstance(item, Mapping)
+            and Path(str(item.get("relative_path", ""))).name.casefold()
+            in {
+                "amd_fidelityfx_upscaler_dx12.dll",
+                "amd_fidelityfx_dx12.dll",
+                "amd_fidelityfx_framegeneration_dx12.dll",
+            }
+        ]
+        has_agility_payload = any(
+            "d3d12_optiscaler" in {
+                part.casefold()
+                for part in PurePosixPath(
+                    str(item.get("relative_path", ""))
+                ).parts[:-1]
+            }
+            for item in installed_files
+            if isinstance(item, Mapping)
+        )
+        if capabilities.agility_sdk_upgrade and not has_agility_payload:
+            capabilities = replace(capabilities, agility_sdk_upgrade=False)
+        # No upstream log parser is implemented here.  Profile/config state is
+        # never accepted as runtime evidence; the watermark must be checked in
+        # the running game.
+        runtime_verification_status = "not_verified"
+        verification_labels = {
+            "not_verified": "Runtime verification required",
+            "verified_fsr4": "Verified FSR4",
+            "verified_fsr4_int8": "Verified FSR4-I8",
+            "verified_fsr3_fallback": "Verified FSR3 fallback",
+        }
+        installed_source_identity = (
+            profile.source_identity
+            or str(manifest.get("source_identity", ""))
+        )
+        configured_mode = ini_state.fsr4_mode
+        has_effective_configuration = bool(
+            profile.enabled
+            and manifest
+            and configured_mode != "unknown"
+        )
+        requested_mode = profile.fsr4_mode
+        expected_mode = (
+            profile.effective_fsr4_mode
+            if profile.configuration_applied
+            and requested_mode == "automatic"
+            and profile.effective_fsr4_mode != "disabled"
+            else requested_mode
+        )
+        configuration_matches_requested = bool(
+            has_effective_configuration
+            and (
+                configured_mode == expected_mode
+                or requested_mode == "automatic"
+                and configured_mode == "automatic"
+            )
+        )
         data = profile.to_dict()
         data.update(
             {
                 "success": True,
                 "appId": profile.app_id,
                 "installationState": profile.installation_state,
-                "installed": profile.enabled and profile.installation_state == "installed",
+                "installed": bool(
+                    profile.enabled
+                    and profile.manifest_id
+                    and profile.installation_state
+                    in {"installed", "partial"}
+                ),
                 "installedVersion": profile.installed_version,
                 "injectionDll": profile.injection_dll,
                 "protonOverride": profile.proton_override,
@@ -1479,6 +2456,7 @@ class OptiScalerService:
                     str(self.manifest_path(profile.app_id, profile.manifest_id))
                     if profile.manifest_id else ""
                 ),
+                "manifestError": manifest_error,
                 "executable": profile.executable,
                 "installDirectory": profile.install_directory,
                 "executableStatus": resolution.status,
@@ -1486,12 +2464,114 @@ class OptiScalerService:
                 "selectedExecutable": selected.to_dict() if selected else {},
                 "executableCandidates": [item.to_dict() for item in resolution.candidates],
                 "executableMessage": resolution.message,
-                "installedFiles": list(manifest.get("installed_files", [])),
+                "installedFiles": installed_files,
                 "replacedFiles": list(manifest.get("replaced_files", [])),
                 "createdFiles": list(manifest.get("created_files", [])),
                 "displacedFiles": list(manifest.get("displaced_files", [])),
                 "reconciledFiles": list(manifest.get("reconciled_files", [])),
                 "installOperation": str(manifest.get("operation", "")),
+                "channel": profile.channel,
+                "installedChannel": str(
+                    manifest.get("channel", profile.channel)
+                ),
+                "sourceIdentity": installed_source_identity,
+                "sourceLabel": (
+                    "Official optiscaler/OptiScaler release"
+                    if installed_source_identity == "official_optiscaler"
+                    else "Local archive"
+                    if installed_source_identity == "local_archive"
+                    else "Unknown"
+                ),
+                "fidelityFxUpscalerVersion": (
+                    profile.fidelityfx_upscaler_version
+                    or str(manifest.get("fidelityfx_upscaler_version", ""))
+                ),
+                "fidelityFxAssets": fidelityfx_assets,
+                "fsr4AssetsInstalled": any(
+                    Path(path).name.casefold()
+                    == "amd_fidelityfx_upscaler_dx12.dll"
+                    for path in fidelityfx_assets
+                ),
+                "fsr4Mode": (
+                    ini_state.fsr4_mode
+                    if ini_state.fsr4_mode != "unknown"
+                    else profile.fsr4_mode
+                ),
+                "requestedFsr4Mode": requested_mode,
+                "effectiveConfiguredFsr4Mode": configured_mode,
+                "effectiveFsr4Mode": (
+                    ini_state.fsr4_mode
+                    if ini_state.fsr4_mode != "unknown"
+                    else profile.effective_fsr4_mode
+                ),
+                "automaticReason": profile.automatic_reason,
+                "fsrAgilitySdkUpgrade": (
+                    ini_state.agility_sdk_upgrade == "true"
+                    if ini_state.agility_sdk_upgrade != "unknown"
+                    else profile.fsr_agility_sdk_upgrade
+                ),
+                "fsrAgilitySdkUpgradeState": ini_state.agility_sdk_upgrade,
+                "fsr4Watermark": (
+                    ini_state.watermark == "true"
+                    if ini_state.watermark != "unknown"
+                    else profile.fsr4_watermark
+                ),
+                "requestedFsr4Watermark": profile.fsr4_watermark,
+                "fsr4WatermarkState": ini_state.watermark,
+                "dx11Upscaler": ini_state.dx11_upscaler or profile.dx11_upscaler,
+                "dx12Upscaler": ini_state.dx12_upscaler or profile.dx12_upscaler,
+                "vulkanUpscaler": (
+                    ini_state.vulkan_upscaler or profile.vulkan_upscaler
+                ),
+                "configurationApplied": has_effective_configuration,
+                "profileConfigurationApplied": profile.configuration_applied,
+                "configurationMatchesRequested": (
+                    configuration_matches_requested
+                ),
+                "runtimeVerificationStatus": (
+                    runtime_verification_status
+                ),
+                "runtimeVerificationLabel": verification_labels[
+                    runtime_verification_status
+                ],
+                "runtimeVerified": runtime_verification_status
+                in {"verified_fsr4", "verified_fsr4_int8"},
+                "iniCapabilities": capabilities.to_dict(),
+                "effectiveIniState": ini_state.to_dict(),
+                "iniCapabilityError": ini_error,
+                "managedSettings": dict(
+                    manifest.get("managed_settings", {})
+                    if isinstance(manifest.get("managed_settings", {}), Mapping)
+                    else {}
+                ),
+                "installationVerificationState": str(
+                    verification.get("state", "not_verified")
+                ),
+                "installationVerificationSummary": str(
+                    verification.get("summary", "Installation has not been verified")
+                ),
+                "installationVerificationCompleted": bool(
+                    verification.get("completed", False)
+                ),
+                "installationPayloadValid": (
+                    bool(verification.get("payload_valid"))
+                    if "payload_valid" in verification else None
+                ),
+                "configurationDrift": bool(
+                    verification.get("configuration_drift", False)
+                ),
+                "managedConfigurationDrift": bool(
+                    verification.get("managed_configuration_drift", False)
+                ),
+                "backupValid": (
+                    bool(verification.get("backup_valid"))
+                    if "backup_valid" in verification else None
+                ),
+                "verificationIssues": list(
+                    verification.get("issues", [])
+                    if isinstance(verification.get("issues", []), list)
+                    else []
+                ),
                 "lastVerifiedAt": (
                     profile.last_verified_at.astimezone(UTC).isoformat()
                     if profile.last_verified_at else ""
@@ -1508,6 +2588,7 @@ __all__ = [
     "OptiScalerConflict",
     "OptiScalerConflictError",
     "OptiScalerError",
+    "OptiScalerVerificationResult",
     "OptiScalerFilePlan",
     "OptiScalerInstallPlan",
     "OptiScalerProfileRepository",

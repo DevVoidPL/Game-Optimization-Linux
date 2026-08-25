@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import replace
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -8,6 +9,7 @@ import json
 import logging
 import os
 from pathlib import Path
+import shlex
 from threading import Event, RLock
 from uuid import uuid4
 
@@ -16,9 +18,11 @@ from game_optimization_linux.models import (
     Game,
     GameStatus,
     Launcher,
+    ManualGameConfig,
     SizeScanStatus,
 )
 from game_optimization_linux.services.game_executable import GameExecutableResolver
+from game_optimization_linux.services.manual_games import ManualGameStore
 
 from .base import FilesystemProvider, GameProvider
 
@@ -38,12 +42,14 @@ class LocalGameProvider(GameProvider):
         *,
         choices_path: Path,
         executable_resolver: GameExecutableResolver | None = None,
+        manual_store: ManualGameStore | None = None,
     ) -> None:
         self._filesystem_provider = filesystem_provider
         self._resolver = executable_resolver or GameExecutableResolver()
         self._choices_path = Path(choices_path)
         self._roots = self._normalize_roots(roots)
         self._choices = self._load_choices()
+        self._manual_store = manual_store
         self._games: dict[str, Game] = {}
         self._lock = RLock()
 
@@ -97,8 +103,128 @@ class LocalGameProvider(GameProvider):
                 if game is not None:
                     discovered[game.id] = game
         with self._lock:
+            # Serialize the short store snapshot with explicit add/edit/remove
+            # operations. A scan that started earlier must not publish stale
+            # manual records after a user save completes.
+            if self._manual_store is not None:
+                for configuration in self._manual_store.load():
+                    if cancel_event is not None and cancel_event.is_set():
+                        return self.list_games()
+                    discovered[configuration.id] = self._manual_game(configuration)
             self._games = discovered
             return self.list_games()
+
+    def _inspect_game_path(self, path: Path) -> dict[str, object]:
+        try:
+            filesystem = self._filesystem_provider.inspect(path)
+        except Exception as error:
+            logger.debug("Could not inspect manual/local game %s: %s", path, error)
+            return {
+                "filesystem": FilesystemType.UNKNOWN,
+                "filesystem_name": "unknown",
+                "compression_available": False,
+                "mount_point": None,
+                "filesystem_device": None,
+                "mount_options": (),
+                "is_writable": None,
+            }
+        return {
+            "filesystem": filesystem.filesystem,
+            "filesystem_name": filesystem.filesystem_name or filesystem.filesystem.value,
+            "compression_available": filesystem.compression_supported,
+            "mount_point": filesystem.mount_point,
+            "filesystem_device": filesystem.device,
+            "mount_options": filesystem.mount_options,
+            "is_writable": filesystem.writable,
+        }
+
+    def _manual_game(self, configuration: ManualGameConfig) -> Game:
+        install_available = configuration.install_directory.is_dir()
+        executable_available = configuration.executable.is_file()
+        working_available = bool(
+            configuration.working_directory is None
+            or configuration.working_directory.is_dir()
+        )
+        prefix_available = bool(
+            configuration.wine_prefix is None or configuration.wine_prefix.is_dir()
+        )
+        runner_available = True
+        if configuration.runner_command:
+            runner = configuration.runner_command[0]
+            runner_path = Path(runner)
+            if runner_path.is_absolute():
+                runner_available = runner_path.is_file()
+        executable_permitted = bool(
+            executable_available
+            and (
+                configuration.runner_command
+                or os.access(configuration.executable, os.X_OK)
+            )
+        )
+        unavailable_reason = ""
+        if not install_available:
+            unavailable_reason = "The configured game directory is missing or inaccessible"
+        elif not executable_available:
+            unavailable_reason = "The configured game executable is missing or inaccessible"
+        elif not executable_permitted:
+            unavailable_reason = "The configured native executable is not executable"
+        elif not working_available:
+            unavailable_reason = "The configured working directory is missing or inaccessible"
+        elif not prefix_available:
+            unavailable_reason = "The configured Wine prefix is missing or inaccessible"
+        elif not runner_available:
+            unavailable_reason = "The configured Wine/Proton executable is missing"
+
+        metadata = self._inspect_game_path(configuration.install_directory)
+        return Game(
+            id=configuration.id,
+            name=configuration.name,
+            launcher=Launcher.MANUAL,
+            launcher_game_id=configuration.stable_uuid,
+            install_path=configuration.install_directory,
+            library_path=configuration.install_directory.parent,
+            logical_size_gb=0.0,
+            physical_size_gb=0.0,
+            status=(GameStatus.READY if not unavailable_reason else GameStatus.MISSING_FILES),
+            data_source="Manual",
+            last_scanned_at=datetime.now(UTC),
+            size_scan_status=SizeScanStatus.NOT_REQUESTED,
+            portrait_artwork_path=configuration.portrait_artwork,
+            header_artwork_path=configuration.header_artwork,
+            executable_path=str(configuration.executable),
+            executable_resolution="selected" if executable_available else "missing",
+            executable_candidates=(str(configuration.executable),),
+            store="custom",
+            runner=shlex.join(configuration.runner_command),
+            wine_prefix=configuration.wine_prefix,
+            working_directory=configuration.working_directory,
+            launch_available=not unavailable_reason,
+            launch_unavailable_reason=unavailable_reason,
+            library_available=install_available,
+            **metadata,
+        )
+
+    def manual_config(self, game_id: str) -> ManualGameConfig | None:
+        if self._manual_store is None:
+            return None
+        return self._manual_store.get(game_id)
+
+    def save_manual_config(self, configuration: ManualGameConfig) -> Game:
+        if self._manual_store is None:
+            raise ValueError("manual game storage is unavailable")
+        with self._lock:
+            self._manual_store.upsert(configuration)
+            game = self._manual_game(configuration)
+            self._games[game.id] = game
+        return game
+
+    def remove_manual_config(self, game_id: str) -> ManualGameConfig:
+        if self._manual_store is None:
+            raise ValueError("manual game storage is unavailable")
+        with self._lock:
+            removed = self._manual_store.remove(game_id)
+            self._games.pop(game_id, None)
+        return removed
 
     def _game_from_child(self, root: Path, child: Path) -> Game | None:
         try:
@@ -242,13 +368,57 @@ class LocalGameProvider(GameProvider):
 
 
 class ConfiguredGameProvider(GameProvider):
-    def __init__(self, steam: GameProvider, local: LocalGameProvider) -> None:
+    """Aggregate launcher providers while keeping their scans independent."""
+
+    def __init__(
+        self,
+        steam: GameProvider,
+        local: LocalGameProvider,
+        *,
+        heroic: GameProvider | None = None,
+        lutris: GameProvider | None = None,
+    ) -> None:
         self.steam = steam
         self.local = local
+        self.heroic = heroic
+        self.lutris = lutris
+        self._provider_errors: dict[Launcher, str] = {}
+        self._lock = RLock()
+
+    @property
+    def providers(self) -> tuple[GameProvider, ...]:
+        return tuple(
+            provider
+            for provider in (self.steam, self.heroic, self.lutris, self.local)
+            if provider is not None
+        )
 
     @property
     def last_report(self):
         return getattr(self.steam, "last_report", None)
+
+    @property
+    def last_reports(self) -> dict[str, object]:
+        return {
+            launcher.value: report
+            for launcher, provider in (
+                (Launcher.STEAM, self.steam),
+                (Launcher.HEROIC, self.heroic),
+                (Launcher.LUTRIS, self.lutris),
+            )
+            if provider is not None
+            and (report := getattr(provider, "last_report", None)) is not None
+        }
+
+    @property
+    def provider_errors(self) -> dict[str, str]:
+        with self._lock:
+            return {launcher.value: message for launcher, message in self._provider_errors.items()}
+
+    @property
+    def failed_launchers(self) -> tuple[Launcher, ...]:
+        with self._lock:
+            return tuple(self._provider_errors)
 
     @property
     def steam_found(self) -> bool:
@@ -270,34 +440,94 @@ class ConfiguredGameProvider(GameProvider):
         return method()
 
     def refresh(self, *, cancel_event: Event | None = None) -> Sequence[Game]:
-        steam_games = self.steam.refresh(cancel_event=cancel_event)  # type: ignore[call-arg]
-        if cancel_event is not None and cancel_event.is_set():
-            return self.list_games()
-        local_games = self.local.refresh(cancel_event=cancel_event)
-        return tuple((*steam_games, *local_games))
+        providers = self.providers
+        launcher_by_provider = {
+            id(self.steam): Launcher.STEAM,
+            id(self.local): Launcher.MANUAL,
+        }
+        if self.heroic is not None:
+            launcher_by_provider[id(self.heroic)] = Launcher.HEROIC
+        if self.lutris is not None:
+            launcher_by_provider[id(self.lutris)] = Launcher.LUTRIS
+        errors: dict[Launcher, str] = {}
+        # The outer LibraryScanner already owns a worker thread. Running the
+        # independent bounded providers concurrently prevents one slow root or
+        # database from serially delaying all other launchers.
+        with ThreadPoolExecutor(
+            max_workers=min(4, len(providers)),
+            thread_name_prefix="game-provider",
+        ) as executor:
+            futures = {
+                executor.submit(provider.refresh, cancel_event=cancel_event): provider
+                for provider in providers
+            }
+            for future in as_completed(futures):
+                provider = futures[future]
+                if cancel_event is not None and cancel_event.is_set():
+                    for pending in futures:
+                        pending.cancel()
+                    return self.list_games()
+                try:
+                    future.result()
+                except Exception as error:
+                    launcher = launcher_by_provider[id(provider)]
+                    errors[launcher] = str(error).strip() or type(error).__name__
+                    logger.exception("%s library provider failed", launcher.value)
+        with self._lock:
+            self._provider_errors = errors
+        return self.list_games()
 
     def list_games(self) -> Sequence[Game]:
         return tuple(
             sorted(
-                (*self.steam.list_games(), *self.local.list_games()),
+                (
+                    game
+                    for provider in self.providers
+                    for game in provider.list_games()
+                ),
                 key=lambda game: (game.name.casefold(), game.id),
             )
         )
 
     def get_game(self, game_id: str) -> Game | None:
-        return self.steam.get_game(game_id) or self.local.get_game(game_id)
+        for provider in self.providers:
+            game = provider.get_game(game_id)
+            if game is not None:
+                return game
+        return None
 
     def add_game(self, game: Game) -> Game:
         return self.steam.add_game(game)
 
     def update_game_sizes(self, game_id: str, *args, **kwargs) -> Game | None:
-        if str(game_id).startswith("local-"):
-            return self.local.update_game_sizes(game_id, *args, **kwargs)
-        method = getattr(self.steam, "update_game_sizes", None)
+        prefix_map = {
+            "local-": self.local,
+            "manual-": self.local,
+            "heroic-": self.heroic,
+            "lutris-": self.lutris,
+        }
+        provider = next(
+            (
+                candidate
+                for prefix, candidate in prefix_map.items()
+                if str(game_id).startswith(prefix) and candidate is not None
+            ),
+            self.steam,
+        )
+        method = getattr(provider, "update_game_sizes", None)
         return method(game_id, *args, **kwargs) if callable(method) else None
 
     def select_local_executable(self, game_id: str, executable: str) -> Game:
         return self.local.select_executable(game_id, executable)
+
+    def manual_config(self, game_id: str) -> ManualGameConfig | None:
+        return self.local.manual_config(game_id)
+
+    def save_manual_config(self, configuration: ManualGameConfig) -> Game:
+        return self.local.save_manual_config(configuration)
+
+    def remove_manual_config(self, game_id: str) -> ManualGameConfig:
+        return self.local.remove_manual_config(game_id)
 
 
 __all__ = ["ConfiguredGameProvider", "LocalGameProvider"]

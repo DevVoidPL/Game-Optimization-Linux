@@ -93,6 +93,15 @@ class Game:
     executable_path: str = ""
     executable_resolution: str = "not_scanned"
     executable_candidates: tuple[str, ...] = ()
+    launcher_game_id: str | None = None
+    store: str = "unknown"
+    launch_uri: str = ""
+    launcher_variant: str = ""
+    runner: str = ""
+    wine_prefix: Path | None = None
+    working_directory: Path | None = None
+    launch_available: bool = True
+    launch_unavailable_reason: str = ""
 
     def __post_init__(self) -> None:
         if not self.id.strip():
@@ -142,6 +151,25 @@ class Game:
             isinstance(value, str) for value in self.executable_candidates
         ):
             raise ValueError("executable_candidates must be a tuple of strings")
+        if self.launcher_game_id is not None and not self.launcher_game_id.strip():
+            raise ValueError("launcher_game_id must be a non-empty string")
+        for value, field_name in (
+            (self.store, "store"),
+            (self.launch_uri, "launch_uri"),
+            (self.launcher_variant, "launcher_variant"),
+            (self.runner, "runner"),
+            (self.launch_unavailable_reason, "launch_unavailable_reason"),
+        ):
+            if not isinstance(value, str):
+                raise ValueError(f"{field_name} must be a string")
+        for value, field_name in (
+            (self.wine_prefix, "wine_prefix"),
+            (self.working_directory, "working_directory"),
+        ):
+            if value is not None and not isinstance(value, Path):
+                raise ValueError(f"{field_name} must be a Path")
+        if not isinstance(self.launch_available, bool):
+            raise ValueError("launch_available must be a boolean")
 
     @property
     def size_label(self) -> str:
@@ -153,8 +181,8 @@ class Game:
 
     @property
     def source(self) -> str:
-        if self.launcher is Launcher.STEAM:
-            return "steam"
+        if self.launcher in {Launcher.STEAM, Launcher.HEROIC, Launcher.LUTRIS}:
+            return self.launcher.name.casefold()
         if self.data_source.casefold() == "local":
             return "local"
         return self.data_source.casefold() or "manual"
@@ -234,6 +262,21 @@ class Game:
             "executable_path": self.executable_path,
             "executable_resolution": self.executable_resolution,
             "executable_candidates": list(self.executable_candidates),
+            "launcher_game_id": self.launcher_game_id,
+            "store": self.store,
+            "launch_uri": self.launch_uri,
+            "launcher_variant": self.launcher_variant,
+            "runner": self.runner,
+            "wine_prefix": (
+                str(self.wine_prefix) if self.wine_prefix is not None else None
+            ),
+            "working_directory": (
+                str(self.working_directory)
+                if self.working_directory is not None
+                else None
+            ),
+            "launch_available": self.launch_available,
+            "launch_unavailable_reason": self.launch_unavailable_reason,
         }
 
 

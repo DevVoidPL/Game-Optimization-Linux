@@ -6,6 +6,7 @@ Button {
     id: control
 
     property string symbol: "⋯"
+    property url iconSource: ""
     property string toolTip: ""
     property bool danger: false
 
@@ -15,14 +16,31 @@ Button {
     padding: 0
     focusPolicy: Qt.StrongFocus
 
-    contentItem: Label {
-        text: control.symbol
-        color: !control.enabled ? App.Theme.textMuted
-                               : control.danger ? App.Theme.danger : App.Theme.textSecondary
-        font.pixelSize: 18
-        font.weight: Font.DemiBold
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
+    contentItem: Item {
+        Label {
+            visible: control.iconSource.toString().length === 0
+            anchors.fill: parent
+            text: control.symbol
+            color: !control.enabled ? App.Theme.textMuted
+                                   : control.danger ? App.Theme.danger : App.Theme.textSecondary
+            font.pixelSize: 18
+            font.weight: Font.DemiBold
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+        }
+        UiIcon {
+            visible: control.iconSource.toString().length > 0
+            anchors.centerIn: parent
+            width: 18
+            height: 18
+            source: control.iconSource
+            sourceSize.width: 18
+            sourceSize.height: 18
+            tintEnabled: !App.Theme.dark
+            tintColor: !control.enabled ? App.Theme.textMuted
+                                      : control.danger ? App.Theme.danger
+                                                       : App.Theme.textSecondary
+        }
     }
 
     background: Rectangle {
@@ -38,4 +56,3 @@ Button {
     ToolTip.text: toolTip
     ToolTip.delay: 450
 }
-

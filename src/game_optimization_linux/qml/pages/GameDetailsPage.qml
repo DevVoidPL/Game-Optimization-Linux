@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import "../components"
+import "../dialogs"
 import "details"
 import ".." as App
 
@@ -16,6 +17,12 @@ Item {
     readonly property bool hasSelection: gameId.length > 0
     readonly property bool launchAllowed: Boolean(value(["launchAllowed"], false))
     readonly property bool analysisAllowed: Boolean(value(["analysisAllowed"], false))
+    readonly property bool customManualGame: Boolean(value(["customManualGame"], false))
+    readonly property bool launcherIntegrationSupported: {
+        var launcher = String(value(["launcher"], ""))
+        return launcher !== "Heroic" && launcher !== "Lutris"
+               && !page.customManualGame
+    }
     signal toastRequested(string message, string tone)
 
     function value(keys, fallback) {
@@ -32,6 +39,8 @@ Item {
         if (controller && controller.backToGames)
             controller.backToGames()
     }
+
+    onGameIdChanged: tabBar.currentIndex = 0
 
     ColumnLayout {
         visible: page.hasSelection
@@ -174,9 +183,11 @@ Item {
                 objectName: "launchGameButton"
                 Layout.alignment: Qt.AlignTop
                 text: page.demoMode ? qsTr("Launch (demo)") : qsTr("Launch")
-                iconText: "▶"
+                iconSource: App.UiIcons.actionLaunch
                 kind: "primary"
                 enabled: Boolean(page.hasSelection && page.launchAllowed)
+                toolTip: enabled ? "" : String(page.value(
+                    ["launchUnavailableReason"], qsTr("Launch is unavailable")))
                 onClicked: {
                     if (page.controller && page.controller.launchGame)
                         page.controller.launchGame(page.gameId)
@@ -191,6 +202,23 @@ Item {
 
                 Menu {
                     id: moreMenu
+
+                    MenuItem {
+                        text: qsTr("Edit custom game")
+                        visible: page.customManualGame
+                        onTriggered: manualGameDialog.openForEdit(page.gameId)
+                    }
+
+                    MenuItem {
+                        text: qsTr("Remove custom game")
+                        visible: page.customManualGame
+                        onTriggered: removeManualDialog.ask(
+                                         qsTr("Remove custom game?"),
+                                         qsTr("This removes only the Game Optimization Linux entry. Game files and artwork are not deleted."),
+                                         qsTr("Remove"), true, page.gameId)
+                    }
+
+                    MenuSeparator { visible: page.customManualGame }
 
                     MenuItem {
                         text: qsTr("Analyze game")
@@ -234,6 +262,7 @@ Item {
                     qsTr("Storage"),
                     qsTr("Graphics Remaster"),
                     qsTr("Optimization"),
+                    qsTr("OptiScaler"),
                     qsTr("MangoHud")
                 ]
 
@@ -241,11 +270,14 @@ Item {
                     id: tabButton
                     required property int index
                     required property string modelData
-                    width: Math.max(92, (tabBar.width - tabBar.spacing * 4) / 5)
+                    width: Math.max(92, (tabBar.width - tabBar.spacing * 5) / 6)
                     height: tabBar.height
                     implicitWidth: 96
                     implicitHeight: height
                     text: modelData
+                    enabled: index < 3 || page.launcherIntegrationSupported
+                    ToolTip.visible: !enabled && tabDisabledHover.hovered
+                    ToolTip.text: qsTr("Full optimization launch integration for this launcher is not available yet")
                     focusPolicy: Qt.StrongFocus
 
                     contentItem: Label {
@@ -260,6 +292,8 @@ Item {
                         ToolTip.text: text
                         HoverHandler { id: tabHover }
                     }
+
+                    HoverHandler { id: tabDisabledHover }
 
                     background: Rectangle {
                         radius: App.Theme.radiusSmall
@@ -280,7 +314,8 @@ Item {
                 if (tabBar.currentIndex === 1) return storageComponent
                 if (tabBar.currentIndex === 2) return graphicsComponent
                 if (tabBar.currentIndex === 3) return optimizationComponent
-                if (tabBar.currentIndex === 4) return mangoHudComponent
+                if (tabBar.currentIndex === 4) return optiScalerComponent
+                if (tabBar.currentIndex === 5) return mangoHudComponent
                 return overviewComponent
             }
         }
@@ -293,6 +328,21 @@ Item {
         message: qsTr("Choose a game from the library to open its details.")
         actionText: qsTr("Back to Games")
         onActionTriggered: page.goBack()
+    }
+
+    ManualGameDialog {
+        id: manualGameDialog
+        objectName: "editManualGameDialog"
+        controller: page.controller
+    }
+
+    ConfirmDialog {
+        id: removeManualDialog
+        objectName: "removeManualGameDialog"
+        onConfirmed: function(gameId) {
+            if (page.controller && page.controller.removeManualGame)
+                page.controller.removeManualGame(String(gameId || ""))
+        }
     }
 
     Component {
@@ -327,6 +377,16 @@ Item {
     Component {
         id: optimizationComponent
         OptimizationTab {
+            controller: page.controller
+            gameData: page.gameData
+            onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
+            onOptiScalerRequested: tabBar.currentIndex = 4
+        }
+    }
+
+    Component {
+        id: optiScalerComponent
+        OptiScalerTab {
             controller: page.controller
             gameData: page.gameData
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
