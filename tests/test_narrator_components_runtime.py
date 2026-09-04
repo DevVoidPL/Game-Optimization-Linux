@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from io import BytesIO
+from dataclasses import replace
 import hashlib
+from io import BytesIO
 from pathlib import Path
 import zipfile
 
@@ -12,9 +13,18 @@ from game_optimization_linux.models.narrator import (
     NarratorComponentState,
 )
 from game_optimization_linux.services.narrator_components import (
+    DEFAULT_NARRATOR_COMPONENTS,
     NarratorComponentArtifact,
     NarratorComponentDefinition,
     NarratorComponentManager,
+)
+from game_optimization_linux.services.narrator_tts import (
+    PIPER_BASS_COMPONENT_ID,
+    PIPER_COMPONENT_ID,
+)
+from game_optimization_linux.services.narrator_ocr import (
+    TESSERACT_COMPONENT_ID,
+    TESSERACT_POLISH_COMPONENT_ID,
 )
 
 
@@ -39,6 +49,133 @@ def _zip_payload(files: dict[str, bytes]) -> bytes:
         for name, payload in files.items():
             archive.writestr(name, payload)
     return output.getvalue()
+
+
+def test_polish_ocr_component_uses_exact_pinned_official_artifact() -> None:
+    definition = next(
+        item
+        for item in DEFAULT_NARRATOR_COMPONENTS
+        if item.component_id == TESSERACT_POLISH_COMPONENT_ID
+    )
+
+    assert definition.component_id != TESSERACT_COMPONENT_ID
+    assert definition.version == "tessdata_fast-8741641"
+    assert definition.download_size_bytes == 4_765_518
+    assert definition.sha256 == (
+        "c4476cdbc0e33d898d32345122b7be1cbf85ace15f920f06c7714756e1ef79b2"
+    )
+    assert definition.source_url == (
+        "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/"
+        "87416418657359cb625c412a48b6e1d6d41c29bd/pol.traineddata"
+    )
+    assert definition.target_relative_path == "tessdata/pol.traineddata"
+    assert definition.license_id == "Apache-2.0"
+    assert definition.artifact_license_id == "Apache-2.0"
+
+
+def test_polish_ocr_component_download_is_verified_and_separately_owned(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    official = next(
+        item
+        for item in DEFAULT_NARRATOR_COMPONENTS
+        if item.component_id == TESSERACT_POLISH_COMPONENT_ID
+    )
+    payload = b"small-polish-tessdata-fixture"
+    definition = replace(
+        official,
+        download_size_bytes=len(payload),
+        sha256=hashlib.sha256(payload).hexdigest(),
+    )
+    monkeypatch.setattr(
+        "game_optimization_linux.services.narrator_components.urlopen",
+        lambda url, **_values: _Response(payload, str(url)),
+    )
+    manager = NarratorComponentManager(tmp_path, definitions=(definition,))
+
+    manager.install(TESSERACT_POLISH_COMPONENT_ID)
+
+    assert manager.verify_installed(TESSERACT_POLISH_COMPONENT_ID) == (True, "")
+    assert (
+        tmp_path
+        / TESSERACT_POLISH_COMPONENT_ID
+        / "tessdata/pol.traineddata"
+    ).read_bytes() == payload
+    assert not (tmp_path / TESSERACT_COMPONENT_ID).exists()
+
+
+def test_bass_voice_component_uses_exact_pinned_official_artifacts() -> None:
+    definition = next(
+        item
+        for item in DEFAULT_NARRATOR_COMPONENTS
+        if item.component_id == PIPER_BASS_COMPONENT_ID
+    )
+
+    assert definition.component_id != PIPER_COMPONENT_ID
+    assert definition.version == "piper-voices-5b44ec7"
+    assert definition.download_size_bytes == 114_208_978
+    assert definition.license_id == "MIT"
+    assert definition.artifact_license_id == "Apache-2.0"
+    assert definition.attribution == "pl_PL-bass-high from rhasspy/piper-voices"
+    assert [artifact.size_bytes for artifact in definition.artifacts] == [
+        114_204_024,
+        4_954,
+    ]
+    assert [artifact.sha256 for artifact in definition.artifacts] == [
+        "73b8408967c58118700f21eb2413cd8b666c7844c6136cf674bf5dd56bde72c2",
+        "7bb41aa14fee87a31cc32264119c09e3553335196d3db15b39b1c18790e13c59",
+    ]
+    assert all(
+        "rhasspy/piper-voices/resolve/"
+        "5b44ec7bab7c5822cfec48fbd5aa99db71a823d6/" in artifact.source_url
+        for artifact in definition.artifacts
+    )
+    assert [artifact.target_relative_path for artifact in definition.artifacts] == [
+        "voices/pl_PL-bass-high.onnx",
+        "voices/pl_PL-bass-high.onnx.json",
+    ]
+
+
+def test_bass_voice_installs_and_verifies_under_separate_component_ownership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    official = next(
+        item
+        for item in DEFAULT_NARRATOR_COMPONENTS
+        if item.component_id == PIPER_BASS_COMPONENT_ID
+    )
+    model = b"small-bass-model-fixture"
+    config = b'{"audio":{"sample_rate":22050}}'
+    payloads = {
+        official.artifacts[0].source_url: model,
+        official.artifacts[1].source_url: config,
+    }
+    artifacts = tuple(
+        replace(
+            artifact,
+            sha256=hashlib.sha256(payloads[artifact.source_url]).hexdigest(),
+            size_bytes=len(payloads[artifact.source_url]),
+        )
+        for artifact in official.artifacts
+    )
+    definition = replace(
+        official,
+        artifacts=artifacts,
+        download_size_bytes=sum(artifact.size_bytes for artifact in artifacts),
+    )
+    monkeypatch.setattr(
+        "game_optimization_linux.services.narrator_components.urlopen",
+        lambda url, **_values: _Response(payloads[str(url)], str(url)),
+    )
+    manager = NarratorComponentManager(tmp_path, definitions=(definition,))
+
+    manager.install(PIPER_BASS_COMPONENT_ID)
+
+    assert manager.verify_installed(PIPER_BASS_COMPONENT_ID) == (True, "")
+    assert (
+        tmp_path / PIPER_BASS_COMPONENT_ID / "voices/pl_PL-bass-high.onnx"
+    ).read_bytes() == model
+    assert not (tmp_path / PIPER_COMPONENT_ID).exists()
 
 
 def test_multi_artifact_component_is_verified_and_installed_atomically(

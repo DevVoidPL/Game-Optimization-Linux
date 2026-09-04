@@ -35,6 +35,8 @@ from game_optimization_linux.services.narrator_gstreamer import (
 from game_optimization_linux.services.narrator_ocr import (
     TESSERACT_COMPONENT_ID,
     TESSERACT_MODEL_RELATIVE_PATH,
+    TESSERACT_POLISH_COMPONENT_ID,
+    TESSERACT_POLISH_MODEL_RELATIVE_PATH,
     TesseractOcrProvider,
 )
 from game_optimization_linux.services.narrator_persistence import (
@@ -351,6 +353,7 @@ def test_gstreamer_transport_delivers_negotiated_frame_and_stops() -> None:
         )
         assert ready.wait(2.0)
         assert (frames[0].width, frames[0].height, frames[0].stride) == (3, 2, 9)
+        assert frames[0].pixel_format == "rgb888"
         assert frames[0].pixels == pixels
     finally:
         transport.stop()
@@ -362,6 +365,17 @@ def _component_model(root: Path) -> Path:
     path = root / TESSERACT_COMPONENT_ID / TESSERACT_MODEL_RELATIVE_PATH
     path.parent.mkdir(parents=True)
     path.write_bytes(b"model")
+    return path
+
+
+def _polish_component_model(root: Path) -> Path:
+    path = (
+        root
+        / TESSERACT_POLISH_COMPONENT_ID
+        / TESSERACT_POLISH_MODEL_RELATIVE_PATH
+    )
+    path.parent.mkdir(parents=True)
+    path.write_bytes(b"polish model")
     return path
 
 
@@ -487,6 +501,34 @@ def test_ocr_provider_serializes_frame_and_parses_confidence(tmp_path: Path) -> 
     assert result.text == "Hello there"
     assert result.confidence == pytest.approx(0.9)
     assert "--tessdata-dir" in calls[0][0]
+
+
+def test_ocr_provider_selects_separately_managed_polish_model(
+    tmp_path: Path,
+) -> None:
+    polish_model = _polish_component_model(tmp_path)
+    calls: list[list[str]] = []
+    tsv = (
+        "level\tpage_num\tblock_num\tpar_num\tline_num\tword_num\tleft\ttop\twidth\theight\tconf\ttext\n"
+        "5\t1\t1\t1\t1\t1\t0\t0\t10\t8\t94\tZażółć\n"
+    )
+
+    def runner(argv, **_values):
+        calls.append(argv)
+        return subprocess.CompletedProcess(argv, 0, tsv.encode(), b"")
+
+    provider = TesseractOcrProvider(
+        tmp_path, executable="/usr/bin/tesseract", runner=runner
+    )
+    result = provider.recognize(_frame(), language="pl")
+
+    assert provider.language_available("pl") is True
+    assert provider.language_available("en") is False
+    assert result.text == "Zażółć"
+    assert calls[0][calls[0].index("--tessdata-dir") + 1] == str(
+        polish_model.parent
+    )
+    assert calls[0][calls[0].index("-l") + 1] == "pol"
 
 
 def test_real_tesseract_provider_boundary_when_runtime_and_model_are_available(

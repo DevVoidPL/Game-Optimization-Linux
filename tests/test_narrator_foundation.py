@@ -5,6 +5,8 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import stat
+from threading import Event
+import time
 from typing import Any, Callable
 
 import pytest
@@ -19,7 +21,9 @@ from game_optimization_linux.models.narrator import (
     NarratorGameSettings,
     NarratorSessionStatus,
     NarratorSourceMode,
+    NarratorSubtitleLanguageMode,
     NormalizedRect,
+    OcrDecisionObservation,
     OcrResult,
     PcmAudio,
     TranslationResult,
@@ -206,6 +210,15 @@ class _Tts:
         self.cancel_calls += 1
 
 
+class _PrewarmingTts(_Tts):
+    def __init__(self) -> None:
+        super().__init__()
+        self.prepared: list[str] = []
+
+    def prepare(self, voice_id: str) -> None:
+        self.prepared.append(voice_id)
+
+
 class _Audio:
     provider_id = "test-audio"
     available = True
@@ -258,7 +271,10 @@ class _ManualExecutor:
         assert self.jobs[0][0].set_running_or_notify_cancel()
 
     def run_next(self) -> None:
-        future, function, args, kwargs = self.jobs.pop(0)
+        self.run_at(0)
+
+    def run_at(self, index: int) -> None:
+        future, function, args, kwargs = self.jobs.pop(index)
         if future.cancelled():
             return
         if not future.running() and not future.set_running_or_notify_cancel():
@@ -333,6 +349,320 @@ def _pipeline(tmp_path: Path, executor: _ManualExecutor) -> tuple[
     return pipeline, capture, activity, ocr, translator, tts, audio
 
 
+def test_region_preview_uses_one_temporary_portal_frame_and_stops_cleanly(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, capture, _activity, *_providers = _pipeline(tmp_path, executor)
+    frames: list[CaptureFrame] = []
+    states: list[CaptureState] = []
+
+    pipeline.request_preview_frame(
+        _settings(),
+        frame_callback=frames.append,
+        state_callback=lambda state, _message: states.append(state),
+    )
+
+    assert len(capture.requests) == 1
+    request = capture.requests[0]
+    assert request.game_key == "292030"
+    assert request.source_type is CaptureSourceType.WINDOW
+    assert request.sampling_hz == 1.0
+    assert states == [CaptureState.ACTIVE]
+    assert capture.frame_callback is not None
+    capture.frame_callback(
+        _frame(
+            session_id=request.session_id,
+            generation=request.generation,
+            value=37,
+        )
+    )
+
+    assert [frame.pixels[0] for frame in frames] == [37]
+    assert pipeline.latest_preview_frame("292030") is frames[0]
+    pipeline.cancel_preview_frame()
+    assert capture.stop_calls == 1
+
+
+def test_region_preview_reuses_active_narrator_stream_without_second_capture(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, capture, _activity, *_providers = _pipeline(tmp_path, executor)
+    snapshot = pipeline.start(_settings())
+    full_frame = _frame(
+        session_id=snapshot.session_id,
+        generation=snapshot.generation,
+        value=81,
+    )
+    pipeline.submit_frame(full_frame)
+    frames: list[CaptureFrame] = []
+
+    pipeline.request_preview_frame(
+        _settings(),
+        frame_callback=frames.append,
+        state_callback=lambda _state, _message: None,
+    )
+
+    assert frames == [full_frame]
+    assert len(capture.requests) == 1
+    assert capture.stop_calls == 0
+    pipeline.cancel_preview_frame()
+    assert capture.stop_calls == 0
+    pipeline.stop()
+
+
+def test_app_controller_region_preview_stops_temporary_capture_after_one_frame(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, capture, _activity, *_providers = _pipeline(tmp_path, executor)
+    controller = AppController(
+        game_provider=DemoGameProvider(),
+        task_service=MockTaskService(),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        narrator_settings_repository=NarratorSettingsRepository(
+            tmp_path / "narrator-games"
+        ),
+        narrator_component_manager=NarratorComponentManager(
+            tmp_path / "components"
+        ),
+        narrator_pipeline=pipeline,
+        auto_refresh=False,
+    )
+    game_id = controller.games[0]["id"]
+    results: list[dict[str, object]] = []
+    ready = Event()
+
+    def changed(changed_game_id: str, values: object) -> None:
+        if changed_game_id != game_id or not isinstance(values, dict):
+            return
+        results.append(values)
+        if values.get("state") == "ready":
+            ready.set()
+
+    controller.narratorRegionPreviewChanged.connect(changed)
+    try:
+        assert controller.requestNarratorRegionPreview(game_id) is True
+        request = capture.requests[-1]
+        assert capture.frame_callback is not None
+        capture.frame_callback(
+            CaptureFrame(
+                session_id=request.session_id,
+                generation=request.generation,
+                timestamp_monotonic=1.0,
+                width=4,
+                height=2,
+                stride=14,
+                pixel_format="rgb888",
+                pixels=(bytes((20, 40, 60) * 4) + b"\xaa\xbb") * 2,
+                source_id="selected-game-window",
+            )
+        )
+        deadline = time.monotonic() + 2.0
+        while not ready.is_set() and time.monotonic() < deadline:
+            QCoreApplication.processEvents()
+            ready.wait(timeout=0.01)
+        assert ready.is_set()
+        assert capture.stop_calls == 1
+        final = results[-1]
+        assert final["state"] == "ready"
+        assert str(final["imageUrl"]).startswith("data:image/png;base64,")
+        assert (final["sourceWidth"], final["sourceHeight"]) == (4, 2)
+    finally:
+        controller.shutdown()
+
+
+def test_app_controller_routes_ready_preview_to_native_selector_and_saves_roi(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, capture, _activity, *_providers = _pipeline(tmp_path, executor)
+    repository = NarratorSettingsRepository(tmp_path / "narrator-games")
+    controller = AppController(
+        game_provider=DemoGameProvider(),
+        task_service=MockTaskService(),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        narrator_settings_repository=repository,
+        narrator_component_manager=NarratorComponentManager(
+            tmp_path / "components"
+        ),
+        narrator_pipeline=pipeline,
+        auto_refresh=False,
+    )
+    game_id = controller.games[0]["id"]
+    initial = {"x": 0.1, "y": 0.6, "width": 0.8, "height": 0.2}
+    shown: list[tuple[str, dict[str, object], dict[str, object]]] = []
+    ready = Event()
+
+    def show_selector(
+        shown_game_id: str,
+        preview: dict[str, object],
+        initial_region: dict[str, object],
+    ) -> None:
+        shown.append((shown_game_id, dict(preview), dict(initial_region)))
+        ready.set()
+
+    controller._narrator_region_selector.show_selector = show_selector  # type: ignore[method-assign]
+    try:
+        assert controller.selectNarratorSubtitleRegion(game_id, initial) is True
+        request = capture.requests[-1]
+        assert capture.frame_callback is not None
+        capture.frame_callback(
+            CaptureFrame(
+                session_id=request.session_id,
+                generation=request.generation,
+                timestamp_monotonic=1.0,
+                width=4,
+                height=2,
+                stride=12,
+                pixel_format="rgb888",
+                pixels=bytes((20, 40, 60) * 8),
+                source_id="selected-game-window",
+            )
+        )
+        deadline = time.monotonic() + 2.0
+        while not ready.is_set() and time.monotonic() < deadline:
+            QCoreApplication.processEvents()
+            ready.wait(timeout=0.01)
+
+        assert ready.is_set()
+        assert shown[0][0] == game_id
+        assert shown[0][1]["state"] == "ready"
+        assert shown[0][2] == initial
+        assert capture.stop_calls == 1
+
+        selected = {"x": 0.2, "y": 0.65, "width": 0.6, "height": 0.18}
+        controller._saveNarratorRegionSelection(game_id, selected)
+        game_key = str(controller.getNarratorGameSettings(game_id)["gameKey"])
+        assert repository.load(game_key).subtitle_region.to_dict() == selected
+    finally:
+        controller.shutdown()
+
+
+def test_app_controller_region_preview_reuses_active_rgb888_frame(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, capture, _activity, *_providers = _pipeline(tmp_path, executor)
+    controller = AppController(
+        game_provider=DemoGameProvider(),
+        task_service=MockTaskService(),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        narrator_settings_repository=NarratorSettingsRepository(
+            tmp_path / "narrator-games"
+        ),
+        narrator_component_manager=NarratorComponentManager(
+            tmp_path / "components"
+        ),
+        narrator_pipeline=pipeline,
+        auto_refresh=False,
+    )
+    game_id = controller.games[0]["id"]
+    ready = Event()
+    results: list[dict[str, object]] = []
+
+    def changed(changed_game_id: str, values: object) -> None:
+        if changed_game_id != game_id or not isinstance(values, dict):
+            return
+        results.append(values)
+        if values.get("state") == "ready":
+            ready.set()
+
+    controller.narratorRegionPreviewChanged.connect(changed)
+    try:
+        game_key = str(controller.getNarratorGameSettings(game_id)["gameKey"])
+        snapshot = pipeline.start(replace(_settings(), game_key=game_key))
+        frame = CaptureFrame(
+            session_id=snapshot.session_id,
+            generation=snapshot.generation,
+            timestamp_monotonic=1.0,
+            width=4,
+            height=2,
+            stride=14,
+            pixel_format="rgb888",
+            pixels=(bytes((180, 40, 20) * 4) + b"\x01\x02") * 2,
+            source_id="active-game-window",
+        )
+        pipeline.submit_frame(frame)
+
+        assert controller.requestNarratorRegionPreview(game_id) is True
+        deadline = time.monotonic() + 2.0
+        while not ready.is_set() and time.monotonic() < deadline:
+            QCoreApplication.processEvents()
+            ready.wait(timeout=0.01)
+
+        assert ready.is_set()
+        assert len(capture.requests) == 1
+        assert capture.stop_calls == 0
+        final = results[-1]
+        assert final["state"] == "ready"
+        assert str(final["imageUrl"]).startswith("data:image/png;base64,")
+    finally:
+        controller.shutdown()
+
+
+def test_region_preview_conversion_error_is_explicit_and_keeps_saved_roi(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, capture, _activity, *_providers = _pipeline(tmp_path, executor)
+    repository = NarratorSettingsRepository(tmp_path / "narrator-games")
+    controller = AppController(
+        game_provider=DemoGameProvider(),
+        task_service=MockTaskService(),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        narrator_settings_repository=repository,
+        narrator_component_manager=NarratorComponentManager(
+            tmp_path / "components"
+        ),
+        narrator_pipeline=pipeline,
+        auto_refresh=False,
+    )
+    game_id = controller.games[0]["id"]
+    game_key = controller.getNarratorGameSettings(game_id)["gameKey"]
+    before = repository.load(str(game_key)).subtitle_region
+    failed = Event()
+    results: list[dict[str, object]] = []
+
+    def changed(changed_game_id: str, values: object) -> None:
+        if changed_game_id != game_id or not isinstance(values, dict):
+            return
+        results.append(values)
+        if values.get("state") == "error":
+            failed.set()
+
+    controller.narratorRegionPreviewChanged.connect(changed)
+    try:
+        assert controller.requestNarratorRegionPreview(game_id) is True
+        request = capture.requests[-1]
+        assert capture.frame_callback is not None
+        capture.frame_callback(
+            CaptureFrame(
+                session_id=request.session_id,
+                generation=request.generation,
+                timestamp_monotonic=1.0,
+                width=4,
+                height=2,
+                stride=4,
+                pixel_format="unsupported-test-format",
+                pixels=b"\0" * 8,
+                source_id="selected-game-window",
+            )
+        )
+        deadline = time.monotonic() + 2.0
+        while not failed.is_set() and time.monotonic() < deadline:
+            QCoreApplication.processEvents()
+            failed.wait(timeout=0.01)
+
+        assert failed.is_set()
+        assert results[-1]["success"] is False
+        assert "unsupported-test-format" in str(results[-1]["error"])
+        assert repository.load(str(game_key)).subtitle_region == before
+    finally:
+        controller.shutdown()
+
+
 def _confirm_phrase(
     pipeline: NarratorPipeline,
     executor: _ManualExecutor,
@@ -396,6 +726,23 @@ def test_narrator_settings_are_per_game_utf8_atomic_and_survive_restart(
     assert b"\\u0141" not in first_path.read_bytes()
     assert replace_calls and replace_calls[0][1] == first_path
     assert not list(first_path.parent.glob("*.tmp"))
+
+
+def test_old_narrator_settings_default_to_english_translation_mode() -> None:
+    settings = NarratorGameSettings.from_dict(
+        {
+            "schema_version": 1,
+            "game_key": "292030",
+            "enabled": True,
+        },
+        expected_game_key="292030",
+    )
+
+    assert (
+        settings.subtitle_language_mode
+        is NarratorSubtitleLanguageMode.ENGLISH_TO_POLISH
+    )
+    assert settings.to_dict()["subtitle_language_mode"] == "english_to_polish"
 
 
 def test_translation_cache_is_scoped_by_provider_and_profile(tmp_path: Path) -> None:
@@ -593,6 +940,38 @@ def test_subtitle_region_stabilization_and_phrase_cooldown() -> None:
     assert deduplicator.accept("Open the door", now=10.0, cooldown_seconds=5) == "Open the door"
 
 
+def test_pipeline_text_consensus_accepts_a_static_subtitle_without_visual_wait(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, ocr, translator, tts, audio = _pipeline(
+        tmp_path, executor
+    )
+    snapshot = pipeline.start(_settings())
+
+    for index, timestamp in enumerate((1.0, 1.2)):
+        pipeline.submit_frame(
+            _frame(
+                session_id=snapshot.session_id,
+                generation=snapshot.generation,
+                value=5,
+                timestamp=timestamp,
+            )
+        )
+        assert pipeline.snapshot.last_visual_change_decision == (
+            "initial_probe" if index == 0 else "text_confirmation"
+        )
+        executor.run_next()
+    executor.run_next()
+    executor.run_next()
+
+    assert ocr.values == [5, 5]
+    assert translator.values == ["phrase 5"]
+    assert tts.values == ["polski phrase 5"]
+    assert len(audio.played) == 1
+    assert pipeline.snapshot.last_accepted_ocr_text == "phrase 5"
+
+
 def test_pipeline_keeps_only_newest_pending_frame_and_discards_stale_work(
     tmp_path: Path,
 ) -> None:
@@ -648,6 +1027,28 @@ def test_pipeline_keeps_only_newest_pending_frame_and_discards_stale_work(
     assert tts.values == ["polski phrase 3"]
     assert audio.played == [(3, pytest.approx(0.85))]
     assert pipeline.snapshot.last_spoken_text == "polski phrase 3"
+    assert pipeline.snapshot.dropped_frames == 1
+    assert pipeline.snapshot.dropped_capture_sampling == 1
+    assert pipeline.snapshot.dropped_capture_coalesced == 0
+    assert pipeline.snapshot.unstable_ocr_observations == 2
+
+
+def test_pipeline_prewarms_selected_tts_without_blocking_start(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, _ocr, _translator, _tts, _audio = _pipeline(
+        tmp_path, executor
+    )
+    prewarming_tts = _PrewarmingTts()
+    pipeline.tts = prewarming_tts
+
+    snapshot = pipeline.start(_settings())
+
+    assert snapshot.status is NarratorSessionStatus.LISTENING
+    assert prewarming_tts.prepared == []
+    executor.run_next()
+    assert prewarming_tts.prepared == ["voice-pl"]
 
 
 def test_pipeline_reports_speaking_only_after_audio_really_starts(
@@ -682,12 +1083,26 @@ def test_pipeline_reports_speaking_only_after_audio_really_starts(
     assert pipeline.snapshot.translation_status == "ready"
     assert pipeline.snapshot.tts_status == "ready"
 
+    now[0] = 10.4
     audio.started_callbacks[0](3.0)
 
     assert pipeline.snapshot.status is NarratorSessionStatus.SPEAKING
     assert pipeline.snapshot.last_spoken_text == "polski phrase 4"
     assert pipeline.snapshot.audio_status == "speaking"
-    assert pipeline.snapshot.total_capture_to_audio_start_ms == pytest.approx(800.0)
+    assert pipeline.snapshot.accepted_to_audio_start_ms == pytest.approx(400.0)
+    assert pipeline.snapshot.total_capture_to_audio_start_ms == pytest.approx(1200.0)
+    assert pipeline.snapshot.confirming_frame_to_audio_start_ms == pytest.approx(
+        1200.0
+    )
+    assert pipeline.snapshot.first_visible_frame_to_audio_start_ms == pytest.approx(
+        1400.0
+    )
+    assert pipeline.snapshot.first_visible_frame_at_monotonic == pytest.approx(9.0)
+    assert pipeline.snapshot.confirming_frame_at_monotonic == pytest.approx(9.2)
+    assert pipeline.snapshot.accepted_at_monotonic == pytest.approx(10.0)
+    assert pipeline.snapshot.tts_started_at_monotonic == pytest.approx(10.0)
+    assert pipeline.snapshot.tts_finished_at_monotonic == pytest.approx(10.0)
+    assert pipeline.snapshot.playback_started_at_monotonic == pytest.approx(10.4)
 
     audio.completed_callbacks[0]()
 
@@ -760,7 +1175,8 @@ def test_pipeline_remains_bounded_while_translation_is_running(tmp_path: Path) -
         value=1,
         timestamp=1.0,
     )
-    # Translation 1 is accepted and running.
+    # Translation 1 is queued, but the independent OCR lane can still validate
+    # the newest frame without letting raw observations cancel accepted work.
     pipeline.submit_frame(
         _frame(
             session_id=snapshot.session_id,
@@ -777,11 +1193,9 @@ def test_pipeline_remains_bounded_while_translation_is_running(tmp_path: Path) -
             timestamp=1.4,
         )
     )
-    assert len(executor.jobs) == 1
+    assert len(executor.jobs) == 2
 
-    executor.run_next()  # Translation 1 survives unvetted pending frames.
-    executor.run_next()  # TTS 1 survives too; OCR 3 is then queued.
-    executor.run_next()  # First OCR 3 observation.
+    executor.run_at(1)  # First OCR 3 observation; Translation 1 still survives.
     pipeline.submit_frame(
         _frame(
             session_id=snapshot.session_id,
@@ -790,17 +1204,72 @@ def test_pipeline_remains_bounded_while_translation_is_running(tmp_path: Path) -
             timestamp=1.6,
         )
     )
-    executor.run_next()  # OCR 3 confirmation.
+    executor.run_at(1)  # OCR 3 confirmation cancels queued Translation 1.
+    executor.run_next()  # Consume the cancelled Translation 1 future.
     executor.run_next()  # Translation 3.
     executor.run_next()  # TTS 3.
 
     assert ocr.values == [1, 1, 3, 3]
+    assert translator.values == ["phrase 3"]
+    assert tts.values == ["polski phrase 3"]
+    assert audio.played == [(4, pytest.approx(0.85))]
+
+
+def test_running_stale_translation_result_never_starts_tts(tmp_path: Path) -> None:
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, _ocr, translator, tts, audio = _pipeline(
+        tmp_path, executor
+    )
+    snapshot = pipeline.start(_settings())
+    pipeline._stabilizer = _AlwaysStable()  # type: ignore[assignment]
+
+    _confirm_phrase(
+        pipeline,
+        executor,
+        session_id=snapshot.session_id,
+        generation=snapshot.generation,
+        value=1,
+        timestamp=1.0,
+    )
+    executor.mark_first_running()
+    pipeline.submit_frame(
+        _frame(
+            session_id=snapshot.session_id,
+            generation=snapshot.generation,
+            value=3,
+            timestamp=1.4,
+        )
+    )
+    executor.run_at(1)  # First observation while Translation 1 is running.
+    pipeline.submit_frame(
+        _frame(
+            session_id=snapshot.session_id,
+            generation=snapshot.generation,
+            value=3,
+            timestamp=1.7,
+        )
+    )
+    executor.run_at(1)  # Stable phrase 3 supersedes Translation 1.
+
+    executor.run_next()  # Translation 1 finishes, but its result is discarded.
+    executor.run_next()  # Translation 3.
+    executor.run_next()  # TTS 3.
+
     assert translator.values == ["phrase 1", "phrase 3"]
-    assert tts.values == ["polski phrase 1", "polski phrase 3"]
-    assert audio.played == [
-        (2, pytest.approx(0.85)),
-        (4, pytest.approx(0.85)),
+    assert tts.values == ["polski phrase 3"]
+    assert audio.played == [(4, pytest.approx(0.85))]
+    assert pipeline.snapshot.stale_running_translation_results == 1
+    accepted_history = [
+        observation
+        for observation in pipeline.snapshot.ocr_decision_history
+        if observation.accepted
     ]
+    assert [observation.decision for observation in accepted_history] == [
+        "accepted_but_tts_stale",
+        "accepted_tts_submitted",
+    ]
+    assert accepted_history[0].tts_submitted is False
+    assert accepted_history[1].tts_submitted is True
 
 
 def test_noisy_observation_does_not_cancel_an_accepted_narration_job(
@@ -868,7 +1337,181 @@ def test_noisy_observation_does_not_cancel_an_accepted_narration_job(
     assert tts.cancel_calls == 0
     assert pipeline.snapshot.last_ocr_rejection_reason == "alphanumeric_noise"
     assert pipeline.snapshot.last_raw_ocr_text == "2490SDAJCXZNJQ2"
+    assert pipeline.snapshot.last_ocr_observation_credible is False
+    assert pipeline.snapshot.last_ocr_gate_decision == "rejected_alphanumeric_noise"
+    assert pipeline.snapshot.ocr_candidate_observation_count == 0
     assert pipeline.snapshot.ocr_rejection_counts["alphanumeric_noise"] == 1
+
+
+def test_ocr_decision_history_explains_candidate_acceptance_and_tts(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, _ocr, _translator, _tts, _audio = _pipeline(
+        tmp_path, executor
+    )
+    snapshot = pipeline.start(_settings())
+    pipeline._stabilizer = _AlwaysStable()  # type: ignore[assignment]
+
+    for timestamp in (1.0, 1.2):
+        pipeline.submit_frame(
+            _frame(
+                session_id=snapshot.session_id,
+                generation=snapshot.generation,
+                value=7,
+                timestamp=timestamp,
+            )
+        )
+        executor.run_next()
+
+    history = pipeline.snapshot.ocr_decision_history
+    assert [entry.decision for entry in history] == [
+        "candidate_started",
+        "accepted_pending_translation",
+    ]
+    assert history[0].candidate_observation_count == 1
+    assert history[1].candidate_observation_count == 2
+    assert history[1].accepted_text == "phrase 7"
+    assert history[1].tts_submitted is False
+
+    executor.run_next()  # Translation completes and submits TTS.
+    accepted = pipeline.snapshot.ocr_decision_history[-1]
+    assert accepted.decision == "accepted_tts_submitted"
+    assert accepted.tts_submitted is True
+    values = pipeline.snapshot.to_dict()["ocrDecisionHistory"]
+    assert values[0]["rawText"] == "phrase 7"
+    assert values[0]["roiWidth"] == 2
+    assert values[0]["backend"] == ""
+
+
+def test_clean_short_ocr_cluster_reaches_tts_from_one_changed_frame(
+    tmp_path: Path,
+) -> None:
+    class CleanShortOcr(_Ocr):
+        def recognize(self, frame: CaptureFrame, *, language: str) -> OcrResult:
+            del frame, language
+            return OcrResult(
+                text="Siema",
+                confidence=0.97,
+                provider_id=self.provider_id,
+                raw_text="Siema",
+                filtered_text="Siema",
+                token_count=1,
+                included_token_count=1,
+                line_count=1,
+                dropped_token_count=0,
+                minimum_token_confidence=0.97,
+                geometry_coherent=True,
+                clean_short_phrase_evidence=True,
+                filter_summary="unchanged",
+            )
+
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, _ocr, translator, tts, audio = _pipeline(
+        tmp_path, executor
+    )
+    pipeline.ocr = CleanShortOcr()
+    snapshot = pipeline.start(_settings())
+
+    pipeline.submit_frame(
+        _frame(
+            session_id=snapshot.session_id,
+            generation=snapshot.generation,
+            value=7,
+            timestamp=1.0,
+        )
+    )
+    executor.run_next()  # OCR; strong short evidence submits translation.
+
+    decision = pipeline.snapshot.ocr_decision_history[-1]
+    assert decision.accepted_text == "Siema"
+    assert decision.candidate_required_observations == 1
+    assert decision.candidate_match_kind == "strong_short_evidence"
+    assert decision.visual_change_decision == "initial_probe"
+    assert decision.clean_short_phrase_evidence is True
+    assert decision.filter_summary == "unchanged"
+
+    executor.run_next()  # Translation.
+    executor.run_next()  # TTS.
+
+    assert translator.values == ["Siema"]
+    assert tts.values == ["polski Siema"]
+    assert len(audio.played) == 1
+
+
+def test_ocr_decision_history_is_bounded_to_twenty(tmp_path: Path) -> None:
+    executor = _ManualExecutor()
+    pipeline, *_providers = _pipeline(tmp_path, executor)
+
+    for observation_id in range(25):
+        pipeline._append_ocr_decision(  # type: ignore[attr-defined]
+            OcrDecisionObservation(
+                observation_id=observation_id,
+                observed_at_monotonic=float(observation_id),
+                raw_text=f"raw {observation_id}",
+                filtered_text=f"filtered {observation_id}",
+                normalized_text=f"normalized {observation_id}",
+                confidence=0.9,
+                decision="candidate_started",
+            )
+        )
+
+    history = pipeline.snapshot.ocr_decision_history
+    assert len(history) == 20
+    assert history[0].observation_id == 5
+    assert history[-1].observation_id == 24
+
+
+def test_empty_transition_frame_does_not_strand_visible_candidate(
+    tmp_path: Path,
+) -> None:
+    class SequenceOcr(_Ocr):
+        def __init__(self) -> None:
+            super().__init__()
+            self.results = iter(
+                (
+                    OcrResult("Zostań tutaj.", 0.95, self.provider_id),
+                    OcrResult("", None, self.provider_id),
+                    OcrResult("Zostań tutaj.", 0.94, self.provider_id),
+                )
+            )
+
+        def recognize(self, frame: CaptureFrame, *, language: str) -> OcrResult:
+            del language
+            self.values.append(frame.pixels[0])
+            return next(self.results)
+
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, _ocr, translator, tts, _audio = _pipeline(
+        tmp_path, executor
+    )
+    sequence_ocr = SequenceOcr()
+    pipeline.ocr = sequence_ocr
+    snapshot = pipeline.start(_settings())
+
+    for value, timestamp in ((1, 1.0), (0, 1.2), (1, 1.4)):
+        pipeline.submit_frame(
+            _frame(
+                session_id=snapshot.session_id,
+                generation=snapshot.generation,
+                value=value,
+                timestamp=timestamp,
+            )
+        )
+        executor.run_next()
+
+    executor.run_next()  # Translation.
+    executor.run_next()  # TTS.
+
+    assert sequence_ocr.values == [1, 0, 1]
+    assert translator.values == ["Zostań tutaj."]
+    assert tts.values == ["polski Zostań tutaj."]
+    history = pipeline.snapshot.ocr_decision_history
+    assert [observation.decision for observation in history] == [
+        "candidate_started",
+        "candidate_retained_after_empty",
+        "accepted_tts_submitted",
+    ]
 
 
 def test_disappearance_and_unchanged_subtitle_do_not_repeat_narration(
@@ -935,8 +1578,12 @@ def test_disappearance_and_unchanged_subtitle_do_not_repeat_narration(
     assert translator.values == ["Run!"]
     assert tts.values == ["polski Run!"]
     assert len(audio.played) == 1
-    assert pipeline.snapshot.last_ocr_rejection_reason == ""
+    assert pipeline.snapshot.last_ocr_rejection_reason == "duplicate"
     assert pipeline.snapshot.last_accepted_ocr_text == "Run!"
+    assert pipeline.snapshot.last_ocr_observation_credible is True
+    assert pipeline.snapshot.last_ocr_gate_decision == "rejected_duplicate"
+    assert pipeline.snapshot.ocr_candidate_observation_count == 2
+    assert pipeline.snapshot.ocr_candidate_required_observations == 2
 
 
 def test_pipeline_ignores_inference_completion_after_stop(tmp_path: Path) -> None:
@@ -1128,7 +1775,35 @@ def test_app_controller_exposes_per_game_narrator_boundary(tmp_path: Path) -> No
                 },
             },
         )
+        before_cancel = first.getNarratorGameSettings(game_id)["subtitleRegion"]
+        assert first.cancelNarratorRegionPreview(game_id) is True
+        assert (
+            first.getNarratorGameSettings(game_id)["subtitleRegion"]
+            == before_cancel
+        )
+        mapped = first.mapNarratorRegionPreview(
+            {
+                "sourceWidth": 1920,
+                "sourceHeight": 1080,
+                "viewportWidth": 1000,
+                "viewportHeight": 1000,
+                "x": 100,
+                "y": 556.25,
+                "width": 700,
+                "height": 112.5,
+            }
+        )
+        assert mapped["success"] is True
+        assert mapped["region"] == pytest.approx(
+            {"x": 0.1, "y": 0.6, "width": 0.7, "height": 0.2}
+        )
+        assert first.saveNarratorGameSettings(
+            game_id, {"subtitleRegion": mapped["region"]}
+        )
         session = first.getNarratorSessionState(game_id)
+        assert session["subtitleRegion"] == pytest.approx(
+            {"x": 0.1, "y": 0.6, "width": 0.7, "height": 0.2}
+        )
         assert session["canStart"] is False
         assert set(session["missingRequirements"]) == {
             "capture",
@@ -1137,6 +1812,14 @@ def test_app_controller_exposes_per_game_narrator_boundary(tmp_path: Path) -> No
             "tts",
             "audio",
         }
+        assert first.saveNarratorGameSettings(
+            game_id,
+            {"subtitleLanguageMode": "polish"},
+        )
+        assert (
+            first.getNarratorGameSettings(game_id)["subtitleLanguageMode"]
+            == "polish"
+        )
     finally:
         first.shutdown()
 
@@ -1145,11 +1828,12 @@ def test_app_controller_exposes_per_game_narrator_boundary(tmp_path: Path) -> No
         settings = restored.getNarratorGameSettings(game_id)
         assert settings["enabled"] is True
         assert settings["voiceId"] == "głos-testowy"
+        assert settings["subtitleLanguageMode"] == "polish"
         assert settings["subtitleRegion"] == {
             "x": 0.1,
             "y": 0.6,
-            "width": 0.8,
-            "height": 0.3,
+            "width": 0.7,
+            "height": 0.2,
         }
     finally:
         restored.shutdown()

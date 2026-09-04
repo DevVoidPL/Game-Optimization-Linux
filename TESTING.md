@@ -18,6 +18,17 @@ The complete test suite includes unit tests, controller integration tests and
 offscreen QML probes. It isolates configuration, cache and state directories;
 do not replace `.venv/bin/python -m pytest` with a system `pytest` invocation.
 
+`tests/conftest.py` creates one `QApplication` for the whole session and defaults
+`QT_QPA_PLATFORM` to `offscreen`, so neither needs to be set by hand any more.
+The application type matches production, which also builds a `QApplication`.
+Setting `QT_QPA_PLATFORM` explicitly still overrides the default.
+
+A single shared application matters: GUI-only statics such as
+`QGuiApplication.clipboard()` dereference an uninitialised GUI layer when the
+process singleton is a bare `QCoreApplication`, which crashes the interpreter
+with SIGSEGV instead of raising. conftest asserts the type up front so a wrong
+application fails immediately rather than mid-run.
+
 ## Focused groups
 
 Useful focused runs while changing a subsystem:
@@ -49,8 +60,7 @@ Desktop/Couch layouts, navigation, artwork reuse, dialogs, tasks, Updates and
 the optimization editor. Run it directly with:
 
 ```bash
-QT_QPA_PLATFORM=offscreen \
-  .venv/bin/python -m pytest -q tests/test_gui_stability.py
+.venv/bin/python -m pytest -q tests/test_gui_stability.py
 ```
 
 A single probe can be inspected as JSON, for example:
@@ -66,7 +76,9 @@ Builds use `flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml`. After
 building a bundle, install it into the user installation and verify both modes:
 
 ```bash
-flatpak install --user --reinstall ./dist/Game-Optimization-Linux-0.1.2-alpha-x86_64.flatpak
+APP_VERSION="$(sed -nE 's/^APP_VERSION[[:space:]]*=[[:space:]]*"([^"[:space:]]+)"[[:space:]]*$/\1/p' src/game_optimization_linux/config.py)"
+BUNDLE="./dist/Game-Optimization-Linux-${APP_VERSION}-x86_64.flatpak"
+flatpak install --user --reinstall "$BUNDLE"
 flatpak run io.github.DevVoidPL.GameOptimizationLinux --desktop
 ```
 

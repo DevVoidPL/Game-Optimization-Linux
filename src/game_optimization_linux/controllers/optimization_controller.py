@@ -1639,8 +1639,13 @@ class OptimizationController:
         )
 
     def _optimization_displays(self) -> list[Any]:
+        # instance() returns any QCoreApplication subclass, so check capability
+        # rather than None.  from_application only calls instance methods
+        # (screens/primaryScreen), so a non-GUI application raises a catchable
+        # AttributeError rather than segfaulting -- but the guard keeps this
+        # consistent with the other application lookups.
         application = QGuiApplication.instance()
-        if application is None:
+        if not isinstance(application, QGuiApplication):
             return []
         try:
             return list(self._app._display_detector.from_application(application))

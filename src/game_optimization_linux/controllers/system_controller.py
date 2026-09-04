@@ -8,6 +8,10 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from ..models import SystemInfo
+from ..services.system_diagnostics import (
+    build_public_system_diagnostics,
+    format_public_system_diagnostics,
+)
 from .presenters import qml_value, system_info_to_qml
 
 if TYPE_CHECKING:
@@ -83,8 +87,47 @@ class SystemController:
         self._app._add_compression_system_info()
         self._app._add_steam_system_info()
         self._app._add_gamepad_system_info()
+        self._add_public_diagnostics()
         if emit_signal:
             self._app.systemInfoChanged.emit()
+
+    def _add_public_diagnostics(self) -> None:
+        diagnostics = build_public_system_diagnostics(self._app._system_info)
+        self._app._system_info["runtimeDiagnostics"] = diagnostics
+        self._app._system_info["runtimeDiagnosticsText"] = (
+            format_public_system_diagnostics(diagnostics)
+        )
+
+    def copy_public_diagnostics(self) -> bool:
+        text = str(self._app._system_info.get("runtimeDiagnosticsText") or "").strip()
+        if not text:
+            return False
+        try:
+            from PySide6.QtGui import QGuiApplication
+
+            # Guard on capability, not just on None.  QGuiApplication.instance()
+            # returns whatever QCoreApplication subclass exists, so a bare
+            # QCoreApplication satisfies "is not None" while having no GUI layer.
+            # The static QGuiApplication.clipboard() would then dereference that
+            # missing layer and take the process down with SIGSEGV inside
+            # QClipboard::setMimeData.  A segfault cannot be caught by
+            # "except Exception", so the block below is false reassurance unless
+            # the application type is checked first.
+            application = QGuiApplication.instance()
+            if not isinstance(application, QGuiApplication):
+                logger.warning(
+                    "Could not copy public system diagnostics: the clipboard "
+                    "requires a GUI application"
+                )
+                return False
+            clipboard = QGuiApplication.clipboard()
+            if clipboard is None:
+                return False
+            clipboard.setText(text)
+        except Exception as error:
+            logger.warning("Could not copy public system diagnostics: %s", error)
+            return False
+        return True
 
     def _add_compression_system_info(self) -> None:
         service = self._app._compression_service

@@ -98,6 +98,13 @@ def test_controller_merges_real_filesystems_and_toggles_system_mounts(
         assert row["sizeBytes"] == 10_000
         assert row["usedBytes"] == 4_000
         assert row["availableBytes"] == 6_000
+        diagnostics = controller.systemInfo["runtimeDiagnostics"]
+        assert diagnostics["distribution"] == "Test Linux"
+        assert diagnostics["kernel"] == "1.0"
+        assert diagnostics["desktop"] == "Test"
+        assert diagnostics["session"] == "Wayland"
+        assert diagnostics["gpu"] == "Test GPU"
+        assert controller.systemInfo["runtimeDiagnosticsText"]
         assert Path("/games") in filesystems.calls[0][0]
         assert filesystems.calls[0][1] is False
 

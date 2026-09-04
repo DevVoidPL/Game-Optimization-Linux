@@ -149,6 +149,29 @@ def test_linux_system_provider_reports_missing_launchers_without_demo_data(
     assert "Ryzen 7 7800X3D" not in str(info.to_dict())
 
 
+def test_linux_system_provider_tolerates_malformed_os_release_lines(
+    tmp_path: Path,
+) -> None:
+    os_release = tmp_path / "os-release"
+    os_release.write_text(
+        "not a key-value line\n"
+        "=missing-key\n"
+        'NAME="Resilient Linux"\n'
+        "VERSION malformed\n",
+        encoding="utf-8",
+    )
+    provider = LinuxSystemProvider(
+        os_release_path=os_release,
+        cpuinfo_path=tmp_path / "missing-cpuinfo",
+        meminfo_path=tmp_path / "missing-meminfo",
+        environment={},
+        which=lambda _name: None,
+        home=tmp_path,
+    )
+
+    assert provider.collect().distribution == "Resilient Linux"
+
+
 def test_linux_system_provider_lspci_driver_belongs_to_gpu(tmp_path: Path) -> None:
     os_release = tmp_path / "os-release"
     cpuinfo = tmp_path / "cpuinfo"

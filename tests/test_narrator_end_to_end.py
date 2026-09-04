@@ -15,6 +15,7 @@ from game_optimization_linux.models.narrator import (
     CaptureState,
     NarratorGameSettings,
     NarratorSessionStatus,
+    NarratorSubtitleLanguageMode,
     NormalizedRect,
     OcrResult,
     PcmAudio,
@@ -114,10 +115,17 @@ class _Ocr:
     provider_id = "test-ocr"
     available = True
 
+    def __init__(self) -> None:
+        self.languages: list[str] = []
+
     def recognize(self, frame: CaptureFrame, *, language: str) -> OcrResult:
-        assert language == "en"
+        self.languages.append(language)
         return OcrResult(
-            text=f"phrase {frame.pixels[0]}",
+            text=(
+                f"polska kwestia {frame.pixels[0]}"
+                if language == "pl"
+                else f"phrase {frame.pixels[0]}"
+            ),
             confidence=0.95,
             provider_id=self.provider_id,
             elapsed_ms=4.0,
@@ -351,6 +359,88 @@ def test_pipeline_cache_hit_skips_translation_and_uses_language_namespace(
     )
 
 
+def test_english_mode_uses_english_ocr_translation_and_selected_voice(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, translator, tts, audio = _pipeline(
+        tmp_path, executor
+    )
+    snapshot = pipeline.start(_settings(voice_id="voice-alt"))
+    assert executor.jobs == []
+    pipeline._stabilizer = _AlwaysStable()  # type: ignore[assignment]
+
+    _confirm_phrase(pipeline, executor, snapshot, 10, 1.0)
+    executor.run_next()  # Translation.
+    executor.run_next()  # TTS.
+
+    assert pipeline.ocr.languages == ["en", "en"]  # type: ignore[attr-defined]
+    assert translator.values == [("phrase 10", "en", "pl", "small")]
+    assert tts.values == [("polski phrase 10", "pl", "voice-alt", 1.0)]
+    assert audio.played == [2]
+
+
+def test_polish_mode_uses_polish_ocr_and_bypasses_missing_translator(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    translator = _UnavailableTranslator()
+    pipeline, _capture, _activity, _translator, tts, audio = _pipeline(
+        tmp_path, executor, translator=translator
+    )
+    settings = _settings(
+        subtitle_language_mode=NarratorSubtitleLanguageMode.POLISH,
+        translation_provider_id="",
+        translation_profile_id="",
+        voice_id="voice-alt",
+    )
+    assert "translation" not in pipeline.missing_requirements(settings)
+    snapshot = pipeline.start(settings)
+    assert executor.jobs == []
+    assert snapshot.translation_status == "bypassed"
+    pipeline._stabilizer = _AlwaysStable()  # type: ignore[assignment]
+
+    _confirm_phrase(pipeline, executor, snapshot, 11, 1.0)
+    executor.run_next()  # TTS; no translation job exists.
+
+    assert pipeline.ocr.languages == ["pl", "pl"]  # type: ignore[attr-defined]
+    assert translator.values == []
+    assert tts.values == [("polska kwestia 11", "pl", "voice-alt", 1.0)]
+    assert audio.played == [2]
+    assert pipeline.snapshot.translation_status == "bypassed"
+    assert pipeline.snapshot.last_translation == ""
+
+
+def test_subtitle_language_can_switch_between_sessions_without_restart(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, translator, tts, _audio = _pipeline(
+        tmp_path, executor
+    )
+    english = pipeline.start(_settings())
+    pipeline._stabilizer = _AlwaysStable()  # type: ignore[assignment]
+    _confirm_phrase(pipeline, executor, english, 12, 1.0)
+    executor.run_next()
+    executor.run_next()
+    pipeline.stop()
+
+    polish = pipeline.start(
+        _settings(
+            subtitle_language_mode=NarratorSubtitleLanguageMode.POLISH,
+            voice_id="voice-alt",
+        )
+    )
+    assert executor.jobs == []
+    pipeline._stabilizer = _AlwaysStable()  # type: ignore[assignment]
+    _confirm_phrase(pipeline, executor, polish, 13, 2.0)
+    executor.run_next()
+
+    assert pipeline.ocr.languages == ["en", "en", "pl", "pl"]  # type: ignore[attr-defined]
+    assert [value[0] for value in translator.values] == ["phrase 12"]
+    assert tts.values[-1] == ("polska kwestia 13", "pl", "voice-alt", 1.0)
+
+
 def test_translation_failure_is_recoverable_for_a_later_subtitle(
     tmp_path: Path,
 ) -> None:
@@ -542,5 +632,42 @@ def test_controller_blocks_start_when_a_required_runtime_component_is_missing(
         assert "translation" in state["missingRequirements"]
         assert controller.startNarrator(game_id) is False
         assert capture.requests == []
+    finally:
+        controller.shutdown()
+
+
+def test_controller_does_not_require_translation_component_in_polish_mode(
+    tmp_path: Path,
+) -> None:
+    executor = _ManualExecutor()
+    pipeline, _capture, _activity, _translator, _tts, _audio = _pipeline(
+        tmp_path, executor, translator=_UnavailableTranslator()
+    )
+    repository = NarratorSettingsRepository(tmp_path / "games")
+    controller = AppController(
+        game_provider=DemoGameProvider(),
+        task_service=MockTaskService(),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        narrator_settings_repository=repository,
+        narrator_component_manager=NarratorComponentManager(tmp_path / "components"),
+        narrator_pipeline=pipeline,
+        auto_refresh=False,
+    )
+    try:
+        game_id = controller.games[0]["id"]
+        game = controller._resolve_game(game_id, show_error=False)
+        assert game is not None
+        game_key = controller._narrator_controller._game_key(game)
+        repository.save(
+            replace(
+                NarratorGameSettings.default(game_key),
+                enabled=True,
+                subtitle_language_mode=NarratorSubtitleLanguageMode.POLISH,
+            )
+        )
+
+        state = controller.getNarratorSessionState(game_id)
+        assert "translation" not in state["missingRequirements"]
+        assert state["translationStatus"] == "bypassed"
     finally:
         controller.shutdown()

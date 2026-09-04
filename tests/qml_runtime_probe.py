@@ -37,6 +37,7 @@ from PySide6.QtCore import (
 from PySide6.QtGui import QColor, QGuiApplication, QImage, QKeyEvent, QWheelEvent
 from PySide6.QtQuick import QQuickItem, QQuickView
 from PySide6.QtQml import QQmlApplicationEngine
+from PySide6.QtWidgets import QApplication
 
 from game_optimization_linux.controllers.presenters import game_to_qml
 from game_optimization_linux.models import FilesystemType, Game, Launcher
@@ -178,6 +179,123 @@ class UpdatesProbeController(QObject):
         return True
 
 
+class NarratorRegionProbeController(QObject):
+    gamesChanged = Signal()
+    narratorComponentsChanged = Signal()
+    narratorChanged = Signal(str)
+    narratorRegionPreviewChanged = Signal(str, "QVariantMap")
+    narratorRegionSelectionChanged = Signal(str, "QVariantMap")
+
+    def __init__(self, image_url: str) -> None:
+        super().__init__()
+        self._image_url = image_url
+        self._region = {"x": 0.05, "y": 0.62, "width": 0.90, "height": 0.30}
+        self.preview_requests = 0
+        self.cancel_requests = 0
+        self.saved_regions: list[dict[str, float]] = []
+        self.native_selector_requests: list[tuple[str, dict[str, float]]] = []
+
+    @Property("QVariantList", notify=gamesChanged)
+    def games(self) -> list[dict[str, str]]:
+        return [{"id": "probe-game", "name": "Subtitle selector probe"}]
+
+    @Property("QVariantList", notify=narratorComponentsChanged)
+    def narratorComponents(self) -> list[object]:
+        return []
+
+    @Slot(str, result="QVariantMap")
+    def getNarratorGameSettings(self, _game_id: str) -> dict[str, object]:
+        return {
+            "enabled": False,
+            "subtitleRegion": dict(self._region),
+            "voices": [],
+        }
+
+    @Slot(str, result="QVariantMap")
+    def getNarratorSessionState(self, _game_id: str) -> dict[str, object]:
+        return {"status": "idle"}
+
+    @Slot(str, result=bool)
+    def requestNarratorRegionPreview(self, game_id: str) -> bool:
+        self.preview_requests += 1
+        QTimer.singleShot(
+            0,
+            lambda: self.narratorRegionPreviewChanged.emit(
+                game_id,
+                {
+                    "success": True,
+                    "state": "ready",
+                    "imageUrl": self._image_url,
+                    "sourceWidth": 1600,
+                    "sourceHeight": 900,
+                },
+            ),
+        )
+        return True
+
+    @Slot(str, "QVariantMap", result=bool)
+    def selectNarratorSubtitleRegion(
+        self,
+        game_id: str,
+        region: dict[str, object],
+    ) -> bool:
+        normalized = {str(key): float(value) for key, value in region.items()}
+        self.native_selector_requests.append((game_id, normalized))
+        self.preview_requests += 1
+        QTimer.singleShot(
+            0,
+            lambda: self.narratorRegionPreviewChanged.emit(
+                game_id,
+                {
+                    "success": True,
+                    "state": "ready",
+                    "imageUrl": self._image_url,
+                    "sourceWidth": 1600,
+                    "sourceHeight": 900,
+                },
+            ),
+        )
+        return True
+
+    @Slot(str, result=bool)
+    def cancelNarratorRegionPreview(self, _game_id: str) -> bool:
+        self.cancel_requests += 1
+        return True
+
+    @Slot("QVariantMap", result="QVariantMap")
+    def mapNarratorRegionPreview(
+        self, values: dict[str, object]
+    ) -> dict[str, object]:
+        source_width = float(values.get("sourceWidth", 0))
+        source_height = float(values.get("sourceHeight", 0))
+        viewport_width = float(values.get("viewportWidth", 0))
+        viewport_height = float(values.get("viewportHeight", 0))
+        scale = min(viewport_width / source_width, viewport_height / source_height)
+        painted_width = source_width * scale
+        painted_height = source_height * scale
+        offset_x = (viewport_width - painted_width) / 2
+        offset_y = (viewport_height - painted_height) / 2
+        return {
+            "success": True,
+            "region": {
+                "x": (float(values.get("x", 0)) - offset_x) / painted_width,
+                "y": (float(values.get("y", 0)) - offset_y) / painted_height,
+                "width": float(values.get("width", 0)) / painted_width,
+                "height": float(values.get("height", 0)) / painted_height,
+            },
+        }
+
+    @Slot(str, "QVariantMap", result=bool)
+    def saveNarratorGameSettings(
+        self, _game_id: str, values: dict[str, object]
+    ) -> bool:
+        region = values.get("subtitleRegion")
+        if isinstance(region, dict):
+            self._region = {str(key): float(value) for key, value in region.items()}
+            self.saved_regions.append(dict(self._region))
+        return True
+
+
 def _message_handler(_mode: object, _context: object, message: str) -> None:
     MESSAGES.append(str(message))
 
@@ -193,6 +311,8 @@ def _view(
     relative_path: str,
     width: int,
     height: int,
+    *,
+    initial_properties: dict[str, object] | None = None,
 ) -> tuple[QQuickView, QQuickItem]:
     view = QQuickView()
     view.engine().addImportPath(str(QML_ROOT))
@@ -202,6 +322,8 @@ def _view(
     )
     view.setResizeMode(QQuickView.ResizeMode.SizeRootObjectToView)
     view.resize(width, height)
+    if initial_properties:
+        view.setInitialProperties(initial_properties)
     view.setSource((QML_ROOT / relative_path).as_uri())
     if view.status() == QQuickView.Status.Error:
         raise AssertionError("; ".join(error.toString() for error in view.errors()))
@@ -211,6 +333,33 @@ def _view(
     view.show()
     _settle(application)
     return view, root
+
+
+def _qt_side_item(root: QObject, name: str) -> QQuickItem:
+    """Look up a named item without enumerating the QML tree in Python.
+
+    ``children()`` and ``childItems()`` convert *every* element of the list they
+    return into a Python object.  Under the KDE Breeze style that bulk
+    conversion is unsafe.  Shiboken maps a QObject* to a Python type through its
+    QMetaObject class name with the QML suffix stripped, so Kirigami's QML
+    component ``Icon`` (``Icon_QML_125``, pulled in by Breeze) is looked up under
+    the bare name ``Icon`` -- which ``PySide6.QtWidgets`` has already registered
+    for the ``QMessageBox.Icon`` enum.  Shiboken then records a BindingManager
+    entry for the C++ pointer whose Python object is not a valid ``SbkObject``,
+    and destruction segfaults inside ``Shiboken::BindingManager::releaseWrapper``.
+
+    The corruption happens during conversion, so filtering the list afterwards
+    cannot prevent it.  ``findChild`` recurses in C++ and converts only the
+    single match, so the Kirigami internals are never handed to Python.  Do not
+    replace this with a ``children()``/``childItems()`` walk.
+    """
+
+    match = root.findChild(QQuickItem, name)
+    if not isinstance(match, QQuickItem):
+        raise AssertionError(
+            f"Missing QQuickItem {name} via findChild; messages: {MESSAGES}"
+        )
+    return match
 
 
 def _descendants(root: QObject) -> list[QObject]:
@@ -1516,6 +1665,287 @@ def probe_manual_game_editor(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+def probe_native_narrator_region_selector(
+    application: QApplication,
+) -> dict[str, Any]:
+    from PySide6.QtGui import QWindow
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers.narrator_region_selector import (
+        NarratorRegionSelectorCoordinator,
+        RegionCanvas,
+        SubtitleRegionSelectorWindow,
+    )
+    from game_optimization_linux.models.narrator import (
+        CaptureFrame,
+        NormalizedRect,
+    )
+    from game_optimization_linux.services.narrator_region import (
+        encode_region_preview,
+    )
+
+    width = 1600
+    height = 900
+    image = QImage(width, height, QImage.Format.Format_RGB888)
+    image.fill(QColor(36, 52, 71))
+    frame = CaptureFrame(
+        session_id="native-selector-preview",
+        generation=1,
+        timestamp_monotonic=1.0,
+        width=width,
+        height=height,
+        stride=width * 3,
+        pixel_format="rgb888",
+        pixels=bytes(image.constBits()),
+        source_id="pipewire-window",
+    )
+    preview = encode_region_preview(frame)
+
+    # A standalone canvas proves that clicks in aspect-fit margins never begin
+    # a selection. The event coordinates remain device-independent at any DPR.
+    letterbox = RegionCanvas(
+        image,
+        source_width=width,
+        source_height=height,
+        initial_region=None,
+    )
+    letterbox.resize(800, 600)
+    letterbox.show()
+    _settle(application, 5)
+    fitted = letterbox.fitted_image_rect()
+    outside = QPoint(round(fitted.center().x()), max(1, round(fitted.top() / 2)))
+    QTest.mousePress(letterbox, Qt.LeftButton, Qt.NoModifier, outside)
+    QTest.mouseMove(letterbox, QPoint(outside.x() + 120, outside.y() + 20), 10)
+    QTest.mouseRelease(
+        letterbox,
+        Qt.LeftButton,
+        Qt.NoModifier,
+        QPoint(outside.x() + 120, outside.y() + 20),
+    )
+    _settle(application, 2)
+    outside_ignored = letterbox.normalized_region() is None
+    letterbox.close()
+
+    window = SubtitleRegionSelectorWindow(
+        image,
+        source_width=width,
+        source_height=height,
+        initial_region=NormalizedRect(),
+    )
+    window.resize(1000, 720)
+    window.show()
+    _settle(application, 8)
+    canvas = window.canvas
+
+    def point(x: float, y: float) -> QPoint:
+        content = canvas.fitted_image_rect()
+        return QPoint(
+            round(content.left() + x * content.width()),
+            round(content.top() + y * content.height()),
+        )
+
+    def region_tuple() -> tuple[float, float, float, float]:
+        region = canvas.normalized_region()
+        if region is None:
+            return (0.0, 0.0, 0.0, 0.0)
+        return (region.x, region.y, region.width, region.height)
+
+    def drag(start: QPoint, end: QPoint) -> tuple[float, float, float, float]:
+        QTest.mousePress(canvas, Qt.LeftButton, Qt.NoModifier, start)
+        _settle(application, 1)
+        for step in range(1, 7):
+            amount = step / 6
+            QTest.mouseMove(
+                canvas,
+                QPoint(
+                    round(start.x() + (end.x() - start.x()) * amount),
+                    round(start.y() + (end.y() - start.y()) * amount),
+                ),
+                10,
+            )
+            _settle(application, 1)
+        during = canvas.selection_rect()
+        QTest.mouseRelease(canvas, Qt.LeftButton, Qt.NoModifier, end)
+        _settle(application, 2)
+        return (during.x(), during.y(), during.width(), during.height())
+
+    # Start outside the existing ROI so the gesture creates a replacement.
+    during_creation = drag(point(0.15, 0.20), point(0.75, 0.35))
+    created = region_tuple()
+    draft_visible = not canvas.selection_rect().isEmpty()
+    release_finalized = canvas.interaction_mode.value == "none"
+    center = point(created[0] + created[2] / 2, created[1] + created[3] / 2)
+    drag(center, point(created[0] + created[2] / 2 + 0.10, created[1] + created[3] / 2 + 0.10))
+    moved = region_tuple()
+    drag(
+        point(moved[0] + moved[2], moved[1] + moved[3]),
+        point(moved[0] + moved[2] + 0.10, moved[1] + moved[3] + 0.10),
+    )
+    resized = region_tuple()
+    window.reset_button.click()
+    _settle(application, 2)
+    reset_invalid = canvas.normalized_region() is None and not window.save_button.isEnabled()
+    drag(point(0.20, 0.60), point(0.80, 0.82))
+    recreated = region_tuple()
+    submitted: list[dict[str, float]] = []
+    window.selectionSubmitted.connect(submitted.append)
+    window.save_button.click()
+    _settle(application, 2)
+    source_size = canvas.selected_source_size()
+    window.mark_completed()
+    window.close()
+
+    # Exercise the real top-level coordinator lifecycle: the selector becomes
+    # visible before the QML/main window is hidden, then restores its state.
+    main_window = QWindow()
+    main_window.resize(640, 480)
+    main_window.show()
+    _settle(application, 3)
+    coordinator = NarratorRegionSelectorCoordinator()
+    coordinator.attach_main_window(main_window)
+    coordinator_submissions: list[tuple[str, dict[str, float]]] = []
+
+    def complete(game_id: str, region: object) -> None:
+        assert isinstance(region, dict)
+        coordinator_submissions.append((game_id, dict(region)))
+        coordinator.complete_selection()
+
+    coordinator.selectionSubmitted.connect(complete)
+    coordinator.show_selector(
+        "probe-game",
+        preview.to_dict(),
+        {"x": 0.05, "y": 0.62, "width": 0.90, "height": 0.30},
+    )
+    _settle(application, 8)
+    native = coordinator.active_window
+    if native is None:
+        raise AssertionError("Native selector coordinator did not create a window")
+    main_hidden = not main_window.isVisible()
+    native.canvas.reset_selection()
+    native_content = native.canvas.fitted_image_rect()
+    native_start = QPoint(
+        round(native_content.left() + native_content.width() * 0.2),
+        round(native_content.top() + native_content.height() * 0.6),
+    )
+    native_end = QPoint(
+        round(native_content.left() + native_content.width() * 0.8),
+        round(native_content.top() + native_content.height() * 0.82),
+    )
+    QTest.mousePress(native.canvas, Qt.LeftButton, Qt.NoModifier, native_start)
+    QTest.mouseMove(native.canvas, native_end, 20)
+    QTest.mouseRelease(native.canvas, Qt.LeftButton, Qt.NoModifier, native_end)
+    native.save_button.click()
+    _settle(application, 8)
+    main_restored = main_window.isVisible()
+
+    cancel_submissions_before = len(coordinator_submissions)
+    coordinator.show_selector(
+        "probe-game",
+        preview.to_dict(),
+        {"x": 0.05, "y": 0.62, "width": 0.90, "height": 0.30},
+    )
+    _settle(application, 5)
+    cancel_window = coordinator.active_window
+    if cancel_window is None:
+        raise AssertionError("Native selector did not reopen for cancellation")
+    QTest.keyClick(cancel_window, Qt.Key_Escape)
+    _settle(application, 6)
+    cancel_did_not_submit = len(coordinator_submissions) == cancel_submissions_before
+    cancel_restored_main = main_window.isVisible()
+    coordinator.shutdown()
+    main_window.close()
+
+    # NarratorPage now only requests the native action and receives its saved
+    # normalized result. No Popup selector object may exist in its hierarchy.
+    controller = NarratorRegionProbeController(preview.data_url)
+    view, root = _view(
+        application,
+        "pages/NarratorPage.qml",
+        1280,
+        820,
+        initial_properties={"controller": controller},
+    )
+    _settle(application, 12)
+    _invoke_qml(root, "requestRegionPreview")
+    _settle(application, 12)
+    page_requested_native = len(controller.native_selector_requests) == 1
+    popup_absent = not _named(root, "subtitleRegionSelector")
+    controller.narratorRegionSelectionChanged.emit(
+        "probe-game",
+        {"x": 0.2, "y": 0.6, "width": 0.6, "height": 0.22},
+    )
+    _settle(application, 4)
+    page_region = tuple(
+        float(root.property(name))
+        for name in ("cropX", "cropY", "cropWidth", "cropHeight")
+    )
+    root.setProperty(
+        "sessionData",
+        {
+            "status": "listening",
+            "ocrDecisionHistory": [
+                {
+                    "ageSeconds": 0.2,
+                    "confidence": 0.94,
+                    "candidateObservationCount": 2,
+                    "candidateRequiredObservations": 2,
+                    "decision": "accepted_tts_submitted",
+                    "rawText": "Batman wraca. PY I",
+                    "filteredText": "Batman wraca.",
+                    "normalizedText": "Batman wraca.",
+                    "rejectionReason": "",
+                    "candidateMatchKind": "normalized_exact",
+                    "candidateReplaced": False,
+                    "ttsSubmitted": True,
+                    "roiWidth": 1114,
+                    "roiHeight": 270,
+                    "backend": "persistent",
+                    "recognitionMs": 24.0,
+                }
+            ],
+        },
+    )
+    root.setProperty("recentOcrDecisionsExpanded", True)
+    _settle(application, 6)
+    history_lists = _named(root, "recentOcrDecisionList")
+    history_texts = [
+        str(item.property("text"))
+        for item in _descendants(root)
+        if item.property("text") is not None
+    ]
+    ocr_history_rendered = bool(history_lists) and any(
+        "accepted_tts_submitted" in text for text in history_texts
+    )
+    view.close()
+
+    return {
+        "opened": True,
+        "outsideIgnored": outside_ignored,
+        "draftVisible": draft_visible,
+        "draftVisibleDuringDrag": during_creation[2] > 0 and during_creation[3] > 0,
+        "releaseFinalized": release_finalized,
+        "created": created,
+        "moved": moved,
+        "resized": resized,
+        "resetInvalid": reset_invalid,
+        "recreated": recreated,
+        "saveSignals": len(submitted),
+        "savedRegion": submitted[0] if submitted else {},
+        "sourceDimensions": [width, height],
+        "selectedSourceDimensions": list(source_size),
+        "mainHidden": main_hidden,
+        "mainRestored": main_restored,
+        "coordinatorSubmissions": len(coordinator_submissions),
+        "cancelDidNotSubmit": cancel_did_not_submit,
+        "cancelRestoredMain": cancel_restored_main,
+        "pageRequestedNative": page_requested_native,
+        "pageRegion": page_region,
+        "ocrHistoryRendered": ocr_history_rendered,
+        "popupAbsent": popup_absent,
+        "applicationType": type(application).__name__,
+    }
+
+
 def probe_artwork_reuse(application: QGuiApplication) -> dict[str, Any]:
     lifecycle_message_start = len(MESSAGES)
     with tempfile.TemporaryDirectory(prefix="game-optimization-artwork-reuse-") as raw_dir:
@@ -2147,11 +2577,14 @@ def probe_breeze(application: QGuiApplication) -> dict[str, Any]:
         {"id": "steam-test", "name": "Test Game", "optimizationProfile": "Balanced"},
     )
     _settle(application, 20)
-    preview = _item(root, "launchPreviewText")
+    # Breeze loads Kirigami primitives, so this probe must not enumerate the
+    # QML tree from Python.  See _qt_side_item for the shiboken name collision.
+    preview = _qt_side_item(root, "launchPreviewText")
     if not bool(preview.property("readOnly")):
         raise AssertionError("Launch preview is not read-only")
+    preview_text = str(preview.property("text"))
     view.close()
-    return {"preview": str(preview.property("text"))}
+    return {"preview": preview_text}
 
 
 def probe_signal_shutdown(application: QGuiApplication) -> dict[str, Any]:
@@ -3614,6 +4047,7 @@ def main() -> int:
             "artwork_refresh",
             "incremental_games",
             "manual_game",
+            "narrator_region",
         ),
     )
     parser.add_argument("--width", type=int, default=1280)
@@ -3627,7 +4061,7 @@ def main() -> int:
     args = parser.parse_args()
 
     qInstallMessageHandler(_message_handler)
-    application = QGuiApplication([sys.argv[0]])
+    application = QApplication([sys.argv[0]])
     if args.mode == "storage":
         result = probe_storage(application)
     elif args.mode == "cards":
@@ -3656,6 +4090,8 @@ def main() -> int:
         result = probe_incremental_games_model(application)
     elif args.mode == "manual_game":
         result = probe_manual_game_editor(application)
+    elif args.mode == "narrator_region":
+        result = probe_native_narrator_region_selector(application)
     else:
         result = probe_updates(application, args.width, args.height, args.scenario)
 

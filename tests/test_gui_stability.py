@@ -592,6 +592,63 @@ def test_incremental_games_model_keeps_existing_delegates_and_images(
     assert result["modelResetSignals"] == 0
 
 
+@pytest.mark.parametrize("scale", ["1.0", "1.5"])
+def test_narrator_region_selector_drag_move_resize_cancel_and_hidpi(
+    tmp_path: Path,
+    scale: str,
+) -> None:
+    payload = _run_probe(tmp_path, "narrator_region", scale=scale)
+    result = payload["result"]
+
+    assert result["opened"] is True
+    assert result["outsideIgnored"] is True
+    assert result["draftVisible"] is True
+    assert result["draftVisibleDuringDrag"] is True
+    assert result["releaseFinalized"] is True
+    assert result["created"] == pytest.approx((0.15, 0.20, 0.60, 0.15), abs=0.004)
+    assert result["moved"] == pytest.approx((0.25, 0.30, 0.60, 0.15), abs=0.004)
+    assert result["resized"] == pytest.approx((0.25, 0.30, 0.70, 0.25), abs=0.004)
+    assert result["resetInvalid"] is True
+    assert result["recreated"] == pytest.approx((0.20, 0.60, 0.60, 0.22), abs=0.003)
+    assert result["saveSignals"] == 1
+    assert result["savedRegion"] == pytest.approx(
+        {"x": 0.20, "y": 0.60, "width": 0.60, "height": 0.22},
+        abs=0.003,
+    )
+    assert result["sourceDimensions"] == [1600, 900]
+    assert result["selectedSourceDimensions"] == pytest.approx(
+        [960, 198], abs=2
+    )
+    assert result["mainHidden"] is True
+    assert result["mainRestored"] is True
+    assert result["coordinatorSubmissions"] == 1
+    assert result["cancelDidNotSubmit"] is True
+    assert result["cancelRestoredMain"] is True
+    assert result["pageRequestedNative"] is True
+    assert result["pageRegion"] == pytest.approx((0.2, 0.6, 0.6, 0.22))
+    assert result["ocrHistoryRendered"] is True
+    assert result["popupAbsent"] is True
+    assert result["applicationType"] == "QApplication"
+
+
+def test_narrator_page_exposes_bounded_ocr_decision_diagnostics() -> None:
+    source = (ROOT / "src/game_optimization_linux/qml/pages/NarratorPage.qml").read_text(
+        encoding="utf-8"
+    )
+
+    assert 'qsTr("Recent OCR decisions (%1)")' in source
+    assert '["ocrDecisionHistory"]' in source
+    assert "candidateObservationCount" in source
+    assert "candidateMatchKind" in source
+    assert "ttsSubmitted" in source
+    assert "minimumTokenConfidence" in source
+    assert "cleanShortPhraseEvidence" in source
+    assert "visualChangeDecision" in source
+    assert "filterSummary" in source
+    assert 'qsTr("Raw: %1")' in source
+    assert 'qsTr("Filtered: %1 · normalized: %2")' in source
+
+
 def signal_number(name: str) -> int:
     import signal
 
