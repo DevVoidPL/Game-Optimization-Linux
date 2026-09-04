@@ -53,6 +53,9 @@ modules:
     buildsystem: cmake-ninja
     builddir: true
     config-opts:
+      # The narrator's isolated persistent OCR worker uses the Tesseract C API.
+      # Keep the shared library as well as the CLI fallback binary.
+      - -DBUILD_SHARED_LIBS=ON
       - -DBUILD_TRAINING_TOOLS=OFF
       - -DBUILD_TESTS=OFF
       - -DDISABLE_ARCHIVE=ON

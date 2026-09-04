@@ -39,6 +39,7 @@ class QtNarratorAudioOutput(QObject):
         self._bytes: QByteArray | None = None
         self._current: _Playback | None = None
         self._pending: _Playback | None = None
+        self._superseded_count = 0
         self._playRequested.connect(
             self._queue_playback, Qt.ConnectionType.QueuedConnection
         )
@@ -47,6 +48,12 @@ class QtNarratorAudioOutput(QObject):
     @property
     def available(self) -> bool:
         return True
+
+    @property
+    def superseded_count(self) -> int:
+        """Number of synthesized, not-yet-playing lines replaced by newer work."""
+
+        return self._superseded_count
 
     def play(
         self,
@@ -78,6 +85,8 @@ class QtNarratorAudioOutput(QObject):
         if not isinstance(playback, _Playback):
             return
         if self._current is not None:
+            if self._pending is not None:
+                self._superseded_count += 1
             self._pending = playback
             return
         self._start(playback)

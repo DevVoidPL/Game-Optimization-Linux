@@ -9,6 +9,7 @@ from collections.abc import Callable
 import json
 from pathlib import Path
 import sys
+import time
 from typing import Any, TextIO
 
 
@@ -30,6 +31,7 @@ def _synthesize(voice: object, text: str, speech_rate: float) -> dict[str, Any]:
     sample_rate = 0
     channels = 0
     sample_width = 0
+    synthesis_started = time.monotonic()
     for chunk in voice.synthesize(text, syn_config=config):  # type: ignore[attr-defined]
         chunk_rate = int(chunk.sample_rate)
         chunk_channels = int(chunk.sample_channels)
@@ -44,15 +46,25 @@ def _synthesize(voice: object, text: str, speech_rate: float) -> dict[str, Any]:
         channels = chunk_channels
         sample_width = chunk_width
         samples.extend(chunk.audio_int16_bytes)
+    synthesis_ms = max(
+        0.0, (time.monotonic() - synthesis_started) * 1000.0
+    )
     if not samples or sample_rate <= 0:
         raise RuntimeError("Piper produced no speech audio")
     if channels != 1 or sample_width != 2:
         raise RuntimeError("Piper produced an unsupported PCM format")
+    serialization_started = time.monotonic()
+    samples_base64 = base64.b64encode(samples).decode("ascii")
+    serialization_ms = max(
+        0.0, (time.monotonic() - serialization_started) * 1000.0
+    )
     return {
-        "samples_base64": base64.b64encode(samples).decode("ascii"),
+        "samples_base64": samples_base64,
         "sample_rate": sample_rate,
         "channels": channels,
         "sample_format": "s16le",
+        "synthesis_ms": synthesis_ms,
+        "serialization_ms": serialization_ms,
     }
 
 
@@ -64,7 +76,21 @@ def serve(
     *,
     voice_loader: Callable[[Path, Path], object] = _load_voice,
 ) -> int:
+    initialization_started = time.monotonic()
     voice = voice_loader(model_path, config_path)
+    output_stream.write(
+        json.dumps(
+            {
+                "status": "ready",
+                "initialization_ms": max(
+                    0.0,
+                    (time.monotonic() - initialization_started) * 1000.0,
+                ),
+            }
+        )
+        + "\n"
+    )
+    output_stream.flush()
     for raw_line in input_stream:
         request: object = None
         try:

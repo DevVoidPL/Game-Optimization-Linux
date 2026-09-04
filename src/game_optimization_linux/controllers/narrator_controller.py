@@ -10,7 +10,17 @@ import time
 from typing import TYPE_CHECKING, Any, Mapping
 
 from game_optimization_linux.models import Game
-from game_optimization_linux.models.narrator import NarratorGameSettings
+from game_optimization_linux.models.narrator import (
+    CaptureFrame,
+    CaptureState,
+    NarratorGameSettings,
+    NarratorSubtitleLanguageMode,
+)
+from game_optimization_linux.services.narrator_region import (
+    EncodedRegionPreview,
+    encode_region_preview,
+    normalized_region_from_preview,
+)
 
 if TYPE_CHECKING:
     from .app_controller import AppController
@@ -26,14 +36,21 @@ class NarratorController:
             max_workers=1, thread_name_prefix="narrator-components"
         )
         self._component_jobs: dict[str, tuple[str, Future[object]]] = {}
+        self._preview_executor = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="narrator-region-preview"
+        )
+        self._preview_generations: dict[str, int] = {}
+        self._preview_jobs: set[Future[object]] = set()
 
     def components(self) -> list[dict[str, Any]]:
         manager = self._app._narrator_component_manager
         descriptions = {
             "capture.portal-pipewire": "capture_runtime",
             "ocr.english-local": "ocr_model_required",
+            "ocr.polish-local": "polish_ocr_model_required",
             "translation.opus-en-pl": "translation_model_required",
             "tts.polish-voice": "polish_voice_required",
+            "tts.polish-bass": "polish_voice_required",
             "audio.qt-pcm": "audio_runtime",
         }
         result: list[dict[str, Any]] = []
@@ -80,6 +97,7 @@ class NarratorController:
                 "enabled": "enabled",
                 "sourceMode": "source_mode",
                 "captureSource": "capture_source",
+                "subtitleLanguageMode": "subtitle_language_mode",
                 "subtitleAdapterId": "subtitle_adapter_id",
                 "ocrProviderId": "ocr_provider_id",
                 "translationProviderId": "translation_provider_id",
@@ -105,6 +123,11 @@ class NarratorController:
                 current, expected_game_key=game_key
             )
             self._app._narrator_settings_repository.save(settings)
+            select_voice = getattr(
+                self._app._narrator_pipeline.tts, "select_voice", None
+            )
+            if callable(select_voice):
+                select_voice(settings.voice_id)
         except Exception as error:
             logger.warning("Could not save narrator settings for %s: %s", game.id, error)
             self._app._emit_toast("Narrator settings could not be saved", "error")
@@ -135,21 +158,40 @@ class NarratorController:
             }
         else:
             snapshot_values = snapshot.to_dict()
+        try:
+            settings = self._app._narrator_settings_repository.load(game_key)
+        except Exception:
+            settings = None
+        polish_mode = bool(
+            settings is not None
+            and settings.subtitle_language_mode
+            is NarratorSubtitleLanguageMode.POLISH
+        )
         if snapshot_values.get("status") in {"idle", "stopped"}:
             snapshot_values["captureState"] = (
                 "stopped"
                 if self._app._narrator_pipeline.capture.capabilities().available
                 else "unavailable"
             )
+            language_available = getattr(
+                self._app._narrator_pipeline.ocr, "language_available", None
+            )
+            ocr_available = bool(
+                language_available("pl" if polish_mode else "en")
+                if callable(language_available)
+                else self._app._narrator_pipeline.ocr.available
+            )
             snapshot_values["ocrStatus"] = (
-                "ready"
-                if self._app._narrator_pipeline.ocr.available
-                else "component_missing"
+                "ready" if ocr_available else "component_missing"
             )
             snapshot_values["translationStatus"] = (
-                "ready"
-                if self._app._narrator_pipeline.translator.available
-                else "component_missing"
+                "bypassed"
+                if polish_mode
+                else (
+                    "ready"
+                    if self._app._narrator_pipeline.translator.available
+                    else "component_missing"
+                )
             )
             snapshot_values["ttsStatus"] = (
                 "ready"
@@ -161,7 +203,7 @@ class NarratorController:
                 if self._app._narrator_pipeline.audio.available
                 else "unavailable"
             )
-        missing = list(self._missing_requirements())
+        missing = list(self._missing_requirements(settings))
         active = self._app._narrator_pipeline.active
         activity = self._app._narrator_pipeline.activity.is_active(game_key)
         can_start = not active and not missing and activity is True
@@ -179,6 +221,11 @@ class NarratorController:
                 "missingRequirements": missing,
                 "gameId": game.id,
                 "gameKey": game_key,
+                "subtitleRegion": (
+                    settings.subtitle_region.to_dict()
+                    if settings is not None
+                    else None
+                ),
                 "lastDetectedAgeSeconds": (
                     max(
                         0.0,
@@ -199,12 +246,12 @@ class NarratorController:
             return False
         game_key = self._game_key(game)
         try:
-            missing = self._missing_requirements()
+            settings = self._app._narrator_settings_repository.load(game_key)
+            missing = self._missing_requirements(settings)
             if missing:
                 raise RuntimeError(
                     "Narrator components are unavailable: " + ", ".join(missing)
                 )
-            settings = self._app._narrator_settings_repository.load(game_key)
             self._app._narrator_pipeline.start(settings)
         except Exception as error:
             logger.info("Narrator start rejected for %s: %s", game.id, error)
@@ -214,15 +261,64 @@ class NarratorController:
         self._app.narratorChanged.emit(game.id)
         return True
 
-    def _missing_requirements(self) -> tuple[str, ...]:
-        required = {"capture", "ocr", "translation", "tts", "audio"}
-        available = {
-            component.kind.value
-            for component in self._app._narrator_component_manager.list_components()
-            if component.state.value == "available"
+    def _missing_requirements(
+        self, settings: NarratorGameSettings | None = None
+    ) -> tuple[str, ...]:
+        polish_mode = bool(
+            settings is not None
+            and settings.subtitle_language_mode
+            is NarratorSubtitleLanguageMode.POLISH
+        )
+        selected_voice = (
+            settings.voice_id
+            if settings is not None and settings.voice_id
+            else str(
+                getattr(
+                    self._app._narrator_pipeline.tts,
+                    "default_voice_id",
+                    "",
+                )
+            )
+        )
+        voice_components = {
+            str(getattr(voice, "voice_id", "")): str(
+                getattr(voice, "component_id", "")
+            )
+            for voice in tuple(
+                getattr(self._app._narrator_pipeline.tts, "voices", ())
+            )
         }
-        missing = required - available
-        missing.update(self._app._narrator_pipeline.missing_requirements())
+        required_components = {
+            "capture": "capture.portal-pipewire",
+            "ocr": "ocr.polish-local" if polish_mode else "ocr.english-local",
+            "tts": voice_components.get(selected_voice, "tts.polish-voice"),
+            "audio": "audio.qt-pcm",
+        }
+        if not polish_mode:
+            required_components["translation"] = "translation.opus-en-pl"
+        component_states = {
+            component.component_id: component.state.value
+            for component in self._app._narrator_component_manager.list_components()
+        }
+        missing = {
+            kind
+            for kind, component_id in required_components.items()
+            if component_states.get(component_id) != "available"
+        }
+        missing.update(
+            self._app._narrator_pipeline.missing_requirements(settings)
+        )
+        if settings is not None:
+            available_voices = tuple(
+                str(value)
+                for value in getattr(
+                    self._app._narrator_pipeline.tts,
+                    "available_voice_ids",
+                    (),
+                )
+            )
+            if selected_voice and selected_voice not in available_voices:
+                missing.add("tts")
         return tuple(
             item
             for item in ("capture", "ocr", "translation", "tts", "audio")
@@ -234,6 +330,135 @@ class NarratorController:
         game = self._game_for_key(snapshot.game_key)
         self._app.narratorChanged.emit(game.id if game is not None else "")
         return True
+
+    def request_region_preview(self, game_id: str) -> bool:
+        game = self._app._resolve_game(game_id, show_error=True)
+        if game is None:
+            return False
+        game_key = self._game_key(game)
+        try:
+            settings = self._app._narrator_settings_repository.load(game_key)
+        except Exception as error:
+            self._emit_region_preview(
+                game.id,
+                {"success": False, "state": "error", "error": str(error)},
+            )
+            return False
+        generation = self._preview_generations.get(game.id, 0) + 1
+        self._preview_generations[game.id] = generation
+        self._emit_region_preview(
+            game.id,
+            {"success": True, "state": "requesting", "message": ""},
+        )
+
+        def frame_received(frame: CaptureFrame) -> None:
+            self._app.narratorRegionPreviewStopRequested.emit(game.id, generation)
+            future = self._preview_executor.submit(encode_region_preview, frame)
+            self._preview_jobs.add(future)
+
+            def encoded(completed: Future[EncodedRegionPreview]) -> None:
+                self._preview_jobs.discard(completed)
+                if self._preview_generations.get(game.id) != generation:
+                    return
+                try:
+                    preview = completed.result()
+                    values = preview.to_dict()
+                except Exception as error:
+                    logger.exception("Could not prepare Narrator region preview")
+                    values = {
+                        "success": False,
+                        "state": "error",
+                        "error": str(error) or error.__class__.__name__,
+                    }
+                self._emit_region_preview(game.id, values)
+
+            future.add_done_callback(encoded)
+
+        def state_changed(state: CaptureState, message: str) -> None:
+            if self._preview_generations.get(game.id) != generation:
+                return
+            terminal = state in {
+                CaptureState.ERROR,
+                CaptureState.CANCELLED,
+                CaptureState.PERMISSION_DENIED,
+                CaptureState.SOURCE_LOST,
+                CaptureState.UNAVAILABLE,
+            }
+            values: dict[str, object] = {
+                "success": not terminal,
+                "state": state.value,
+                "message": str(message),
+            }
+            if terminal:
+                values["error"] = str(message) or "The game frame could not be captured"
+                self._app.narratorRegionPreviewStopRequested.emit(
+                    game.id, generation
+                )
+            self._emit_region_preview(game.id, values)
+
+        try:
+            self._app._narrator_pipeline.request_preview_frame(
+                settings,
+                frame_callback=frame_received,
+                state_callback=state_changed,
+            )
+        except Exception as error:
+            logger.info("Narrator region preview rejected for %s: %s", game.id, error)
+            cancel = getattr(
+                self._app._narrator_pipeline, "cancel_preview_frame", None
+            )
+            if callable(cancel):
+                cancel()
+            self._emit_region_preview(
+                game.id,
+                {
+                    "success": False,
+                    "state": "error",
+                    "error": str(error) or error.__class__.__name__,
+                },
+            )
+            return False
+        return True
+
+    def cancel_region_preview(self, game_id: str) -> bool:
+        normalized = str(game_id)
+        self._preview_generations[normalized] = (
+            self._preview_generations.get(normalized, 0) + 1
+        )
+        cancel = getattr(
+            self._app._narrator_pipeline, "cancel_preview_frame", None
+        )
+        if callable(cancel):
+            cancel()
+        return True
+
+    def finish_region_preview_capture(self, game_id: str, generation: int) -> None:
+        if self._preview_generations.get(str(game_id)) == int(generation):
+            cancel = getattr(
+                self._app._narrator_pipeline, "cancel_preview_frame", None
+            )
+            if callable(cancel):
+                cancel()
+
+    @staticmethod
+    def map_region_preview(values: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            region = normalized_region_from_preview(
+                source_width=int(values.get("sourceWidth", 0)),
+                source_height=int(values.get("sourceHeight", 0)),
+                viewport_width=float(values.get("viewportWidth", 0.0)),
+                viewport_height=float(values.get("viewportHeight", 0.0)),
+                selection_x=float(values.get("x", 0.0)),
+                selection_y=float(values.get("y", 0.0)),
+                selection_width=float(values.get("width", 0.0)),
+                selection_height=float(values.get("height", 0.0)),
+            )
+        except (TypeError, ValueError) as error:
+            return {"success": False, "error": str(error)}
+        return {"success": True, "region": region.to_dict()}
+
+    def _emit_region_preview(self, game_id: str, values: Mapping[str, object]) -> None:
+        self._app.narratorRegionPreviewChanged.emit(game_id, dict(values))
 
     def install_component(self, component_id: str) -> bool:
         return self._component_action("install", component_id)
@@ -309,8 +534,10 @@ class NarratorController:
     def _refresh_component_runtime(self, component_id: str) -> None:
         providers = {
             "ocr.english-local": self._app._narrator_pipeline.ocr,
+            "ocr.polish-local": self._app._narrator_pipeline.ocr,
             "translation.opus-en-pl": self._app._narrator_pipeline.translator,
             "tts.polish-voice": self._app._narrator_pipeline.tts,
+            "tts.polish-bass": self._app._narrator_pipeline.tts,
             "audio.qt-pcm": self._app._narrator_pipeline.audio,
         }
         provider = providers.get(component_id)
@@ -318,6 +545,31 @@ class NarratorController:
             return
         message = getattr(provider, "status_message", "")
         available = bool(provider.available)
+        ocr_languages = {
+            "ocr.english-local": ("en", "English"),
+            "ocr.polish-local": ("pl", "Polish"),
+        }
+        ocr_language = ocr_languages.get(component_id)
+        if ocr_language and hasattr(provider, "language_available"):
+            language, language_name = ocr_language
+            available = bool(provider.language_available(language))
+            message = (
+                f"Tesseract {language_name} subtitle OCR is ready"
+                if available
+                else f"Install the verified {language_name} OCR model"
+            )
+        voice_ids = {
+            "tts.polish-voice": "pl_PL-gosia-medium",
+            "tts.polish-bass": "pl_PL-bass-high",
+        }
+        voice_id = voice_ids.get(component_id)
+        if voice_id and hasattr(provider, "voice_available"):
+            available = bool(provider.voice_available(voice_id))
+            message = (
+                f"Piper Polish voice {voice_id} is ready"
+                if available
+                else f"Install the verified Polish voice {voice_id}"
+            )
         manager = self._app._narrator_component_manager
         component = manager.status(component_id)
         if available and component.kind.value in {"ocr", "translation", "tts"}:
@@ -334,6 +586,18 @@ class NarratorController:
         )
 
     def shutdown(self) -> None:
+        try:
+            cancel = getattr(
+                self._app._narrator_pipeline, "cancel_preview_frame", None
+            )
+            if callable(cancel):
+                cancel()
+        except Exception:
+            logger.exception("Could not stop Narrator region preview capture")
+        for future in tuple(self._preview_jobs):
+            future.cancel()
+        self._preview_jobs.clear()
+        self._preview_executor.shutdown(wait=False, cancel_futures=True)
         for _action, future in self._component_jobs.values():
             future.cancel()
         self._component_jobs.clear()
@@ -369,18 +633,38 @@ class NarratorController:
         default_profile = str(getattr(translator, "default_profile_id", ""))
         if not default_profile and profile_ids:
             default_profile = str(profile_ids[0])
-        voices: list[dict[str, str]] = []
-        for voice in tuple(getattr(tts, "voices", ())) if tts.available else ():
+        voices: list[dict[str, Any]] = []
+        for voice in tuple(getattr(tts, "voices", ())):
             if isinstance(voice, Mapping):
                 voice_id = str(voice.get("id", ""))
                 name = str(voice.get("name", voice_id))
+                component_id = str(voice.get("component_id", ""))
             else:
                 voice_id = str(
                     getattr(voice, "voice_id", getattr(voice, "id", ""))
                 )
                 name = str(getattr(voice, "name", voice_id))
+                component_id = str(getattr(voice, "component_id", ""))
             if voice_id:
-                voices.append({"id": voice_id, "name": name or voice_id})
+                installed = bool(
+                    getattr(tts, "voice_installed", lambda _voice_id: False)(
+                        voice_id
+                    )
+                )
+                available = bool(
+                    getattr(tts, "voice_available", lambda _voice_id: False)(
+                        voice_id
+                    )
+                )
+                voices.append(
+                    {
+                        "id": voice_id,
+                        "name": name or voice_id,
+                        "componentId": component_id,
+                        "installed": installed,
+                        "available": available,
+                    }
+                )
         default_voice = str(getattr(tts, "default_voice_id", ""))
         if not default_voice and voices:
             default_voice = voices[0]["id"]
@@ -392,6 +676,7 @@ class NarratorController:
             "enabled": settings.enabled,
             "sourceMode": settings.source_mode.value,
             "captureSource": settings.capture_source.value,
+            "subtitleLanguageMode": settings.subtitle_language_mode.value,
             "subtitleAdapterId": settings.subtitle_adapter_id,
             "ocrProviderId": (
                 settings.ocr_provider_id or self._app._narrator_pipeline.ocr.provider_id

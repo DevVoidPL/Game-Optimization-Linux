@@ -26,6 +26,11 @@ PIPER_VOICE_ID = "pl_PL-gosia-medium"
 PIPER_VOICE_VERSION = "058271fb41b630e96989367e15b4514992a25b42"
 PIPER_MODEL_RELATIVE_PATH = Path("voices") / "pl_PL-gosia-medium.onnx"
 PIPER_CONFIG_RELATIVE_PATH = Path("voices") / "pl_PL-gosia-medium.onnx.json"
+PIPER_BASS_COMPONENT_ID = "tts.polish-bass"
+PIPER_BASS_VOICE_ID = "pl_PL-bass-high"
+PIPER_BASS_VOICE_VERSION = "5b44ec7bab7c5822cfec48fbd5aa99db71a823d6"
+PIPER_BASS_MODEL_RELATIVE_PATH = Path("voices") / "pl_PL-bass-high.onnx"
+PIPER_BASS_CONFIG_RELATIVE_PATH = Path("voices") / "pl_PL-bass-high.onnx.json"
 _WORKER_BOOTSTRAP = (
     "import runpy, sys; "
     "path = sys.argv.pop(1); "
@@ -40,6 +45,9 @@ class PolishVoice:
     name: str
     language: str
     version: str
+    component_id: str
+    model_relative_path: Path
+    config_relative_path: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -48,6 +56,12 @@ class PiperSynthesis:
     sample_rate: int
     channels: int
     sample_format: str = "s16le"
+    worker_synthesis_ms: float | None = None
+    serialization_ms: float | None = None
+    worker_roundtrip_ms: float | None = None
+    client_decode_ms: float | None = None
+    worker_startup_ms: float | None = None
+    worker_reused: bool = True
 
 
 POLISH_VOICES = (
@@ -56,11 +70,25 @@ POLISH_VOICES = (
         name="Gosia",
         language="pl",
         version=PIPER_VOICE_VERSION,
+        component_id=PIPER_COMPONENT_ID,
+        model_relative_path=PIPER_MODEL_RELATIVE_PATH,
+        config_relative_path=PIPER_CONFIG_RELATIVE_PATH,
+    ),
+    PolishVoice(
+        voice_id=PIPER_BASS_VOICE_ID,
+        name="Bass",
+        language="pl",
+        version=PIPER_BASS_VOICE_VERSION,
+        component_id=PIPER_BASS_COMPONENT_ID,
+        model_relative_path=PIPER_BASS_MODEL_RELATIVE_PATH,
+        config_relative_path=PIPER_BASS_CONFIG_RELATIVE_PATH,
     ),
 )
 
 
 class PiperWorker(Protocol):
+    def start(self) -> None: ...
+
     def synthesize(self, text: str, *, speech_rate: float) -> PiperSynthesis: ...
 
     def cancel(self) -> None: ...
@@ -100,9 +128,17 @@ class PiperWorkerClient:
         self._process: subprocess.Popen[str] | None = None
         self._request_id = 0
         self._stderr_tail: deque[str] = deque(maxlen=40)
+        self.initialization_ms: float | None = None
+        self.startup_ms: float | None = None
+
+    def start(self) -> None:
+        with self._io_lock:
+            self._ensure_process()
 
     def synthesize(self, text: str, *, speech_rate: float) -> PiperSynthesis:
         with self._io_lock:
+            existing = self._process
+            reused = existing is not None and existing.poll() is None
             process = self._ensure_process()
             self._request_id += 1
             request_id = self._request_id
@@ -112,6 +148,7 @@ class PiperWorkerClient:
                 "text": text,
                 "speech_rate": speech_rate,
             }
+            roundtrip_started = time.monotonic()
             try:
                 assert process.stdin is not None
                 process.stdin.write(json.dumps(request, ensure_ascii=False) + "\n")
@@ -129,8 +166,12 @@ class PiperWorkerClient:
             try:
                 import base64
 
+                decode_started = time.monotonic()
                 samples = base64.b64decode(
                     str(response["samples_base64"]), validate=True
+                )
+                decode_ms = max(
+                    0.0, (time.monotonic() - decode_started) * 1000.0
                 )
                 sample_rate = int(response["sample_rate"])
                 channels = int(response["channels"])
@@ -138,7 +179,24 @@ class PiperWorkerClient:
             except (KeyError, TypeError, ValueError) as error:
                 self._discard(process)
                 raise RuntimeError("The Piper worker returned invalid audio data") from error
-            return PiperSynthesis(samples, sample_rate, channels, sample_format)
+            return PiperSynthesis(
+                samples,
+                sample_rate,
+                channels,
+                sample_format,
+                worker_synthesis_ms=self._response_float(
+                    response, "synthesis_ms"
+                ),
+                serialization_ms=self._response_float(
+                    response, "serialization_ms"
+                ),
+                worker_roundtrip_ms=max(
+                    0.0, (time.monotonic() - roundtrip_started) * 1000.0
+                ),
+                client_decode_ms=decode_ms,
+                worker_startup_ms=self.startup_ms if not reused else None,
+                worker_reused=reused,
+            )
 
     def cancel(self) -> None:
         with self._state_lock:
@@ -176,6 +234,7 @@ class PiperWorkerClient:
                 "--config",
                 str(self._config_path),
             ]
+            startup_started = time.monotonic()
             process = self._popen(
                 argv,
                 stdin=subprocess.PIPE,
@@ -197,7 +256,29 @@ class PiperWorkerClient:
                 name="narrator-piper-stderr",
                 daemon=True,
             ).start()
-            return process
+        response = self._read_response(process)
+        self.startup_ms = max(
+            0.0, (time.monotonic() - startup_started) * 1000.0
+        )
+        if response.get("status") != "ready":
+            message = str(
+                response.get("message", "The Piper voice could not be loaded")
+            ).strip()
+            self._discard(process)
+            raise RuntimeError(message or "The Piper voice could not be loaded")
+        self.initialization_ms = self._response_float(
+            response, "initialization_ms"
+        )
+        return process
+
+    @staticmethod
+    def _response_float(
+        response: dict[str, object], name: str
+    ) -> float | None:
+        try:
+            return max(0.0, float(response[name]))
+        except (KeyError, TypeError, ValueError):
+            return None
 
     def _read_response(self, process: subprocess.Popen[str]) -> dict[str, object]:
         assert process.stdout is not None
@@ -269,6 +350,22 @@ class PiperPolishTtsProvider:
         self._state_lock = RLock()
         self._inference_lock = Lock()
         self._worker: PiperWorker | None = None
+        self._worker_voice_id = ""
+
+    def prepare(self, voice_id: str) -> None:
+        """Load only the selected voice in the persistent worker."""
+        selected_voice = voice_id.strip() or PIPER_VOICE_ID
+        if not self._runtime_available() or not self.voice_installed(selected_voice):
+            return
+        with self._inference_lock:
+            worker = self._get_worker(selected_voice)
+            start = getattr(worker, "start", None)
+            if callable(start):
+                try:
+                    start()
+                except Exception:
+                    self._drop_worker(worker)
+                    raise
 
     @property
     def model_path(self) -> Path:
@@ -288,23 +385,50 @@ class PiperPolishTtsProvider:
 
     @property
     def available(self) -> bool:
-        return bool(
-            self._runtime_available()
-            and self.model_path.is_file()
-            and self.config_path.is_file()
-        )
+        return bool(self.available_voice_ids)
 
     @property
     def status_message(self) -> str:
         if not self._runtime_available():
             return "The Piper CPU runtime is unavailable"
-        if not self.model_path.is_file() or not self.config_path.is_file():
+        if not self.installed_voice_ids:
             return "Install the verified Polish Piper voice"
         return "Piper Polish speech synthesis is ready"
 
     @property
     def available_voice_ids(self) -> tuple[str, ...]:
-        return tuple(voice.voice_id for voice in self.voices)
+        if not self._runtime_available():
+            return ()
+        return self.installed_voice_ids
+
+    @property
+    def installed_voice_ids(self) -> tuple[str, ...]:
+        return tuple(
+            voice.voice_id
+            for voice in self.voices
+            if self.voice_installed(voice.voice_id)
+        )
+
+    def voice_installed(self, voice_id: str) -> bool:
+        voice = self._voice(voice_id)
+        model, config = self._voice_paths(voice)
+        return model.is_file() and config.is_file()
+
+    def voice_available(self, voice_id: str) -> bool:
+        return bool(self._runtime_available() and self.voice_installed(voice_id))
+
+    def select_voice(self, voice_id: str) -> None:
+        """Release a resident worker when the persisted voice selection changes."""
+
+        self._voice(voice_id)
+        with self._inference_lock:
+            with self._state_lock:
+                if self._worker is None or self._worker_voice_id == voice_id:
+                    return
+                worker = self._worker
+                self._worker = None
+                self._worker_voice_id = ""
+            worker.close()
 
     def synthesize(
         self,
@@ -320,7 +444,7 @@ class PiperPolishTtsProvider:
         if language.casefold() not in {"pl", "pl-pl"}:
             raise ValueError("The current Piper provider supports Polish only")
         selected_voice = voice_id.strip() or PIPER_VOICE_ID
-        if selected_voice not in self.available_voice_ids:
+        if selected_voice not in {voice.voice_id for voice in self.voices}:
             raise ValueError(f"Unsupported Polish voice: {selected_voice}")
         try:
             normalized_rate = float(speech_rate)
@@ -328,12 +452,20 @@ class PiperPolishTtsProvider:
             raise ValueError("Speech rate must be a number") from error
         if not isfinite(normalized_rate) or not 0.5 <= normalized_rate <= 2.0:
             raise ValueError("Speech rate must be between 0.5 and 2.0")
-        if not self.available:
-            raise RuntimeError(self.status_message)
+        if not self._runtime_available():
+            raise RuntimeError("The Piper CPU runtime is unavailable")
+        if not self.voice_installed(selected_voice):
+            raise RuntimeError(
+                f"The selected Polish voice is not installed: {selected_voice}"
+            )
 
         started = self._clock()
+        wait_started = started
         with self._inference_lock:
-            worker = self._get_worker()
+            queue_wait_ms = max(
+                0.0, (self._clock() - wait_started) * 1000.0
+            )
+            worker = self._get_worker(selected_voice)
             try:
                 result = worker.synthesize(phrase, speech_rate=normalized_rate)
             except Exception:
@@ -354,12 +486,22 @@ class PiperPolishTtsProvider:
             sample_format=result.sample_format,
             provider_id=self.provider_id,
             elapsed_ms=max(0.0, (self._clock() - started) * 1000.0),
+            queue_wait_ms=queue_wait_ms,
+            worker_roundtrip_ms=result.worker_roundtrip_ms,
+            inference_ms=result.worker_synthesis_ms,
+            serialization_ms=result.serialization_ms,
+            worker_startup_ms=result.worker_startup_ms,
+            worker_reused=result.worker_reused,
+            audio_duration_ms=(
+                len(result.samples) / 2 / result.sample_rate * 1000.0
+            ),
         )
 
     def cancel(self) -> None:
         with self._state_lock:
             worker = self._worker
             self._worker = None
+            self._worker_voice_id = ""
         if worker is not None:
             worker.cancel()
 
@@ -367,27 +509,52 @@ class PiperPolishTtsProvider:
         with self._state_lock:
             worker = self._worker
             self._worker = None
+            self._worker_voice_id = ""
         if worker is not None:
             worker.close()
 
-    def _get_worker(self) -> PiperWorker:
+    def _get_worker(self, voice_id: str) -> PiperWorker:
         with self._state_lock:
-            if self._worker is None:
-                self._worker = self._worker_factory(
-                    self.model_path,
-                    self.config_path,
-                )
+            if self._worker is not None and self._worker_voice_id == voice_id:
+                return self._worker
+            if self._worker is not None:
+                self._worker.close()
+                self._worker = None
+                self._worker_voice_id = ""
+            voice = self._voice(voice_id)
+            model, config = self._voice_paths(voice)
+            self._worker = self._worker_factory(model, config)
+            self._worker_voice_id = voice_id
             return self._worker
 
     def _drop_worker(self, worker: PiperWorker) -> None:
         with self._state_lock:
             if self._worker is worker:
                 self._worker = None
+                self._worker_voice_id = ""
         worker.close()
+
+    def _voice(self, voice_id: str) -> PolishVoice:
+        for voice in self.voices:
+            if voice.voice_id == voice_id:
+                return voice
+        raise ValueError(f"Unsupported Polish voice: {voice_id}")
+
+    def _voice_paths(self, voice: PolishVoice) -> tuple[Path, Path]:
+        component = self._component_root / voice.component_id
+        return (
+            component / voice.model_relative_path,
+            component / voice.config_relative_path,
+        )
 
 
 __all__ = [
     "PIPER_COMPONENT_ID",
+    "PIPER_BASS_COMPONENT_ID",
+    "PIPER_BASS_CONFIG_RELATIVE_PATH",
+    "PIPER_BASS_MODEL_RELATIVE_PATH",
+    "PIPER_BASS_VOICE_ID",
+    "PIPER_BASS_VOICE_VERSION",
     "PIPER_CONFIG_RELATIVE_PATH",
     "PIPER_MODEL_RELATIVE_PATH",
     "PIPER_PROVIDER_ID",

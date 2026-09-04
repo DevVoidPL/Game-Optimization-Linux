@@ -11,11 +11,13 @@ flatpak run --filesystem="$PWD" --command=flatpak-builder org.flatpak.Builder \
 Export the bundle and install it with the host Flatpak executable:
 
 ```bash
+APP_VERSION="$(sed -nE 's/^APP_VERSION[[:space:]]*=[[:space:]]*"([^"[:space:]]+)"[[:space:]]*$/\1/p' src/game_optimization_linux/config.py)"
+BUNDLE="dist/Game-Optimization-Linux-${APP_VERSION}-x86_64.flatpak"
 flatpak build-bundle .flatpak-build-repo \
-  dist/Game-Optimization-Linux-1.6.0-alpha-x86_64.flatpak \
-  io.github.DevVoidPL.GameOptimizationLinux master
+  "$BUNDLE" \
+  io.github.DevVoidPL.GameOptimizationLinux stable
 flatpak install --user --reinstall \
-  dist/Game-Optimization-Linux-1.6.0-alpha-x86_64.flatpak
+  "$BUNDLE"
 ```
 
 Do not pass `--install` to Flatpak Builder running inside its sandbox. That

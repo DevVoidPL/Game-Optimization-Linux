@@ -159,6 +159,25 @@ DEFAULT_NARRATOR_COMPONENTS = (
         message="Verified 3.9 MiB English tessdata_fast model",
     ),
     NarratorComponentDefinition(
+        component_id="ocr.polish-local",
+        kind=NarratorComponentKind.OCR,
+        name="Tesseract Polish subtitle OCR",
+        license_id="Apache-2.0",
+        runtime_license_id="Apache-2.0",
+        artifact_license_id="Apache-2.0",
+        version="tessdata_fast-8741641",
+        download_size_bytes=4_765_518,
+        source_url=(
+            "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/"
+            "87416418657359cb625c412a48b6e1d6d41c29bd/pol.traineddata"
+        ),
+        sha256="c4476cdbc0e33d898d32345122b7be1cbf85ace15f920f06c7714756e1ef79b2",
+        target_relative_path="tessdata/pol.traineddata",
+        attribution="Tesseract OCR and tessdata_fast, Apache License 2.0",
+        install_ready=True,
+        message="Verified 4.5 MiB Polish tessdata_fast model",
+    ),
+    NarratorComponentDefinition(
         component_id="translation.opus-en-pl",
         kind=NarratorComponentKind.TRANSLATION,
         name="Argos OPUS English to Polish",
@@ -217,6 +236,41 @@ DEFAULT_NARRATOR_COMPONENTS = (
                 sha256="956cd5b2a08dca5e780ad584a6d2e971ba3bd7fcd06297dfa6cd85c9fbcd3d42",
                 size_bytes=6_920,
                 target_relative_path="voices/pl_PL-gosia-medium.onnx.json",
+            ),
+        ),
+    ),
+    NarratorComponentDefinition(
+        component_id="tts.polish-bass",
+        kind=NarratorComponentKind.TTS,
+        name="Piper Polish voice - Bass",
+        license_id="MIT",
+        runtime_license_id="GPL-3.0-or-later",
+        artifact_license_id="Apache-2.0",
+        version="piper-voices-5b44ec7",
+        download_size_bytes=114_208_978,
+        attribution="pl_PL-bass-high from rhasspy/piper-voices",
+        install_ready=True,
+        message="Verified 108.9 MiB Polish male Piper voice for local CPU speech",
+        artifacts=(
+            NarratorComponentArtifact(
+                source_url=(
+                    "https://huggingface.co/rhasspy/piper-voices/resolve/"
+                    "5b44ec7bab7c5822cfec48fbd5aa99db71a823d6/pl/pl_PL/"
+                    "bass/high/pl_PL-bass-high.onnx"
+                ),
+                sha256="73b8408967c58118700f21eb2413cd8b666c7844c6136cf674bf5dd56bde72c2",
+                size_bytes=114_204_024,
+                target_relative_path="voices/pl_PL-bass-high.onnx",
+            ),
+            NarratorComponentArtifact(
+                source_url=(
+                    "https://huggingface.co/rhasspy/piper-voices/resolve/"
+                    "5b44ec7bab7c5822cfec48fbd5aa99db71a823d6/pl/pl_PL/"
+                    "bass/high/pl_PL-bass-high.onnx.json"
+                ),
+                sha256="7bb41aa14fee87a31cc32264119c09e3553335196d3db15b39b1c18790e13c59",
+                size_bytes=4_954,
+                target_relative_path="voices/pl_PL-bass-high.onnx.json",
             ),
         ),
     ),

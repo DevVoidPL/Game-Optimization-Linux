@@ -96,7 +96,23 @@ Item {
         return "not checked"
     }
 
+    function diagnosticValue(key) {
+        var source = runtimeDiagnostics || {}
+        var candidate = source[key]
+        if (candidate === undefined || candidate === null)
+            return ""
+        return String(candidate)
+    }
+
+    function gamingDiagnostic(key) {
+        var source = runtimeDiagnostics && runtimeDiagnostics.gaming
+                     ? runtimeDiagnostics.gaming : ({})
+        var candidate = source[key]
+        return candidate === undefined || candidate === null ? "" : String(candidate)
+    }
+
     readonly property var capabilityRows: buildCapabilities()
+    readonly property var runtimeDiagnostics: value(["runtimeDiagnostics"], ({})) || ({})
     readonly property var filesystems: value(["filesystems"], []) || []
     readonly property var compressionCapabilities: value(
                                                            ["compressionCapabilities",
@@ -157,6 +173,207 @@ Item {
                 StatusBadge {
                     text: page.value(["demo"], false) ? qsTr("Demo data") : qsTr("Detected")
                     status: page.value(["demo"], false) ? "warning" : "available"
+                }
+            }
+
+            SurfaceCard {
+                objectName: "runtimeDiagnosticsCard"
+                Layout.fillWidth: true
+                Layout.leftMargin: App.Theme.contentPadding
+                Layout.rightMargin: App.Theme.contentPadding
+                padding: 20
+                elevated: true
+
+                contentItem: ColumnLayout {
+                    spacing: 14
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 10
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Label {
+                                text: qsTr("About and diagnostics")
+                                color: App.Theme.text
+                                font.pixelSize: 18
+                                font.weight: Font.Bold
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: qsTr("A privacy-safe summary for support reports")
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        StatusBadge {
+                            text: page.runtimeDiagnostics.flatpak === true
+                                  ? qsTr("Flatpak") : qsTr("Native")
+                            status: "available"
+                            showDot: false
+                        }
+                    }
+
+                    GridLayout {
+                        Layout.fillWidth: true
+                        columns: page.width >= 960 ? 3 : 1
+                        rowSpacing: 14
+                        columnSpacing: 24
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignTop
+                            spacing: 4
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: "%1 %2".arg(page.diagnosticValue("appName"))
+                                      .arg(page.diagnosticValue("appVersion"))
+                                color: App.Theme.text
+                                font.pixelSize: App.Theme.fontBodyLarge
+                                font.weight: Font.Bold
+                                wrapMode: Text.WordWrap
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: page.diagnosticValue("appId")
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                                font.family: "monospace"
+                                wrapMode: Text.WrapAnywhere
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: page.diagnosticValue("appCommit").length > 0
+                                text: qsTr("App commit: %1").arg(page.diagnosticValue("appCommit"))
+                                color: App.Theme.textMuted
+                                font.pixelSize: App.Theme.fontCaption
+                                font.family: "monospace"
+                                elide: Text.ElideMiddle
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignTop
+                            spacing: 4
+
+                            Label {
+                                text: qsTr("System")
+                                color: App.Theme.textMuted
+                                font.pixelSize: App.Theme.fontCaption
+                                font.weight: Font.DemiBold
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: page.diagnosticValue("distribution").length > 0
+                                text: page.diagnosticValue("distribution")
+                                color: App.Theme.text
+                                wrapMode: Text.WordWrap
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: page.diagnosticValue("kernel").length > 0
+                                         || page.diagnosticValue("architecture").length > 0
+                                text: [page.diagnosticValue("kernel"),
+                                       page.diagnosticValue("architecture")]
+                                      .filter(function(value) { return value.length > 0 }).join(" · ")
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: page.diagnosticValue("desktop").length > 0
+                                         || page.diagnosticValue("session").length > 0
+                                text: [page.diagnosticValue("desktop"),
+                                       page.diagnosticValue("session")]
+                                      .filter(function(value) { return value.length > 0 }).join(" · ")
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: page.diagnosticValue("gpu").length > 0
+                                text: page.diagnosticValue("gpu")
+                                color: App.Theme.text
+                                wrapMode: Text.WordWrap
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: page.diagnosticValue("renderer").length > 0
+                                         || page.diagnosticValue("driver").length > 0
+                                text: [page.diagnosticValue("renderer"),
+                                       page.diagnosticValue("driver")]
+                                      .filter(function(value) { return value.length > 0 }).join(" · ")
+                                color: App.Theme.textMuted
+                                font.pixelSize: App.Theme.fontCaption
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            Layout.alignment: Qt.AlignTop
+                            spacing: 5
+
+                            Label {
+                                text: qsTr("Gaming environment")
+                                color: App.Theme.textMuted
+                                font.pixelSize: App.Theme.fontCaption
+                                font.weight: Font.DemiBold
+                            }
+
+                            Repeater {
+                                model: [
+                                    { "label": "Steam", "status": page.gamingDiagnostic("steam") },
+                                    { "label": "GameMode", "status": page.gamingDiagnostic("gameMode") },
+                                    { "label": "Gamescope", "status": page.gamingDiagnostic("gamescope") },
+                                    { "label": "MangoHud", "status": page.gamingDiagnostic("mangoHud") }
+                                ]
+
+                                delegate: RowLayout {
+                                    id: gamingDiagnosticRow
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    visible: String(gamingDiagnosticRow.modelData.status).length > 0
+                                    spacing: 8
+
+                                    Label {
+                                        Layout.fillWidth: true
+                                        text: gamingDiagnosticRow.modelData.label
+                                        color: App.Theme.text
+                                        font.pixelSize: App.Theme.fontBody
+                                    }
+                                    StatusBadge {
+                                        property string diagnosticStatus: String(
+                                                                              gamingDiagnosticRow.modelData.status)
+                                        text: diagnosticStatus === "available" ? qsTr("Available")
+                                              : diagnosticStatus === "detected" ? qsTr("Detected")
+                                              : qsTr("Not detected")
+                                        status: diagnosticStatus === "available"
+                                                || diagnosticStatus === "detected"
+                                                ? "available" : "missing"
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    AppButton {
+                        objectName: "copySystemInfoButton"
+                        Layout.alignment: Qt.AlignRight
+                        text: qsTr("Copy system info")
+                        kind: "secondary"
+                        compact: true
+                        onClicked: {
+                            if (page.controller && page.controller.copySystemInfo
+                                    && page.controller.copySystemInfo())
+                                page.toastRequested(qsTr("System information copied"), "success")
+                        }
+                    }
                 }
             }
 

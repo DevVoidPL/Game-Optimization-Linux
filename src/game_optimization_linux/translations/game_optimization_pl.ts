@@ -5865,6 +5865,164 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Enable the narrator and install all required components first</source>
         <translation type="vanished">Najpierw włącz lektora i zainstaluj wszystkie wymagane komponenty</translation>
     </message>
+    <message>
+        <location line="-721"/>
+        <source>Cancel capture</source>
+        <translation>Anuluj przechwytywanie</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Select subtitle area on game</source>
+        <translation>Wybierz obszar napisów na obrazie gry</translation>
+    </message>
+    <message>
+        <location line="+36"/>
+        <source>Waiting for the selected game frame...</source>
+        <translation>Oczekiwanie na klatkę wybranej gry...</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Capture a game frame to preview the OCR region</source>
+        <translation>Przechwyć klatkę gry, aby wyświetlić podgląd obszaru OCR</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Source: %1x%2    OCR region: %3x%4</source>
+        <translation>Źródło: %1x%2    Obszar OCR: %3x%4</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Source and OCR dimensions will appear after capturing a frame</source>
+        <translation>Wymiary źródła i obszaru OCR pojawią się po przechwyceniu klatki</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Hide fine tuning</source>
+        <translation>Ukryj precyzyjne ustawienia</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Advanced fine tuning</source>
+        <translation>Zaawansowane ustawienia precyzyjne</translation>
+    </message>
+    <message>
+        <location line="-578"/>
+        <source>Disabled</source>
+        <translation>Wyłączone</translation>
+    </message>
+    <message>
+        <location line="+1046"/>
+        <source>OCR diagnostics</source>
+        <translation>Diagnostyka OCR</translation>
+    </message>
+    <message>
+        <location line="-34"/>
+        <source>OCR image + PNG: %1</source>
+        <translation>Obraz OCR + PNG: %1</translation>
+    </message>
+    <message>
+        <location line="+41"/>
+        <source>Backend: %1 · confidence: %2 · decision: %3 · match: %4 · candidate: %5/%6</source>
+        <translation>Mechanizm: %1 · pewność: %2 · decyzja: %3 · dopasowanie: %4 · kandydat: %5/%6</translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>ROI decision: %1 · localized change: %2</source>
+        <translation>Decyzja ROI: %1 · lokalna zmiana: %2</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Normalized OCR: %1 · rejection: %2</source>
+        <translation>Znormalizowany OCR: %1 · odrzucenie: %2</translation>
+    </message>
+    <message>
+        <location line="-26"/>
+        <source>Raw OCR: %1</source>
+        <translation>Surowy OCR: %1</translation>
+    </message>
+    <message>
+        <location line="-58"/>
+        <source>OCR ROI: %1x%2</source>
+        <translation>ROI OCR: %1x%2</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>OCR recognition: %1</source>
+        <translation>Rozpoznawanie OCR: %1</translation>
+    </message>
+    <message>
+        <location line="+58"/>
+        <source>Debug capture: %1</source>
+        <translation>Zapis diagnostyczny: %1</translation>
+    </message>
+    <message>
+        <location line="-761"/>
+        <source>English - translate to Polish</source>
+        <translation>Angielski - tłumacz na polski</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Polish - read without translation</source>
+        <translation>Polski - czytaj bez tłumaczenia</translation>
+    </message>
+    <message>
+        <location line="-10"/>
+        <source>Subtitle language</source>
+        <translation>Język napisów</translation>
+    </message>
+    <message>
+        <location line="+718"/>
+        <source>Source capture: %1x%2</source>
+        <translation>Źródło przechwytywania: %1x%2</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>OCR total: %1</source>
+        <translation>OCR łącznie: %1</translation>
+    </message>
+    <message>
+        <location line="-105"/>
+        <source>Last accepted subtitle</source>
+        <translation>Ostatni zaakceptowany napis</translation>
+    </message>
+    <message>
+        <location line="-1050"/>
+        <source>Local Polish subtitle OCR</source>
+        <translation>Lokalne rozpoznawanie polskich napisów (OCR)</translation>
+    </message>
+    <message>
+        <location line="+1158"/>
+        <source>OCR worker wait: %1</source>
+        <translation>Oczekiwanie workera OCR: %1</translation>
+    </message>
+    <message>
+        <location line="-1119"/>
+        <source>A verified local Polish OCR runtime and model are required.</source>
+        <translation>Wymagane są zweryfikowane lokalne środowisko OCR i model języka polskiego.</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>Not required for the selected subtitle language.</source>
+        <translation>Niewymagane dla wybranego języka napisów.</translation>
+    </message>
+    <message>
+        <location line="-179"/>
+        <source>Screen capture is unavailable.</source>
+        <translation>Przechwytywanie ekranu jest niedostępne.</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>The selected game frame could not be captured.</source>
+        <translation>Nie udało się przechwycić klatki wybranej gry.</translation>
+    </message>
+    <message>
+        <source>The subtitle area is invalid.</source>
+        <translation type="vanished">Obszar napisów jest nieprawidłowy.</translation>
+    </message>
+    <message>
+        <source>The subtitle area could not be saved.</source>
+        <translation type="vanished">Nie udało się zapisać obszaru napisów.</translation>
+    </message>
 </context>
 <context>
     <name>OptiScalerSection</name>
@@ -10612,6 +10770,45 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <location line="-378"/>
         <source>Application updates will be delivered later through Flatpak or the system package manager.</source>
         <translation>Aktualizacje aplikacji będą później dostarczane przez Flatpak lub systemowy menedżer pakietów.</translation>
+    </message>
+</context>
+<context>
+    <name>SubtitleRegionSelector</name>
+    <message>
+        <source>Select a non-empty subtitle area inside the game frame.</source>
+        <translation type="vanished">Wybierz niepusty obszar napisów wewnątrz klatki gry.</translation>
+    </message>
+    <message>
+        <source>Select subtitle area</source>
+        <translation type="vanished">Wybierz obszar napisów</translation>
+    </message>
+    <message>
+        <source>Drag over subtitles. Drag the selection to move it or use its edges and corners to resize it.</source>
+        <translation type="vanished">Przeciągnij nad napisami. Przeciągnij zaznaczenie, aby je przenieść, albo użyj krawędzi i narożników, aby zmienić jego rozmiar.</translation>
+    </message>
+    <message>
+        <source>Refresh frame</source>
+        <translation type="vanished">Odśwież klatkę</translation>
+    </message>
+    <message>
+        <source>Source: %1x%2    OCR region: %3x%4</source>
+        <translation type="vanished">Źródło: %1x%2    Obszar OCR: %3x%4</translation>
+    </message>
+    <message>
+        <source>No captured frame</source>
+        <translation type="vanished">Brak przechwyconej klatki</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="vanished">Anuluj</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation type="vanished">Resetuj</translation>
+    </message>
+    <message>
+        <source>Save region</source>
+        <translation type="vanished">Zapisz obszar</translation>
     </message>
 </context>
 </TS>

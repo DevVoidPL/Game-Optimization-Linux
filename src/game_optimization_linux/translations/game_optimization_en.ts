@@ -5865,6 +5865,164 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Enable the narrator and install all required components first</source>
         <translation type="vanished">Enable the narrator and install all required components first</translation>
     </message>
+    <message>
+        <location line="-721"/>
+        <source>Cancel capture</source>
+        <translation>Cancel capture</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Select subtitle area on game</source>
+        <translation>Select subtitle area on game</translation>
+    </message>
+    <message>
+        <location line="+36"/>
+        <source>Waiting for the selected game frame...</source>
+        <translation>Waiting for the selected game frame...</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Capture a game frame to preview the OCR region</source>
+        <translation>Capture a game frame to preview the OCR region</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>Source: %1x%2    OCR region: %3x%4</source>
+        <translation>Source: %1x%2    OCR region: %3x%4</translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Source and OCR dimensions will appear after capturing a frame</source>
+        <translation>Source and OCR dimensions will appear after capturing a frame</translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>Hide fine tuning</source>
+        <translation>Hide fine tuning</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Advanced fine tuning</source>
+        <translation>Advanced fine tuning</translation>
+    </message>
+    <message>
+        <location line="-578"/>
+        <source>Disabled</source>
+        <translation>Disabled</translation>
+    </message>
+    <message>
+        <location line="+1046"/>
+        <source>OCR diagnostics</source>
+        <translation>OCR diagnostics</translation>
+    </message>
+    <message>
+        <location line="-34"/>
+        <source>OCR image + PNG: %1</source>
+        <translation>OCR image + PNG: %1</translation>
+    </message>
+    <message>
+        <location line="+41"/>
+        <source>Backend: %1 · confidence: %2 · decision: %3 · match: %4 · candidate: %5/%6</source>
+        <translation>Backend: %1 · confidence: %2 · decision: %3 · match: %4 · candidate: %5/%6</translation>
+    </message>
+    <message>
+        <location line="+30"/>
+        <source>ROI decision: %1 · localized change: %2</source>
+        <translation>ROI decision: %1 · localized change: %2</translation>
+    </message>
+    <message>
+        <location line="+19"/>
+        <source>Normalized OCR: %1 · rejection: %2</source>
+        <translation>Normalized OCR: %1 · rejection: %2</translation>
+    </message>
+    <message>
+        <location line="-26"/>
+        <source>Raw OCR: %1</source>
+        <translation>Raw OCR: %1</translation>
+    </message>
+    <message>
+        <location line="-58"/>
+        <source>OCR ROI: %1x%2</source>
+        <translation>OCR ROI: %1x%2</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>OCR recognition: %1</source>
+        <translation>OCR recognition: %1</translation>
+    </message>
+    <message>
+        <location line="+58"/>
+        <source>Debug capture: %1</source>
+        <translation>Debug capture: %1</translation>
+    </message>
+    <message>
+        <location line="-761"/>
+        <source>English - translate to Polish</source>
+        <translation>English - translate to Polish</translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Polish - read without translation</source>
+        <translation>Polish - read without translation</translation>
+    </message>
+    <message>
+        <location line="-10"/>
+        <source>Subtitle language</source>
+        <translation>Subtitle language</translation>
+    </message>
+    <message>
+        <location line="+718"/>
+        <source>Source capture: %1x%2</source>
+        <translation>Source capture: %1x%2</translation>
+    </message>
+    <message>
+        <location line="-7"/>
+        <source>OCR total: %1</source>
+        <translation>OCR total: %1</translation>
+    </message>
+    <message>
+        <location line="-105"/>
+        <source>Last accepted subtitle</source>
+        <translation>Last accepted subtitle</translation>
+    </message>
+    <message>
+        <location line="-1050"/>
+        <source>Local Polish subtitle OCR</source>
+        <translation>Local Polish subtitle OCR</translation>
+    </message>
+    <message>
+        <location line="+1158"/>
+        <source>OCR worker wait: %1</source>
+        <translation>OCR worker wait: %1</translation>
+    </message>
+    <message>
+        <location line="-1119"/>
+        <source>A verified local Polish OCR runtime and model are required.</source>
+        <translation>A verified local Polish OCR runtime and model are required.</translation>
+    </message>
+    <message>
+        <location line="-6"/>
+        <source>Not required for the selected subtitle language.</source>
+        <translation>Not required for the selected subtitle language.</translation>
+    </message>
+    <message>
+        <location line="-179"/>
+        <source>Screen capture is unavailable.</source>
+        <translation>Screen capture is unavailable.</translation>
+    </message>
+    <message>
+        <location line="+35"/>
+        <source>The selected game frame could not be captured.</source>
+        <translation>The selected game frame could not be captured.</translation>
+    </message>
+    <message>
+        <source>The subtitle area is invalid.</source>
+        <translation type="vanished">The subtitle area is invalid.</translation>
+    </message>
+    <message>
+        <source>The subtitle area could not be saved.</source>
+        <translation type="vanished">The subtitle area could not be saved.</translation>
+    </message>
 </context>
 <context>
     <name>OptiScalerSection</name>
@@ -10612,6 +10770,45 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <location line="-378"/>
         <source>Application updates will be delivered later through Flatpak or the system package manager.</source>
         <translation>Application updates will be delivered later through Flatpak or the system package manager.</translation>
+    </message>
+</context>
+<context>
+    <name>SubtitleRegionSelector</name>
+    <message>
+        <source>Select a non-empty subtitle area inside the game frame.</source>
+        <translation type="vanished">Select a non-empty subtitle area inside the game frame.</translation>
+    </message>
+    <message>
+        <source>Select subtitle area</source>
+        <translation type="vanished">Select subtitle area</translation>
+    </message>
+    <message>
+        <source>Drag over subtitles. Drag the selection to move it or use its edges and corners to resize it.</source>
+        <translation type="vanished">Drag over subtitles. Drag the selection to move it or use its edges and corners to resize it.</translation>
+    </message>
+    <message>
+        <source>Refresh frame</source>
+        <translation type="vanished">Refresh frame</translation>
+    </message>
+    <message>
+        <source>Source: %1x%2    OCR region: %3x%4</source>
+        <translation type="vanished">Source: %1x%2    OCR region: %3x%4</translation>
+    </message>
+    <message>
+        <source>No captured frame</source>
+        <translation type="vanished">No captured frame</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation type="vanished">Cancel</translation>
+    </message>
+    <message>
+        <source>Reset</source>
+        <translation type="vanished">Reset</translation>
+    </message>
+    <message>
+        <source>Save region</source>
+        <translation type="vanished">Save region</translation>
     </message>
 </context>
 </TS>

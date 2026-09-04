@@ -175,6 +175,8 @@ from .narrator_gstreamer import GStreamerPipeWireTransport, PnmStreamDecoder
 from .narrator_ocr import (
     TESSERACT_COMPONENT_ID,
     TESSERACT_MODEL_RELATIVE_PATH,
+    TESSERACT_POLISH_COMPONENT_ID,
+    TESSERACT_POLISH_MODEL_RELATIVE_PATH,
     TesseractOcrProvider,
 )
 from .narrator_translation import (
@@ -184,6 +186,11 @@ from .narrator_translation import (
     ArgosCTranslate2TranslationProvider,
 )
 from .narrator_tts import (
+    PIPER_BASS_COMPONENT_ID,
+    PIPER_BASS_CONFIG_RELATIVE_PATH,
+    PIPER_BASS_MODEL_RELATIVE_PATH,
+    PIPER_BASS_VOICE_ID,
+    PIPER_BASS_VOICE_VERSION,
     PIPER_COMPONENT_ID,
     PIPER_CONFIG_RELATIVE_PATH,
     PIPER_MODEL_RELATIVE_PATH,
@@ -392,11 +399,18 @@ __all__ = [
     "TtsProvider",
     "TESSERACT_COMPONENT_ID",
     "TESSERACT_MODEL_RELATIVE_PATH",
+    "TESSERACT_POLISH_COMPONENT_ID",
+    "TESSERACT_POLISH_MODEL_RELATIVE_PATH",
     "TesseractOcrProvider",
     "ARGOS_TRANSLATION_COMPONENT_ID",
     "ARGOS_TRANSLATION_MODEL_VERSION",
     "ARGOS_TRANSLATION_PROVIDER_ID",
     "ArgosCTranslate2TranslationProvider",
+    "PIPER_BASS_COMPONENT_ID",
+    "PIPER_BASS_CONFIG_RELATIVE_PATH",
+    "PIPER_BASS_MODEL_RELATIVE_PATH",
+    "PIPER_BASS_VOICE_ID",
+    "PIPER_BASS_VOICE_VERSION",
     "PIPER_COMPONENT_ID",
     "PIPER_CONFIG_RELATIVE_PATH",
     "PIPER_MODEL_RELATIVE_PATH",

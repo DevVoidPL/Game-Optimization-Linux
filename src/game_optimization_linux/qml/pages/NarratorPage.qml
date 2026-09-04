@@ -19,6 +19,7 @@ Item {
     property bool narratorEnabled: false
     property string sourceMode: "auto"
     property string captureSource: "window"
+    property string subtitleLanguageMode: "english_to_polish"
     property string ocrProviderId: ""
     property string translationProviderId: ""
     property string translationProfile: ""
@@ -32,7 +33,13 @@ Item {
     property real cropY: 0.62
     property real cropWidth: 0.90
     property real cropHeight: 0.30
-
+    property bool advancedRegionVisible: false
+    property bool regionPreviewLoading: false
+    property string regionPreviewError: ""
+    property url regionPreviewSource: ""
+    property int regionPreviewSourceWidth: 0
+    property int regionPreviewSourceHeight: 0
+    property bool recentOcrDecisionsExpanded: false
     readonly property var gameRows: buildGameRows()
     readonly property string sessionStatus: String(value(
                                                         sessionData,
@@ -43,6 +50,7 @@ Item {
         "translating", "speaking", "stopping"
     ].indexOf(sessionStatus) >= 0
     readonly property bool componentsReady: requiredComponentsReady()
+    readonly property bool selectedVoiceReady: selectedVoiceAvailable()
 
     signal toastRequested(string message, string tone)
 
@@ -112,6 +120,14 @@ Item {
         var normalized = String(gameId || "")
         if (!normalized.length)
             return
+        if (selectedGameId.length && normalized !== selectedGameId)
+            cancelRegionPreview()
+        if (normalized !== selectedGameId) {
+            regionPreviewSource = ""
+            regionPreviewSourceWidth = 0
+            regionPreviewSourceHeight = 0
+            regionPreviewError = ""
+        }
         selectedGameId = normalized
         loadSettings()
         refreshSession()
@@ -125,6 +141,10 @@ Item {
         narratorEnabled = Boolean(value(settings, ["enabled"], false))
         sourceMode = String(value(settings, ["source_mode", "sourceMode"], "auto"))
         captureSource = String(value(settings, ["capture_source", "captureSource"], "window"))
+        subtitleLanguageMode = String(value(
+                                          settings,
+                                          ["subtitle_language_mode", "subtitleLanguageMode"],
+                                          "english_to_polish"))
         ocrProviderId = String(value(settings, ["ocr_provider_id", "ocrProviderId"], ""))
         translationProviderId = String(value(settings, ["translation_provider_id", "translationProviderId"], ""))
         translationProfile = String(value(
@@ -149,6 +169,7 @@ Item {
             "enabled": narratorEnabled,
             "sourceMode": sourceMode,
             "captureSource": captureSource,
+            "subtitleLanguageMode": subtitleLanguageMode,
             "ocrProviderId": ocrProviderId,
             "translationProviderId": translationProviderId,
             "translationProfileId": translationProfile,
@@ -205,20 +226,75 @@ Item {
         cropHeight = 0.30
     }
 
-    function requiredComponentsReady() {
-        var required = {
-            "capture": false,
-            "ocr": false,
-            "translation": false,
-            "tts": false,
-            "audio": false
+    function requestRegionPreview() {
+        regionPreviewError = ""
+        if (!selectedGameId.length || !controller
+                || typeof controller.selectNarratorSubtitleRegion !== "function") {
+            regionPreviewError = qsTr("Screen capture is unavailable.")
+            return
         }
+        regionPreviewLoading = true
+        if (!controller.selectNarratorSubtitleRegion(
+                    selectedGameId,
+                    {"x": cropX, "y": cropY,
+                     "width": cropWidth, "height": cropHeight}))
+            regionPreviewLoading = false
+    }
+
+    function cancelRegionPreview() {
+        if (controller && typeof controller.cancelNarratorRegionPreview === "function")
+            controller.cancelNarratorRegionPreview(selectedGameId)
+        regionPreviewLoading = false
+    }
+
+    function applyRegionPreview(gameId, preview) {
+        if (String(gameId || "") !== selectedGameId)
+            return
+        var values = preview || {}
+        var state = String(value(values, ["state"], ""))
+        if (state === "ready" && Boolean(value(values, ["success"], false))) {
+            regionPreviewLoading = false
+            regionPreviewError = ""
+            regionPreviewSource = String(value(values, ["imageUrl"], ""))
+            regionPreviewSourceWidth = Number(value(values, ["sourceWidth"], 0))
+            regionPreviewSourceHeight = Number(value(values, ["sourceHeight"], 0))
+            return
+        }
+        if (!Boolean(value(values, ["success"], true))) {
+            regionPreviewLoading = false
+            regionPreviewError = String(value(
+                                            values,
+                                            ["error", "message"],
+                                            qsTr("The selected game frame could not be captured.")))
+        }
+    }
+
+    function applyNativeRegionSelection(gameId, selection) {
+        if (String(gameId || "") !== selectedGameId)
+            return
+        var region = selection || {}
+        cropX = Number(value(region, ["x"], cropX))
+        cropY = Number(value(region, ["y"], cropY))
+        cropWidth = Number(value(region, ["width"], cropWidth))
+        cropHeight = Number(value(region, ["height"], cropHeight))
+        regionPreviewError = ""
+        refreshSession()
+    }
+
+    function requiredComponentsReady() {
+        var required = {}
+        required["capture.portal-pipewire"] = false
+        required[subtitleLanguageMode === "polish"
+                 ? "ocr.polish-local" : "ocr.english-local"] = false
+        required["audio.qt-pcm"] = false
+        if (subtitleLanguageMode !== "polish")
+            required["translation.opus-en-pl"] = false
         var source = componentsData || []
         for (var i = 0; i < source.length; ++i) {
-            var kind = String(value(source[i], ["kind"], ""))
-            if (required[kind] !== undefined
+            var componentId = String(value(source[i], ["componentId", "component_id"], ""))
+            if (required[componentId] !== undefined
                     && String(value(source[i], ["state"], "")) === "available")
-                required[kind] = true
+                required[componentId] = true
         }
         for (var key in required) {
             if (!required[key])
@@ -241,6 +317,44 @@ Item {
         return ids
     }
 
+    function selectedVoice() {
+        for (var i = 0; i < (voices || []).length; ++i) {
+            if (String(value(voices[i], ["id"], "")) === voiceId)
+                return voices[i]
+        }
+        return null
+    }
+
+    function selectedVoiceInstalled() {
+        var voice = selectedVoice()
+        return voice !== null && Boolean(value(voice, ["installed"], false))
+    }
+
+    function selectedVoiceAvailable() {
+        var voice = selectedVoice()
+        return voice !== null && Boolean(value(voice, ["available"], false))
+    }
+
+    function selectedVoiceComponent() {
+        var voice = selectedVoice()
+        if (voice === null)
+            return null
+        var componentId = String(value(voice, ["componentId", "component_id"], ""))
+        for (var i = 0; i < (componentsData || []).length; ++i) {
+            if (String(value(componentsData[i], ["componentId", "component_id"], ""))
+                    === componentId)
+                return componentsData[i]
+        }
+        return null
+    }
+
+    function installSelectedVoice() {
+        var component = selectedVoiceComponent()
+        if (component === null || !saveSettings())
+            return
+        runComponentAction(component)
+    }
+
     function translationProfileLabels(options) {
         var labels = []
         for (var i = 0; i < (options || []).length; ++i) {
@@ -261,10 +375,14 @@ Item {
             return qsTr("Wayland portal and PipeWire capture")
         if (componentId === "ocr.english-local")
             return qsTr("Local English subtitle OCR")
+        if (componentId === "ocr.polish-local")
+            return qsTr("Local Polish subtitle OCR")
         if (componentId === "translation.opus-en-pl")
             return qsTr("Local English to Polish translation")
         if (componentId === "tts.polish-voice")
-            return qsTr("Local Polish voice")
+            return qsTr("Local Polish voice") + " - Gosia"
+        if (componentId === "tts.polish-bass")
+            return qsTr("Local Polish voice") + " - Bass"
         if (componentId === "audio.qt-pcm")
             return qsTr("PCM audio output")
         return String(value(component, ["name"], componentId))
@@ -286,10 +404,18 @@ Item {
 
     function componentDescription(component) {
         var code = String(value(component, ["descriptionCode", "description_code"], ""))
+        if ((code === "ocr_model_required" && subtitleLanguageMode === "polish")
+                || (code === "polish_ocr_model_required"
+                    && subtitleLanguageMode !== "polish")
+                || (code === "translation_model_required"
+                    && subtitleLanguageMode === "polish"))
+            return qsTr("Not required for the selected subtitle language.")
         if (code === "capture_runtime")
             return qsTr("Capture permission is requested through the system portal when a session starts.")
         if (code === "ocr_model_required")
             return qsTr("A verified local English OCR runtime and model are required.")
+        if (code === "polish_ocr_model_required")
+            return qsTr("A verified local Polish OCR runtime and model are required.")
         if (code === "translation_model_required")
             return qsTr("A verified local English to Polish translation model is required.")
         if (code === "polish_voice_required")
@@ -394,6 +520,8 @@ Item {
             return processingLabel
         if (state === "ready")
             return qsTr("Ready")
+        if (state === "bypassed")
+            return qsTr("Disabled")
         if (state === "error")
             return errorLabel
         return qsTr("Component missing")
@@ -464,6 +592,14 @@ Item {
         function onNarratorComponentsChanged() {
             page.loadSettings()
             page.refreshSession()
+        }
+
+        function onNarratorRegionPreviewChanged(gameId, preview) {
+            page.applyRegionPreview(gameId, preview)
+        }
+
+        function onNarratorRegionSelectionChanged(gameId, selection) {
+            page.applyNativeRegionSelection(gameId, selection)
         }
     }
 
@@ -684,12 +820,39 @@ Item {
 
                         Label {
                             Layout.fillWidth: true
+                            text: qsTr("Subtitle language")
+                            color: App.Theme.textMuted
+                            font.pixelSize: App.Theme.fontCaption
+                        }
+
+                        AppComboBox {
+                            property var values: ["english_to_polish", "polish"]
+                            Layout.fillWidth: true
+                            model: [
+                                qsTr("English - translate to Polish"),
+                                qsTr("Polish - read without translation")
+                            ]
+                            currentIndex: page.indexOfValue(
+                                              values,
+                                              page.subtitleLanguageMode,
+                                              0)
+                            enabled: !page.sessionActive
+                            onActivated: function(index) {
+                                if (index >= 0 && index < values.length)
+                                    page.subtitleLanguageMode = values[index]
+                            }
+                        }
+
+                        Label {
+                            visible: page.subtitleLanguageMode !== "polish"
+                            Layout.fillWidth: true
                             text: qsTr("Translation profile")
                             color: App.Theme.textMuted
                             font.pixelSize: App.Theme.fontCaption
                         }
 
                         AppComboBox {
+                            visible: page.subtitleLanguageMode !== "polish"
                             property var values: page.optionIds(page.translationProfiles)
                             Layout.fillWidth: true
                             model: page.translationProfileLabels(page.translationProfiles)
@@ -702,7 +865,8 @@ Item {
                         }
 
                         Label {
-                            visible: page.translationProfiles.length === 0
+                            visible: page.subtitleLanguageMode !== "polish"
+                                     && page.translationProfiles.length === 0
                             Layout.fillWidth: true
                             text: qsTr("Install the verified translation component to enable local English to Polish translation")
                             color: App.Theme.textSecondary
@@ -736,6 +900,33 @@ Item {
                             color: App.Theme.textSecondary
                             font.pixelSize: App.Theme.fontCaption
                             wrapMode: Text.WordWrap
+                        }
+
+                        RowLayout {
+                            visible: page.voices.length > 0 && !page.selectedVoiceReady
+                            Layout.fillWidth: true
+                            spacing: 10
+
+                            Label {
+                                Layout.fillWidth: true
+                                text: String(page.value(page.selectedVoice(), ["name", "id"], ""))
+                                      + " - " + (page.selectedVoiceInstalled()
+                                                   ? qsTr("Unavailable in this build")
+                                                   : qsTr("Not installed"))
+                                color: App.Theme.warning
+                                font.pixelSize: App.Theme.fontCaption
+                                wrapMode: Text.WordWrap
+                            }
+
+                            AppButton {
+                                visible: !page.selectedVoiceInstalled()
+                                compact: true
+                                text: qsTr("Install")
+                                iconSource: App.UiIcons.actionInstall
+                                enabled: !page.sessionActive
+                                         && page.selectedVoiceComponent() !== null
+                                onClicked: page.installSelectedVoice()
+                            }
                         }
 
                         Divider { Layout.fillWidth: true }
@@ -822,10 +1013,18 @@ Item {
                             }
                         }
                         AppButton {
-                            text: qsTr("Reset to bottom area")
+                            text: page.regionPreviewLoading
+                                  ? qsTr("Cancel capture")
+                                  : qsTr("Select subtitle area on game")
+                            kind: page.regionPreviewLoading ? "ghost" : "primary"
                             compact: true
-                            enabled: !page.sessionActive
-                            onClicked: page.resetSubtitleRegion()
+                            enabled: page.selectedGameId.length > 0
+                            iconSource: page.regionPreviewLoading
+                                        ? App.UiIcons.actionCancel
+                                        : App.UiIcons.actionScan
+                            onClicked: page.regionPreviewLoading
+                                       ? page.cancelRegionPreview()
+                                       : page.requestRegionPreview()
                         }
                     }
 
@@ -839,18 +1038,36 @@ Item {
                         border.color: App.Theme.border
                         clip: true
 
+                        Image {
+                            id: currentRegionPreviewImage
+                            anchors.fill: parent
+                            source: page.regionPreviewSource
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            cache: false
+                        }
+
                         Label {
                             anchors.centerIn: parent
-                            text: qsTr("Captured screen or window")
+                            visible: currentRegionPreviewImage.status !== Image.Ready
+                            text: page.regionPreviewLoading
+                                  ? qsTr("Waiting for the selected game frame...")
+                                  : qsTr("Capture a game frame to preview the OCR region")
                             color: App.Theme.textMuted
                             font.pixelSize: App.Theme.fontBody
                         }
 
                         Rectangle {
-                            x: page.cropX * parent.width
-                            y: page.cropY * parent.height
-                            width: page.cropWidth * parent.width
-                            height: page.cropHeight * parent.height
+                            readonly property real fittedWidth: currentRegionPreviewImage.status === Image.Ready
+                                                                 ? currentRegionPreviewImage.paintedWidth : parent.width
+                            readonly property real fittedHeight: currentRegionPreviewImage.status === Image.Ready
+                                                                  ? currentRegionPreviewImage.paintedHeight : parent.height
+                            readonly property real fittedX: (parent.width - fittedWidth) / 2
+                            readonly property real fittedY: (parent.height - fittedHeight) / 2
+                            x: fittedX + page.cropX * fittedWidth
+                            y: fittedY + page.cropY * fittedHeight
+                            width: page.cropWidth * fittedWidth
+                            height: page.cropHeight * fittedHeight
                             color: App.Theme.accentSoft
                             border.width: 2
                             border.color: App.Theme.accent
@@ -865,7 +1082,41 @@ Item {
                         }
                     }
 
+                    RowLayout {
+                        Layout.fillWidth: true
+                        Label {
+                            Layout.fillWidth: true
+                            text: page.regionPreviewSourceWidth > 0
+                                  ? qsTr("Source: %1x%2    OCR region: %3x%4")
+                                        .arg(page.regionPreviewSourceWidth)
+                                        .arg(page.regionPreviewSourceHeight)
+                                        .arg(Math.round(page.regionPreviewSourceWidth * page.cropWidth))
+                                        .arg(Math.round(page.regionPreviewSourceHeight * page.cropHeight))
+                                  : qsTr("Source and OCR dimensions will appear after capturing a frame")
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
+                        AppButton {
+                            text: page.advancedRegionVisible
+                                  ? qsTr("Hide fine tuning") : qsTr("Advanced fine tuning")
+                            compact: true
+                            kind: "ghost"
+                            iconSource: App.UiIcons.actionAdvancedSettings
+                            onClicked: page.advancedRegionVisible = !page.advancedRegionVisible
+                        }
+                    }
+
+                    Label {
+                        visible: page.regionPreviewError.length > 0
+                        Layout.fillWidth: true
+                        text: page.regionPreviewError
+                        color: App.Theme.danger
+                        wrapMode: Text.WordWrap
+                    }
+
                     GridLayout {
+                        visible: page.advancedRegionVisible
                         Layout.fillWidth: true
                         columns: page.width >= 900 ? 2 : 1
                         columnSpacing: 22
@@ -941,6 +1192,18 @@ Item {
                                 enabled: !page.sessionActive
                                 onMoved: page.cropHeight = value
                             }
+                        }
+                    }
+
+                    RowLayout {
+                        visible: page.advancedRegionVisible
+                        Layout.fillWidth: true
+                        Item { Layout.fillWidth: true }
+                        AppButton {
+                            text: qsTr("Reset to bottom area")
+                            compact: true
+                            enabled: !page.sessionActive
+                            onClicked: page.resetSubtitleRegion()
                         }
                     }
                 }
@@ -1163,7 +1426,7 @@ Item {
 
                         ColumnLayout {
                             Layout.fillWidth: true
-                            Label { text: qsTr("Last detected English phrase"); color: App.Theme.textMuted; font.pixelSize: App.Theme.fontCaption }
+                            Label { text: qsTr("Last accepted subtitle"); color: App.Theme.textMuted; font.pixelSize: App.Theme.fontCaption }
                             Label {
                                 Layout.fillWidth: true
                                 text: String(page.value(page.sessionData, ["lastDetectedText", "last_detected_text"], qsTr("None")))
@@ -1268,20 +1531,210 @@ Item {
                         Layout.fillWidth: true
                         spacing: 18
                         Label { text: qsTr("Capture: %1").arg(page.formatLatency(page.value(page.sessionData, ["captureMs", "capture_ms"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
-                        Label { text: qsTr("OCR: %1").arg(page.formatLatency(page.value(page.sessionData, ["ocrMs", "ocr_ms"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("OCR total: %1").arg(page.formatLatency(page.value(page.sessionData, ["ocrMs", "ocr_ms"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("OCR recognition: %1").arg(page.formatLatency(page.value(page.sessionData, ["ocrRecognitionMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("OCR image + PNG: %1").arg(page.formatLatency(page.value(page.sessionData, ["ocrPreprocessingMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("OCR worker wait: %1").arg(page.formatLatency(page.value(page.sessionData, ["ocrWorkerLockWaitMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Translation: %1").arg(page.formatLatency(page.value(page.sessionData, ["translationMs", "translation_ms"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Speech: %1").arg(page.formatLatency(page.value(page.sessionData, ["ttsMs", "tts_ms"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Audio start: %1").arg(page.formatLatency(page.value(page.sessionData, ["audioStartMs", "audio_start_ms"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
-                        Label { text: qsTr("Capture size: %1x%2").arg(page.value(page.sessionData, ["captureWidth"], 0)).arg(page.value(page.sessionData, ["captureHeight"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Source capture: %1x%2").arg(page.value(page.sessionData, ["captureWidth"], 0)).arg(page.value(page.sessionData, ["captureHeight"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("OCR ROI: %1x%2").arg(page.value(page.sessionData, ["ocrRoiWidth"], 0)).arg(page.value(page.sessionData, ["ocrRoiHeight"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Capture to text: %1").arg(page.formatLatency(page.value(page.sessionData, ["totalCaptureToTextMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Subtitle to speech: %1").arg(page.formatLatency(page.value(page.sessionData, ["totalCaptureToAudioStartMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("OCR runs: %1").arg(page.value(page.sessionData, ["ocrExecutionCount"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Dropped work: %1").arg(page.value(page.sessionData, ["droppedFrames"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label {
+                            text: qsTr("Subtitle region") + ": x="
+                                  + page.cropX.toFixed(3) + " y="
+                                  + page.cropY.toFixed(3) + " w="
+                                  + page.cropWidth.toFixed(3) + " h="
+                                  + page.cropHeight.toFixed(3)
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                        }
+                        Label {
                             visible: page.value(page.sessionData, ["lastDetectedAgeSeconds"], null) !== null
                             text: qsTr("Last phrase: %1 s ago").arg(Number(page.value(page.sessionData, ["lastDetectedAgeSeconds"], 0)).toFixed(1))
                             color: App.Theme.textSecondary
                             font.pixelSize: App.Theme.fontCaption
+                        }
+                    }
+
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 3
+
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("OCR diagnostics")
+                            color: App.Theme.textMuted
+                            font.pixelSize: App.Theme.fontCaption
+                            font.weight: Font.DemiBold
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Backend: %1 · confidence: %2 · decision: %3 · match: %4 · candidate: %5/%6")
+                                .arg(String(page.value(page.sessionData, ["ocrBackend"], qsTr("Unknown"))))
+                                .arg(page.value(page.sessionData, ["ocrConfidence"], null) === null
+                                     ? qsTr("Not measured")
+                                     : Number(page.value(page.sessionData, ["ocrConfidence"], 0)).toFixed(3))
+                                .arg(String(page.value(page.sessionData, ["lastOcrGateDecision"], qsTr("None"))))
+                                .arg(String(page.value(page.sessionData, ["ocrCandidateMatchKind"], qsTr("None"))))
+                                .arg(page.value(page.sessionData, ["ocrCandidateObservationCount"], 0))
+                                .arg(page.value(page.sessionData, ["ocrCandidateRequiredObservations"], 2))
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
+                        Label {
+                            visible: String(page.value(page.sessionData, ["ocrDebugCapturePath"], "")).length > 0
+                            Layout.fillWidth: true
+                            text: qsTr("Debug capture: %1").arg(String(page.value(page.sessionData, ["ocrDebugCapturePath"], "")))
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WrapAnywhere
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Raw OCR: %1").arg(String(page.value(page.sessionData, ["lastRawOcrText"], qsTr("None"))))
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("ROI decision: %1 · localized change: %2")
+                                .arg(String(page.value(page.sessionData, ["lastVisualChangeDecision"], qsTr("None"))))
+                                .arg(page.value(page.sessionData, ["lastVisualChangeScore"], null) === null
+                                     ? qsTr("Not measured")
+                                     : Number(page.value(page.sessionData, ["lastVisualChangeScore"], 0)).toFixed(4))
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Filtered OCR: %1")
+                                .arg(String(page.value(page.sessionData, ["lastFilteredOcrText"], qsTr("None"))))
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Normalized OCR: %1 · rejection: %2")
+                                .arg(String(page.value(page.sessionData, ["lastNormalizedOcrText"], qsTr("None"))))
+                                .arg(String(page.value(page.sessionData, ["lastOcrRejectionReason"], qsTr("None"))))
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
+
+                        AppButton {
+                            text: page.recentOcrDecisionsExpanded
+                                  ? qsTr("Hide recent OCR decisions")
+                                  : qsTr("Recent OCR decisions (%1)").arg(
+                                        page.value(page.sessionData, ["ocrDecisionHistory"], []).length)
+                            kind: "ghost"
+                            compact: true
+                            onClicked: page.recentOcrDecisionsExpanded = !page.recentOcrDecisionsExpanded
+                        }
+
+                        ColumnLayout {
+                            objectName: "recentOcrDecisionList"
+                            Layout.fillWidth: true
+                            visible: page.recentOcrDecisionsExpanded
+                            spacing: 8
+
+                            Repeater {
+                                model: page.value(page.sessionData, ["ocrDecisionHistory"], [])
+
+                                delegate: Rectangle {
+                                    id: decisionRow
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    implicitHeight: decisionDetails.implicitHeight + 14
+                                    radius: App.Theme.radiusSmall
+                                    color: App.Theme.surfaceRaised
+                                    border.width: 1
+                                    border.color: App.Theme.border
+
+                                    ColumnLayout {
+                                        id: decisionDetails
+                                        anchors.fill: parent
+                                        anchors.margins: 7
+                                        spacing: 2
+
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: qsTr("%1 s · confidence %2 · candidate %3/%4 · %5")
+                                                .arg(Number(decisionRow.modelData.ageSeconds || 0).toFixed(1))
+                                                .arg(decisionRow.modelData.confidence === null
+                                                     || decisionRow.modelData.confidence === undefined
+                                                     ? qsTr("Not measured")
+                                                     : Number(decisionRow.modelData.confidence).toFixed(3))
+                                                .arg(Number(decisionRow.modelData.candidateObservationCount || 0))
+                                                .arg(Number(decisionRow.modelData.candidateRequiredObservations || 2))
+                                                .arg(String(decisionRow.modelData.decision || qsTr("None")))
+                                            color: App.Theme.text
+                                            font.pixelSize: App.Theme.fontCaption
+                                            font.weight: Font.DemiBold
+                                            wrapMode: Text.WordWrap
+                                        }
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: qsTr("Raw: %1").arg(String(decisionRow.modelData.rawText || qsTr("None")))
+                                            color: App.Theme.textSecondary
+                                            font.pixelSize: App.Theme.fontCaption
+                                            wrapMode: Text.WordWrap
+                                        }
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: qsTr("Filtered: %1 · normalized: %2")
+                                                .arg(String(decisionRow.modelData.filteredText || qsTr("None")))
+                                                .arg(String(decisionRow.modelData.normalizedText || qsTr("None")))
+                                            color: App.Theme.textSecondary
+                                            font.pixelSize: App.Theme.fontCaption
+                                            wrapMode: Text.WordWrap
+                                        }
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: qsTr("Reason: %1 · match: %2 · replaced: %3 · TTS: %4 · ROI: %5x%6 · %7 / %8")
+                                                .arg(String(decisionRow.modelData.rejectionReason || qsTr("None")))
+                                                .arg(String(decisionRow.modelData.candidateMatchKind || qsTr("None")))
+                                                .arg(decisionRow.modelData.candidateReplaced ? qsTr("yes") : qsTr("no"))
+                                                .arg(decisionRow.modelData.ttsSubmitted ? qsTr("submitted") : qsTr("not submitted"))
+                                                .arg(Number(decisionRow.modelData.roiWidth || 0))
+                                                .arg(Number(decisionRow.modelData.roiHeight || 0))
+                                                .arg(String(decisionRow.modelData.backend || qsTr("Unknown")))
+                                                .arg(page.formatLatency(decisionRow.modelData.recognitionMs))
+                                            color: App.Theme.textMuted
+                                            font.pixelSize: App.Theme.fontCaption
+                                            wrapMode: Text.WordWrap
+                                        }
+                                        Label {
+                                            Layout.fillWidth: true
+                                            text: qsTr("Tokens: %1/%2 · lines: %3 · dropped: %4 · minimum confidence: %5 · geometry: %6 · strong short evidence: %7 · visual: %8 · filter: %9")
+                                                .arg(Number(decisionRow.modelData.includedTokenCount || 0))
+                                                .arg(Number(decisionRow.modelData.tokenCount || 0))
+                                                .arg(Number(decisionRow.modelData.lineCount || 0))
+                                                .arg(Number(decisionRow.modelData.droppedTokenCount || 0))
+                                                .arg(decisionRow.modelData.minimumTokenConfidence === null
+                                                     || decisionRow.modelData.minimumTokenConfidence === undefined
+                                                     ? qsTr("Not measured")
+                                                     : Number(decisionRow.modelData.minimumTokenConfidence).toFixed(3))
+                                                .arg(decisionRow.modelData.geometryCoherent ? qsTr("coherent") : qsTr("uncertain"))
+                                                .arg(decisionRow.modelData.cleanShortPhraseEvidence ? qsTr("yes") : qsTr("no"))
+                                                .arg(String(decisionRow.modelData.visualChangeDecision || qsTr("Unknown")))
+                                                .arg(String(decisionRow.modelData.filterSummary || qsTr("unchanged")))
+                                            color: App.Theme.textMuted
+                                            font.pixelSize: App.Theme.fontCaption
+                                            wrapMode: Text.WordWrap
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -1300,7 +1753,8 @@ Item {
                             enabled: page.sessionActive
                                      || (page.selectedGameId.length > 0
                                          && page.narratorEnabled
-                                         && page.componentsReady)
+                                         && page.componentsReady
+                                         && page.selectedVoiceReady)
                             toolTip: enabled ? "" : qsTr("Enable the narrator and install all required local narrator components first")
                             onClicked: page.sessionActive
                                        ? page.stopNarrator() : page.startNarrator()
@@ -1312,4 +1766,5 @@ Item {
             Item { Layout.preferredHeight: App.Theme.contentPadding }
         }
     }
+
 }
