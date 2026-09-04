@@ -13,6 +13,7 @@ from typing import Any
 from PySide6.QtCore import QMetaObject, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QGuiApplication, QIcon
 from PySide6.QtQml import QQmlApplicationEngine, QQmlError
+from PySide6.QtWidgets import QApplication
 
 from .config import (
     APP_ID,
@@ -114,7 +115,7 @@ def _application_icon() -> QIcon:
 
 
 def _install_termination_handlers(
-    application: QGuiApplication,
+    application: QApplication,
 ) -> tuple[list[int | None], dict[int, Any]]:
     """Turn terminal signals into one orderly Qt shutdown request."""
 
@@ -202,7 +203,7 @@ def run(argv: Sequence[str] | None = None) -> int:
     previous_handlers: dict[int, Any] = {}
     requested_signal: list[int | None] = [None]
     try:
-        application = QGuiApplication(qt_arguments)
+        application = QApplication(qt_arguments)
         # Set this on the live application as well as before construction.  On
         # Wayland the compositor uses the desktop-file identity, rather than
         # the window icon pixels, to resolve the taskbar/dock icon.
@@ -254,12 +255,13 @@ def run(argv: Sequence[str] | None = None) -> int:
             ).strip()
             == "1",
         )
-
         engine.load(QUrl.fromLocalFile(str(qml_path)))
         if not engine.rootObjects():
             logger.critical("QML engine failed to create a root object from %s", qml_path)
             controller.shutdown()
             return 3
+
+        controller.attach_main_window(engine.rootObjects()[0])
 
         application.aboutToQuit.connect(lambda: _prepare_qml_shutdown(engine))
 
