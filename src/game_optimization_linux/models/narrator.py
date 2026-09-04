@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from enum import StrEnum
 from math import isfinite
+import time
 from typing import Any, Mapping
 
 from .mangohud import validate_game_key
@@ -19,6 +20,11 @@ class NarratorSourceMode(StrEnum):
     AUTO = "auto"
     OCR = "ocr"
     ADAPTER = "adapter"
+
+
+class NarratorSubtitleLanguageMode(StrEnum):
+    ENGLISH_TO_POLISH = "english_to_polish"
+    POLISH = "polish"
 
 
 class CaptureSourceType(StrEnum):
@@ -142,6 +148,9 @@ class NarratorGameSettings:
     enabled: bool = False
     source_mode: NarratorSourceMode = NarratorSourceMode.AUTO
     capture_source: CaptureSourceType = CaptureSourceType.WINDOW
+    subtitle_language_mode: NarratorSubtitleLanguageMode = (
+        NarratorSubtitleLanguageMode.ENGLISH_TO_POLISH
+    )
     subtitle_adapter_id: str = ""
     ocr_provider_id: str = ""
     translation_provider_id: str = ""
@@ -166,6 +175,11 @@ class NarratorGameSettings:
             raise ValueError("enabled must be a boolean")
         object.__setattr__(self, "source_mode", NarratorSourceMode(self.source_mode))
         object.__setattr__(self, "capture_source", CaptureSourceType(self.capture_source))
+        object.__setattr__(
+            self,
+            "subtitle_language_mode",
+            NarratorSubtitleLanguageMode(self.subtitle_language_mode),
+        )
         for name in (
             "subtitle_adapter_id",
             "ocr_provider_id",
@@ -259,6 +273,9 @@ class NarratorGameSettings:
             capture_source=CaptureSourceType(
                 values.get("capture_source", "window")
             ),
+            subtitle_language_mode=NarratorSubtitleLanguageMode(
+                values.get("subtitle_language_mode", "english_to_polish")
+            ),
             subtitle_adapter_id=str(values.get("subtitle_adapter_id", "")),
             ocr_provider_id=str(values.get("ocr_provider_id", "")),
             translation_provider_id=str(
@@ -289,6 +306,7 @@ class NarratorGameSettings:
             "enabled": self.enabled,
             "source_mode": self.source_mode.value,
             "capture_source": self.capture_source.value,
+            "subtitle_language_mode": self.subtitle_language_mode.value,
             "subtitle_adapter_id": self.subtitle_adapter_id,
             "ocr_provider_id": self.ocr_provider_id,
             "translation_provider_id": self.translation_provider_id,
@@ -382,6 +400,103 @@ class OcrResult:
     confidence: float | None = None
     provider_id: str = ""
     elapsed_ms: float = 0.0
+    preprocessing_ms: float = 0.0
+    image_preprocessing_ms: float = 0.0
+    png_encoding_ms: float = 0.0
+    backend: str = ""
+    recognition_ms: float | None = None
+    worker_execution_ms: float | None = None
+    worker_decode_ms: float | None = None
+    worker_roundtrip_ms: float | None = None
+    worker_lock_wait_ms: float | None = None
+    client_overhead_ms: float | None = None
+    worker_startup_ms: float | None = None
+    worker_restarted: bool = False
+    fallback_reason: str = ""
+    debug_capture_path: str = ""
+    raw_text: str = ""
+    filtered_text: str = ""
+    raw_confidence: float | None = None
+    token_count: int = 0
+    included_token_count: int = 0
+    line_count: int = 0
+    dropped_token_count: int = 0
+    minimum_token_confidence: float | None = None
+    geometry_coherent: bool = False
+    clean_short_phrase_evidence: bool = False
+    filter_summary: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class OcrDecisionObservation:
+    """One bounded, in-memory explanation of an OCR pipeline decision."""
+
+    observation_id: int
+    observed_at_monotonic: float
+    raw_text: str
+    filtered_text: str
+    normalized_text: str
+    confidence: float | None
+    decision: str
+    rejection_reason: str = ""
+    candidate_text: str = ""
+    candidate_observation_count: int = 0
+    candidate_required_observations: int = 2
+    candidate_similarity: float | None = None
+    candidate_match_kind: str = ""
+    candidate_replaced: bool = False
+    accepted_text: str = ""
+    accepted: bool = False
+    tts_submitted: bool = False
+    roi_width: int = 0
+    roi_height: int = 0
+    backend: str = ""
+    recognition_ms: float | None = None
+    token_count: int = 0
+    included_token_count: int = 0
+    line_count: int = 0
+    dropped_token_count: int = 0
+    minimum_token_confidence: float | None = None
+    geometry_coherent: bool = False
+    clean_short_phrase_evidence: bool = False
+    visual_change_decision: str = ""
+    filter_summary: str = ""
+
+    def to_dict(self, *, now: float | None = None) -> dict[str, Any]:
+        current = time.monotonic() if now is None else float(now)
+        return {
+            "observationId": self.observation_id,
+            "observedAtMonotonic": self.observed_at_monotonic,
+            "ageSeconds": max(0.0, current - self.observed_at_monotonic),
+            "rawText": self.raw_text,
+            "filteredText": self.filtered_text,
+            "normalizedText": self.normalized_text,
+            "confidence": self.confidence,
+            "decision": self.decision,
+            "rejectionReason": self.rejection_reason,
+            "candidateText": self.candidate_text,
+            "candidateObservationCount": self.candidate_observation_count,
+            "candidateRequiredObservations": self.candidate_required_observations,
+            "candidateSimilarity": self.candidate_similarity,
+            "candidateMatchKind": self.candidate_match_kind,
+            "candidateReplaced": self.candidate_replaced,
+            "acceptedText": self.accepted_text,
+            "accepted": self.accepted,
+            "ttsSubmitted": self.tts_submitted,
+            "roiWidth": self.roi_width,
+            "roiHeight": self.roi_height,
+            "backend": self.backend,
+            "recognitionMs": self.recognition_ms,
+            "tokenCount": self.token_count,
+            "includedTokenCount": self.included_token_count,
+            "lineCount": self.line_count,
+            "droppedTokenCount": self.dropped_token_count,
+            "minimumTokenConfidence": self.minimum_token_confidence,
+            "geometryCoherent": self.geometry_coherent,
+            "cleanShortPhraseEvidence": self.clean_short_phrase_evidence,
+            "visualChangeDecision": self.visual_change_decision,
+            "filterSummary": self.filter_summary,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -403,6 +518,13 @@ class PcmAudio:
     sample_format: str = "s16le"
     provider_id: str = ""
     elapsed_ms: float = 0.0
+    queue_wait_ms: float = 0.0
+    worker_roundtrip_ms: float | None = None
+    inference_ms: float | None = None
+    serialization_ms: float | None = None
+    worker_startup_ms: float | None = None
+    worker_reused: bool = True
+    audio_duration_ms: float | None = None
 
     def __post_init__(self) -> None:
         if self.sample_rate <= 0 or self.channels <= 0:
@@ -418,15 +540,52 @@ class NarratorSessionSnapshot:
     last_detected_text: str = ""
     last_translation: str = ""
     last_spoken_text: str = ""
+    frame_acquisition_ms: float | None = None
     capture_ms: float | None = None
+    ocr_preprocessing_ms: float | None = None
+    ocr_image_preprocessing_ms: float | None = None
+    ocr_png_encoding_ms: float | None = None
     ocr_ms: float | None = None
+    ocr_backend: str = ""
+    ocr_recognition_ms: float | None = None
+    ocr_worker_execution_ms: float | None = None
+    ocr_worker_decode_ms: float | None = None
+    ocr_worker_roundtrip_ms: float | None = None
+    ocr_worker_lock_wait_ms: float | None = None
+    ocr_client_overhead_ms: float | None = None
+    ocr_worker_startup_ms: float | None = None
+    ocr_worker_restart_count: int = 0
+    ocr_cli_fallback_count: int = 0
+    ocr_fallback_reason: str = ""
+    ocr_debug_capture_path: str = ""
+    stabilization_dedup_ms: float | None = None
     translation_ms: float | None = None
     tts_ms: float | None = None
+    tts_queue_wait_ms: float | None = None
+    tts_worker_roundtrip_ms: float | None = None
+    tts_inference_ms: float | None = None
+    tts_serialization_ms: float | None = None
+    tts_worker_startup_ms: float | None = None
+    tts_worker_reused: bool | None = None
+    tts_audio_duration_ms: float | None = None
     audio_start_ms: float | None = None
+    accepted_to_audio_start_ms: float | None = None
+    confirming_frame_to_audio_start_ms: float | None = None
+    first_visible_frame_to_audio_start_ms: float | None = None
     total_capture_to_text_ms: float | None = None
     total_capture_to_audio_start_ms: float | None = None
+    first_visible_frame_at_monotonic: float | None = None
+    confirming_frame_at_monotonic: float | None = None
+    accepted_at_monotonic: float | None = None
+    tts_started_at_monotonic: float | None = None
+    tts_finished_at_monotonic: float | None = None
+    playback_started_at_monotonic: float | None = None
     capture_width: int = 0
     capture_height: int = 0
+    ocr_roi_width: int = 0
+    ocr_roi_height: int = 0
+    last_visual_change_decision: str = ""
+    last_visual_change_score: float | None = None
     capture_state: str = "stopped"
     ocr_status: str = "component_missing"
     translation_status: str = "component_missing"
@@ -435,11 +594,28 @@ class NarratorSessionSnapshot:
     ocr_confidence: float | None = None
     last_raw_ocr_text: str = ""
     last_filtered_ocr_text: str = ""
+    last_normalized_ocr_text: str = ""
     last_ocr_rejection_reason: str = ""
+    last_ocr_observation_credible: bool = False
+    last_ocr_gate_decision: str = ""
+    ocr_candidate_text: str = ""
+    ocr_candidate_observation_count: int = 0
+    ocr_candidate_required_observations: int = 2
+    ocr_candidate_similarity: float | None = None
+    ocr_candidate_match_kind: str = ""
     last_accepted_ocr_text: str = ""
+    ocr_decision_history: tuple[OcrDecisionObservation, ...] = ()
     ocr_rejection_counts: Mapping[str, int] = field(default_factory=dict)
     last_detected_at_monotonic: float | None = None
     dropped_frames: int = 0
+    dropped_capture_sampling: int = 0
+    dropped_capture_coalesced: int = 0
+    unstable_ocr_observations: int = 0
+    stale_queued_translation: int = 0
+    stale_running_translation_results: int = 0
+    stale_queued_tts: int = 0
+    stale_running_tts_results: int = 0
+    audio_supersessions: int = 0
     ocr_execution_count: int = 0
     generation: int = 0
 
@@ -452,15 +628,58 @@ class NarratorSessionSnapshot:
             "lastDetectedText": self.last_detected_text,
             "lastTranslation": self.last_translation,
             "lastSpokenText": self.last_spoken_text,
+            "frameAcquisitionMs": self.frame_acquisition_ms,
             "captureMs": self.capture_ms,
+            "ocrPreprocessingMs": self.ocr_preprocessing_ms,
+            "ocrImagePreprocessingMs": self.ocr_image_preprocessing_ms,
+            "ocrPngEncodingMs": self.ocr_png_encoding_ms,
             "ocrMs": self.ocr_ms,
+            "ocrBackend": self.ocr_backend,
+            "ocrRecognitionMs": self.ocr_recognition_ms,
+            "ocrWorkerExecutionMs": self.ocr_worker_execution_ms,
+            "ocrWorkerDecodeMs": self.ocr_worker_decode_ms,
+            "ocrWorkerRoundtripMs": self.ocr_worker_roundtrip_ms,
+            "ocrWorkerLockWaitMs": self.ocr_worker_lock_wait_ms,
+            "ocrClientOverheadMs": self.ocr_client_overhead_ms,
+            "ocrWorkerStartupMs": self.ocr_worker_startup_ms,
+            "ocrWorkerRestartCount": self.ocr_worker_restart_count,
+            "ocrCliFallbackCount": self.ocr_cli_fallback_count,
+            "ocrFallbackReason": self.ocr_fallback_reason,
+            "ocrDebugCapturePath": self.ocr_debug_capture_path,
+            "stabilizationDedupMs": self.stabilization_dedup_ms,
             "translationMs": self.translation_ms,
             "ttsMs": self.tts_ms,
+            "ttsQueueWaitMs": self.tts_queue_wait_ms,
+            "ttsWorkerRoundtripMs": self.tts_worker_roundtrip_ms,
+            "ttsInferenceMs": self.tts_inference_ms,
+            "ttsSerializationMs": self.tts_serialization_ms,
+            "ttsWorkerStartupMs": self.tts_worker_startup_ms,
+            "ttsWorkerReused": self.tts_worker_reused,
+            "ttsAudioDurationMs": self.tts_audio_duration_ms,
             "audioStartMs": self.audio_start_ms,
+            "acceptedToAudioStartMs": self.accepted_to_audio_start_ms,
+            "confirmingFrameToAudioStartMs": (
+                self.confirming_frame_to_audio_start_ms
+            ),
+            "firstVisibleFrameToAudioStartMs": (
+                self.first_visible_frame_to_audio_start_ms
+            ),
             "totalCaptureToTextMs": self.total_capture_to_text_ms,
             "totalCaptureToAudioStartMs": self.total_capture_to_audio_start_ms,
+            "firstVisibleFrameAtMonotonic": (
+                self.first_visible_frame_at_monotonic
+            ),
+            "confirmingFrameAtMonotonic": self.confirming_frame_at_monotonic,
+            "acceptedAtMonotonic": self.accepted_at_monotonic,
+            "ttsStartedAtMonotonic": self.tts_started_at_monotonic,
+            "ttsFinishedAtMonotonic": self.tts_finished_at_monotonic,
+            "playbackStartedAtMonotonic": self.playback_started_at_monotonic,
             "captureWidth": self.capture_width,
             "captureHeight": self.capture_height,
+            "ocrRoiWidth": self.ocr_roi_width,
+            "ocrRoiHeight": self.ocr_roi_height,
+            "lastVisualChangeDecision": self.last_visual_change_decision,
+            "lastVisualChangeScore": self.last_visual_change_score,
             "captureState": self.capture_state,
             "ocrStatus": self.ocr_status,
             "translationStatus": self.translation_status,
@@ -469,11 +688,35 @@ class NarratorSessionSnapshot:
             "ocrConfidence": self.ocr_confidence,
             "lastRawOcrText": self.last_raw_ocr_text,
             "lastFilteredOcrText": self.last_filtered_ocr_text,
+            "lastNormalizedOcrText": self.last_normalized_ocr_text,
             "lastOcrRejectionReason": self.last_ocr_rejection_reason,
+            "lastOcrObservationCredible": self.last_ocr_observation_credible,
+            "lastOcrGateDecision": self.last_ocr_gate_decision,
+            "ocrCandidateText": self.ocr_candidate_text,
+            "ocrCandidateObservationCount": self.ocr_candidate_observation_count,
+            "ocrCandidateRequiredObservations": (
+                self.ocr_candidate_required_observations
+            ),
+            "ocrCandidateSimilarity": self.ocr_candidate_similarity,
+            "ocrCandidateMatchKind": self.ocr_candidate_match_kind,
             "lastAcceptedOcrText": self.last_accepted_ocr_text,
+            "ocrDecisionHistory": [
+                observation.to_dict()
+                for observation in reversed(self.ocr_decision_history)
+            ],
             "ocrRejectionCounts": dict(self.ocr_rejection_counts),
             "lastDetectedAtMonotonic": self.last_detected_at_monotonic,
             "droppedFrames": self.dropped_frames,
+            "droppedCaptureSampling": self.dropped_capture_sampling,
+            "droppedCaptureCoalesced": self.dropped_capture_coalesced,
+            "unstableOcrObservations": self.unstable_ocr_observations,
+            "staleQueuedTranslation": self.stale_queued_translation,
+            "staleRunningTranslationResults": (
+                self.stale_running_translation_results
+            ),
+            "staleQueuedTts": self.stale_queued_tts,
+            "staleRunningTtsResults": self.stale_running_tts_results,
+            "audioSupersessions": self.audio_supersessions,
             "ocrExecutionCount": self.ocr_execution_count,
             "generation": self.generation,
         }
@@ -507,6 +750,7 @@ __all__ = [
     "NarratorSessionStatus",
     "NarratorSourceMode",
     "NormalizedRect",
+    "OcrDecisionObservation",
     "OcrResult",
     "PcmAudio",
     "TranslationResult",
