@@ -342,10 +342,20 @@ def test_piper_worker_keeps_voice_loaded_and_returns_framed_pcm(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     configs: list[float] = []
+    noise_settings: list[tuple[float | None, float | None]] = []
 
     class SynthesisConfig:
-        def __init__(self, *, length_scale: float) -> None:
+        # Mirrors piper-tts 1.7.0: noise_scale and noise_w_scale are optional and
+        # default to None, which makes Piper use the voice's own values.
+        def __init__(
+            self,
+            *,
+            length_scale: float,
+            noise_scale: float | None = None,
+            noise_w_scale: float | None = None,
+        ) -> None:
             configs.append(length_scale)
+            noise_settings.append((noise_scale, noise_w_scale))
 
     class Chunk:
         sample_rate = 22050
@@ -405,6 +415,9 @@ def test_piper_worker_keeps_voice_loaded_and_returns_framed_pcm(
     assert ready["initialization_ms"] >= 0.0
     assert voice.phrases == ["Pierwsza kwestia", "Druga kwestia"]
     assert configs == pytest.approx([0.8, 1.0])
+    # No advanced override was requested, so Piper must fall back to the voice's
+    # own noise values rather than receiving numbers from us.
+    assert noise_settings == [(None, None), (None, None)]
     assert [item["request_id"] for item in responses] == [1, 2]
     assert all(item["ok"] is True for item in responses)
     assert responses[0]["sample_rate"] == 22050

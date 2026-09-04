@@ -106,6 +106,8 @@ class NarratorController:
                 "voiceId": "voice_id",
                 "volume": "volume",
                 "speechRate": "speech_rate",
+                "noiseScale": "noise_scale",
+                "noiseWScale": "noise_w_scale",
                 "captureSamplingHz": "capture_sampling_hz",
                 "visualChangeThreshold": "visual_change_threshold",
                 "stabilizationMs": "stabilization_ms",
@@ -696,6 +698,9 @@ class NarratorController:
             "voices": voices,
             "volume": settings.volume,
             "speechRate": settings.speech_rate,
+            # None means "use the voice's own value"; QML treats this as unset.
+            "noiseScale": settings.noise_scale,
+            "noiseWScale": settings.noise_w_scale,
             "subtitleRegion": settings.subtitle_region.to_dict(),
             "captureSamplingHz": settings.capture_sampling_hz,
             "visualChangeThreshold": settings.visual_change_threshold,

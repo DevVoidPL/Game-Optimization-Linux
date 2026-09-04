@@ -1987,6 +1987,8 @@ class NarratorPipeline:
             spoken_text,
             settings.voice_id,
             settings.speech_rate,
+            settings.noise_scale,
+            settings.noise_w_scale,
         )
         self._stage_futures.add(tts_future)
         self._stage_kinds[tts_future] = "tts"
@@ -2003,14 +2005,28 @@ class NarratorPipeline:
         )
 
     def _synthesize_timed(
-        self, text: str, voice_id: str, speech_rate: float
+        self,
+        text: str,
+        voice_id: str,
+        speech_rate: float,
+        noise_scale: float | None = None,
+        noise_w_scale: float | None = None,
     ) -> _TtsStageResult:
         started_at = self._clock()
+        # Only forward the advanced overrides when the user actually set them,
+        # so providers that do not accept them keep working and Piper falls back
+        # to each voice's own configured values.
+        advanced: dict[str, float] = {}
+        if noise_scale is not None:
+            advanced["noise_scale"] = noise_scale
+        if noise_w_scale is not None:
+            advanced["noise_w_scale"] = noise_w_scale
         audio = self.tts.synthesize(
             text,
             language="pl",
             voice_id=voice_id,
             speech_rate=speech_rate,
+            **advanced,
         )
         return _TtsStageResult(
             audio=audio,

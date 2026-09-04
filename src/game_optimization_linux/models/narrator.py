@@ -88,6 +88,16 @@ def _finite_number(value: object, name: str, minimum: float, maximum: float) -> 
     return normalized
 
 
+def _optional_finite_number(
+    value: object, name: str, minimum: float, maximum: float
+) -> float | None:
+    """Validate an optional override where None means "use the default"."""
+
+    if value is None:
+        return None
+    return _finite_number(value, name, minimum, maximum)
+
+
 def _integer(value: object, name: str, minimum: int, maximum: int) -> int:
     if isinstance(value, bool):
         raise ValueError(f"{name} must be an integer")
@@ -159,6 +169,11 @@ class NarratorGameSettings:
     voice_id: str = ""
     volume: float = 0.85
     speech_rate: float = 1.0
+    # Advanced Piper inference overrides. None means "use the voice's own
+    # configured value", which is the default for every installed voice.
+    # Field names follow piper-tts 1.7.0: noise_scale and noise_w_scale.
+    noise_scale: float | None = None
+    noise_w_scale: float | None = None
     subtitle_region: NormalizedRect = field(default_factory=NormalizedRect)
     capture_sampling_hz: float = 6.0
     visual_change_threshold: float = 0.08
@@ -198,6 +213,18 @@ class NarratorGameSettings:
             self,
             "speech_rate",
             _finite_number(self.speech_rate, "speech_rate", 0.5, 2.0),
+        )
+        object.__setattr__(
+            self,
+            "noise_scale",
+            _optional_finite_number(self.noise_scale, "noise_scale", 0.0, 2.0),
+        )
+        object.__setattr__(
+            self,
+            "noise_w_scale",
+            _optional_finite_number(
+                self.noise_w_scale, "noise_w_scale", 0.0, 2.0
+            ),
         )
         object.__setattr__(
             self,
@@ -286,6 +313,8 @@ class NarratorGameSettings:
             voice_id=str(values.get("voice_id", "")),
             volume=values.get("volume", 0.85),
             speech_rate=values.get("speech_rate", 1.0),
+            noise_scale=values.get("noise_scale"),
+            noise_w_scale=values.get("noise_w_scale"),
             subtitle_region=NormalizedRect.from_dict(
                 values.get("subtitle_region")
                 if isinstance(values.get("subtitle_region"), Mapping)
@@ -315,6 +344,8 @@ class NarratorGameSettings:
             "voice_id": self.voice_id,
             "volume": self.volume,
             "speech_rate": self.speech_rate,
+            "noise_scale": self.noise_scale,
+            "noise_w_scale": self.noise_w_scale,
             "subtitle_region": self.subtitle_region.to_dict(),
             "capture_sampling_hz": self.capture_sampling_hz,
             "visual_change_threshold": self.visual_change_threshold,

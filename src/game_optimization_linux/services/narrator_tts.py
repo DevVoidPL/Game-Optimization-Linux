@@ -7,6 +7,7 @@ from collections.abc import Callable
 from dataclasses import dataclass
 import importlib.util
 import json
+import logging
 from math import isfinite
 from pathlib import Path
 import selectors
@@ -18,6 +19,9 @@ from typing import Protocol, TextIO
 
 from game_optimization_linux.config import NARRATOR_COMPONENTS_DIR
 from game_optimization_linux.models.narrator import PcmAudio
+
+
+logger = logging.getLogger(__name__)
 
 
 PIPER_COMPONENT_ID = "tts.polish-voice"
@@ -62,6 +66,10 @@ class PiperSynthesis:
     client_decode_ms: float | None = None
     worker_startup_ms: float | None = None
     worker_reused: bool = True
+    # The length_scale Piper actually used, and the voice's own default, as
+    # reported by the worker. length_scale is inverse to speed.
+    length_scale: float | None = None
+    voice_default_length_scale: float | None = None
 
 
 POLISH_VOICES = (
@@ -135,19 +143,32 @@ class PiperWorkerClient:
         with self._io_lock:
             self._ensure_process()
 
-    def synthesize(self, text: str, *, speech_rate: float) -> PiperSynthesis:
+    def synthesize(
+        self,
+        text: str,
+        *,
+        speech_rate: float,
+        noise_scale: float | None = None,
+        noise_w_scale: float | None = None,
+    ) -> PiperSynthesis:
         with self._io_lock:
             existing = self._process
             reused = existing is not None and existing.poll() is None
             process = self._ensure_process()
             self._request_id += 1
             request_id = self._request_id
-            request = {
+            request: dict[str, object] = {
                 "command": "synthesize",
                 "request_id": request_id,
                 "text": text,
                 "speech_rate": speech_rate,
             }
+            # Omit unset advanced controls entirely so the worker leaves them to
+            # the voice's own configuration.
+            if noise_scale is not None:
+                request["noise_scale"] = noise_scale
+            if noise_w_scale is not None:
+                request["noise_w_scale"] = noise_w_scale
             roundtrip_started = time.monotonic()
             try:
                 assert process.stdin is not None
@@ -196,6 +217,10 @@ class PiperWorkerClient:
                 client_decode_ms=decode_ms,
                 worker_startup_ms=self.startup_ms if not reused else None,
                 worker_reused=reused,
+                length_scale=self._response_float(response, "length_scale"),
+                voice_default_length_scale=self._response_float(
+                    response, "voice_default_length_scale"
+                ),
             )
 
     def cancel(self) -> None:
@@ -437,6 +462,8 @@ class PiperPolishTtsProvider:
         language: str,
         voice_id: str,
         speech_rate: float,
+        noise_scale: float | None = None,
+        noise_w_scale: float | None = None,
     ) -> PcmAudio:
         phrase = " ".join(str(text).split())
         if not phrase:
@@ -467,10 +494,42 @@ class PiperPolishTtsProvider:
             )
             worker = self._get_worker(selected_voice)
             try:
-                result = worker.synthesize(phrase, speech_rate=normalized_rate)
+                # Only forward the advanced overrides when the user set them, so
+                # the unset case keeps the previous call shape exactly.
+                advanced: dict[str, float] = {}
+                if noise_scale is not None:
+                    advanced["noise_scale"] = noise_scale
+                if noise_w_scale is not None:
+                    advanced["noise_w_scale"] = noise_w_scale
+                result = worker.synthesize(
+                    phrase, speech_rate=normalized_rate, **advanced
+                )
             except Exception:
                 self._drop_worker(worker)
                 raise
+        # length_scale is inverse to speed, so a higher rate must produce a
+        # smaller value here. Logged per utterance in the main process so the
+        # effective value is visible in a real Flatpak run, not just in tests.
+        logger.debug(
+            "Narrator speech synthesis voice=%s rate=%.2fx "
+            "length_scale=%s voice_default_length_scale=%s "
+            "noise_scale=%s noise_w_scale=%s characters=%d",
+            selected_voice,
+            normalized_rate,
+            (
+                f"{result.length_scale:.4f}"
+                if result.length_scale is not None
+                else "unreported"
+            ),
+            (
+                f"{result.voice_default_length_scale:.4f}"
+                if result.voice_default_length_scale is not None
+                else "unreported"
+            ),
+            "voice_default" if noise_scale is None else f"{noise_scale:.3f}",
+            "voice_default" if noise_w_scale is None else f"{noise_w_scale:.3f}",
+            len(phrase),
+        )
         if result.sample_format != "s16le":
             raise RuntimeError(
                 f"Piper returned unsupported PCM format: {result.sample_format}"

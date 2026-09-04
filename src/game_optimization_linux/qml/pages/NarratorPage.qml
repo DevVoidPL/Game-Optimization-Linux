@@ -29,6 +29,13 @@ Item {
     property var voices: []
     property real narratorVolume: 0.85
     property real speechRate: 1.0
+    // Advanced articulation overrides. When articulationOverridden is false the
+    // values are not sent at all, so each voice's own defaults apply. The
+    // numbers below are only the slider starting positions and match the values
+    // both installed Polish voices already use.
+    property bool articulationOverridden: false
+    property real noiseWScale: 0.8
+    property real noiseScale: 0.667
     property real cropX: 0.05
     property real cropY: 0.62
     property real cropWidth: 0.90
@@ -157,6 +164,14 @@ Item {
         voices = value(settings, ["voices"], []) || []
         narratorVolume = Number(value(settings, ["volume"], 0.85))
         speechRate = Number(value(settings, ["speech_rate", "speechRate"], 1.0))
+        // A null/absent value means the voice's own articulation is in use.
+        var storedNoiseW = value(settings, ["noise_w_scale", "noiseWScale"], null)
+        var storedNoise = value(settings, ["noise_scale", "noiseScale"], null)
+        articulationOverridden = storedNoiseW !== null || storedNoise !== null
+        if (storedNoiseW !== null)
+            noiseWScale = Number(storedNoiseW)
+        if (storedNoise !== null)
+            noiseScale = Number(storedNoise)
         var region = value(settings, ["subtitle_region", "subtitleRegion"], ({})) || {}
         cropX = Number(value(region, ["x"], 0.05))
         cropY = Number(value(region, ["y"], 0.62))
@@ -177,6 +192,9 @@ Item {
             "voiceId": voiceId,
             "volume": narratorVolume,
             "speechRate": speechRate,
+            // null tells the backend to leave articulation to the voice.
+            "noiseWScale": articulationOverridden ? noiseWScale : null,
+            "noiseScale": articulationOverridden ? noiseScale : null,
             "subtitleRegion": {
                 "x": cropX,
                 "y": cropY,
@@ -556,10 +574,30 @@ Item {
         return (unit === 0 ? Math.round(amount) : amount.toFixed(1)) + " " + units[unit]
     }
 
+    // Turning the override off clears the stored values, so the backend falls
+    // back to the voice's own articulation instead of the last slider position.
+    function setArticulationOverridden(enabled) {
+        articulationOverridden = enabled
+        saveSettings()
+    }
+
     function formatLatency(raw) {
         if (raw === undefined || raw === null || !isFinite(Number(raw)))
             return qsTr("Not measured")
         return qsTr("%1 ms").arg(Number(raw).toFixed(0))
+    }
+
+    // How long consensus waited between first seeing the subtitle and accepting
+    // the phrase. Derived by subtraction from two values the session snapshot
+    // already reports; nothing new is measured here.
+    function formatConsensusWait(session) {
+        var firstSeen = value(session, ["firstVisibleFrameToAudioStartMs"], null)
+        var accepted = value(session, ["acceptedToAudioStartMs"], null)
+        if (firstSeen === null || accepted === null)
+            return qsTr("Not measured")
+        if (!isFinite(Number(firstSeen)) || !isFinite(Number(accepted)))
+            return qsTr("Not measured")
+        return formatLatency(Math.max(0, Number(firstSeen) - Number(accepted)))
     }
 
     function runComponentAction(component) {
@@ -979,6 +1017,82 @@ Item {
                             value: page.speechRate
                             enabled: !page.sessionActive
                             onMoved: page.speechRate = value
+                        }
+
+                        // Advanced Piper inference overrides. Unset by default,
+                        // in which case each voice's own configured value is
+                        // used. Exposed so a different articulation can be
+                        // tried; no outcome is promised here.
+                        AppSwitch {
+                            id: articulationToggle
+                            Layout.fillWidth: true
+                            text: qsTr("Advanced voice articulation")
+                            checked: page.articulationOverridden
+                            enabled: !page.sessionActive
+                            onToggled: page.setArticulationOverridden(checked)
+                        }
+
+                        Label {
+                            Layout.fillWidth: true
+                            visible: articulationToggle.checked
+                            text: qsTr("Piper inference parameters. Lower values reduce variation. Leave this off to use each voice's own values.")
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            visible: articulationToggle.checked
+                            Label {
+                                Layout.fillWidth: true
+                                text: qsTr("Phoneme duration variation")
+                                color: App.Theme.text
+                                font.pixelSize: App.Theme.fontBody
+                            }
+                            Label {
+                                text: page.noiseWScale.toFixed(3)
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                            }
+                        }
+
+                        AppSlider {
+                            Layout.fillWidth: true
+                            visible: articulationToggle.checked
+                            from: 0.0
+                            to: 2.0
+                            stepSize: 0.025
+                            value: page.noiseWScale
+                            enabled: !page.sessionActive
+                            onMoved: page.noiseWScale = value
+                        }
+
+                        RowLayout {
+                            Layout.fillWidth: true
+                            visible: articulationToggle.checked
+                            Label {
+                                Layout.fillWidth: true
+                                text: qsTr("Acoustic variation")
+                                color: App.Theme.text
+                                font.pixelSize: App.Theme.fontBody
+                            }
+                            Label {
+                                text: page.noiseScale.toFixed(3)
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                            }
+                        }
+
+                        AppSlider {
+                            Layout.fillWidth: true
+                            visible: articulationToggle.checked
+                            from: 0.0
+                            to: 2.0
+                            stepSize: 0.025
+                            value: page.noiseScale
+                            enabled: !page.sessionActive
+                            onMoved: page.noiseScale = value
                         }
                     }
                 }
@@ -1541,9 +1655,13 @@ Item {
                         Label { text: qsTr("Source capture: %1x%2").arg(page.value(page.sessionData, ["captureWidth"], 0)).arg(page.value(page.sessionData, ["captureHeight"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("OCR ROI: %1x%2").arg(page.value(page.sessionData, ["ocrRoiWidth"], 0)).arg(page.value(page.sessionData, ["ocrRoiHeight"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Capture to text: %1").arg(page.formatLatency(page.value(page.sessionData, ["totalCaptureToTextMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
-                        Label { text: qsTr("Subtitle to speech: %1").arg(page.formatLatency(page.value(page.sessionData, ["totalCaptureToAudioStartMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Subtitle on screen to speech: %1").arg(page.formatLatency(page.value(page.sessionData, ["firstVisibleFrameToAudioStartMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Consensus wait: %1").arg(page.formatConsensusWait(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Phrase accepted to speech: %1").arg(page.formatLatency(page.value(page.sessionData, ["acceptedToAudioStartMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Confirming frame to speech: %1").arg(page.formatLatency(page.value(page.sessionData, ["totalCaptureToAudioStartMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("OCR runs: %1").arg(page.value(page.sessionData, ["ocrExecutionCount"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Dropped work: %1").arg(page.value(page.sessionData, ["droppedFrames"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Dropped spoken lines: %1").arg(page.value(page.sessionData, ["audioSupersessions"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label {
                             text: qsTr("Subtitle region") + ": x="
                                   + page.cropX.toFixed(3) + " y="
