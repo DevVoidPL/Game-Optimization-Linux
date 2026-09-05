@@ -629,9 +629,13 @@ class NarratorSessionSnapshot:
     # Per-session loss funnel, keyed by the pipeline's own decision vocabulary.
     # Bounded: one integer per known decision name.
     narration_funnel: Mapping[str, int] = field(default_factory=dict)
-    # Per-session loss funnel, keyed by the pipeline's own decision vocabulary.
-    # Bounded: one integer per known decision name.
-    narration_funnel: Mapping[str, int] = field(default_factory=dict)
+    # Playback outcome. "finished" must mean the PCM was actually played, so an
+    # utterance truncated by a backend underrun counts as interrupted.
+    playback_completed: int = 0
+    playback_interrupted: int = 0
+    playback_last_result: str = ""
+    playback_expected_ms: float | None = None
+    playback_actual_ms: float | None = None
     capture_frames_received: int = 0
     capture_stream_errors: int = 0
     capture_restarts: int = 0
@@ -779,6 +783,11 @@ class NarratorSessionSnapshot:
             "captureVariantsTried": self.capture_variants_tried,
             "captureVariantsFailed": self.capture_variants_failed,
             "narrationFunnel": self.narration_funnel_summary(),
+            "playbackCompleted": self.playback_completed,
+            "playbackInterrupted": self.playback_interrupted,
+            "playbackLastResult": self.playback_last_result,
+            "playbackExpectedMs": self.playback_expected_ms,
+            "playbackActualMs": self.playback_actual_ms,
             "captureFramesReceived": self.capture_frames_received,
             "captureStreamErrors": self.capture_stream_errors,
             "captureRestarts": self.capture_restarts,

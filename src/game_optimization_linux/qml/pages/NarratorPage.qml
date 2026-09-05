@@ -606,6 +606,20 @@ Item {
         return qsTr("%1 (%2 sampling interval, %3 OCR busy)").arg(total).arg(sampling).arg(busy)
     }
 
+    // Last playback outcome with expected versus actually played duration. A
+    // truncated utterance shows a played time well below the expected time.
+    function formatPlaybackResult(session) {
+        var result = String(value(session, ["playbackLastResult"], ""))
+        if (result === "")
+            return qsTr("Not measured")
+        var expected = value(session, ["playbackExpectedMs"], null)
+        var actual = value(session, ["playbackActualMs"], null)
+        if (expected === null || actual === null)
+            return result
+        return qsTr("%1 (played %2 of %3)").arg(result)
+                .arg(formatLatency(actual)).arg(formatLatency(expected))
+    }
+
     // Compact loss funnel. Shows every stage where a subtitle can disappear, so
     // a line lost before the audio queue is visible rather than invisible.
     function formatNarrationFunnel(session) {
@@ -1726,6 +1740,9 @@ Item {
                         Label { text: qsTr("Subtitle funnel: %1").arg(page.formatNarrationFunnel(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Lost at: %1").arg(page.formatNarrationLosses(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Superseded in audio queue: %1").arg(page.value(page.sessionData, ["audioSupersessions"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Playback completed: %1").arg(page.value(page.sessionData, ["playbackCompleted"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Playback interrupted: %1").arg(page.value(page.sessionData, ["playbackInterrupted"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Last playback: %1").arg(page.formatPlaybackResult(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Frames received: %1").arg(page.value(page.sessionData, ["captureFramesReceived"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Capture format: %1").arg(page.formatCaptureFormat(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Capture variants tried: %1").arg(page.formatCaptureVariants(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }

@@ -2414,6 +2414,14 @@ class NarratorPipeline:
                 getattr(self.capture, "failed_variants", ()) or ()
             ),
             narration_funnel=dict(self._funnel),
+            playback_completed=int(getattr(self.audio, "completed_count", 0)),
+            playback_interrupted=int(getattr(self.audio, "interrupted_count", 0)),
+            playback_last_result=str(
+                getattr(getattr(self.audio, "last_playback", None), "result", "")
+                or ""
+            ),
+            playback_expected_ms=self._playback_ms("expected_seconds"),
+            playback_actual_ms=self._playback_ms("processed_seconds"),
             capture_frames_received=int(
                 getattr(self.capture, "frames_received", 0)
             ),
@@ -2530,6 +2538,18 @@ class NarratorPipeline:
         self._pending_frame_visual_decision = ""
         self._first_visible_frame_timestamp = None
         self._settings = None
+
+    def _playback_ms(self, attribute: str) -> float | None:
+        """Read one duration off the last playback record, in milliseconds."""
+
+        record = getattr(self.audio, "last_playback", None)
+        value = getattr(record, attribute, None) if record is not None else None
+        if value is None:
+            return None
+        try:
+            return max(0.0, float(value) * 1000.0)
+        except (TypeError, ValueError):
+            return None
 
     def _cancel_provider_work(self) -> None:
         for provider in (self.ocr, self.translator, self.tts):
