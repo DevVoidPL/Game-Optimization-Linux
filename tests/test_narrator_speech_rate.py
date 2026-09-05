@@ -433,8 +433,9 @@ def test_narrator_page_labels_each_latency_unambiguously() -> None:
     assert '["firstVisibleFrameToAudioStartMs"]' in source
     assert '["acceptedToAudioStartMs"]' in source
     assert '["totalCaptureToAudioStartMs"]' in source
-    # The dropped-utterance counter must be visible too.
-    assert 'qsTr("Dropped spoken lines: %1")' in source
+    # The audio-queue counter must stay visible, but named for what it counts:
+    # it covers supersessions only, not every way a line can be lost.
+    assert 'qsTr("Superseded in audio queue: %1")' in source
     assert '["audioSupersessions"]' in source
 
 

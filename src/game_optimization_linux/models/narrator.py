@@ -618,6 +618,23 @@ class NarratorSessionSnapshot:
     last_visual_change_decision: str = ""
     last_visual_change_score: float | None = None
     capture_state: str = "stopped"
+    # Capture transport diagnostics. capture_frames_received separates "no
+    # subtitles were recognised" from "no frames ever arrived".
+    capture_format: str = ""
+    capture_dmabuf: bool = False
+    # Which pipeline variants were attempted and which were retired, so a
+    # silent fallback becomes visible.
+    capture_variants_tried: str = ""
+    capture_variants_failed: str = ""
+    # Per-session loss funnel, keyed by the pipeline's own decision vocabulary.
+    # Bounded: one integer per known decision name.
+    narration_funnel: Mapping[str, int] = field(default_factory=dict)
+    # Per-session loss funnel, keyed by the pipeline's own decision vocabulary.
+    # Bounded: one integer per known decision name.
+    narration_funnel: Mapping[str, int] = field(default_factory=dict)
+    capture_frames_received: int = 0
+    capture_stream_errors: int = 0
+    capture_restarts: int = 0
     ocr_status: str = "component_missing"
     translation_status: str = "component_missing"
     tts_status: str = "component_missing"
@@ -649,6 +666,51 @@ class NarratorSessionSnapshot:
     audio_supersessions: int = 0
     ocr_execution_count: int = 0
     generation: int = 0
+
+    def narration_funnel_summary(self) -> dict[str, int]:
+        """Aggregate the raw decision counts into an interpretable funnel.
+
+        Every stage where a subtitle can be lost is reported, using the
+        pipeline's existing decision names.
+
+        ``candidate_abandoned`` is derived, because no single event marks it. A
+        candidate that has been seen once and never confirmed disappears through
+        one of three existing decisions: the subtitle changed to something
+        dissimilar (``candidate_replaced_dissimilar``), the stability window
+        elapsed (``candidate_window_expired``), or a later observation reset it
+        (``candidate_reset_*``). Summing those gives the number of candidates
+        that reached 1/2 and were silently dropped, which no other counter shows.
+        """
+
+        counts = dict(self.narration_funnel)
+
+        def total(*names: str) -> int:
+            return sum(int(counts.get(name, 0)) for name in names)
+
+        def prefixed(prefix: str) -> int:
+            return sum(
+                int(value)
+                for name, value in counts.items()
+                if name.startswith(prefix)
+            )
+
+        abandoned = (
+            total("candidate_replaced_dissimilar", "candidate_window_expired")
+            + prefixed("candidate_reset_")
+        )
+        return {
+            "observations": int(counts.get("observations", 0)),
+            "rejectedEmpty": prefixed("rejected_empty"),
+            "rejectedLowConfidence": prefixed("rejected_low_confidence"),
+            "rejectedDuplicate": prefixed("rejected_duplicate"),
+            "candidateStarted": int(counts.get("candidate_started", 0)),
+            "candidateAbandoned": abandoned,
+            "candidateReplacedDissimilar": total("candidate_replaced_dissimilar"),
+            "accepted": int(counts.get("accepted", 0)),
+            "ttsSubmitted": int(counts.get("tts_submitted", 0)),
+            "playedToCompletion": int(counts.get("played_to_completion", 0)),
+            "supersededInAudioQueue": int(self.audio_supersessions),
+        }
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -712,6 +774,14 @@ class NarratorSessionSnapshot:
             "lastVisualChangeDecision": self.last_visual_change_decision,
             "lastVisualChangeScore": self.last_visual_change_score,
             "captureState": self.capture_state,
+            "captureFormat": self.capture_format,
+            "captureDmabuf": self.capture_dmabuf,
+            "captureVariantsTried": self.capture_variants_tried,
+            "captureVariantsFailed": self.capture_variants_failed,
+            "narrationFunnel": self.narration_funnel_summary(),
+            "captureFramesReceived": self.capture_frames_received,
+            "captureStreamErrors": self.capture_stream_errors,
+            "captureRestarts": self.capture_restarts,
             "ocrStatus": self.ocr_status,
             "translationStatus": self.translation_status,
             "ttsStatus": self.tts_status,

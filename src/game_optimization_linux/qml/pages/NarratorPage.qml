@@ -581,6 +581,68 @@ Item {
         saveSettings()
     }
 
+    // Which pipeline variant negotiated, and whether the runtime can use
+    // DMA-BUF at all. Distinguishes a DMA-BUF capable stream from a
+    // system-memory fallback when diagnosing "unhandled format" failures.
+    function formatCaptureFormat(session) {
+        var variant = String(value(session, ["captureFormat"], ""))
+        if (variant === "")
+            return qsTr("Not negotiated")
+        var failed = String(value(session, ["captureVariantsFailed"], ""))
+        if (failed !== "")
+            return qsTr("%1 (after %2 failed)").arg(variant).arg(failed)
+        return variant
+    }
+
+    // Capture frames deliberately not sent to OCR. This is rate limiting, not
+    // lost work: either the sampling interval had not elapsed, or an OCR request
+    // was still in flight. A high number next to a healthy OCR count is normal.
+    function formatSkippedFrames(session) {
+        var total = Number(value(session, ["droppedFrames"], 0))
+        var sampling = Number(value(session, ["droppedCaptureSampling"], 0))
+        var busy = Number(value(session, ["droppedCaptureCoalesced"], 0))
+        if (total <= 0)
+            return "0"
+        return qsTr("%1 (%2 sampling interval, %3 OCR busy)").arg(total).arg(sampling).arg(busy)
+    }
+
+    // Compact loss funnel. Shows every stage where a subtitle can disappear, so
+    // a line lost before the audio queue is visible rather than invisible.
+    function formatNarrationFunnel(session) {
+        var funnel = value(session, ["narrationFunnel"], null)
+        if (!funnel)
+            return qsTr("Not measured")
+        function count(key) { return Number(funnel[key] || 0) }
+        return qsTr("seen %1 -> accepted %2 -> spoken %3 -> finished %4")
+                .arg(count("observations"))
+                .arg(count("accepted"))
+                .arg(count("ttsSubmitted"))
+                .arg(count("playedToCompletion"))
+    }
+
+    // Where lines were lost, in the pipeline's own decision vocabulary.
+    function formatNarrationLosses(session) {
+        var funnel = value(session, ["narrationFunnel"], null)
+        if (!funnel)
+            return qsTr("Not measured")
+        function count(key) { return Number(funnel[key] || 0) }
+        return qsTr("empty %1, low confidence %2, duplicate %3, abandoned %4, superseded %5")
+                .arg(count("rejectedEmpty"))
+                .arg(count("rejectedLowConfidence"))
+                .arg(count("rejectedDuplicate"))
+                .arg(count("candidateAbandoned"))
+                .arg(count("supersededInAudioQueue"))
+    }
+
+    // Makes a silent variant fallback visible.
+    function formatCaptureVariants(session) {
+        var tried = String(value(session, ["captureVariantsTried"], ""))
+        if (tried === "")
+            return qsTr("None attempted")
+        var glReady = value(session, ["captureDmabuf"], false) === true
+        return tried + (glReady ? qsTr(" (GL available)") : qsTr(" (no GL)"))
+    }
+
     function formatLatency(raw) {
         if (raw === undefined || raw === null || !isFinite(Number(raw)))
             return qsTr("Not measured")
@@ -1660,8 +1722,15 @@ Item {
                         Label { text: qsTr("Phrase accepted to speech: %1").arg(page.formatLatency(page.value(page.sessionData, ["acceptedToAudioStartMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("Confirming frame to speech: %1").arg(page.formatLatency(page.value(page.sessionData, ["totalCaptureToAudioStartMs"], null))); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label { text: qsTr("OCR runs: %1").arg(page.value(page.sessionData, ["ocrExecutionCount"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
-                        Label { text: qsTr("Dropped work: %1").arg(page.value(page.sessionData, ["droppedFrames"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
-                        Label { text: qsTr("Dropped spoken lines: %1").arg(page.value(page.sessionData, ["audioSupersessions"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Frames skipped by rate limit: %1").arg(page.formatSkippedFrames(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Subtitle funnel: %1").arg(page.formatNarrationFunnel(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Lost at: %1").arg(page.formatNarrationLosses(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Superseded in audio queue: %1").arg(page.value(page.sessionData, ["audioSupersessions"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Frames received: %1").arg(page.value(page.sessionData, ["captureFramesReceived"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Capture format: %1").arg(page.formatCaptureFormat(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Capture variants tried: %1").arg(page.formatCaptureVariants(page.sessionData)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Capture stream errors: %1").arg(page.value(page.sessionData, ["captureStreamErrors"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
+                        Label { text: qsTr("Capture restarts: %1").arg(page.value(page.sessionData, ["captureRestarts"], 0)); color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption }
                         Label {
                             text: qsTr("Subtitle region") + ": x="
                                   + page.cropX.toFixed(3) + " y="

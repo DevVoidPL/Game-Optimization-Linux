@@ -836,6 +836,8 @@ class NarratorPipeline:
         self._text_gate = SubtitleTextGate()
         self._deduplicator = PhraseDeduplicator()
         self._ocr_rejection_counts: dict[str, int] = {}
+        # Per-session loss funnel. Bounded: one integer per known decision name.
+        self._funnel: dict[str, int] = {}
         self._last_ocr_diagnostic: tuple[str, str, float | None] | None = None
         self._last_ocr_backend_diagnostic: tuple[str, str] | None = None
         self._ocr_future: Future[OcrResult] | None = None
@@ -1050,6 +1052,7 @@ class NarratorPipeline:
             )
             self._deduplicator = PhraseDeduplicator()
             self._ocr_rejection_counts = {}
+            self._funnel = {}
             self._last_ocr_diagnostic = None
             self._last_ocr_backend_diagnostic = None
             self._request_active = False
@@ -1661,6 +1664,17 @@ class NarratorPipeline:
                 )
             elif phrase:
                 final_decision = "accepted"
+            # Loss funnel. Every observation is counted exactly once under the
+            # decision the pipeline already assigned it, so no new vocabulary is
+            # invented and the rows stay traceable to the decision history.
+            self._funnel["observations"] = self._funnel.get("observations", 0) + 1
+            self._funnel[final_decision] = self._funnel.get(final_decision, 0) + 1
+            if observation.candidate_started:
+                self._funnel["candidate_started"] = (
+                    self._funnel.get("candidate_started", 0) + 1
+                )
+            if phrase:
+                self._funnel["accepted"] = self._funnel.get("accepted", 0) + 1
             self._append_ocr_decision(
                 OcrDecisionObservation(
                     observation_id=request_id,
@@ -1982,6 +1996,7 @@ class NarratorPipeline:
             decision="accepted_tts_submitted",
             tts_submitted=True,
         )
+        self._funnel["tts_submitted"] = self._funnel.get("tts_submitted", 0) + 1
         tts_future = self._executor.submit(
             self._synthesize_timed,
             spoken_text,
@@ -2213,6 +2228,9 @@ class NarratorPipeline:
             ):
                 return
             self._snapshot = replace(self._snapshot, audio_status="ready")
+            self._funnel["played_to_completion"] = (
+                self._funnel.get("played_to_completion", 0) + 1
+            )
             if not self._request_active:
                 self._emit(NarratorSessionStatus.LISTENING)
 
@@ -2383,6 +2401,24 @@ class NarratorPipeline:
                 int(getattr(self.audio, "superseded_count", 0))
                 - self._audio_supersession_baseline,
             ),
+            # Read defensively: capture backends other than the GStreamer
+            # transport do not expose these counters.
+            capture_format=str(
+                getattr(self.capture, "negotiated_variant", "") or ""
+            ),
+            capture_dmabuf=bool(getattr(self.capture, "dmabuf_supported", False)),
+            capture_variants_tried=",".join(
+                getattr(self.capture, "tried_variants", ()) or ()
+            ),
+            capture_variants_failed=",".join(
+                getattr(self.capture, "failed_variants", ()) or ()
+            ),
+            narration_funnel=dict(self._funnel),
+            capture_frames_received=int(
+                getattr(self.capture, "frames_received", 0)
+            ),
+            capture_stream_errors=int(getattr(self.capture, "stream_errors", 0)),
+            capture_restarts=int(getattr(self.capture, "restarts", 0)),
         )
         timings = {
             name: value

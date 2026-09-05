@@ -119,6 +119,37 @@ class PortalScreenCaptureProvider:
             )
         return self._backend.capabilities()
 
+    # Forward the transport's capture diagnostics through to the pipeline. The
+    # pipeline holds this provider, not the backend or the transport, so without
+    # these the panel would keep reporting zero frames and "Not negotiated".
+    @property
+    def negotiated_variant(self) -> str:
+        return str(getattr(self._backend, "negotiated_variant", "") or "")
+
+    @property
+    def dmabuf_supported(self) -> bool:
+        return bool(getattr(self._backend, "dmabuf_supported", False))
+
+    @property
+    def frames_received(self) -> int:
+        return int(getattr(self._backend, "frames_received", 0))
+
+    @property
+    def stream_errors(self) -> int:
+        return int(getattr(self._backend, "stream_errors", 0))
+
+    @property
+    def restarts(self) -> int:
+        return int(getattr(self._backend, "restarts", 0))
+
+    @property
+    def tried_variants(self) -> tuple[str, ...]:
+        return tuple(getattr(self._backend, "tried_variants", ()) or ())
+
+    @property
+    def failed_variants(self) -> tuple[str, ...]:
+        return tuple(getattr(self._backend, "failed_variants", ()) or ())
+
     def start(
         self,
         request: CaptureRequest,

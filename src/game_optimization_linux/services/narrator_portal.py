@@ -780,6 +780,37 @@ class QtPortalScreenCastBackend(QObject):
     def capabilities(self) -> CaptureCapabilities:
         return self._portal.capabilities(self._transport.available, self._transport.message)
 
+    # Capture diagnostics live on the GStreamer transport, but the pipeline only
+    # holds the capture provider. Forward them so the panel reflects reality
+    # instead of the placeholder defaults.
+    @property
+    def negotiated_variant(self) -> str:
+        return str(getattr(self._transport, "negotiated_variant", "") or "")
+
+    @property
+    def dmabuf_supported(self) -> bool:
+        return bool(getattr(self._transport, "dmabuf_supported", False))
+
+    @property
+    def frames_received(self) -> int:
+        return int(getattr(self._transport, "frames_received", 0))
+
+    @property
+    def stream_errors(self) -> int:
+        return int(getattr(self._transport, "stream_errors", 0))
+
+    @property
+    def restarts(self) -> int:
+        return int(getattr(self._transport, "restarts", 0))
+
+    @property
+    def tried_variants(self) -> tuple[str, ...]:
+        return tuple(getattr(self._transport, "tried_variants", ()) or ())
+
+    @property
+    def failed_variants(self) -> tuple[str, ...]:
+        return tuple(getattr(self._transport, "failed_variants", ()) or ())
+
     def start(
         self,
         request: CaptureRequest,
