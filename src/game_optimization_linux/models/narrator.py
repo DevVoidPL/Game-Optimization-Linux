@@ -456,6 +456,10 @@ class OcrResult:
     geometry_coherent: bool = False
     clean_short_phrase_evidence: bool = False
     filter_summary: str = ""
+    # Best single line in the frame. Distinguishes "no subtitle was on screen"
+    # from "a readable subtitle was present and still lost".
+    strongest_line_confidence: float | None = None
+    strongest_line_text: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -629,6 +633,8 @@ class NarratorSessionSnapshot:
     # Per-session loss funnel, keyed by the pipeline's own decision vocabulary.
     # Bounded: one integer per known decision name.
     narration_funnel: Mapping[str, int] = field(default_factory=dict)
+    # Subtitles that had a readable line and were rejected anyway. Bounded.
+    lost_strong_lines: tuple[Mapping[str, Any], ...] = ()
     # Playback outcome. "finished" must mean the PCM was actually played, so an
     # utterance truncated by a backend underrun counts as interrupted.
     playback_completed: int = 0
@@ -706,6 +712,9 @@ class NarratorSessionSnapshot:
             "observations": int(counts.get("observations", 0)),
             "rejectedEmpty": prefixed("rejected_empty"),
             "rejectedLowConfidence": prefixed("rejected_low_confidence"),
+            # The two causes the single figure above merged together.
+            "rejectedNoStrongLine": total("rejected_no_strong_line"),
+            "rejectedDespiteStrongLine": total("rejected_despite_strong_line"),
             "rejectedDuplicate": prefixed("rejected_duplicate"),
             "candidateStarted": int(counts.get("candidate_started", 0)),
             "candidateAbandoned": abandoned,
@@ -783,6 +792,7 @@ class NarratorSessionSnapshot:
             "captureVariantsTried": self.capture_variants_tried,
             "captureVariantsFailed": self.capture_variants_failed,
             "narrationFunnel": self.narration_funnel_summary(),
+            "lostStrongLines": [dict(entry) for entry in self.lost_strong_lines],
             "playbackCompleted": self.playback_completed,
             "playbackInterrupted": self.playback_interrupted,
             "playbackLastResult": self.playback_last_result,

@@ -31,6 +31,11 @@ TESSERACT_MODEL_RELATIVE_PATH = Path("tessdata") / "eng.traineddata"
 TESSERACT_POLISH_COMPONENT_ID = "ocr.polish-local"
 TESSERACT_POLISH_MODEL_RELATIVE_PATH = Path("tessdata") / "pol.traineddata"
 OCR_UPSCALE_FACTOR = 2.0
+
+# The confidence a line must reach to act as the strong reference for the
+# weak-line rule. Reused when splitting low-confidence rejections, so that split
+# can never drift away from the rule it is describing.
+OCR_STRONG_LINE_CONFIDENCE = 0.80
 OCR_MAX_PREPROCESSED_PIXELS = 4_000_000
 OCR_CONTRAST_TILE_WIDTH = 96
 OCR_CONTRAST_TILE_HEIGHT = 64
@@ -498,6 +503,7 @@ class TesseractOcrProvider:
             raw_confidence,
             tokens,
         ) = self._analyze_tsv(tsv)
+        strongest_confidence, strongest_text = self._strongest_line(tokens)
         quality = self._quality_evidence(
             filtered_text,
             confidence,
@@ -566,6 +572,8 @@ class TesseractOcrProvider:
             geometry_coherent=quality["geometry_coherent"],
             clean_short_phrase_evidence=quality["clean_short_phrase_evidence"],
             filter_summary=quality["filter_summary"],
+            strongest_line_confidence=strongest_confidence,
+            strongest_line_text=strongest_text,
         )
 
     def prepare(self, language: str) -> None:
@@ -999,6 +1007,38 @@ class TesseractOcrProvider:
         return text, average, tokens
 
     @staticmethod
+    def _strongest_line(
+        tokens: list[dict[str, object]],
+    ) -> tuple[float | None, str]:
+        """Report the best line's confidence and text.
+
+        Measurement only. Used to tell a frame that held a readable subtitle from
+        one that held none, when the phrase was rejected on confidence.
+        """
+
+        groups: dict[tuple, list[dict[str, object]]] = {}
+        for token in tokens:
+            key = tuple(
+                int(token[name])
+                for name in ("page", "block", "paragraph", "line")
+            )
+            groups.setdefault(key, []).append(token)
+        best_confidence: float | None = None
+        best_text = ""
+        for values in groups.values():
+            confidence = TesseractOcrProvider._token_confidence(values)
+            if confidence is None:
+                continue
+            if best_confidence is None or confidence > best_confidence:
+                best_confidence = confidence
+                best_text = " ".join(
+                    str(token["text"])
+                    for token in values
+                    if str(token["text"]).strip()
+                )
+        return best_confidence, best_text
+
+    @staticmethod
     def _analyze_tsv(
         payload: str,
     ) -> tuple[
@@ -1053,7 +1093,7 @@ class TesseractOcrProvider:
             # one whose token composition independently identifies it as noise.
             if (
                 strongest_line is not None
-                and strongest_line >= 0.80
+                and strongest_line >= OCR_STRONG_LINE_CONFIDENCE
                 and (line_confidence is None or line_confidence < 0.50)
                 and (
                     line_confidence is None

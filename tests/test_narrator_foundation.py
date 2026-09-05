@@ -595,8 +595,15 @@ def test_app_controller_region_preview_reuses_active_rgb888_frame(
         assert ready.is_set()
         assert len(capture.requests) == 1
         assert capture.stop_calls == 0
-        final = results[-1]
-        assert final["state"] == "ready"
+        # Assert the ready state was REACHED rather than that it was the last
+        # element observed: a later "active" update can legitimately arrive after
+        # it, which made results[-1] flip intermittently.
+        ready_states = [entry for entry in results if entry.get("state") == "ready"]
+        assert ready_states, (
+            "no ready state observed; saw "
+            f"{[entry.get('state') for entry in results]}"
+        )
+        final = ready_states[-1]
         assert str(final["imageUrl"]).startswith("data:image/png;base64,")
     finally:
         controller.shutdown()

@@ -201,10 +201,12 @@ def test_empty_funnel_reports_zeros_not_missing_keys() -> None:
 def test_funnel_is_bounded_to_known_decision_names() -> None:
     """Bounded memory: the summary never grows with observation count."""
 
-    summary = _snapshot({"rejected_low_confidence": 5000, "observations": 5000})
+    small = _snapshot({"rejected_low_confidence": 1, "observations": 1})
+    large = _snapshot({"rejected_low_confidence": 5000, "observations": 5000})
 
-    assert len(summary) == 11
-    assert summary["rejectedLowConfidence"] == 5000
+    # The number of reported rows is fixed; only the values grow.
+    assert set(small) == set(large)
+    assert large["rejectedLowConfidence"] == 5000
 
 
 def test_narrator_page_shows_the_funnel_and_renamed_counter() -> None:

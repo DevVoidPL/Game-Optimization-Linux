@@ -640,9 +640,12 @@ Item {
         if (!funnel)
             return qsTr("Not measured")
         function count(key) { return Number(funnel[key] || 0) }
-        return qsTr("empty %1, low confidence %2, duplicate %3, abandoned %4, superseded %5")
+        // "no strong line" almost certainly means no subtitle was on screen;
+        // "despite strong line" means a readable line existed and was still lost.
+        return qsTr("empty %1, no strong line %2, lost despite strong line %3, duplicate %4, abandoned %5, superseded %6")
                 .arg(count("rejectedEmpty"))
-                .arg(count("rejectedLowConfidence"))
+                .arg(count("rejectedNoStrongLine"))
+                .arg(count("rejectedDespiteStrongLine"))
                 .arg(count("rejectedDuplicate"))
                 .arg(count("candidateAbandoned"))
                 .arg(count("supersededInAudioQueue"))

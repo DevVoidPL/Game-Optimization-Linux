@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import deque
 from collections.abc import Callable
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, replace
@@ -31,6 +32,7 @@ from game_optimization_linux.models.narrator import (
 )
 
 from .narrator_capture import CaptureRequest, ScreenCaptureProvider
+from .narrator_ocr import OCR_STRONG_LINE_CONFIDENCE
 from .narrator_persistence import TranslationCache
 
 
@@ -838,6 +840,8 @@ class NarratorPipeline:
         self._ocr_rejection_counts: dict[str, int] = {}
         # Per-session loss funnel. Bounded: one integer per known decision name.
         self._funnel: dict[str, int] = {}
+        # Bounded: subtitles that had a readable line and were rejected anyway.
+        self._lost_strong_lines: deque[dict[str, object]] = deque(maxlen=10)
         self._last_ocr_diagnostic: tuple[str, str, float | None] | None = None
         self._last_ocr_backend_diagnostic: tuple[str, str] | None = None
         self._ocr_future: Future[OcrResult] | None = None
@@ -1053,6 +1057,7 @@ class NarratorPipeline:
             self._deduplicator = PhraseDeduplicator()
             self._ocr_rejection_counts = {}
             self._funnel = {}
+            self._lost_strong_lines.clear()
             self._last_ocr_diagnostic = None
             self._last_ocr_backend_diagnostic = None
             self._request_active = False
@@ -1669,6 +1674,31 @@ class NarratorPipeline:
             # invented and the rows stay traceable to the decision history.
             self._funnel["observations"] = self._funnel.get("observations", 0) + 1
             self._funnel[final_decision] = self._funnel.get(final_decision, 0) + 1
+            if rejection_reason == "low_confidence":
+                # One number merged two unrelated outcomes: a frame with no
+                # subtitle on it (correct rejection) and a frame that held a
+                # readable line and lost it anyway (a real loss). Split them on
+                # the same 0.80 the weak-line rule uses as its strong reference.
+                strongest = result.strongest_line_confidence
+                had_strong_line = (
+                    strongest is not None
+                    and strongest >= OCR_STRONG_LINE_CONFIDENCE
+                )
+                key = (
+                    "rejected_despite_strong_line"
+                    if had_strong_line
+                    else "rejected_no_strong_line"
+                )
+                self._funnel[key] = self._funnel.get(key, 0) + 1
+                if had_strong_line:
+                    # Record which subtitles were lost, not merely how many.
+                    self._lost_strong_lines.append(
+                        {
+                            "observation": request_id,
+                            "confidence": round(float(strongest), 4),
+                            "text": str(result.strongest_line_text)[:160],
+                        }
+                    )
             if observation.candidate_started:
                 self._funnel["candidate_started"] = (
                     self._funnel.get("candidate_started", 0) + 1
@@ -2414,6 +2444,7 @@ class NarratorPipeline:
                 getattr(self.capture, "failed_variants", ()) or ()
             ),
             narration_funnel=dict(self._funnel),
+            lost_strong_lines=tuple(dict(entry) for entry in self._lost_strong_lines),
             playback_completed=int(getattr(self.audio, "completed_count", 0)),
             playback_interrupted=int(getattr(self.audio, "interrupted_count", 0)),
             playback_last_result=str(
