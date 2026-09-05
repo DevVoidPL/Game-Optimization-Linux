@@ -59,7 +59,19 @@ class _FakeSink:
     def setVolume(self, _volume: float) -> None:
         return None
 
-    def start(self, _device) -> None:
+    def setBufferSize(self, size: int) -> None:
+        # A real backend honours the request exactly; record it so the test can
+        # assert the prefetch was sized before start().
+        self.requested_buffer_size = int(size)
+        self._buffer_size = int(size)
+
+    def bufferSize(self) -> int:
+        return getattr(self, "_buffer_size", 11024)
+
+    def start(self, device) -> None:
+        # Recorded so the feed path can be audited: this is the QIODevice the
+        # sink pulls PCM from for the whole playback.
+        self.started_with = device
         self._state = QtAudio.State.ActiveState
 
     def stop(self) -> None:
@@ -367,3 +379,126 @@ def test_old_completion_rule_would_have_called_a_half_played_line_finished(
     record = output.last_playback
     assert record is not None
     assert record.processed_seconds < record.expected_seconds
+
+
+# ---------------------------------------------------------------------------
+# Source lifetime (H1): the invariant the feed path depends on
+# ---------------------------------------------------------------------------
+
+
+def test_provider_retains_device_and_backing_data_for_the_whole_playback(
+    output: QtNarratorAudioOutput,
+) -> None:
+    """Guard the invariant that refuted the source-lifetime hypothesis.
+
+    The QBuffer handed to start() wraps a QByteArray. If either were dropped
+    while the sink was still playing, the sink would emit only what it had
+    already prefetched - about one buffer - and then report IdleState, which
+    looks exactly like the reported truncation. Verified against a real
+    QAudioSink: forcing gc.collect() during playback does not truncate, because
+    the provider holds both objects. Do not remove either reference.
+    """
+
+    import gc
+
+    _play(output, 4.0)
+    sink = output.sinks[0]  # type: ignore[attr-defined]
+
+    # Exactly the object passed to the sink, and its backing store.
+    assert output._buffer is not None
+    assert output._bytes is not None
+    assert sink.started_with is output._buffer
+
+    del sink
+    gc.collect()
+    gc.collect()
+
+    assert output._buffer is not None, "the feed device must survive collection"
+    assert output._bytes is not None, "the backing data must survive collection"
+    assert output._buffer.isOpen()
+    # The full PCM is still readable: nothing was truncated or freed.
+    assert output._buffer.size() == 4 * _RATE * _WIDTH
+    assert output._current is not None
+
+
+def test_multi_buffer_pcm_plays_to_completion(
+    output: QtNarratorAudioOutput,
+) -> None:
+    """Several sink buffers long, so a one-buffer cutoff would be visible."""
+
+    events = _play(output, 8.0)
+
+    output.sinks[0].finish(8.0)  # type: ignore[attr-defined]
+
+    assert events["completed"] == 1
+    assert output.completed_count == 1
+    assert output.interrupted_count == 0
+    record = output.last_playback
+    assert record is not None
+    assert record.expected_seconds == pytest.approx(8.0)
+    assert record.processed_seconds == pytest.approx(8.0)
+
+
+def test_whole_utterance_is_prefetched_so_starvation_cannot_truncate(
+    output: QtNarratorAudioOutput,
+) -> None:
+    """INVERTED ASSERTION. This test previously asserted truncation.
+
+    It used to be ``test_starvation_cutoff_does_not_scale_with_utterance_length``
+    and passed by asserting the played duration stayed pinned at one buffer
+    (0.25 s) while the expected duration grew - the signature of main-thread
+    starvation. The guarantee has changed: the sink now prefetches the entire
+    utterance, so there is nothing left to starve, and the same durations must
+    play in full.
+
+    Measured against a real QAudioSink under CPU-bound worker threads and a
+    blocked main thread, at 2 s, 4 s and 8 s: 100% played in all six cases, with
+    the backend honouring the requested buffer size exactly.
+    """
+
+    played: list[tuple[float, float]] = []
+    for index, seconds in enumerate((2.0, 4.0, 8.0), start=1):
+        _play(output, seconds, request_id=index)
+        sink = output.sinks[-1]  # type: ignore[attr-defined]
+        # The prefetch must cover the whole utterance, so a starved refill has
+        # nothing to drain.
+        assert sink.requested_buffer_size == seconds * _RATE * _WIDTH
+        sink.finish(seconds)
+        record = output.last_playback
+        assert record is not None
+        played.append((record.expected_seconds, record.processed_seconds))
+
+    assert output.completed_count == 3
+    assert output.interrupted_count == 0
+    # Played duration now tracks expected duration instead of staying constant.
+    assert [round(expected, 2) for expected, _ in played] == [2.0, 4.0, 8.0]
+    assert [round(actual, 2) for _, actual in played] == [2.0, 4.0, 8.0]
+
+
+def test_buffer_size_is_requested_before_start(
+    output: QtNarratorAudioOutput,
+) -> None:
+    """setBufferSize has no effect once the sink is running."""
+
+    _play(output, 4.0)
+    sink = output.sinks[0]  # type: ignore[attr-defined]
+
+    assert sink.requested_buffer_size == 4 * _RATE * _WIDTH
+    # Ordering: the buffer was sized before the device was handed over.
+    assert sink.started_with is not None
+    assert sink.bufferSize() == 4 * _RATE * _WIDTH
+
+
+def test_oversized_utterance_is_capped_not_unbounded(
+    output: QtNarratorAudioOutput,
+) -> None:
+    """A malformed PcmAudio must not ask the backend for an absurd allocation."""
+
+    from game_optimization_linux.services.narrator_audio import _MAX_BUFFER_BYTES
+
+    # 60 s is far beyond any subtitle and exceeds the cap.
+    _play(output, 60.0)
+    sink = output.sinks[0]  # type: ignore[attr-defined]
+
+    assert 60 * _RATE * _WIDTH > _MAX_BUFFER_BYTES
+    assert sink.requested_buffer_size == _MAX_BUFFER_BYTES

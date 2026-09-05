@@ -24,6 +24,12 @@ _SAMPLE_WIDTHS = {"u8": 1, "s16le": 2, "s32le": 4, "f32le": 4}
 # clean finish, so require almost all of it rather than exactly all.
 _COMPLETION_RATIO = 0.98
 
+# Upper bound on the prefetch buffer. 1 MiB is about 23 s at 22050 Hz mono
+# s16le, well beyond any subtitle (a long 11 s line is ~485 KB), and small enough
+# that holding it costs nothing. Bounded so a malformed PcmAudio cannot ask the
+# backend for an unreasonable allocation.
+_MAX_BUFFER_BYTES = 1024 * 1024
+
 
 @dataclass(slots=True)
 class _Playback:
@@ -245,6 +251,14 @@ class QtNarratorAudioOutput(QObject):
             )
             return
         self._sink = self._sink_factory(device, audio_format, self)
+        # Prefetch the whole utterance. In pull mode the sink refills on a timer
+        # owned by the thread that created it, which is the main thread; while
+        # OCR and synthesis occupy that thread the refill never runs and the sink
+        # drains its buffer, reports IdleState with no error, and speech stops
+        # mid-sentence after a machine-dependent constant (measured: the default
+        # 11024 B buffer is exactly 0.25 s). Sizing the buffer to the utterance
+        # leaves nothing to starve. Must be set before start().
+        self._sink.setBufferSize(min(len(playback.audio.samples), _MAX_BUFFER_BYTES))
         self._sink.setVolume(playback.volume)
         self._sink.stateChanged.connect(self._state_changed)
         playback.started_at = self._clock()
