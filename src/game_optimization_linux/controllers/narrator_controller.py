@@ -74,6 +74,63 @@ class NarratorController:
             result.append(values)
         return result
 
+    def get_global_settings(self) -> dict[str, Any]:
+        try:
+            settings = self._app._narrator_settings_repository.load_defaults()
+        except Exception as error:
+            logger.warning("Could not load global narrator settings: %s", error)
+            return self._settings_error(str(error))
+        result = self._settings_to_qml(None, settings)
+        result["global"] = True
+        return result
+
+    def save_global_settings(self, values: Mapping[str, Any]) -> bool:
+        try:
+            repository = self._app._narrator_settings_repository
+            current = repository.load_defaults().to_dict()
+            aliases = {
+                "enabled": "enabled",
+                "sourceMode": "source_mode",
+                "captureSource": "capture_source",
+                "subtitleLanguageMode": "subtitle_language_mode",
+                "subtitleAdapterId": "subtitle_adapter_id",
+                "ocrProviderId": "ocr_provider_id",
+                "translationProviderId": "translation_provider_id",
+                "translationProfileId": "translation_profile_id",
+                "ttsProviderId": "tts_provider_id",
+                "voiceId": "voice_id",
+                "volume": "volume",
+                "speechRate": "speech_rate",
+                "noiseScale": "noise_scale",
+                "noiseWScale": "noise_w_scale",
+                "captureSamplingHz": "capture_sampling_hz",
+                "visualChangeThreshold": "visual_change_threshold",
+                "stabilizationMs": "stabilization_ms",
+                "ocrMinConfidence": "ocr_min_confidence",
+                "duplicateCooldownMs": "duplicate_cooldown_ms",
+            }
+            for source, target in aliases.items():
+                if source in values:
+                    current[target] = values[source]
+            crop = values.get("subtitleRegion")
+            if isinstance(crop, Mapping):
+                current["subtitle_region"] = dict(crop)
+            current["updated_at"] = datetime.now(UTC).isoformat()
+            settings = NarratorGameSettings.from_dict(
+                current,
+                expected_game_key=str(current["game_key"]),
+            )
+            repository.save_defaults(settings)
+        except Exception as error:
+            logger.warning("Could not save global narrator settings: %s", error)
+            self._app._emit_toast(
+                "Global Narrator settings could not be saved", "error"
+            )
+            return False
+        self._app.narratorChanged.emit("")
+        self._app._emit_toast("Global Narrator settings saved", "success")
+        return True
+
     def get_settings(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
         if game is None:
@@ -483,6 +540,11 @@ class NarratorController:
                 self._app._emit_toast(event.message, "error")
         for game_id in changed:
             self._app.narratorChanged.emit(game_id)
+        snapshot = self._app._narrator_pipeline.snapshot
+        self._app._ui_sound_service.set_music_ducked(
+            snapshot.status.value == "speaking"
+            and snapshot.audio_status == "speaking"
+        )
 
     def game_for_key(self, game_key: str) -> Game | None:
         return self._game_for_key(game_key)
@@ -623,7 +685,7 @@ class NarratorController:
         return f"local-{digest}"
 
     def _settings_to_qml(
-        self, game: Game, settings: NarratorGameSettings
+        self, game: Game | None, settings: NarratorGameSettings
     ) -> dict[str, Any]:
         translator = self._app._narrator_pipeline.translator
         tts = self._app._narrator_pipeline.tts
@@ -672,9 +734,9 @@ class NarratorController:
             default_voice = voices[0]["id"]
         return {
             "success": True,
-            "gameId": game.id,
+            "gameId": game.id if game is not None else "",
             "gameKey": settings.game_key,
-            "gameName": game.name,
+            "gameName": game.name if game is not None else "",
             "enabled": settings.enabled,
             "sourceMode": settings.source_mode.value,
             "captureSource": settings.capture_source.value,

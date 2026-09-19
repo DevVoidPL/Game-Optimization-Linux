@@ -5,20 +5,36 @@ import "../.." as App
 Button {
     id: control
     property real couchScale: 1.0
+    property url iconSource: ""
+    property int iconSize: App.Theme.couchIconSizeButton
     readonly property bool focusVisible: activeFocus || visualFocus || focus
 
     implicitHeight: App.Theme.couchButtonHeight * couchScale
     font.pixelSize: App.Theme.couchBodySize * couchScale
     font.weight: Font.DemiBold
 
-    contentItem: Label {
-        text: control.text
-        color: !control.enabled ? App.Theme.textMuted
-               : control.focusVisible ? "white" : App.Theme.text
-        font: control.font
-        horizontalAlignment: Text.AlignHCenter
-        verticalAlignment: Text.AlignVCenter
-        elide: Text.ElideRight
+    contentItem: Row {
+        spacing: 6 * control.couchScale
+        anchors.centerIn: parent
+        Image {
+            visible: control.iconSource
+            source: control.iconSource
+            fillMode: Image.PreserveAspectFit
+            sourceSize.width: control.iconSize * control.couchScale
+            sourceSize.height: control.iconSize * control.couchScale
+            width: visible ? control.iconSize * control.couchScale : 0
+            height: visible ? control.iconSize * control.couchScale : 0
+            anchors.verticalCenter: parent.verticalCenter
+        }
+        Label {
+            text: control.text
+            color: !control.enabled ? App.Theme.textMuted
+                   : control.focusVisible ? "white" : App.Theme.text
+            font: control.font
+            horizontalAlignment: Text.AlignHCenter
+            verticalAlignment: Text.AlignVCenter
+            elide: Text.ElideRight
+        }
     }
 
     background: Rectangle {

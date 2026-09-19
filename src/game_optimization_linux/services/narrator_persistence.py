@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import UTC, datetime
 import json
 import os
@@ -22,6 +23,7 @@ from game_optimization_linux.models.mangohud import validate_game_key
 
 
 NARRATOR_SETTINGS_FILE_NAME = "narrator.json"
+GLOBAL_NARRATOR_SETTINGS_KEY = "local-000000000000000000000000"
 CAPTURE_GRANTS_SCHEMA_VERSION = 1
 
 
@@ -47,21 +49,41 @@ class NarratorSettingsRepository:
     def __init__(self, root: Path = GAMES_CONFIG_DIR) -> None:
         self.root = Path(root)
 
+    @property
+    def defaults_path(self) -> Path:
+        return self.root / NARRATOR_SETTINGS_FILE_NAME
+
     def path(self, game_key: object) -> Path:
         return self.root / validate_game_key(game_key) / NARRATOR_SETTINGS_FILE_NAME
 
-    def load(self, game_key: object) -> NarratorGameSettings:
-        normalized = validate_game_key(game_key)
-        path = self.path(normalized)
-        if not path.is_file():
-            return NarratorGameSettings.default(normalized)
+    @staticmethod
+    def _read(path: Path, expected_game_key: str) -> NarratorGameSettings:
         try:
             values = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
             raise ValueError(f"could not read narrator settings: {error}") from error
         if not isinstance(values, Mapping):
             raise ValueError("narrator settings must contain a JSON object")
-        return NarratorGameSettings.from_dict(values, expected_game_key=normalized)
+        return NarratorGameSettings.from_dict(
+            values, expected_game_key=expected_game_key
+        )
+
+    def load_defaults(self) -> NarratorGameSettings:
+        if not self.defaults_path.is_file():
+            return NarratorGameSettings.default(GLOBAL_NARRATOR_SETTINGS_KEY)
+        return self._read(self.defaults_path, GLOBAL_NARRATOR_SETTINGS_KEY)
+
+    def save_defaults(self, settings: NarratorGameSettings) -> Path:
+        normalized = replace(settings, game_key=GLOBAL_NARRATOR_SETTINGS_KEY)
+        _atomic_json_write(self.defaults_path, normalized.to_dict())
+        return self.defaults_path
+
+    def load(self, game_key: object) -> NarratorGameSettings:
+        normalized = validate_game_key(game_key)
+        path = self.path(normalized)
+        if not path.is_file():
+            return replace(self.load_defaults(), game_key=normalized)
+        return self._read(path, normalized)
 
     def save(self, settings: NarratorGameSettings) -> Path:
         path = self.path(settings.game_key)

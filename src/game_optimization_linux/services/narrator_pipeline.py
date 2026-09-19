@@ -110,6 +110,7 @@ class NarratorAudioOutput(Protocol):
         started_callback: Callable[[float], None],
         completed_callback: Callable[[], None],
         error_callback: Callable[[str], None],
+        text: str = "",
     ) -> None: ...
 
     def stop(self) -> None: ...
@@ -162,6 +163,13 @@ class OcrGateObservation:
     candidate_match_kind: str = ""
     candidate_replaced: bool = False
     decision: str = ""
+    # Diagnostics only. A stable identity per candidate, so every observation
+    # belonging to one subtitle attempt can be grouped, and a replacement can
+    # name what it displaced. candidate_identity is the normalized text, which
+    # changes on replacement and therefore cannot serve as an identity.
+    candidate_id: int = 0
+    replaced_candidate_id: int = 0
+    replaced_candidate_text: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -206,6 +214,9 @@ class SubtitleTextGate:
         self._candidate_gap_count = 0
         self._accepted_identity = ""
         self._needs_confirmation = False
+        # Diagnostics only: monotonic counter, one value per created candidate,
+        # so all observations of one subtitle attempt share an identity.
+        self._candidate_id = 0
 
     @property
     def needs_confirmation(self) -> bool:
@@ -244,8 +255,12 @@ class SubtitleTextGate:
                     candidate_text=previous_candidate,
                     candidate_observation_count=self._candidate_count,
                     required_observations=self.required_observations,
+                    candidate_id=self._candidate_id,
                     decision=f"candidate_retained_after_{reason}",
                 )
+            # The candidate is abandoned here. Reported before _clear, so the
+            # terminal record still names it and its text.
+            abandoned_id = self._candidate_id if previous_candidate else 0
             self._clear(no_subtitle=True)
             return OcrGateObservation(
                 raw,
@@ -253,6 +268,9 @@ class SubtitleTextGate:
                 confidence,
                 reason,
                 required_observations=self.required_observations,
+                candidate_id=abandoned_id,
+                replaced_candidate_id=abandoned_id,
+                replaced_candidate_text=previous_candidate,
                 decision=(
                     f"candidate_reset_{reason}"
                     if previous_candidate
@@ -320,6 +338,12 @@ class SubtitleTextGate:
         )
         similar = within_window and bool(match_kind)
         if not similar:
+            # A new candidate begins here, whether or not it displaced one.
+            # Recorded before the identity is overwritten, so the log can name
+            # exactly which candidate was abandoned and with what text.
+            replaced_id = self._candidate_id if previous_identity else 0
+            replaced_text = self._candidate_text if previous_identity else ""
+            self._candidate_id += 1
             self._candidate_text = filtered
             self._candidate_identity = identity
             self._candidate_confidence = confidence if confidence is not None else -1.0
@@ -342,6 +366,9 @@ class SubtitleTextGate:
                     candidate_similarity if previous_identity else None
                 ),
                 candidate_replaced=bool(previous_identity),
+                candidate_id=self._candidate_id,
+                replaced_candidate_id=replaced_id,
+                replaced_candidate_text=replaced_text,
                 decision=(
                     "candidate_window_expired"
                     if previous_identity
@@ -374,12 +401,16 @@ class SubtitleTextGate:
                 required_observations=self.required_observations,
                 candidate_similarity=candidate_similarity,
                 candidate_match_kind=match_kind,
+                candidate_id=self._candidate_id,
                 decision="candidate_confirming",
             )
 
         accepted = self._candidate_text
         self._accepted_identity = self._candidate_identity
         accepted_count = self._candidate_count
+        # Captured before _reset_candidate clears it, so the accepting
+        # observation still reports which candidate reached consensus.
+        accepted_candidate_id = self._candidate_id
         self._reset_candidate()
         return OcrGateObservation(
             raw,
@@ -393,6 +424,7 @@ class SubtitleTextGate:
             required_observations=self.required_observations,
             candidate_similarity=candidate_similarity,
             candidate_match_kind=match_kind,
+            candidate_id=accepted_candidate_id,
             decision="accepted_consensus",
         )
 
@@ -560,16 +592,189 @@ class SubtitleTextGate:
         return units
 
 
+_DEDUP_VOWELS = frozenset("aąeęioóuy")
+# q, v and x do not occur in Polish orthography, so a token containing one is
+# almost always OCR noise rather than a word.
+_DEDUP_FOREIGN_LETTERS = frozenset("qvx")
+_DEDUP_WORD_SPLIT = re.compile(r"[^0-9a-ząćęłńóśźż]+")
+_DEDUP_FOLD = str.maketrans("ąćęłńóśźż", "acelnoszz")
+# A shared core must carry most of the shorter phrase and at least this many
+# real words, so two unrelated lines can never collapse into one.
+_DEDUP_MIN_CORE_WORDS = 3
+_DEDUP_MIN_CORE_RATIO = 0.7
+# Consecutive text-free observations that end a subtitle episode. More than one,
+# so a single dropped or misread frame cannot re-arm the same phrase.
+_DEDUP_EPISODE_ABSENT_FRAMES = 3
+
+
+def _dedup_words(identity: str) -> list[str]:
+    return [word for word in _DEDUP_WORD_SPLIT.split(identity) if word]
+
+
+def _dedup_is_word(token: str) -> bool:
+    """Whether a token counts towards the shared core."""
+
+    return len(token) >= 2 and any(character.isalpha() for character in token)
+
+
+def _dedup_looks_like_garbage(token: str) -> bool:
+    """Whether an unmatched token is OCR noise rather than a real word."""
+
+    letters = [character for character in token if character.isalpha()]
+    if len(letters) < 2:
+        return True
+    if _DEDUP_FOREIGN_LETTERS.intersection(letters):
+        return True
+    return not any(character in _DEDUP_VOWELS for character in letters)
+
+
+def _dedup_words_match(first: str, second: str) -> bool:
+    """Equal words, or one truncated by OCR at a phrase edge.
+
+    ``gent``/``agent`` and ``kojnie``/``spokojnie`` are the same word with its
+    start eaten by the ROI; ``ib``/``fib`` is the same inside a sentence. A
+    truncation may lose at most three characters, so ``wróć`` can never match
+    ``jedź``.
+    """
+
+    if first == second:
+        return True
+    short, long = sorted((first, second), key=len)
+    if len(short) < 2 or len(long) - len(short) > 3:
+        return False
+    return long.startswith(short) or long.endswith(short)
+
+
+def _dedup_absorbed(word: str, garbage_tokens: list[str]) -> bool:
+    """Whether a real word was swallowed by garbage glued to it.
+
+    ``xsasJEDZ`` contains ``jedź`` with noise welded to its front.
+    """
+
+    folded = word.translate(_DEDUP_FOLD)
+    return any(
+        folded in token.translate(_DEDUP_FOLD) for token in garbage_tokens
+    )
+
+
+def _dedup_core_matches(first: list[str], second: list[str]) -> int:
+    """Length of the longest in-order run of matching words."""
+
+    rows = len(first)
+    columns = len(second)
+    table = [[0] * (columns + 1) for _ in range(rows + 1)]
+    for row in range(rows - 1, -1, -1):
+        for column in range(columns - 1, -1, -1):
+            if _dedup_words_match(first[row], second[column]):
+                table[row][column] = 1 + table[row + 1][column + 1]
+            else:
+                table[row][column] = max(
+                    table[row + 1][column], table[row][column + 1]
+                )
+    return table[0][0]
+
+
+def _dedup_is_garbage_variant(candidate: str, spoken: str) -> bool:
+    """Whether two phrases are the same line, one carrying OCR garbage.
+
+    Only noise is forgiven. Every word that fails to align must itself look like
+    garbage, or be a real word swallowed by garbage on the other side, so an
+    extra or changed word inside the sentence keeps the phrases distinct.
+    """
+
+    candidate_words = [word for word in _dedup_words(candidate) if _dedup_is_word(word)]
+    spoken_words = [word for word in _dedup_words(spoken) if _dedup_is_word(word)]
+    if not candidate_words or not spoken_words:
+        return False
+    matched = _dedup_core_matches(candidate_words, spoken_words)
+    shorter = min(len(candidate_words), len(spoken_words))
+    if matched < _DEDUP_MIN_CORE_WORDS or matched / shorter < _DEDUP_MIN_CORE_RATIO:
+        return False
+
+    candidate_unmatched: list[str] = []
+    spoken_unmatched: list[str] = []
+    remaining = list(spoken_words)
+    for word in candidate_words:
+        for index, other in enumerate(remaining):
+            if _dedup_words_match(word, other):
+                del remaining[index]
+                break
+        else:
+            candidate_unmatched.append(word)
+    spoken_unmatched = remaining
+
+    candidate_garbage = [
+        word for word in candidate_unmatched if _dedup_looks_like_garbage(word)
+    ]
+    spoken_garbage = [
+        word for word in spoken_unmatched if _dedup_looks_like_garbage(word)
+    ]
+    for word in candidate_unmatched:
+        if _dedup_looks_like_garbage(word):
+            continue
+        if not _dedup_absorbed(word, spoken_garbage):
+            return False
+    for word in spoken_unmatched:
+        if _dedup_looks_like_garbage(word):
+            continue
+        if not _dedup_absorbed(word, candidate_garbage):
+            return False
+    return True
+
+
 class PhraseDeduplicator:
+    """Speak each subtitle once per episode.
+
+    An *episode* is one appearance of one subtitle on screen. It begins when a
+    phrase is handed onwards for synthesis and ends only when the subtitle really
+    goes away: either a clearly different phrase is accepted, or the text is
+    absent for several consecutive observations. A cooldown expiring is not the
+    end of an episode - a subtitle that lingers on screen would otherwise be read
+    again, which is the reported bug.
+    """
+
     def __init__(self) -> None:
         self._visible_phrase = ""
         self._spoken_at: dict[str, float] = {}
+        # The phrase already read in the current episode, and how many
+        # consecutive observations have carried no text at all.
+        self._episode_identity = ""
+        self._absent_streak = 0
 
-    def accept(self, text: str, *, now: float, cooldown_seconds: float) -> str | None:
+    def accept(
+        self,
+        text: str,
+        *,
+        now: float,
+        cooldown_seconds: float,
+        frame_had_text: bool | None = None,
+    ) -> str | None:
         normalized = normalize_subtitle(text)
         identity = normalized.casefold()
         if not identity:
             self._visible_phrase = ""
+            # A rejected frame that still contained text means the subtitle is
+            # very likely on screen, so it must not disarm the episode. Only a
+            # genuinely empty run counts towards a stable disappearance.
+            if frame_had_text:
+                self._absent_streak = 0
+            else:
+                self._absent_streak += 1
+                if self._absent_streak >= _DEDUP_EPISODE_ABSENT_FRAMES:
+                    # The subtitle really went away, so a later appearance is a
+                    # new subtitle. Forget the cooldown for it as well, otherwise
+                    # a quick genuine repeat would still be swallowed.
+                    if self._episode_identity:
+                        self._spoken_at.pop(self._episode_identity, None)
+                    self._episode_identity = ""
+            return None
+        self._absent_streak = 0
+        # Already read in this episode, exactly or with OCR noise on the edges.
+        # Blocked for the whole episode, however long it lasts.
+        if self._episode_identity and (
+            identity == self._episode_identity
+            or _dedup_is_garbage_variant(identity, self._episode_identity)
+        ):
             return None
         if identity == self._visible_phrase:
             return None
@@ -577,6 +782,19 @@ class PhraseDeduplicator:
         previous = self._spoken_at.get(identity)
         if previous is not None and now - previous < cooldown_seconds:
             return None
+        # The same line re-recognised with OCR noise at its edges produces a
+        # different identity and used to slip through, so the phrase was spoken
+        # twice. Compare against what was actually spoken inside the existing
+        # cooldown window; only edge garbage is forgiven.
+        for spoken_identity, spoken_at in self._spoken_at.items():
+            if now - spoken_at >= cooldown_seconds:
+                continue
+            if _dedup_is_garbage_variant(identity, spoken_identity):
+                return None
+        # Latch here, at the moment the phrase is handed onwards for synthesis, so
+        # a second variant cannot reach the queue before the first is marked. A
+        # clearly different phrase starts a new episode by replacing the latch.
+        self._episode_identity = identity
         return normalized
 
     def mark_spoken(self, text: str, *, now: float) -> None:
@@ -783,6 +1001,7 @@ class UnavailableAudioOutput:
         started_callback: Callable[[float], None],
         completed_callback: Callable[[], None],
         error_callback: Callable[[str], None],
+        text: str = "",
     ) -> None:
         del (
             audio,
@@ -791,6 +1010,7 @@ class UnavailableAudioOutput:
             started_callback,
             completed_callback,
             error_callback,
+            text,
         )
         raise RuntimeError("Narrator audio output is unavailable")
 
@@ -1654,6 +1874,11 @@ class NarratorPipeline:
                     "",
                     now=now,
                     cooldown_seconds=settings.duplicate_cooldown_ms / 1000.0,
+                    # A frame that still carried text does not end the episode,
+                    # so a low-confidence misread cannot re-arm the same phrase.
+                    frame_had_text=bool(
+                        (result.filtered_text or result.text).strip()
+                    ),
                 )
             phrase = self._deduplicator.accept(
                 observation.accepted_text,
@@ -1725,6 +1950,9 @@ class NarratorPipeline:
                     candidate_similarity=observation.candidate_similarity,
                     candidate_match_kind=observation.candidate_match_kind,
                     candidate_replaced=observation.candidate_replaced,
+                    candidate_id=observation.candidate_id,
+                    replaced_candidate_id=observation.replaced_candidate_id,
+                    replaced_candidate_text=observation.replaced_candidate_text,
                     accepted_text=phrase or "",
                     accepted=bool(phrase),
                     roi_width=self._snapshot.ocr_roi_width,
@@ -2148,6 +2376,9 @@ class NarratorPipeline:
                     audio,
                     volume=settings.volume,
                     request_id=work_id,
+                    # Diagnostics only: ties this request_id to the phrase, so a
+                    # re-recognised variant of the same subtitle is visible.
+                    text=translated,
                     started_callback=lambda elapsed: self._audio_started(
                         elapsed,
                         source_text=source_text,

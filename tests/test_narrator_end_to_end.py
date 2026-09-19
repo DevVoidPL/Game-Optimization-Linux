@@ -224,8 +224,9 @@ class _Audio:
         started_callback: Callable[[float], None],
         completed_callback: Callable[[], None],
         error_callback: Callable[[str], None],
+        text: str = "",
     ) -> None:
-        del audio, volume, error_callback
+        del audio, volume, error_callback, text
         self.played.append(request_id)
         started_callback(1.5)
         completed_callback()

@@ -55,6 +55,12 @@ AUTO_FALSE_FSR_KEYS = frozenset(
         "fsragilitysdkupgrade",
     }
 )
+_UPSCALER_ALIASES = {
+    "fsr31": "ffx",
+    "ffx": "fsr31",
+    "fsr31_12": "ffx_12",
+    "ffx_12": "fsr31_12",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +72,7 @@ class OptiScalerIniCapabilities:
     dx11_values: tuple[str, ...]
     dx12_values: tuple[str, ...]
     vulkan_values: tuple[str, ...]
+    known: bool = True
 
     @property
     def supports_fsr4(self) -> bool:
@@ -75,13 +82,21 @@ class OptiScalerIniCapabilities:
 
     @property
     def supports_force_int8(self) -> bool:
-        return self.force_int8_style in {"boolean", "model"}
+        return self.known and self.force_int8_style in {"boolean", "model"}
+
+    @property
+    def force_int8_state(self) -> str:
+        if not self.known:
+            return "unknown"
+        return "supported" if self.supports_force_int8 else "unsupported"
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "fsr4Update": self.fsr4_update,
             "forceInt8": self.supports_force_int8,
             "forceInt8Style": self.force_int8_style,
+            "forceInt8State": self.force_int8_state,
+            "known": self.known,
             "agilitySdkUpgrade": self.agility_sdk_upgrade,
             "watermark": self.watermark,
             "dx11Upscalers": list(self.dx11_values),
@@ -207,6 +222,7 @@ def inspect_optiscaler_ini(text: str) -> OptiScalerIniCapabilities:
         dx11_values=backend_values("Dx11Upscaler") if has(upscalers, "Dx11Upscaler") else (),
         dx12_values=backend_values("Dx12Upscaler") if has(upscalers, "Dx12Upscaler") else (),
         vulkan_values=backend_values("VulkanUpscaler") if has(upscalers, "VulkanUpscaler") else (),
+        known=True,
     )
 
 
@@ -409,9 +425,14 @@ def managed_ini_updates(
         if not available:
             continue
         value = str(selected).casefold()
-        if value not in available:
+        configured_value = value
+        if configured_value not in available:
+            equivalent = _UPSCALER_ALIASES.get(configured_value)
+            if equivalent in available:
+                configured_value = equivalent
+        if configured_value not in available:
             raise ValueError(f"{key}={value} is not advertised by the installed OptiScaler INI")
-        updates[(UPSCALERS_SECTION, key)] = value
+        updates[(UPSCALERS_SECTION, key)] = configured_value
     return updates
 
 

@@ -24,6 +24,8 @@ from game_optimization_linux.services import (
 )
 
 from game_optimization_linux.services.optiscaler_online import (
+    OFFICIAL_NIGHTLY_RELEASES_URL,
+    OFFICIAL_NIGHTLY_REPOSITORY,
     OptiScalerDownloadError,
     OptiScalerMetadataError,
     OptiScalerNetworkError,
@@ -119,6 +121,89 @@ def test_official_release_is_downloaded_validated_and_reused_from_cache(
     assert client.cached_archive(release) is not None
 
 
+def test_edge_discovery_uses_selected_asset_url_and_downloads_it(
+    tmp_path: Path,
+) -> None:
+    archive = _archive_bytes()
+    payload = [
+        {
+            "tag_name": "nightly-20260918",
+            "html_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/tag/nightly-20260918",
+            "published_at": "2026-09-18T08:51:17Z",
+            "prerelease": True,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_v10.0.0-pre1_20260918.zip",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20260918/OptiScaler_v10.0.0-pre1_20260918.zip",
+                    "size": len(archive),
+                    "digest": "sha256:" + sha256(archive).hexdigest(),
+                }
+            ],
+        }
+    ]
+    requests: list[str] = []
+
+    def opener(request, **_kwargs):
+        requests.append(request.full_url)
+        if request.full_url == OFFICIAL_NIGHTLY_RELEASES_URL:
+            return _Response(json.dumps(payload).encode(), url=request.full_url)
+        return _Response(
+            archive,
+            url=payload[0]["assets"][0]["browser_download_url"],
+        )
+
+    client = OptiScalerReleaseClient(tmp_path / "cache", opener=opener)
+    release = client.latest_release(channel="edge", force_refresh=True)
+    cached = client.ensure_archive(release)
+
+    assert release.asset.download_url == payload[0]["assets"][0]["browser_download_url"]
+    assert cached.path.is_file()
+    assert cached.sha256 == sha256(archive).hexdigest()
+    assert requests == [OFFICIAL_NIGHTLY_RELEASES_URL, release.asset.download_url]
+
+
+def test_edge_download_retries_transient_timeout_without_switching_release(
+    tmp_path: Path,
+) -> None:
+    archive = _archive_bytes()
+    release_payload = [
+        {
+            "tag_name": "nightly-20260918",
+            "html_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/tag/nightly-20260918",
+            "prerelease": True,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_v10.0.0-pre1_20260918.zip",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20260918/OptiScaler_v10.0.0-pre1_20260918.zip",
+                    "size": len(archive),
+                }
+            ],
+        }
+    ]
+    attempts = 0
+
+    def opener(request, **_kwargs):
+        nonlocal attempts
+        if request.full_url.endswith("/releases"):
+            return _Response(json.dumps(release_payload).encode(), url=request.full_url)
+        attempts += 1
+        if attempts == 1:
+            raise TimeoutError("synthetic timeout")
+        return _Response(
+            archive,
+            url="https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20260918/OptiScaler_v10.0.0-pre1_20260918.zip",
+        )
+
+    client = OptiScalerReleaseClient(tmp_path / "cache", opener=opener)
+    release = client.latest_release(channel="edge", force_refresh=True)
+    cached = client.ensure_archive(release)
+
+    assert attempts == 2
+    assert cached.release.asset.download_url == release.asset.download_url
+
+
 def test_flatpak_grants_network_for_official_release_client() -> None:
     manifest = Path(
         "flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml"
@@ -149,6 +234,41 @@ def test_latest_stable_ignores_prerelease_and_prefers_7z() -> None:
         },
     ]
     assert parse_latest_stable_release(payload).asset.name == "release.7z"
+
+
+def test_stable_selects_latest_published_qualified_release_when_payload_is_shuffled() -> None:
+    payload = [
+        {
+            "tag_name": "v0.9.3",
+            "html_url": "https://github.com/optiscaler/OptiScaler/releases/tag/v0.9.3",
+            "published_at": "2026-06-18T21:18:06Z",
+            "prerelease": False,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_0.9.3.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler/releases/download/v0.9.3/OptiScaler_0.9.3.7z",
+                    "size": 10,
+                }
+            ],
+        },
+        {
+            "tag_name": "v0.9.4",
+            "html_url": "https://github.com/optiscaler/OptiScaler/releases/tag/v0.9.4",
+            "published_at": "2026-07-18T21:46:07Z",
+            "prerelease": False,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_0.9.4.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler/releases/download/v0.9.4/OptiScaler_0.9.4.7z",
+                    "size": 10,
+                }
+            ],
+        },
+    ]
+
+    assert parse_latest_stable_release(payload).version == "0.9.4"
 
 
 def test_network_failure_uses_only_previously_validated_stale_metadata(
@@ -205,15 +325,15 @@ def test_unofficial_asset_is_rejected() -> None:
 def test_official_edge_channel_accepts_only_official_prerelease_assets() -> None:
     payload = [
         {
-            "tag_name": "v2.0.0-edge",
-            "html_url": "https://github.com/optiscaler/OptiScaler/releases/tag/v2.0.0-edge",
+            "tag_name": "nightly-20260918",
+            "html_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/tag/nightly-20260918",
             "draft": False,
             "prerelease": True,
             "body": "FSR 4.1.1 edge",
             "assets": [
                 {
-                    "name": "OptiScaler_edge.7z",
-                    "browser_download_url": "https://github.com/optiscaler/OptiScaler/releases/download/v2.0.0-edge/OptiScaler_edge.7z",
+                    "name": "OptiScaler_v10.0.0-pre1_20260918.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20260918/OptiScaler_v10.0.0-pre1_20260918.7z",
                     "size": 42,
                 }
             ],
@@ -221,14 +341,150 @@ def test_official_edge_channel_accepts_only_official_prerelease_assets() -> None
     ]
     release = parse_release(payload, channel="edge")
     assert release.channel == "edge"
+    assert release.repository == OFFICIAL_NIGHTLY_REPOSITORY
+    assert release.version == "10.0.0-pre1"
     assert release.fidelityfx_upscaler_version == "4.1.1"
 
     payload[0]["assets"][0]["browser_download_url"] = (
-        "https://github.com/benjamimgois/OptiScaler-builds/releases/download/"
-        "edge/OptiScaler_edge.7z"
+        "https://github.com/optiscaler/OptiScaler/releases/download/"
+        "nightly-20260918/OptiScaler_v10.0.0-pre1_20260918.7z"
     )
     with pytest.raises(OptiScalerMetadataError):
         parse_release(payload, channel="edge")
+
+
+def test_edge_selects_latest_qualified_nightly_not_old_main_repo_prerelease() -> None:
+    payload = [
+        {
+            "tag_name": "nightly-20260917",
+            "html_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/tag/nightly-20260917",
+            "published_at": "2026-09-17T09:18:40Z",
+            "prerelease": True,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_v10.0.0-pre1_20260917.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20260917/OptiScaler_v10.0.0-pre1_20260917.7z",
+                    "size": 10,
+                }
+            ],
+        },
+        {
+            "tag_name": "nightly-20260918",
+            "html_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/tag/nightly-20260918",
+            "published_at": "2026-09-18T08:51:17Z",
+            "prerelease": True,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_v10.0.0-pre1_20260918.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20260918/OptiScaler_v10.0.0-pre1_20260918.7z",
+                    "size": 11,
+                }
+            ],
+        },
+    ]
+
+    release = parse_release(payload, channel="edge")
+
+    assert release.tag_name == "nightly-20260918"
+    # Selection uses the upstream publication timestamp, not list position.
+    assert release.version == "10.0.0-pre1"
+
+
+def test_edge_rejects_old_main_repository_prerelease_payload() -> None:
+    payload = [
+        {
+            "tag_name": "v0.7-old_nightly",
+            "html_url": "https://github.com/optiscaler/OptiScaler/releases/tag/v0.7-old_nightly",
+            "prerelease": True,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_v0.7.7-pre13_20250731.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler/releases/download/v0.7-old_nightly/OptiScaler_v0.7.7-pre13_20250731.7z",
+                    "size": 10,
+                }
+            ],
+        }
+    ]
+
+    with pytest.raises(
+        OptiScalerMetadataError,
+        match="latest edge OptiScaler releases have no supported",
+    ):
+        parse_release(payload, channel="edge")
+
+
+def test_edge_reports_no_release_when_nightly_has_no_qualifying_asset() -> None:
+    payload = [
+        {
+            "tag_name": "nightly",
+            "html_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/tag/nightly",
+            "prerelease": True,
+            "draft": False,
+            "assets": [],
+        }
+    ]
+
+    with pytest.raises(OptiScalerMetadataError, match="no supported ZIP or 7z asset"):
+        parse_release(payload, channel="edge")
+
+
+def test_channel_discovery_uses_separate_upstream_endpoints(tmp_path: Path) -> None:
+    archive = _archive_bytes()
+    requests: list[str] = []
+
+    def opener(request, **_kwargs):
+        requests.append(request.full_url)
+        return _Response(_metadata(archive), url=request.full_url)
+
+    client = OptiScalerReleaseClient(tmp_path / "cache", opener=opener)
+    client.latest_release(channel="stable", force_refresh=True)
+    # This response is intentionally stable-shaped; endpoint selection is the
+    # behavior under test, while parser rejection protects channel isolation.
+    with pytest.raises(OptiScalerMetadataError):
+        client.latest_release(channel="edge", force_refresh=True)
+
+    assert requests[0] == "https://api.github.com/repos/optiscaler/OptiScaler/releases"
+    assert requests[1] == OFFICIAL_NIGHTLY_RELEASES_URL
+
+
+def test_stable_and_edge_metadata_caches_are_separate(tmp_path: Path) -> None:
+    archive = _archive_bytes()
+    stable_payload = json.loads(_metadata(archive))
+    edge_payload = [
+        {
+            "tag_name": "nightly-20260918",
+            "html_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/tag/nightly-20260918",
+            "published_at": "2026-09-18T08:51:17Z",
+            "prerelease": True,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_v10.0.0-pre1_20260918.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20260918/OptiScaler_v10.0.0-pre1_20260918.7z",
+                    "size": 10,
+                }
+            ],
+        }
+    ]
+
+    def opener(request, **_kwargs):
+        payload = (
+            stable_payload
+            if request.full_url == "https://api.github.com/repos/optiscaler/OptiScaler/releases"
+            else edge_payload
+        )
+        return _Response(json.dumps(payload).encode(), url=request.full_url)
+
+    client = OptiScalerReleaseClient(tmp_path / "cache", opener=opener)
+    assert client.latest_release(channel="stable", force_refresh=True).version == "1.2.3"
+    assert client.latest_release(channel="edge", force_refresh=True).version == "10.0.0-pre1"
+    assert client.cached_release("stable").version == "1.2.3"
+    assert client.cached_release("edge").version == "10.0.0-pre1"
+    assert (tmp_path / "cache/latest-stable.json").is_file()
+    assert (tmp_path / "cache/latest-edge.json").is_file()
 
 
 def test_archive_redirect_outside_explicit_github_asset_hosts_is_rejected(

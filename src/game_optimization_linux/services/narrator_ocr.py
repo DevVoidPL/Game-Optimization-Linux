@@ -36,6 +36,13 @@ OCR_UPSCALE_FACTOR = 2.0
 # weak-line rule. Reused when splitting low-confidence rejections, so that split
 # can never drift away from the rule it is describing.
 OCR_STRONG_LINE_CONFIDENCE = 0.80
+
+# Edge-noise trimming. A token only qualifies as noise below this token-level
+# confidence and at this short a length, and at least this many words must remain
+# afterwards, so a real sentence is never shortened into a fragment.
+OCR_EDGE_GARBAGE_CONFIDENCE = 60.0
+OCR_EDGE_GARBAGE_MAX_LENGTH = 3
+OCR_EDGE_GARBAGE_MIN_CORE = 4
 OCR_MAX_PREPROCESSED_PIXELS = 4_000_000
 OCR_CONTRAST_TILE_WIDTH = 96
 OCR_CONTRAST_TILE_HEIGHT = 64
@@ -1110,6 +1117,7 @@ class TesseractOcrProvider:
                         token["included"] = False
                         token["filter_reason"] = "weak_isolated_line"
                 continue
+            TesseractOcrProvider._trim_edge_garbage(line_tokens)
             TesseractOcrProvider._filter_separated_weak_suffix(line_tokens)
 
         filtered_lines: list[str] = []
@@ -1139,6 +1147,72 @@ class TesseractOcrProvider:
             weighted += (float(token["confidence"]) / 100.0) * characters
             weight += characters
         return weighted / weight if weight else None
+
+    @staticmethod
+    def _is_edge_garbage(token: dict[str, object]) -> bool:
+        """Whether a token at a line edge is noise rather than a word.
+
+        Deliberately narrow: only a short, low-confidence token that cannot be a
+        word qualifies. A repeated letter (``SS``, ``EE``), a vowel-less scrap or
+        a pure symbol is noise; anything of normal length, or a short token with a
+        normal letter mix such as ``Nie`` or ``FIB``, is not.
+        """
+
+        if not bool(token.get("valid_confidence", False)):
+            return True
+        if float(token["confidence"]) >= OCR_EDGE_GARBAGE_CONFIDENCE:
+            return False
+        text = str(token["text"]).strip()
+        if not text:
+            return True
+        if bool(token.get("punctuation_only", False)):
+            return True
+        letters = [character for character in text if character.isalpha()]
+        if not letters:
+            return True
+        if len(text) > OCR_EDGE_GARBAGE_MAX_LENGTH:
+            return False
+        if len({character.casefold() for character in letters}) == 1:
+            return True
+        return not any(
+            character.casefold() in "aąeęioóuy" for character in letters
+        )
+
+    @staticmethod
+    def _trim_edge_garbage(line_tokens: list[dict[str, object]]) -> None:
+        """Drop noise tokens from the two ends of a line, never from inside.
+
+        A correct sentence flanked by scraps such as ``SS trzeba to szybkd
+        wrzucić do netu EE`` used to be scored with that noise included and was
+        rejected whole. Excluding only the edges leaves the core, and the phrase
+        confidence is recomputed from the remaining tokens by the caller.
+        """
+
+        included = [token for token in line_tokens if bool(token["included"])]
+        if len(included) <= OCR_EDGE_GARBAGE_MIN_CORE:
+            return
+        # Strip every edge scrap first, then judge what is left. Stopping early to
+        # protect a minimum size would leave noise attached to the core.
+        start = 0
+        end = len(included)
+        while start < end and TesseractOcrProvider._is_edge_garbage(included[start]):
+            start += 1
+        while end > start and TesseractOcrProvider._is_edge_garbage(included[end - 1]):
+            end -= 1
+        if start == 0 and end == len(included):
+            return
+        core = included[start:end]
+        # Keep the line only if what survives still reads as a sentence.
+        words = sum(
+            1
+            for token in core
+            if int(token.get("alphanumeric_characters", 0)) > 0
+        )
+        if words < OCR_EDGE_GARBAGE_MIN_CORE:
+            return
+        for token in included[:start] + included[end:]:
+            token["included"] = False
+            token["filter_reason"] = "edge_garbage"
 
     @staticmethod
     def _filter_separated_weak_suffix(

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -105,10 +107,13 @@ Item {
                             currentIndex: page.languageIndex(page.setting(["language"], "en"))
                             onActivated: function(index) {
                                 var code = codes[index]
+                                // translationManager is an application context property.
+                                // qmllint disable unqualified
                                 if (page.save("language", code)
                                         && translationManager
                                         && translationManager.setLanguage)
                                     translationManager.setLanguage(code)
+                                // qmllint enable unqualified
                             }
                         }
                     }
@@ -447,8 +452,8 @@ Item {
 
                     ColumnLayout {
                         Layout.fillWidth: true
-                        enabled: !!(page.controller && page.controller.gamepadAvailable)
-                        opacity: enabled ? 1.0 : 0.55
+                        enabled: true
+                        opacity: 1.0
                         spacing: 4
 
                         SettingRow {
@@ -604,6 +609,74 @@ Item {
                                 model: labels
                                 currentIndex: page.indexOfValue(values, page.setting(["postLaunchBehavior", "post_launch_behavior"], "Minimize"), 0)
                                 onActivated: function(index) { page.save("postLaunchBehavior", values[index]) }
+                            }
+                        }
+
+                        Divider { Layout.fillWidth: true }
+
+                        SettingRow {
+                            Layout.fillWidth: true
+                            title: qsTr("Enable Couch Mode menu sounds")
+                            description: qsTr("Subtle feedback for navigation, actions and unavailable controls")
+                            AppSwitch {
+                                checked: Boolean(page.setting(["couchMenuSoundsEnabled", "couch_menu_sounds_enabled"], true))
+                                onToggled: page.save("couchMenuSoundsEnabled", checked)
+                            }
+                        }
+
+                        Divider { Layout.fillWidth: true }
+
+                        SettingRow {
+                            Layout.fillWidth: true
+                            title: qsTr("Menu sound volume")
+                            description: qsTr("Volume for short Couch Mode interface effects")
+                            RowLayout {
+                                AppSlider {
+                                    id: couchSoundVolumeSlider
+                                    Layout.preferredWidth: 190
+                                    from: 0
+                                    to: 100
+                                    stepSize: 5
+                                    enabled: Boolean(page.setting(["couchMenuSoundsEnabled", "couch_menu_sounds_enabled"], true))
+                                    value: Number(page.setting(["couchMenuSoundsVolume", "couch_menu_sounds_volume"], 40))
+                                    onMoved: couchSoundVolumeSave.restart()
+                                }
+                                Label { text: qsTr("%1%").arg(Math.round(couchSoundVolumeSlider.value)); color: App.Theme.text; Layout.preferredWidth: 48 }
+                                Timer { id: couchSoundVolumeSave; interval: 180; onTriggered: page.save("couchMenuSoundsVolume", Math.round(couchSoundVolumeSlider.value)) }
+                            }
+                        }
+
+                        Divider { Layout.fillWidth: true }
+
+                        SettingRow {
+                            Layout.fillWidth: true
+                            title: qsTr("Enable Couch Mode music")
+                            description: qsTr("Play the packaged ambient loop only while Couch Mode is active")
+                            AppSwitch {
+                                checked: Boolean(page.setting(["couchMusicEnabled", "couch_music_enabled"], true))
+                                onToggled: page.save("couchMusicEnabled", checked)
+                            }
+                        }
+
+                        Divider { Layout.fillWidth: true }
+
+                        SettingRow {
+                            Layout.fillWidth: true
+                            title: qsTr("Couch Mode music volume")
+                            description: qsTr("Low background level; Narrator speech ducks it automatically")
+                            RowLayout {
+                                AppSlider {
+                                    id: couchMusicVolumeSlider
+                                    Layout.preferredWidth: 190
+                                    from: 0
+                                    to: 100
+                                    stepSize: 5
+                                    enabled: Boolean(page.setting(["couchMusicEnabled", "couch_music_enabled"], true))
+                                    value: Number(page.setting(["couchMusicVolume", "couch_music_volume"], 20))
+                                    onMoved: couchMusicVolumeSave.restart()
+                                }
+                                Label { text: qsTr("%1%").arg(Math.round(couchMusicVolumeSlider.value)); color: App.Theme.text; Layout.preferredWidth: 48 }
+                                Timer { id: couchMusicVolumeSave; interval: 180; onTriggered: page.save("couchMusicVolume", Math.round(couchMusicVolumeSlider.value)) }
                             }
                         }
 

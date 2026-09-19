@@ -35,7 +35,15 @@ from .enums import (
     TextureScope,
     ThemeMode,
 )
-from .gamepad import GamepadAction, GamepadDevice, GamepadEvent, GamepadType, button_hints
+from .gamepad import (
+    CANONICAL_GAMEPAD_ACTIONS,
+    GamepadAction,
+    GamepadDevice,
+    GamepadEvent,
+    GamepadType,
+    button_hints,
+    normalize_gamepad_action,
+)
 from .game_analysis import (
     BaselineSession,
     BottleneckAnalysis,
@@ -111,7 +119,9 @@ from .optimization_profile import (
     GameOptimizationProfile,
 )
 from .optiscaler import (
+    OPTISCALER_BACKENDS,
     OPTISCALER_CHANNELS,
+    OPTISCALER_COMPATIBILITY_STATES,
     OPTISCALER_FSR4_MODES,
     OPTISCALER_PROXY_DLLS,
     OPTISCALER_RUNTIME_VERIFICATION_STATES,
@@ -185,8 +195,12 @@ __all__ = [
     "FPS_MODES",
     "OPTIMIZATION_PRESETS",
     "OPTIMIZATION_SCHEMA_VERSION",
+    "OPTISCALER_BACKENDS",
+    "OPTISCALER_CHANNELS",
+    "OPTISCALER_COMPATIBILITY_STATES",
     "USER_GOALS",
     "GameStatus",
+    "CANONICAL_GAMEPAD_ACTIONS",
     "GamepadAction",
     "GamepadDevice",
     "GamepadEvent",
@@ -243,6 +257,7 @@ __all__ = [
     "TextureScope",
     "ThemeMode",
     "button_hints",
+    "normalize_gamepad_action",
     "validate_app_id",
     "validate_game_key",
     "local_path",

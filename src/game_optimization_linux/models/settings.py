@@ -53,6 +53,20 @@ def _read_percentage(data: Mapping[str, Any], key: str, default: int) -> int:
     return value
 
 
+def _read_optional_bool(data: Mapping[str, Any], key: str, default: bool) -> bool:
+    """Read newly introduced preferences without invalidating older settings."""
+
+    value = data.get(key, default)
+    return value if isinstance(value, bool) else default
+
+
+def _read_clamped_volume(data: Mapping[str, Any], key: str, default: int) -> int:
+    value = data.get(key, default)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return default
+    return max(0, min(100, int(round(float(value)))))
+
+
 def _read_int_range(
     data: Mapping[str, Any], key: str, default: int, minimum: int, maximum: int
 ) -> int:
@@ -111,6 +125,10 @@ class AppSettings:
     start_couch_mode_fullscreen: bool = True
     post_launch_behavior: PostLaunchBehavior = PostLaunchBehavior.MINIMIZE
     interface_sounds: bool = False
+    couch_menu_sounds_enabled: bool = True
+    couch_menu_sounds_volume: int = 40
+    couch_music_enabled: bool = True
+    couch_music_volume: int = 20
 
     def __post_init__(self) -> None:
         if not isinstance(self.language, str) or not self.language.strip():
@@ -224,9 +242,17 @@ class AppSettings:
             (self.hide_cursor_in_couch_mode, "hide_cursor_in_couch_mode"),
             (self.start_couch_mode_fullscreen, "start_couch_mode_fullscreen"),
             (self.interface_sounds, "interface_sounds"),
+            (self.couch_menu_sounds_enabled, "couch_menu_sounds_enabled"),
+            (self.couch_music_enabled, "couch_music_enabled"),
         ):
             if not isinstance(value, bool):
                 raise ValueError(f"{field_name} must be a boolean")
+        for value, field_name in (
+            (self.couch_menu_sounds_volume, "couch_menu_sounds_volume"),
+            (self.couch_music_volume, "couch_music_volume"),
+        ):
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= 100:
+                raise ValueError(f"{field_name} must be an integer between 0 and 100")
         if not isinstance(self.post_launch_behavior, PostLaunchBehavior):
             raise ValueError("post_launch_behavior must be a PostLaunchBehavior value")
 
@@ -273,6 +299,10 @@ class AppSettings:
             "start_couch_mode_fullscreen": self.start_couch_mode_fullscreen,
             "post_launch_behavior": self.post_launch_behavior.value,
             "interface_sounds": self.interface_sounds,
+            "couch_menu_sounds_enabled": self.couch_menu_sounds_enabled,
+            "couch_menu_sounds_volume": self.couch_menu_sounds_volume,
+            "couch_music_enabled": self.couch_music_enabled,
+            "couch_music_volume": self.couch_music_volume,
         }
 
     @classmethod
@@ -475,5 +505,17 @@ class AppSettings:
             post_launch_behavior=post_launch_behavior,
             interface_sounds=_read_bool(
                 data, "interface_sounds", defaults.interface_sounds
+            ),
+            couch_menu_sounds_enabled=_read_optional_bool(
+                data, "couch_menu_sounds_enabled", defaults.couch_menu_sounds_enabled
+            ),
+            couch_menu_sounds_volume=_read_clamped_volume(
+                data, "couch_menu_sounds_volume", defaults.couch_menu_sounds_volume
+            ),
+            couch_music_enabled=_read_optional_bool(
+                data, "couch_music_enabled", defaults.couch_music_enabled
+            ),
+            couch_music_volume=_read_clamped_volume(
+                data, "couch_music_volume", defaults.couch_music_volume
             ),
         )

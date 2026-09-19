@@ -104,6 +104,13 @@ class SettingsController:
                 self._app._set_interface_mode("couch")
         elif field_name == "interface_sounds":
             self._app._ui_sound_service.set_enabled(bool(converted_value))
+        elif field_name in {
+            "couch_menu_sounds_enabled",
+            "couch_menu_sounds_volume",
+            "couch_music_enabled",
+            "couch_music_volume",
+        }:
+            self._app._configure_couch_audio()
         elif field_name.startswith("automatic_compression_"):
             self._app._reload_updates()
             if (
@@ -165,6 +172,10 @@ class SettingsController:
             "startCouchModeFullscreen": "start_couch_mode_fullscreen",
             "postLaunchBehavior": "post_launch_behavior",
             "interfaceSounds": "interface_sounds",
+            "couchMenuSoundsEnabled": "couch_menu_sounds_enabled",
+            "couchMenuSoundsVolume": "couch_menu_sounds_volume",
+            "couchMusicEnabled": "couch_music_enabled",
+            "couchMusicVolume": "couch_music_volume",
         }
         requested = aliases.get(key, key)
         if not is_dataclass(self._app._settings_model):

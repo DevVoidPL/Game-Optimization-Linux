@@ -40,6 +40,133 @@ class UpdatesController:
     def __init__(self, app: AppController) -> None:
         self._app = app
 
+    @staticmethod
+    def _row_value(row: Mapping[str, Any], keys: Sequence[str]) -> str:
+        for key in keys:
+            value = row.get(key)
+            if value is not None and str(value).strip():
+                return str(value).strip()
+        return ""
+
+    @staticmethod
+    def _normalized_title(value: object) -> str:
+        return " ".join(str(value or "").casefold().split())
+
+    def _game_for_update_row(self, row: Mapping[str, Any]) -> Game | None:
+        game_id = self._row_value(row, ("gameId", "game_id"))
+        if game_id:
+            game = self._app._domain_games.get(game_id)
+            if game is not None:
+                return game
+
+        row_id = self._row_value(row, ("id",))
+        if row_id in self._app._domain_games:
+            return self._app._domain_games[row_id]
+
+        app_id = self._row_value(
+            row,
+            ("steamAppId", "steam_app_id", "appId", "app_id"),
+        )
+        if app_id:
+            app_matches = [
+                game
+                for game in self._app._domain_games.values()
+                if str(game.steam_app_id or "") == app_id
+            ]
+            if len(app_matches) == 1:
+                return app_matches[0]
+
+        # Sparse persisted state rows may predate stable IDs. Exact title
+        # matching is deliberately the final fallback and must be unique;
+        # a supplied provider also has to agree with the domain game.
+        title = self._normalized_title(
+            self._row_value(row, ("gameName", "game_name", "title", "name"))
+        )
+        if not title:
+            return None
+        provider = self._normalized_title(
+            self._row_value(row, ("provider", "launcher", "store"))
+        )
+        title_matches = []
+        for game in self._app._domain_games.values():
+            if self._normalized_title(game.name) != title:
+                continue
+            game_providers = {
+                self._normalized_title(game.launcher.value),
+                self._normalized_title(game.store),
+            }
+            if provider and provider not in game_providers:
+                continue
+            title_matches.append(game)
+        return title_matches[0] if len(title_matches) == 1 else None
+
+    def _enrich_update_row(self, row: Mapping[str, Any]) -> dict[str, Any]:
+        enriched = dict(row)
+        game = self._game_for_update_row(row)
+        presented: Mapping[str, Any] = {}
+        if game is not None:
+            presented = self._app._present_game(
+                game,
+                analysis_report=self._app._analysis_reports.get(game.id),
+            )
+
+        existing_app_id = self._row_value(
+            row,
+            ("steamAppId", "steam_app_id", "appId", "app_id"),
+        )
+        app_id = str(game.steam_app_id or "") if game is not None else existing_app_id
+        stable_game_id = (
+            game.id
+            if game is not None
+            else self._row_value(row, ("gameId", "game_id"))
+            or (f"steam-{app_id}" if app_id else "")
+        )
+        provider = (
+            str(presented.get("launcher") or game.launcher.value)
+            if game is not None
+            else self._row_value(row, ("provider", "launcher", "store"))
+        )
+        artwork = self._row_value(
+            presented if game is not None else row,
+            (
+                "effectiveArtworkUrl",
+                "portraitArtwork",
+                "cover",
+                "fallbackArtwork",
+                "headerArtwork",
+            ),
+        )
+        if not artwork:
+            artwork = self._row_value(
+                row,
+                (
+                    "effectiveArtworkUrl",
+                    "artworkUrl",
+                    "portraitArtwork",
+                    "cover",
+                    "fallbackArtwork",
+                    "headerArtwork",
+                ),
+            )
+
+        enriched.update(
+            {
+                "gameId": stable_game_id,
+                "provider": provider,
+                "appId": app_id,
+                "steamAppId": app_id,
+                "artworkUrl": artwork,
+                "effectiveArtworkUrl": artwork,
+            }
+        )
+        if game is not None:
+            enriched["gameKnown"] = True
+            if not self._row_value(row, ("name", "gameName", "game_name")):
+                enriched["name"] = game.name
+            enriched["gameName"] = game.name
+            enriched.setdefault("launcher", provider)
+        return enriched
+
     def ignoreUpdate(self, game_id: str) -> bool:
         tracker = self._app._update_tracker
         if tracker is None:
@@ -367,11 +494,14 @@ class UpdatesController:
         tracker = self._app._update_tracker
         records = tracker.list_records() if tracker is not None else ()
         record_rows = [
-            self._app._update_record_to_qml(record)
+            self._enrich_update_row(self._app._update_record_to_qml(record))
             for record in records
             if not self._app._update_record_is_in_ignored_library(record)
         ]
-        history_rows = self._app._history_update_rows()
+        history_rows = [
+            self._enrich_update_row(row)
+            for row in self._app._history_update_rows()
+        ]
         record_rows = [
             row
             for row in record_rows

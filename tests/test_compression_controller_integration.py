@@ -965,6 +965,49 @@ def test_updates_mapping_and_summary_have_stable_types(tmp_path: Path) -> None:
         controller.shutdown()
 
 
+def test_sparse_state_update_row_is_enriched_before_qml(tmp_path: Path) -> None:
+    artwork_path = tmp_path / "library_600x900.jpg"
+    artwork_path.write_bytes(b"fixture artwork")
+    game = replace(_game(tmp_path), portrait_artwork_path=artwork_path)
+    sparse_state_update = {
+        "id": "state-update-42",
+        "title": game.name,
+        "build_id": "9002",
+        "changed_bytes": 8192,
+        "status": "verification_required",
+    }
+    controller = AppController(
+        game_provider=_GameProvider((game,)),
+        task_service=_TaskService(),
+        settings_store=SettingsStore(tmp_path / "settings.json"),
+        system_provider=_SystemProvider(),
+        filesystem_provider=_FilesystemProvider(),
+        compression_service=_CompressionService((sparse_state_update,)),  # type: ignore[arg-type]
+        initial_games=(game,),
+        demo_mode=False,
+        auto_refresh=False,
+    )
+    try:
+        row = next(
+            item
+            for item in controller.updates
+            if item["sectionKey"] == "recently_optimized"
+        )
+        expected_artwork = artwork_path.resolve().as_uri()
+        assert row["title"] == game.name
+        assert row["build_id"] == "9002"
+        assert row["changed_bytes"] == 8192
+        assert row["gameId"] == game.id
+        assert row["gameName"] == game.name
+        assert row["provider"] == "Steam"
+        assert row["appId"] == str(game.steam_app_id)
+        assert row["steamAppId"] == str(game.steam_app_id)
+        assert row["effectiveArtworkUrl"] == expected_artwork
+        assert row["artworkUrl"] == expected_artwork
+    finally:
+        controller.shutdown()
+
+
 def test_automatic_compression_defaults_to_off(tmp_path: Path) -> None:
     game = _game(tmp_path)
     harness = _harness(

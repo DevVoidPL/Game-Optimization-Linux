@@ -260,6 +260,71 @@ def test_translation_catalogs_contain_no_mojibake() -> None:
         assert not any(marker in text for marker in mojibake_markers), path
 
 
+def test_all_qml_translation_sources_exist_in_every_catalog() -> None:
+    """Keep newly added desktop and Couch UI text out of English-only fallbacks."""
+
+    qml_root = Path("src/game_optimization_linux/qml")
+    expected: set[tuple[str, str]] = set()
+    pattern = re.compile(r'qsTr\(\s*"((?:[^"\\]|\\.)*)"')
+    for path in qml_root.rglob("*.qml"):
+        text = path.read_text(encoding="utf-8")
+        pragma = re.search(
+            r'^\s*pragma\s+Translator:\s*"([^"]+)"', text, re.MULTILINE
+        )
+        context = pragma.group(1) if pragma else path.stem
+        expected.update((context, source) for source in pattern.findall(text))
+
+    python_selector = Path(
+        "src/game_optimization_linux/controllers/narrator_region_selector.py"
+    ).read_text(encoding="utf-8")
+    expected.update(
+        ("SubtitleRegionSelector", source)
+        for source in re.findall(r'_tr\(\s*"((?:[^"\\]|\\.)*)"', python_selector)
+    )
+
+    assert expected
+    for code in ("en", "pl", "es"):
+        root = ET.parse(
+            TRANSLATIONS_DIR / f"game_optimization_{code}.ts"
+        ).getroot()
+        actual = {
+            (context.findtext("name") or "", message.findtext("source") or "")
+            for context in root.findall("context")
+            for message in context.findall("message")
+        }
+        missing = sorted(expected - actual)
+        assert not missing, f"{code} catalog is missing QML sources: {missing}"
+
+
+def test_couch_uses_shared_narrator_route_and_icon_registry() -> None:
+    """Keep Couch navigation and visual identity connected to shared surfaces."""
+
+    couch_main = (Path("src/game_optimization_linux/qml/couch/CouchMain.qml")
+              ).read_text(encoding="utf-8")
+    couch_home = (Path("src/game_optimization_linux/qml/couch/CouchHome.qml")
+              ).read_text(encoding="utf-8")
+    tile = (Path("src/game_optimization_linux/qml/couch/components/CouchTile.qml")
+        ).read_text(encoding="utf-8")
+    assert 'name === "narrator" ? narratorPage' in couch_main
+    assert 'controller.navigate("narrator")' in couch_home
+    assert "App.UiIcons.sidebarNarrator" in couch_home
+    assert "property url iconSource" in tile
+
+
+def test_couch_narrator_is_not_desktop_page() -> None:
+    main = Path("src/game_optimization_linux/qml/couch/CouchMain.qml").read_text(
+        encoding="utf-8"
+    )
+    narrator = Path(
+        "src/game_optimization_linux/qml/couch/CouchNarratorPage.qml"
+    ).read_text(encoding="utf-8")
+    assert "CouchNarratorPage" in main
+    assert "NarratorPage.qml" not in main
+    assert "saveNarratorGameSettings" in narrator
+    assert "startNarrator" in narrator
+    assert "requestNarratorRegionPreview" in narrator
+
+
 def test_language_aliases_and_unknown_language() -> None:
     manager = TranslationManager(_APPLICATION)
 

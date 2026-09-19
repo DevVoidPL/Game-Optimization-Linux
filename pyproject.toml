@@ -71,6 +71,8 @@ game_optimization_linux = [
     "assets/branding/*.png",
     "assets/ui-icons/*.svg",
     "assets/ui-icons/manifest.json",
+    "assets/audio/*.wav",
+    "assets/audio/*.md",
     "resources/*",
     "resources/app-icons/*.png",
     "translations/*.ts",

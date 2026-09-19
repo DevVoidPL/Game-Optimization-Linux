@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -26,6 +28,14 @@ FocusScope {
                                           && updatesList.currentIndex < stableUpdates.count
                                           ? stableUpdates.get(updatesList.currentIndex).updateData
                                           : ({})
+    readonly property var artworkProbe: ({
+        "gameId": resolvedGameId(selectedUpdate),
+        "artworkSource": resolvedArtwork(selectedUpdate)
+    })
+    readonly property var renderedArtworkProbe: updatesList.currentItem ? ({
+        "gameId": String(updatesList.currentItem.renderedCoverGameId || ""),
+        "artworkSource": String(updatesList.currentItem.renderedCoverArtwork || "")
+    }) : ({ "gameId": "", "artworkSource": "" })
     readonly property var actionModel: [
         {
             "symbol": "⌕",
@@ -107,11 +117,28 @@ FocusScope {
     }
 
     function gameId(update) {
-        return String(value(update, ["gameId", "game_id", "id"], ""))
+        return String(value(update, ["gameId", "game_id"], ""))
     }
 
     function gameName(update) {
-        return String(value(update, ["name", "gameName", "game_name"], qsTr("Unknown game")))
+        return String(value(update, ["gameName", "name", "game_name", "title"], qsTr("Unknown game")))
+    }
+
+    function playSemanticSound(kind) {
+        if (controller && controller.playCouchSound && String(kind || "").length)
+            controller.playCouchSound(String(kind))
+    }
+
+    function resolvedGameId(update) {
+        return gameId(update)
+    }
+
+    function resolvedArtwork(update) {
+        return String(value(update, ["effectiveArtworkUrl", "artworkUrl"], ""))
+    }
+
+    function resolvedLauncher(update) {
+        return String(value(update, ["provider", "launcher"], qsTr("Steam")))
     }
 
     function stateOf(update) {
@@ -271,13 +298,15 @@ FocusScope {
 
     function selectUpdate(index) {
         if (index < 0 || index >= stableUpdates.count)
-            return
+            return false
+        var changed = updatesList.currentIndex !== index
         updatesList.currentIndex = index
         retainedRowId = String(stableUpdates.get(index).rowId || "")
         if (navigation)
             navigation.rememberFocus("updates", retainedRowId, index)
         updatesList.positionViewAtIndex(index, ListView.Contain)
         ensureSelectedAction()
+        return changed
     }
 
     function moveAction(direction) {
@@ -285,11 +314,13 @@ FocusScope {
         var candidate = selectedAction + direction
         while (candidate >= 0 && candidate < actions.length) {
             if (actions[candidate].visible && actions[candidate].enabled) {
+                var changed = selectedAction !== candidate
                 selectedAction = candidate
-                return
+                return changed
             }
             candidate += direction
         }
+        return false
     }
 
     function profileFor(update) {
@@ -340,7 +371,7 @@ FocusScope {
     function prepareSelectedCompression() {
         var id = gameId(selectedUpdate)
         if (id.length === 0 || !controller || !controller.prepareCompression)
-            return
+            return false
         var plan = controller.prepareCompression(id, profileFor(selectedUpdate), true)
         if (!planIsValid(plan)) {
             var message = String(planValue(plan, ["error", "message"],
@@ -349,104 +380,132 @@ FocusScope {
             if (blockers && blockers.length > 0)
                 message = String(blockers[0])
             showMessage(message, "error")
-            return
+            return false
         }
         pendingPlan = plan
         confirmSelection = 0
         confirmationOverlay.visible = true
         if (navigation)
             navigation.openModal("updates-compression", "cancel")
+        return true
     }
 
     function closeConfirmation() {
+        if (!confirmationOverlay.visible)
+            return false
         confirmationOverlay.visible = false
         pendingPlan = ({})
         confirmSelection = 0
         if (navigation)
             navigation.closeModal()
+        return true
     }
 
     function confirmPlan() {
         var planId = String(planValue(pendingPlan, ["planId", "plan_id"], ""))
-        if (planId.length > 0 && controller && controller.startCompression)
-            controller.startCompression(planId)
+        var started = planId.length > 0 && controller && controller.startCompression
+                ? Boolean(controller.startCompression(planId)) : false
         closeConfirmation()
+        return started
     }
 
     function activateSelectedAction() {
         var actions = page.actionModel || []
         if (!actions[selectedAction] || !actions[selectedAction].enabled)
-            return
+            return "error"
         var id = gameId(selectedUpdate)
         if (selectedAction === 0 && id.length > 0 && controller && controller.analyzeChanges)
-            controller.analyzeChanges(id)
-        else if (selectedAction === 1)
-            prepareSelectedCompression()
-        else if (selectedAction === 2 && id.length > 0 && controller && controller.ignoreUpdate)
-            controller.ignoreUpdate(id)
-        else if (selectedAction === 3 && id.length > 0 && controller && controller.openGame)
-            controller.openGame(id)
-        else if (selectedAction === 4)
+            return controller.analyzeChanges(id) ? "confirm" : "error"
+        if (selectedAction === 1)
+            return prepareSelectedCompression() ? "open" : "error"
+        if (selectedAction === 2 && id.length > 0 && controller && controller.ignoreUpdate)
+            return controller.ignoreUpdate(id) ? "confirm" : "error"
+        if (selectedAction === 3 && id.length > 0 && controller && controller.openGame)
+            return controller.openGame(id) ? "confirm" : "error"
+        if (selectedAction === 4) {
             backRequested()
+            return "back"
+        }
+        return "error"
     }
 
     function handleConfirmationAction(action) {
         if (action === "Back") {
-            closeConfirmation()
-        } else if (action === "NavigateLeft" || action === "NavigateUp") {
-            confirmSelection = 0
-        } else if (action === "NavigateRight" || action === "NavigateDown") {
-            confirmSelection = 1
+            if (closeConfirmation())
+                playSemanticSound("back")
+        } else if (action === "NavigateLeft" || action === "NavigateUp"
+                   || action === "NavigateRight" || action === "NavigateDown") {
+            var previousChoice = confirmSelection
+            confirmSelection = (action === "NavigateLeft" || action === "NavigateUp") ? 0 : 1
+            if (confirmSelection !== previousChoice)
+                playSemanticSound("navigate")
         } else if (action === "Confirm") {
             if (confirmSelection === 1)
-                confirmPlan()
-            else
+                playSemanticSound(confirmPlan() ? "confirm" : "error")
+            else {
                 closeConfirmation()
+                playSemanticSound("confirm")
+            }
         }
     }
 
     function handleAction(action) {
         if (action === "Accept") action = "Confirm"
-        else if (action === "PreviousSection") action = "PageLeft"
-        else if (action === "NextSection") action = "PageRight"
+        else if (action === "PreviousSection" || action === "PageLeft") action = "PageUp"
+        else if (action === "NextSection" || action === "PageRight") action = "PageDown"
         if (confirmationOpen) {
             handleConfirmationAction(action)
             return
         }
         if (action === "Back") {
             backRequested()
+            playSemanticSound("back")
         } else if (action === "NavigateUp") {
             if (focusZone === 1 && stableUpdates.count > 0) {
                 focusZone = 0
                 updatesList.forceActiveFocus()
-            } else if (focusZone === 0) {
-                selectUpdate(Math.max(0, updatesList.currentIndex - 1))
+                playSemanticSound("navigate")
+            } else if (focusZone === 0
+                       && selectUpdate(Math.max(0, updatesList.currentIndex - 1))) {
+                playSemanticSound("navigate")
             }
         } else if (action === "NavigateDown") {
-            if (focusZone === 0 && updatesList.currentIndex < stableUpdates.count - 1)
-                selectUpdate(updatesList.currentIndex + 1)
-            else {
+            if (focusZone === 0 && updatesList.currentIndex < stableUpdates.count - 1) {
+                if (selectUpdate(updatesList.currentIndex + 1))
+                    playSemanticSound("navigate")
+            } else if (focusZone !== 1) {
                 focusZone = 1
                 ensureSelectedAction()
                 var tile = actionRepeater.itemAt(selectedAction)
                 if (tile)
                     tile.forceActiveFocus()
+                playSemanticSound("navigate")
             }
         } else if (action === "NavigateLeft" && focusZone === 1) {
-            moveAction(-1)
+            if (moveAction(-1)) playSemanticSound("navigate")
         } else if (action === "NavigateRight" && focusZone === 1) {
-            moveAction(1)
+            if (moveAction(1)) playSemanticSound("navigate")
         } else if (action === "Confirm" && focusZone === 0) {
             focusZone = 1
             ensureSelectedAction()
+            playSemanticSound("navigate")
         } else if (action === "Confirm" && focusZone === 1) {
-            activateSelectedAction()
-        } else if (action === "PageLeft" && stableUpdates.count > 0) {
-            focusZone = 0
-            selectUpdate(Math.max(0, updatesList.currentIndex - 5))
-        } else if (action === "PageRight" && stableUpdates.count > 0) {
-            focusZone = 0
-            selectUpdate(Math.min(stableUpdates.count - 1, updatesList.currentIndex + 5))
+            playSemanticSound(activateSelectedAction())
+        } else if (action === "PageUp" && stableUpdates.count > 0) {
+            var movedUp = selectUpdate(Math.max(0, updatesList.currentIndex - 5))
+            if (focusZone !== 0 || movedUp) {
+                focusZone = 0
+                playSemanticSound("navigate")
+            }
+        } else if (action === "PageDown" && stableUpdates.count > 0) {
+            var movedDown = selectUpdate(Math.min(stableUpdates.count - 1,
+                                                  updatesList.currentIndex + 5))
+            if (focusZone !== 0 || movedDown) {
+                focusZone = 0
+                playSemanticSound("navigate")
+            }
+        } else if (action === "Confirm") {
+            playSemanticSound("error")
         }
     }
 
@@ -467,6 +526,24 @@ FocusScope {
     Rectangle {
         anchors.fill: parent
         color: App.Theme.background
+        gradient: Gradient {
+            GradientStop { position: 0.0; color: App.Theme.dark ? "#111C29" : "#F8FBFF" }
+            GradientStop { position: 0.58; color: App.Theme.background }
+            GradientStop { position: 1.0; color: App.Theme.dark ? "#070B11" : "#E8EFF7" }
+        }
+    }
+    Rectangle {
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.rightMargin: -180 * page.couchScale
+        anchors.topMargin: -240 * page.couchScale
+        width: 680 * page.couchScale
+        height: 680 * page.couchScale
+        radius: width / 2
+        color: "transparent"
+        border.width: 110 * page.couchScale
+        border.color: Qt.rgba(App.Theme.accent.r, App.Theme.accent.g,
+                              App.Theme.accent.b, App.Theme.dark ? 0.055 : 0.035)
     }
 
     ColumnLayout {
@@ -524,6 +601,7 @@ FocusScope {
                 ]
 
                 delegate: Rectangle {
+                    id: summaryMetric
                     required property var modelData
                     Layout.preferredWidth: 205 * page.couchScale
                     Layout.preferredHeight: 78 * page.couchScale
@@ -537,13 +615,13 @@ FocusScope {
                         anchors.margins: 10 * page.couchScale
                         spacing: 1
                         Label {
-                            text: String(parent.parent.modelData.value)
+                            text: String(summaryMetric.modelData.value)
                             color: App.Theme.text
                             font.pixelSize: 22 * page.couchScale
                             font.weight: Font.Bold
                         }
                         Label {
-                            text: parent.parent.modelData.label
+                            text: summaryMetric.modelData.label
                             color: App.Theme.textMuted
                             font.pixelSize: 15 * page.couchScale
                             elide: Text.ElideRight
@@ -578,6 +656,8 @@ FocusScope {
                     required property var model
                     property var updateData: model.updateData || ({})
                     property string updateState: page.stateOf(updateData)
+                    readonly property string renderedCoverGameId: updateCover.gameId
+                    readonly property string renderedCoverArtwork: String(updateCover.artworkSource)
                     width: ListView.view.width - 28 * page.couchScale
                     x: 14 * page.couchScale
                     height: 148 * page.couchScale
@@ -615,16 +695,14 @@ FocusScope {
                         spacing: 16 * page.couchScale
 
                         GameCover {
+                            id: updateCover
                             objectName: "couchUpdateCover"
                             Layout.preferredWidth: 82 * page.couchScale
                             Layout.preferredHeight: 122 * page.couchScale
+                            gameId: page.resolvedGameId(updateRow.updateData)
                             title: page.gameName(updateRow.updateData)
-                            launcher: String(page.value(updateRow.updateData, ["launcher"], qsTr("Steam")))
-                            artworkSource: page.value(updateRow.updateData, [
-                                "effectiveArtworkUrl", "effective_artwork_url",
-                                "portraitArtwork", "portrait_artwork", "cover",
-                                "fallbackArtwork", "headerArtwork"
-                            ], "")
+                            launcher: page.resolvedLauncher(updateRow.updateData)
+                            artworkSource: page.resolvedArtwork(updateRow.updateData)
                             artworkFillMode: Image.PreserveAspectCrop
                             cornerRadius: 10 * page.couchScale
                         }
@@ -860,6 +938,7 @@ FocusScope {
                     ]
 
                     delegate: Rectangle {
+                        id: planMetric
                         required property var modelData
                         Layout.preferredWidth: 280 * page.couchScale
                         Layout.preferredHeight: 92 * page.couchScale
@@ -874,7 +953,7 @@ FocusScope {
                             spacing: 3 * page.couchScale
                             Label {
                                 Layout.fillWidth: true
-                                text: parent.parent.modelData.value
+                                text: planMetric.modelData.value
                                 color: App.Theme.text
                                 font.pixelSize: 18 * page.couchScale
                                 font.weight: Font.Bold
@@ -883,7 +962,7 @@ FocusScope {
                             }
                             Label {
                                 Layout.fillWidth: true
-                                text: parent.parent.modelData.label
+                                text: planMetric.modelData.label
                                 color: App.Theme.textMuted
                                 font.pixelSize: 12 * page.couchScale
                                 horizontalAlignment: Text.AlignHCenter

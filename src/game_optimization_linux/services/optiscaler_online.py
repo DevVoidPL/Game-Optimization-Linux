@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import os
@@ -30,8 +31,12 @@ OFFICIAL_RELEASES_URL: Final = (
     "https://api.github.com/repos/optiscaler/OptiScaler/releases"
 )
 OFFICIAL_REPOSITORY: Final = "optiscaler/OptiScaler"
+OFFICIAL_NIGHTLY_REPOSITORY: Final = "optiscaler/OptiScaler-nightly"
+OFFICIAL_NIGHTLY_RELEASES_URL: Final = (
+    "https://api.github.com/repos/optiscaler/OptiScaler-nightly/releases"
+)
 SUPPORTED_ARCHIVE_SUFFIXES: Final = (".7z", ".zip")
-METADATA_CACHE_SCHEMA_VERSION: Final = 1
+METADATA_CACHE_SCHEMA_VERSION: Final = 2
 ARCHIVE_CACHE_SCHEMA_VERSION: Final = 1
 DEFAULT_METADATA_MAX_AGE_SECONDS: Final = 15 * 60
 DEFAULT_MAX_METADATA_BYTES: Final = 2 * 1024 * 1024
@@ -83,7 +88,12 @@ class OptiScalerReleaseAsset:
         }
 
     @classmethod
-    def from_dict(cls, raw: Mapping[str, Any]) -> "OptiScalerReleaseAsset":
+    def from_dict(
+        cls,
+        raw: Mapping[str, Any],
+        *,
+        repository: str = OFFICIAL_REPOSITORY,
+    ) -> "OptiScalerReleaseAsset":
         try:
             asset = cls(
                 name=str(raw["name"]),
@@ -96,7 +106,7 @@ class OptiScalerReleaseAsset:
             raise OptiScalerMetadataError(
                 "cached OptiScaler asset metadata is incomplete"
             ) from error
-        _validate_asset(asset)
+        _validate_asset(asset, repository=repository)
         return asset
 
 
@@ -113,6 +123,7 @@ class OptiScalerRelease:
     fidelityfx_upscaler_version: str = ""
     source: str = "network"
     stale: bool = False
+    repository: str = OFFICIAL_REPOSITORY
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -123,11 +134,13 @@ class OptiScalerRelease:
             "asset": self.asset.to_dict(),
             "channel": self.channel,
             "fidelityfx_upscaler_version": self.fidelityfx_upscaler_version,
+            "repository": self.repository,
         }
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> "OptiScalerRelease":
         try:
+            repository = str(raw.get("repository") or OFFICIAL_REPOSITORY)
             asset_raw = raw["asset"]
             if not isinstance(asset_raw, Mapping):
                 raise TypeError("asset must be an object")
@@ -136,12 +149,15 @@ class OptiScalerRelease:
                 version=str(raw["version"]),
                 html_url=str(raw["html_url"]),
                 published_at=str(raw.get("published_at", "")),
-                asset=OptiScalerReleaseAsset.from_dict(asset_raw),
+                asset=OptiScalerReleaseAsset.from_dict(
+                    asset_raw, repository=repository
+                ),
                 channel=str(raw.get("channel") or "stable"),
                 fidelityfx_upscaler_version=str(
                     raw.get("fidelityfx_upscaler_version") or ""
                 ),
                 source="cache",
+                repository=repository,
             )
         except (KeyError, TypeError, ValueError) as error:
             raise OptiScalerMetadataError(
@@ -162,14 +178,16 @@ class CachedOptiScalerArchive:
     from_cache: bool = False
 
 
-def _is_official_release_download_url(value: str) -> bool:
+def _is_official_release_download_url(
+    value: str, *, repository: str = OFFICIAL_REPOSITORY
+) -> bool:
     parsed = urlparse(str(value))
     return (
         parsed.scheme == "https"
         and parsed.hostname is not None
         and parsed.hostname.casefold() == "github.com"
         and parsed.path.casefold().startswith(
-            "/optiscaler/optiscaler/releases/download/"
+            f"/{repository.casefold()}/releases/download/"
         )
         and not parsed.username
         and not parsed.password
@@ -178,21 +196,25 @@ def _is_official_release_download_url(value: str) -> bool:
     )
 
 
-def _is_official_release_page_url(value: str) -> bool:
+def _is_official_release_page_url(
+    value: str, *, repository: str = OFFICIAL_REPOSITORY
+) -> bool:
     parsed = urlparse(str(value))
     return (
         parsed.scheme == "https"
         and parsed.hostname is not None
         and parsed.hostname.casefold() == "github.com"
         and parsed.path.casefold().startswith(
-            "/optiscaler/optiscaler/releases/"
+            f"/{repository.casefold()}/releases/"
         )
         and not parsed.username
         and not parsed.password
     )
 
 
-def _validate_asset(asset: OptiScalerReleaseAsset) -> None:
+def _validate_asset(
+    asset: OptiScalerReleaseAsset, *, repository: str = OFFICIAL_REPOSITORY
+) -> None:
     if (
         not asset.name
         or Path(asset.name).name != asset.name
@@ -203,7 +225,9 @@ def _validate_asset(asset: OptiScalerReleaseAsset) -> None:
         raise OptiScalerMetadataError("release asset has an unsafe archive name")
     if asset.size <= 0:
         raise OptiScalerMetadataError("release asset has no valid size")
-    if not _is_official_release_download_url(asset.download_url):
+    if not _is_official_release_download_url(
+        asset.download_url, repository=repository
+    ):
         raise OptiScalerMetadataError(
             "release asset does not belong to the official OptiScaler repository"
         )
@@ -214,24 +238,46 @@ def _validate_asset(asset: OptiScalerReleaseAsset) -> None:
 def _validate_release(release: OptiScalerRelease) -> None:
     if not release.tag_name.strip() or not release.version.strip():
         raise OptiScalerMetadataError("release version is missing")
-    if not _is_official_release_page_url(release.html_url):
+    if not _is_official_release_page_url(
+        release.html_url, repository=release.repository
+    ):
         raise OptiScalerMetadataError(
             "release page does not belong to the official OptiScaler repository"
         )
     if release.channel not in {"stable", "edge"}:
         raise OptiScalerMetadataError("release has an unsupported channel")
+    expected_repository = (
+        OFFICIAL_NIGHTLY_REPOSITORY
+        if release.channel == "edge"
+        else OFFICIAL_REPOSITORY
+    )
+    if release.repository != expected_repository:
+        raise OptiScalerMetadataError("release belongs to the wrong channel repository")
     if release.fidelityfx_upscaler_version and not re.fullmatch(
         r"\d+(?:\.\d+){1,2}", release.fidelityfx_upscaler_version
     ):
         raise OptiScalerMetadataError(
             "release has an invalid FidelityFX upscaler version"
         )
-    _validate_asset(release.asset)
+    _validate_asset(release.asset, repository=release.repository)
 
 
 def _normalized_version(tag_name: str) -> str:
     tag = str(tag_name or "").strip()
     return tag[1:] if tag[:1].casefold() == "v" else tag
+
+
+def _release_version(tag_name: str, asset_name: str) -> str:
+    """Prefer the semantic version embedded in the selected artifact name."""
+
+    match = re.search(
+        r"(?i)(?:^|[_\-.])v?(\d+\.\d+\.\d+(?:-(?:pre|rc|beta|alpha)\d+)?)"
+        r"(?:[_\-.]|$)",
+        asset_name,
+    )
+    if match:
+        return match.group(1).replace("_", "-")
+    return _normalized_version(tag_name)
 
 
 def _asset_priority(asset: OptiScalerReleaseAsset) -> tuple[int, int, str]:
@@ -244,7 +290,9 @@ def _asset_priority(asset: OptiScalerReleaseAsset) -> tuple[int, int, str]:
     )
 
 
-def _parse_asset(raw: Mapping[str, Any]) -> OptiScalerReleaseAsset | None:
+def _parse_asset(
+    raw: Mapping[str, Any], *, repository: str = OFFICIAL_REPOSITORY
+) -> OptiScalerReleaseAsset | None:
     try:
         name = str(raw["name"])
         url = str(raw["browser_download_url"])
@@ -259,7 +307,7 @@ def _parse_asset(raw: Mapping[str, Any]) -> OptiScalerReleaseAsset | None:
         digest=str(raw.get("digest") or ""),
     )
     try:
-        _validate_asset(candidate)
+        _validate_asset(candidate, repository=repository)
     except OptiScalerMetadataError:
         return None
     return candidate
@@ -274,7 +322,13 @@ def parse_release(payload: object, *, channel: str = "stable") -> OptiScalerRele
     if selected_channel not in {"stable", "edge"}:
         raise OptiScalerMetadataError("unsupported OptiScaler release channel")
     matching_release_seen = False
-    for raw_release in payload:
+    repository = (
+        OFFICIAL_NIGHTLY_REPOSITORY
+        if selected_channel == "edge"
+        else OFFICIAL_REPOSITORY
+    )
+    candidates_by_date: list[tuple[datetime, int, OptiScalerRelease]] = []
+    for index, raw_release in enumerate(payload):
         if not isinstance(raw_release, Mapping):
             continue
         if bool(raw_release.get("draft")):
@@ -294,7 +348,7 @@ def parse_release(payload: object, *, channel: str = "stable") -> OptiScalerRele
             candidate
             for item in raw_assets
             if isinstance(item, Mapping)
-            if (candidate := _parse_asset(item)) is not None
+            if (candidate := _parse_asset(item, repository=repository)) is not None
         ]
         if not candidates:
             continue
@@ -302,7 +356,7 @@ def parse_release(payload: object, *, channel: str = "stable") -> OptiScalerRele
         tag_name = str(raw_release.get("tag_name", "")).strip()
         release = OptiScalerRelease(
             tag_name=tag_name,
-            version=_normalized_version(tag_name),
+            version=_release_version(tag_name, selected.name),
             html_url=str(raw_release.get("html_url", "")),
             published_at=str(raw_release.get("published_at", "")),
             asset=selected,
@@ -310,9 +364,19 @@ def parse_release(payload: object, *, channel: str = "stable") -> OptiScalerRele
             fidelityfx_upscaler_version=_release_fsr_version(
                 str(raw_release.get("body", ""))
             ),
+            repository=repository,
         )
         _validate_release(release)
-        return release
+        published = str(raw_release.get("published_at", "")).strip()
+        try:
+            published_at = datetime.fromisoformat(
+                published.replace("Z", "+00:00")
+            ).astimezone(timezone.utc)
+        except ValueError:
+            published_at = datetime.min.replace(tzinfo=timezone.utc)
+        candidates_by_date.append((published_at, -index, release))
+    if candidates_by_date:
+        return max(candidates_by_date, key=lambda item: (item[0], item[1]))[2]
     if matching_release_seen:
         raise OptiScalerMetadataError(
             f"the latest {selected_channel} OptiScaler releases have no supported ZIP or 7z asset"
@@ -427,7 +491,12 @@ class OptiScalerReleaseClient:
                 raise TypeError("cache root must be an object")
             if int(raw.get("schema_version", 0)) != METADATA_CACHE_SCHEMA_VERSION:
                 return None
-            if str(raw.get("repository", "")) != OFFICIAL_REPOSITORY:
+            expected_repository = (
+                OFFICIAL_NIGHTLY_REPOSITORY
+                if selected == "edge"
+                else OFFICIAL_REPOSITORY
+            )
+            if str(raw.get("repository", "")) != expected_repository:
                 return None
             cached_at = float(raw["cached_at"])
             release_raw = raw["release"]
@@ -466,15 +535,25 @@ class OptiScalerReleaseClient:
             self.metadata_cache_path_for(release.channel),
             {
                 "schema_version": METADATA_CACHE_SCHEMA_VERSION,
-                "repository": OFFICIAL_REPOSITORY,
+                "repository": release.repository,
                 "cached_at": self._clock(),
                 "release": release.to_dict(),
             },
         )
 
     def _fetch_release_metadata(self, channel: str = "stable") -> OptiScalerRelease:
+        repository = (
+            OFFICIAL_NIGHTLY_REPOSITORY
+            if str(channel or "stable").strip().casefold() == "edge"
+            else OFFICIAL_REPOSITORY
+        )
+        releases_url = (
+            OFFICIAL_NIGHTLY_RELEASES_URL
+            if repository == OFFICIAL_NIGHTLY_REPOSITORY
+            else OFFICIAL_RELEASES_URL
+        )
         request = Request(
-            OFFICIAL_RELEASES_URL,
+            releases_url,
             headers={
                 "Accept": "application/vnd.github+json",
                 "User-Agent": "Game-Optimization-Linux",
@@ -595,7 +674,7 @@ class OptiScalerReleaseClient:
                 return None
             if int(raw.get("schema_version", 0)) != ARCHIVE_CACHE_SCHEMA_VERSION:
                 return None
-            if str(raw.get("repository", "")) != OFFICIAL_REPOSITORY:
+            if str(raw.get("repository", "")) != release.repository:
                 return None
             if str(raw.get("tag_name", "")) != release.tag_name:
                 return None
@@ -677,52 +756,60 @@ class OptiScalerReleaseClient:
                 delete=False,
             ) as output:
                 temporary_path = Path(output.name)
-                digest = sha256()
-                downloaded = 0
-                try:
-                    with self._open(request) as response:
-                        status = int(getattr(response, "status", 200))
-                        if status != 200:
-                            raise OptiScalerDownloadError(
-                                f"OptiScaler archive download returned HTTP {status}"
-                            )
-                        final_url_getter = getattr(response, "geturl", None)
-                        final_url = (
-                            str(final_url_getter())
-                            if callable(final_url_getter) else release.asset.download_url
-                        )
-                        parsed_final = urlparse(final_url)
-                        final_host = (parsed_final.hostname or "").casefold()
-                        if (
-                            parsed_final.scheme != "https"
-                            or not (
-                                final_host == "github.com"
-                                or final_host == "release-assets.githubusercontent.com"
-                                or final_host == "objects.githubusercontent.com"
-                            )
-                        ):
-                            raise OptiScalerDownloadError(
-                                "OptiScaler archive redirected outside official GitHub asset hosting"
-                            )
-                        while True:
-                            chunk = response.read(DOWNLOAD_CHUNK_SIZE)
-                            if not chunk:
-                                break
-                            downloaded += len(chunk)
-                            if downloaded > self.max_archive_bytes:
+                for attempt in range(3):
+                    output.seek(0)
+                    output.truncate()
+                    digest = sha256()
+                    downloaded = 0
+                    try:
+                        with self._open(request) as response:
+                            status = int(getattr(response, "status", 200))
+                            if status != 200:
                                 raise OptiScalerDownloadError(
-                                    "OptiScaler archive exceeds the download size limit"
+                                    f"OptiScaler archive download returned HTTP {status}"
                                 )
-                            output.write(chunk)
-                            digest.update(chunk)
-                except HTTPError as error:
-                    raise OptiScalerDownloadError(
-                        f"OptiScaler archive download returned HTTP {error.code}"
-                    ) from error
-                except (URLError, TimeoutError, ConnectionError, OSError) as error:
-                    raise OptiScalerDownloadError(
-                        f"could not download the official OptiScaler archive: {error}"
-                    ) from error
+                            final_url_getter = getattr(response, "geturl", None)
+                            final_url = (
+                                str(final_url_getter())
+                                if callable(final_url_getter)
+                                else release.asset.download_url
+                            )
+                            parsed_final = urlparse(final_url)
+                            final_host = (parsed_final.hostname or "").casefold()
+                            if (
+                                parsed_final.scheme != "https"
+                                or not (
+                                    final_host == "github.com"
+                                    or final_host == "release-assets.githubusercontent.com"
+                                    or final_host == "objects.githubusercontent.com"
+                                )
+                            ):
+                                raise OptiScalerDownloadError(
+                                    "OptiScaler archive redirected outside official GitHub asset hosting"
+                                )
+                            while True:
+                                chunk = response.read(DOWNLOAD_CHUNK_SIZE)
+                                if not chunk:
+                                    break
+                                downloaded += len(chunk)
+                                if downloaded > self.max_archive_bytes:
+                                    raise OptiScalerDownloadError(
+                                        "OptiScaler archive exceeds the download size limit"
+                                    )
+                                output.write(chunk)
+                                digest.update(chunk)
+                        break
+                    except HTTPError as error:
+                        raise OptiScalerDownloadError(
+                            f"OptiScaler archive download returned HTTP {error.code}"
+                        ) from error
+                    except (URLError, TimeoutError, ConnectionError, OSError) as error:
+                        if attempt == 2:
+                            raise OptiScalerDownloadError(
+                                "could not download the official OptiScaler archive "
+                                f"after 3 attempts: {error}"
+                            ) from error
+                        time.sleep(0.5 * (2**attempt))
                 output.flush()
                 os.fsync(output.fileno())
             if downloaded != release.asset.size:
@@ -743,7 +830,7 @@ class OptiScalerReleaseClient:
                 record_path,
                 {
                     "schema_version": ARCHIVE_CACHE_SCHEMA_VERSION,
-                    "repository": OFFICIAL_REPOSITORY,
+                    "repository": release.repository,
                     "tag_name": release.tag_name,
                     "version": release.version,
                     "asset_name": release.asset.name,
@@ -781,6 +868,8 @@ __all__ = [
     "METADATA_CACHE_SCHEMA_VERSION",
     "OFFICIAL_RELEASES_URL",
     "OFFICIAL_REPOSITORY",
+    "OFFICIAL_NIGHTLY_RELEASES_URL",
+    "OFFICIAL_NIGHTLY_REPOSITORY",
     "OptiScalerCacheError",
     "OptiScalerDownloadError",
     "OptiScalerMetadataError",

@@ -693,6 +693,10 @@ def settings_to_qml(settings: AppSettings) -> dict[str, Any]:
         "start_couch_mode_fullscreen": "startCouchModeFullscreen",
         "post_launch_behavior": "postLaunchBehavior",
         "interface_sounds": "interfaceSounds",
+        "couch_menu_sounds_enabled": "couchMenuSoundsEnabled",
+        "couch_menu_sounds_volume": "couchMenuSoundsVolume",
+        "couch_music_enabled": "couchMusicEnabled",
+        "couch_music_volume": "couchMusicVolume",
     }
     for source, target in aliases.items():
         if source in raw:

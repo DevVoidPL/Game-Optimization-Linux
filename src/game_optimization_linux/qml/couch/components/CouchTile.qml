@@ -6,6 +6,7 @@ import "../.." as App
 Button {
     id: control
     property string symbol: ""
+    property url iconSource: ""
     property string subtitle: ""
     property real couchScale: 1.0
     property bool primary: false
@@ -20,12 +21,23 @@ Button {
     contentItem: RowLayout {
         spacing: 16 * control.couchScale
         Label {
+            visible: !control.iconSource
             text: control.symbol
             color: control.enabled
                    ? control.focusVisible ? "white" : App.Theme.accent
                    : App.Theme.textMuted
             font.pixelSize: 32 * control.couchScale
             Layout.alignment: Qt.AlignVCenter
+        }
+        Image {
+            visible: control.iconSource
+            source: control.iconSource
+            sourceSize.width: App.Theme.couchIconSizeTile * control.couchScale
+            sourceSize.height: App.Theme.couchIconSizeTile * control.couchScale
+            Layout.preferredWidth: App.Theme.couchIconSizeTile * control.couchScale
+            Layout.preferredHeight: App.Theme.couchIconSizeTile * control.couchScale
+            Layout.alignment: Qt.AlignVCenter
+            fillMode: Image.PreserveAspectFit
         }
         ColumnLayout {
             Layout.fillWidth: true

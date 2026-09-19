@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -47,6 +49,8 @@ FocusScope {
     property var optimizationReasons: []
     property var optiScalerData: ({})
     property var protonTweaksData: ({})
+    property var narratorData: ({})
+    property var narratorSession: ({})
     readonly property var optimizationPresets: ["automatic", "maximum_performance", "balanced", "quiet", "custom"]
     readonly property var optimizationCategories: ["competitive", "fast_action", "cinematic", "platformer_2d", "strategy_simulation", "retro", "unknown", "custom"]
     readonly property var optimizationFpsValues: [30, 45, 60, 90, 120, 144, 165, 200, 240]
@@ -58,8 +62,9 @@ FocusScope {
     readonly property var tabs: [
         { "id": "overview", "title": qsTr("Overview") },
         { "id": "storage", "title": qsTr("Storage") },
-        { "id": "graphics", "title": qsTr("Graphics Remaster") },
-        { "id": "optimization", "title": qsTr("Optimization") }
+        { "id": "optimization", "title": qsTr("Optimization") },
+        { "id": "optiscaler", "title": qsTr("OptiScaler") },
+        { "id": "narrator", "title": qsTr("Narrator") }
     ]
     readonly property var profileNames: ["Fast", "Balanced", "Maximum", "Auto"]
     readonly property var actionModel: actionsForTab()
@@ -68,6 +73,10 @@ FocusScope {
         return launcher !== "Heroic" && launcher !== "Lutris"
     }
     signal backRequested()
+
+    function loadedImplicitHeight(loadedItem) {
+        return loadedItem ? Number(loadedItem.implicitHeight || 0) : 0
+    }
 
     function restoreActiveFocus() {
         forceActiveFocus()
@@ -97,6 +106,10 @@ FocusScope {
         return fallback
     }
     function boolValue(keys, fallback) { return value(keys, fallback) === true }
+    function playSemanticSound(kind) {
+        if (controller && controller.playCouchSound && String(kind || "").length)
+            controller.playCouchSound(String(kind))
+    }
     function formatBytes(raw) {
         var bytes = Number(raw)
         if (!isFinite(bytes) || bytes < 0) return qsTr("Unavailable")
@@ -104,6 +117,184 @@ FocusScope {
         var unit = 0
         while (bytes >= 1024 && unit < units.length - 1) { bytes /= 1024; unit++ }
         return (unit ? bytes.toFixed(bytes >= 100 ? 0 : 1) : Math.round(bytes)) + " " + units[unit]
+    }
+    function narratorVoices() {
+        var source = narratorData && narratorData.voices
+                ? Array.from(narratorData.voices) : []
+        return source.filter(function(voice) {
+            return voice && (voice.available === true || voice.installed === true)
+        })
+    }
+    function narratorVoiceLabel() {
+        var voices = narratorVoices()
+        var selected = String(narratorData.voiceId || "")
+        for (var index = 0; index < voices.length; ++index) {
+            if (String(voices[index].id || "") === selected)
+                return String(voices[index].name || voices[index].id)
+        }
+        return voices.length ? String(voices[0].name || voices[0].id) : qsTr("No installed voice")
+    }
+    function narratorLanguageLabel() {
+        return String(narratorData.subtitleLanguageMode || "english_to_polish") === "polish"
+                ? qsTr("Polish subtitles") : qsTr("English → Polish")
+    }
+    function narratorSourceLabel() {
+        var mode = String(narratorData.sourceMode || "auto")
+        return mode === "ocr" ? qsTr("OCR only") : qsTr("Automatic")
+    }
+    function narratorCaptureLabel() {
+        return String(narratorData.captureSource || "window") === "monitor"
+                ? qsTr("Monitor") : qsTr("Game window")
+    }
+    function narratorSessionActive() {
+        return ["starting", "selecting_source", "listening", "ocr", "translating",
+                "speaking", "stopping"].indexOf(String(narratorSession.status || "idle")) >= 0
+    }
+    function narratorStatusLabel() {
+        var status = String(narratorSession.status || "idle")
+        if (status === "starting") return qsTr("Starting")
+        if (status === "selecting_source") return qsTr("Select a capture source")
+        if (status === "listening") return qsTr("Listening")
+        if (status === "ocr") return qsTr("Reading subtitles")
+        if (status === "translating") return qsTr("Translating")
+        if (status === "speaking") return qsTr("Speaking")
+        if (status === "stopping") return qsTr("Stopping")
+        if (status === "error") return qsTr("Error")
+        return qsTr("Stopped")
+    }
+    function narratorCaptureStateLabel(state) {
+        if (state === "permission_required" || state === "selecting_source")
+            return qsTr("Waiting for portal permission or source")
+        if (state === "starting")
+            return qsTr("Starting capture")
+        if (state === "active")
+            return qsTr("Active")
+        if (state === "cancelled")
+            return qsTr("Selection cancelled")
+        if (state === "permission_denied")
+            return qsTr("Permission denied")
+        if (state === "error" || state === "source_lost")
+            return qsTr("Capture error")
+        if (state === "unavailable")
+            return qsTr("Unavailable")
+        return qsTr("Stopped")
+    }
+    function narratorOcrStateLabel(state) {
+        if (state === "loading")
+            return qsTr("Loading")
+        if (state === "processing")
+            return qsTr("Processing")
+        if (state === "ready")
+            return qsTr("Ready")
+        if (state === "error")
+            return qsTr("OCR error")
+        return qsTr("Component missing")
+    }
+    function narratorInferenceStateLabel(state, processingLabel, errorLabel) {
+        if (state === "loading")
+            return qsTr("Loading")
+        if (state === "processing")
+            return processingLabel
+        if (state === "ready")
+            return qsTr("Ready")
+        if (state === "bypassed")
+            return qsTr("Disabled")
+        if (state === "error")
+            return errorLabel
+        return qsTr("Component missing")
+    }
+    function narratorStartMessage() {
+        if (narratorSessionActive())
+            return qsTr("Stop the current narration session")
+        var reason = String(narratorSession.reasonCode || "")
+        if (reason === "components_missing") return qsTr("Required local components are missing")
+        if (reason === "game_not_running") return qsTr("Launch the game before starting Narrator")
+        if (reason === "another_session_active") return qsTr("Narrator is active for another game")
+        if (narratorData.enabled !== true) return qsTr("Enable Narrator for this game first")
+        return qsTr("Start narration for the running game")
+    }
+    function narratorActions() {
+        if (!narratorData || narratorData.success !== true) return [{
+            "id": "narrator-reload", "symbol": "↻", "title": qsTr("Load Narrator settings"),
+            "subtitle": qsTr("Read the saved per-game configuration"), "enabled": true
+        }]
+        var active = narratorSessionActive()
+        return [
+            { "id": "narrator-enabled", "symbol": "N", "title": qsTr("Narrator: %1").arg(narratorData.enabled ? qsTr("On") : qsTr("Off")), "subtitle": qsTr("Saved only for this game"), "enabled": true },
+            { "id": "narrator-language", "symbol": "文", "title": narratorLanguageLabel(), "subtitle": qsTr("Cycle subtitle language mode"), "enabled": true },
+            { "id": "narrator-source", "symbol": "⌁", "title": qsTr("Source: %1").arg(narratorSourceLabel()), "subtitle": qsTr("Automatic detection or OCR capture"), "enabled": true },
+            { "id": "narrator-capture", "symbol": "▣", "title": qsTr("Capture: %1").arg(narratorCaptureLabel()), "subtitle": qsTr("Choose a window or the full monitor"), "enabled": true },
+            { "id": "narrator-voice", "symbol": "♪", "title": narratorVoiceLabel(), "subtitle": qsTr("Cycle installed speech voices"), "enabled": narratorVoices().length > 0 },
+            { "id": "narrator-volume", "symbol": "◖", "title": qsTr("Volume: %1%").arg(Math.round(Number(narratorData.volume || 0) * 100)), "subtitle": qsTr("Press repeatedly to adjust"), "enabled": true },
+            { "id": "narrator-rate", "symbol": "››", "title": qsTr("Speech rate: %1×").arg(Number(narratorData.speechRate || 1).toFixed(1)), "subtitle": qsTr("Press repeatedly to adjust"), "enabled": true },
+            { "id": "narrator-region", "symbol": "⌗", "title": qsTr("Select subtitle region"), "subtitle": qsTr("Open the native capture selector"), "enabled": Boolean(controller && controller.selectNarratorSubtitleRegion) },
+            { "id": active ? "narrator-stop" : "narrator-start", "symbol": active ? "■" : "▶", "title": active ? qsTr("Stop Narrator") : qsTr("Start Narrator"), "subtitle": narratorStartMessage(), "enabled": active || (narratorData.enabled === true && narratorSession.canStart === true) }
+        ]
+    }
+    function optiScalerExecutable() {
+        var selected = optiScalerData.selectedExecutable || ({})
+        return String(optiScalerData.executable || selected.relativePath || "")
+    }
+    function optiScalerOperation() {
+        var installation = String(optiScalerData.installationState || "")
+        if (installation === "corrupt" || installation === "partial") return "repair"
+        if (String(optiScalerData.onlineState || "") === "update_available") return "update"
+        if (optiScalerData.installed === true) return "reinstall"
+        return "install"
+    }
+    function optiScalerOperationLabel() {
+        var operation = optiScalerOperation()
+        if (operation === "repair") return qsTr("Repair OptiScaler")
+        if (operation === "update") return qsTr("Update OptiScaler")
+        if (operation === "reinstall") return qsTr("Reinstall OptiScaler")
+        return qsTr("Install OptiScaler")
+    }
+    function optiScalerModeLabel() {
+        var mode = String(optiScalerData.requestedFsr4Mode || optiScalerData.fsr4Mode || "automatic")
+        if (mode === "normal") return qsTr("FSR 4.1.1")
+        if (mode === "force_int8") return qsTr("FSR 4.1.1 INT8")
+        if (mode === "disabled") return qsTr("Disabled")
+        return qsTr("Automatic")
+    }
+    function optimizationActions() {
+        return [
+            { "id": "optimization-profile", "symbol": "◐", "title": qsTr("Profile: %1").arg(optimizationPresetLabel()), "enabled": true },
+            { "id": "gamemode", "symbol": "⚡", "title": "GameMode: " + (gameModeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
+            { "id": "gamescope", "symbol": "▣", "title": "Gamescope: " + (gamescopeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
+            { "id": "mangohud-profile", "symbol": "◉", "title": qsTr("MangoHud"), "subtitle": mangoHudPresetLabel(), "enabled": true }
+        ]
+    }
+    function optiScalerRefreshSubtitle() {
+        if (optiScalerData.loading || optiScalerData.refreshing)
+            return qsTr("Checking the official release…")
+        var onlineError = String(optiScalerData.onlineError || "")
+        if (onlineError.length > 0)
+            return onlineError
+        return qsTr("Prepare a verified Couch installation")
+    }
+    function optiScalerActions() {
+        var actions = []
+        var installed = optiScalerData.installed === true
+        var needsPackage = !installed
+                || String(optiScalerData.onlineState || "") === "update_available"
+                || ["corrupt", "partial"].indexOf(String(optiScalerData.installationState || "")) >= 0
+        if (needsPackage) {
+            if (optiScalerData.archiveReady === true) {
+                actions.push({ "id": "optiscaler-install", "symbol": "◇", "title": optiScalerOperationLabel(), "subtitle": qsTr("Official verified release · confirmation required"), "enabled": optiScalerExecutable().length > 0 })
+            } else {
+                actions.push({ "id": "optiscaler-refresh", "symbol": "↓", "title": qsTr("Download official OptiScaler release"), "subtitle": optiScalerRefreshSubtitle(), "enabled": !(optiScalerData.loading || optiScalerData.refreshing) })
+            }
+        }
+        if (installed) {
+            actions.push({ "id": "optiscaler-configure", "symbol": "◈", "title": qsTr("Upscaling: %1").arg(optiScalerModeLabel()), "subtitle": qsTr("Cycle and apply the FSR mode"), "enabled": (optiScalerData.supportedFsr4Modes || []).length > 0 })
+            actions.push({ "id": "optiscaler-verify", "symbol": "✓", "title": qsTr("Verify OptiScaler"), "subtitle": qsTr("Check managed files without changing them"), "enabled": true })
+            actions.push({ "id": "optiscaler-launch", "symbol": "▶", "title": qsTr("Launch with OptiScaler"), "subtitle": qsTr("Use the installed profile"), "enabled": true })
+            if (String(optiScalerData.manifestId || "").length > 0)
+                actions.push({ "id": "optiscaler-remove", "symbol": "×", "title": qsTr("Remove OptiScaler"), "subtitle": qsTr("Requires confirmation"), "enabled": true })
+        }
+        if (actions.length === 0)
+            actions.push({ "id": "unavailable", "symbol": "i", "title": qsTr("Checking OptiScaler status…"), "enabled": false })
+        return actions
     }
     function actionsForTab() {
         if (selectedTab === 0) return [
@@ -116,22 +307,18 @@ FocusScope {
             { "id": "profile", "symbol": "◈", "title": qsTr("Profile: %1").arg(selectedProfile), "subtitle": boolValue(["analysisProfilesUnlocked"], false) ? qsTr("Choose a planned profile") : qsTr("Analyze the game first"), "enabled": boolValue(["analysisProfilesUnlocked"], false) },
             { "id": "compress", "symbol": "↓", "title": qsTr("Start compression"), "subtitle": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) ? qsTr("Review the verified plan") : qsTr("A verified Btrfs plan is required"), "enabled": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) }
         ]
-        if (selectedTab === 3 && !launcherIntegrationSupported) return [{
+        if ((selectedTab === 2 || selectedTab === 3) && !launcherIntegrationSupported) return [{
                 "id": "unavailable", "symbol": "i",
                 "title": qsTr("Launcher integration unavailable"),
                 "subtitle": qsTr("Full optimization launch integration for this launcher is planned for a later update"),
                 "enabled": false
             }]
-        if (selectedTab === 3) return [
-            { "id": "optimization-profile", "symbol": "◐", "title": qsTr("Profile: %1").arg(optimizationPresetLabel()), "enabled": true },
-            { "id": "gamemode", "symbol": "⚡", "title": "GameMode: " + (gameModeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
-            { "id": "gamescope", "symbol": "▣", "title": "Gamescope: " + (gamescopeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
-            { "id": "mangohud-profile", "symbol": "◉", "title": qsTr("MangoHud"), "subtitle": mangoHudPresetLabel(), "enabled": true },
-            { "id": "optiscaler-launch", "symbol": "◇", "title": qsTr("OptiScaler: %1").arg(optiScalerData.installed ? qsTr("Installed") : qsTr("Not installed")), "subtitle": optiScalerData.installed ? qsTr("Launch with the installed profile") : qsTr("Installation is available in Desktop Mode"), "enabled": Boolean(optiScalerData.installed) },
-            { "id": "optiscaler-remove", "symbol": "×", "title": qsTr("Remove OptiScaler"), "subtitle": qsTr("Requires confirmation"), "enabled": Boolean(optiScalerData.manifestId) },
-            { "id": "fps", "symbol": "↯", "title": qsTr("FPS: %1").arg(fpsLimit > 0 ? fpsLimit : qsTr("Unlimited")), "enabled": true },
-            { "id": "resolution", "symbol": "□", "title": qsTr("Resolution: %1").arg(targetResolution), "enabled": true }
-        ]
+        if (selectedTab === 2)
+            return optimizationActions()
+        if (selectedTab === 3)
+            return optiScalerActions()
+        if (selectedTab === 4)
+            return narratorActions()
         return [{ "id": "unavailable", "symbol": "i", "title": qsTr("Unavailable in this version"), "enabled": false }]
     }
     function ensureAction() {
@@ -141,14 +328,17 @@ FocusScope {
         selectedAction = -1
     }
     function changeTab(delta) {
+        var previousTab = selectedTab
         selectedTab = (selectedTab + delta + tabs.length) % tabs.length
         selectedAction = 0
         contentFocus = false
         ensureAction()
         if (navigation) navigation.rememberFocus("details", "tab-" + tabs[selectedTab].id, selectedTab)
+        return selectedTab !== previousTab
     }
     function moveAction(delta) {
         var actions = actionModel
+        var previousAction = selectedAction
         var candidate = selectedAction
         for (var count = 0; count < actions.length; ++count) {
             candidate = Math.max(0, Math.min(actions.length - 1, candidate + delta))
@@ -156,6 +346,7 @@ FocusScope {
             if (candidate === 0 || candidate === actions.length - 1) break
         }
         if (navigation && selectedAction >= 0) navigation.rememberFocus("details", actions[selectedAction].id, selectedAction)
+        return selectedAction !== previousAction
     }
     function planValid(plan) {
         return plan && typeof plan === "object" && String(plan.planId || plan.plan_id || "").length > 0
@@ -185,10 +376,10 @@ FocusScope {
         return labels[index >= 0 ? index : 0]
     }
     function legacyOptimizationProfileLabel() {
-        if (optimizationProfile === "maximum_performance") return "Maximum Performance"
-        if (optimizationProfile === "quiet") return "Quiet"
-        if (optimizationProfile === "custom") return "Custom"
-        return "Balanced"
+        if (optimizationProfile === "maximum_performance") return qsTr("Maximum Performance")
+        if (optimizationProfile === "quiet") return qsTr("Quiet")
+        if (optimizationProfile === "custom") return qsTr("Custom")
+        return qsTr("Balanced")
     }
     function optimizationCategoryLabel() {
         var labels = [qsTr("Competitive"), qsTr("Fast action"), qsTr("Cinematic single-player"), qsTr("Platformer / 2D"), qsTr("Strategy / simulation"), qsTr("Retro"), qsTr("Unknown"), qsTr("Custom")]
@@ -238,6 +429,136 @@ FocusScope {
         var result = controller.getProtonTweaks(String(game.id)) || ({})
         protonTweaksData = result.success ? result : ({})
     }
+    function loadNarrator() {
+        if (!controller || !game.id) {
+            narratorData = ({})
+            narratorSession = ({})
+            return
+        }
+        if (controller.getNarratorGameSettings)
+            narratorData = controller.getNarratorGameSettings(String(game.id)) || ({})
+        if (controller.getNarratorSessionState)
+            narratorSession = controller.getNarratorSessionState(String(game.id)) || ({})
+    }
+    function saveNarratorValue(key, value) {
+        if (!controller || !controller.saveNarratorGameSettings || !game.id)
+            return false
+        var payload = ({})
+        payload[key] = value
+        var saved = Boolean(controller.saveNarratorGameSettings(String(game.id), payload))
+        if (saved)
+            loadNarrator()
+        return saved
+    }
+    function activateNarratorAction(id) {
+        if (id === "narrator-reload") {
+            loadNarrator()
+            return narratorData.success === true
+        }
+        if (id === "narrator-enabled")
+            return saveNarratorValue("enabled", narratorData.enabled !== true)
+        if (id === "narrator-language")
+            return saveNarratorValue("subtitleLanguageMode",
+                    String(narratorData.subtitleLanguageMode || "english_to_polish") === "polish"
+                    ? "english_to_polish" : "polish")
+        if (id === "narrator-source")
+            return saveNarratorValue("sourceMode",
+                    String(narratorData.sourceMode || "auto") === "ocr" ? "auto" : "ocr")
+        if (id === "narrator-capture")
+            return saveNarratorValue("captureSource",
+                    String(narratorData.captureSource || "window") === "monitor" ? "window" : "monitor")
+        if (id === "narrator-voice") {
+            var voices = narratorVoices()
+            if (!voices.length)
+                return false
+            var selected = String(narratorData.voiceId || "")
+            var voiceIndex = -1
+            for (var index = 0; index < voices.length; ++index) {
+                if (String(voices[index].id || "") === selected) {
+                    voiceIndex = index
+                    break
+                }
+            }
+            return saveNarratorValue("voiceId",
+                    String(voices[(voiceIndex + 1) % voices.length].id || ""))
+        }
+        if (id === "narrator-volume") {
+            var volume = Math.round((Number(narratorData.volume || 0) + 0.05) * 100) / 100
+            return saveNarratorValue("volume", volume > 1 ? 0 : volume)
+        }
+        if (id === "narrator-rate") {
+            var rate = Math.round((Number(narratorData.speechRate || 1) + 0.1) * 10) / 10
+            return saveNarratorValue("speechRate", rate > 2 ? 0.5 : rate)
+        }
+        if (id === "narrator-region")
+            return Boolean(controller.selectNarratorSubtitleRegion
+                    && controller.selectNarratorSubtitleRegion(
+                        String(game.id), narratorData.subtitleRegion || ({})))
+        if (id === "narrator-start")
+            return Boolean(controller.startNarrator
+                    && controller.startNarrator(String(game.id)))
+        if (id === "narrator-stop")
+            return Boolean(controller.stopNarrator && controller.stopNarrator())
+        return false
+    }
+    function refreshCouchOptiScaler() {
+        return Boolean(controller && controller.refreshOptiScalerRelease
+                && controller.refreshOptiScalerRelease(String(game.id || ""), true))
+    }
+    function openOptiScalerConfirmation(operation) {
+        confirmationChoice = 0
+        confirmationKind = "optiscaler_" + String(operation)
+        confirmationOpen = true
+        if (navigation) navigation.openModal("optiscaler-operation", "cancel")
+        restoreActiveFocus()
+        return true
+    }
+    function beginCouchOptiScalerOperation() {
+        if (!controller || !controller.inspectOnlineOptiScaler
+                || !controller.installOnlineOptiScaler)
+            return false
+        var executable = optiScalerExecutable()
+        if (!executable.length || optiScalerData.archiveReady !== true)
+            return false
+        var operation = String(confirmationKind).replace("optiscaler_", "")
+        var injectionDll = String(optiScalerData.injectionDll || "auto")
+        var plan = controller.inspectOnlineOptiScaler(
+                    String(game.id || ""), executable, injectionDll, true) || ({})
+        if (plan.success !== true || (plan.blockers || []).length > 0)
+            return false
+        return Boolean(controller.installOnlineOptiScaler(
+                    String(game.id || ""), executable, injectionDll, operation,
+                    Boolean(plan.requiresConflictConfirmation), true))
+    }
+    function configureCouchOptiScaler() {
+        if (!controller || !controller.configureOptiScalerUpscaling)
+            return false
+        var modes = Array.from(optiScalerData.supportedFsr4Modes || [])
+        if (!modes.length)
+            return false
+        var current = String(optiScalerData.requestedFsr4Mode
+                             || optiScalerData.fsr4Mode || "automatic")
+        var currentIndex = modes.indexOf(current)
+        var requested = String(modes[(currentIndex + 1 + modes.length) % modes.length])
+        var recommendation = optiScalerData.recommendation || ({})
+        var effective = requested === "automatic"
+                ? String(recommendation.recommendedMode || "disabled") : requested
+        if (["normal", "force_int8", "disabled"].indexOf(effective) < 0)
+            effective = "disabled"
+        var result = controller.configureOptiScalerUpscaling(String(game.id || ""), {
+            "fsr4Mode": requested,
+            "effectiveFsr4Mode": effective,
+            "automaticReason": requested === "automatic" ? String(recommendation.reason || "") : "",
+            "fsrAgilitySdkUpgrade": Boolean(optiScalerData.fsrAgilitySdkUpgrade),
+            "fsr4Watermark": Boolean(optiScalerData.fsr4Watermark),
+            "dx11Upscaler": String(optiScalerData.dx11Upscaler || "auto"),
+            "dx12Upscaler": String(optiScalerData.dx12Upscaler || "auto"),
+            "vulkanUpscaler": String(optiScalerData.vulkanUpscaler || "auto")
+        }) || ({})
+        if (result.success === true)
+            loadOptiScalerStatus()
+        return result.success === true
+    }
     function openOptimizationOverlay() {
         loadOptimizationProfile()
         optimizationRow = 0
@@ -252,6 +573,9 @@ FocusScope {
         restoreActiveFocus()
     }
     function adjustOptimization(delta) {
+        var before = [optimizationProfile, optimizationCategory, fpsLimit,
+                      gameModeEnabled, gamescopeEnabled,
+                      optimizationGamescopeMode, optimizationDisplayId].join("|")
         if (optimizationRow === 0) optimizationProfile = cycleValue(optimizationPresets, optimizationProfile, delta)
         else if (optimizationRow === 1) optimizationCategory = cycleValue(optimizationCategories, optimizationCategory, delta)
         else if (optimizationRow === 2) fpsLimit = cycleValue(optimizationFpsValues, fpsLimit, delta)
@@ -263,9 +587,13 @@ FocusScope {
             var values = optimizationDisplays.map(function(item) { return String(item.id || "") })
             optimizationDisplayId = cycleValue(values, optimizationDisplayId, delta)
         }
+        var after = [optimizationProfile, optimizationCategory, fpsLimit,
+                     gameModeEnabled, gamescopeEnabled,
+                     optimizationGamescopeMode, optimizationDisplayId].join("|")
+        return before !== after
     }
     function saveCouchOptimization() {
-        if (!controller || !controller.saveOptimizationProfile) return
+        if (!controller || !controller.saveOptimizationProfile) return false
         var source = optimizationData || ({})
         var payload = Object.assign({}, source, {
             "preset": optimizationProfile, "gameCategory": optimizationCategory,
@@ -274,18 +602,49 @@ FocusScope {
             "gamescopeEnabled": gamescopeEnabled, "gamescopeMode": optimizationGamescopeMode
         })
         var result = controller.saveOptimizationProfile(String(game.id || ""), payload) || ({})
-        if (result.success) { optimizationData = result; closeOptimizationOverlay() }
+        if (result.success) {
+            optimizationData = result
+            closeOptimizationOverlay()
+            return true
+        }
+        return false
     }
+    function moveOverlayRow(view, current, delta, maximum) {
+        var candidate = current
+        for (var count = 0; count <= maximum; ++count) {
+            candidate += delta
+            if (candidate < 0 || candidate > maximum)
+                return current
+            var entry = view.model[candidate]
+            if (!entry || entry.enabled !== false)
+                return candidate
+        }
+        return current
+    }
+
     function handleOptimizationAction(action) {
-        if (action === "Back") closeOptimizationOverlay()
-        else if (action === "NavigateUp") optimizationRow = Math.max(0, optimizationRow - 1)
-        else if (action === "NavigateDown") optimizationRow = Math.min(7, optimizationRow + 1)
-        else if (action === "NavigateLeft") adjustOptimization(-1)
-        else if (action === "NavigateRight") adjustOptimization(1)
-        else if (action === "Confirm") {
-            if (optimizationRow < 6) adjustOptimization(1)
-            else if (optimizationRow === 6) saveCouchOptimization()
-            else closeOptimizationOverlay()
+        if (action === "Back") {
+            closeOptimizationOverlay()
+            playSemanticSound("back")
+        } else if (action === "NavigateUp" || action === "NavigateDown") {
+            var previousRow = optimizationRow
+            optimizationRow = moveOverlayRow(
+                optimizationOptions, optimizationRow,
+                action === "NavigateUp" ? -1 : 1, 7)
+            if (optimizationRow !== previousRow)
+                playSemanticSound("navigate")
+        } else if (action === "NavigateLeft" || action === "NavigateRight") {
+            playSemanticSound(adjustOptimization(action === "NavigateLeft" ? -1 : 1)
+                              ? "adjust" : "error")
+        } else if (action === "Confirm") {
+            if (optimizationRow < 6)
+                playSemanticSound(adjustOptimization(1) ? "adjust" : "error")
+            else if (optimizationRow === 6)
+                playSemanticSound(saveCouchOptimization() ? "confirm" : "error")
+            else {
+                closeOptimizationOverlay()
+                playSemanticSound("back")
+            }
         }
         restoreActiveFocus()
     }
@@ -330,6 +689,9 @@ FocusScope {
         return values[(index + delta + values.length) % values.length]
     }
     function adjustMangoHud(delta) {
+        var before = [mangoHudPreset, mangoHudPosition, mangoHudFontSize,
+                      mangoHudFpsLimit, mangoHudTemperatures,
+                      mangoHudMemory].join("|")
         if (mangoHudRow === 0) {
             mangoHudPreset = cycleValue(mangoHudPresets, mangoHudPreset, delta)
         } else if (mangoHudRow === 1) {
@@ -345,6 +707,10 @@ FocusScope {
             mangoHudMemory = !mangoHudMemory
             mangoHudPreset = "custom"
         }
+        var after = [mangoHudPreset, mangoHudPosition, mangoHudFontSize,
+                     mangoHudFpsLimit, mangoHudTemperatures,
+                     mangoHudMemory].join("|")
+        return before !== after
     }
     function couchMangoHudMetrics() {
         if (mangoHudPreset !== "custom")
@@ -362,7 +728,7 @@ FocusScope {
         return selected
     }
     function saveCouchMangoHud() {
-        if (!controller || !controller.saveMangoHudProfile) return
+        if (!controller || !controller.saveMangoHudProfile) return false
         var source = mangoHudProfile || ({})
         var payload = {
             "enabled": mangoHudPreset !== "disabled",
@@ -388,70 +754,143 @@ FocusScope {
             mangoHudProfile = result
             mangoHudEnabled = Boolean(result.activationEnabled)
             closeMangoHudOverlay()
+            return true
         }
+        return false
     }
     function handleMangoHudAction(action) {
         if (action === "Back") {
             closeMangoHudOverlay()
-        } else if (action === "NavigateUp") {
-            mangoHudRow = Math.max(0, mangoHudRow - 1)
-        } else if (action === "NavigateDown") {
-            mangoHudRow = Math.min(7, mangoHudRow + 1)
-        } else if (action === "NavigateLeft") {
-            adjustMangoHud(-1)
-        } else if (action === "NavigateRight") {
-            adjustMangoHud(1)
+            playSemanticSound("back")
+        } else if (action === "NavigateUp" || action === "NavigateDown") {
+            var previousRow = mangoHudRow
+            mangoHudRow = moveOverlayRow(
+                mangoHudOptions, mangoHudRow,
+                action === "NavigateUp" ? -1 : 1, 7)
+            if (mangoHudRow !== previousRow)
+                playSemanticSound("navigate")
+        } else if (action === "NavigateLeft" || action === "NavigateRight") {
+            playSemanticSound(adjustMangoHud(action === "NavigateLeft" ? -1 : 1)
+                              ? "adjust" : "error")
         } else if (action === "Confirm") {
-            if (mangoHudRow < 6) adjustMangoHud(1)
-            else if (mangoHudRow === 6) saveCouchMangoHud()
-            else closeMangoHudOverlay()
+            if (mangoHudRow < 6)
+                playSemanticSound(adjustMangoHud(1) ? "adjust" : "error")
+            else if (mangoHudRow === 6)
+                playSemanticSound(saveCouchMangoHud() ? "confirm" : "error")
+            else {
+                closeMangoHudOverlay()
+                playSemanticSound("back")
+            }
         }
         restoreActiveFocus()
     }
     function prepareCompression() {
-        if (!controller || !controller.prepareCompression || !game.id) return
+        if (!controller || !controller.prepareCompression || !game.id) return false
         var plan = controller.prepareCompression(String(game.id), selectedProfile, true)
-        if (!planValid(plan)) return
+        if (!planValid(plan)) return false
         pendingPlan = plan
         confirmationChoice = 0
         confirmationKind = "compression"
         confirmationOpen = true
         if (navigation) navigation.openModal("compression-confirmation", "cancel")
+        return true
     }
     function closeConfirmation() {
+        if (!confirmationOpen) return false
         confirmationOpen = false
         confirmationKind = ""
         pendingPlan = ({})
         confirmationChoice = 0
         if (navigation) navigation.closeModal()
+        return true
+    }
+    function confirmationTitle() {
+        if (confirmationKind === "optiscaler_remove") return qsTr("Remove OptiScaler?")
+        if (confirmationKind === "optiscaler_update") return qsTr("Update OptiScaler?")
+        if (confirmationKind === "optiscaler_repair") return qsTr("Repair OptiScaler?")
+        if (confirmationKind === "optiscaler_reinstall") return qsTr("Reinstall OptiScaler?")
+        if (confirmationKind === "optiscaler_install") return qsTr("Install OptiScaler?")
+        return qsTr("Review compression plan")
+    }
+    function confirmationDescription() {
+        if (confirmationKind === "optiscaler_remove")
+            return qsTr("Only files recorded as created by GameOpti will be removed. Replaced files remain available for restoration in Desktop Mode.")
+        if (confirmationKind.indexOf("optiscaler_") === 0)
+            return qsTr("Use the verified official release. Existing target files are backed up before replacement. Do not use injection in online or anti-cheat protected games unless you accept the compatibility and account risk.")
+        return qsTr("Profile: %1. Review warnings before starting. No operation starts until explicit confirmation.").arg(selectedProfile)
+    }
+    function confirmationButtonLabel() {
+        if (confirmationKind === "optiscaler_remove") return qsTr("Remove")
+        if (confirmationKind === "optiscaler_update") return qsTr("Update")
+        if (confirmationKind === "optiscaler_repair") return qsTr("Repair")
+        if (confirmationKind === "optiscaler_reinstall") return qsTr("Reinstall")
+        if (confirmationKind === "optiscaler_install") return qsTr("Install")
+        return qsTr("Start task")
     }
     function activateAction() {
-        if (selectedAction < 0 || !actionModel[selectedAction] || !actionModel[selectedAction].enabled || !controller) return
+        if (selectedAction < 0 || !actionModel[selectedAction]
+                || !actionModel[selectedAction].enabled || !controller)
+            return "error"
         var id = actionModel[selectedAction].id
         if (id === "launch") {
-            launchPending = true
-            controller.launchGame(String(game.id || ""))
-            launchGuard.restart()
-        } else if (id === "updates") controller.navigate("updates")
-        else if (id === "analyze") controller.analyzeGame(String(game.id || ""))
-        else if (id === "verify") controller.verifyCompression(String(game.id || ""))
-        else if (id === "profile") {
+            var launched = Boolean(controller.launchGame(String(game.id || "")))
+            launchPending = launched
+            if (launched) launchGuard.restart()
+            return launched ? "confirm" : "error"
+        }
+        if (id === "updates") {
+            controller.navigate("updates")
+            return "confirm"
+        }
+        if (id === "analyze")
+            return controller.analyzeGame(String(game.id || "")) ? "confirm" : "error"
+        if (id === "verify")
+            return controller.verifyCompression(String(game.id || "")) ? "confirm" : "error"
+        if (id === "profile") {
             var index = profileNames.indexOf(selectedProfile)
             selectedProfile = profileNames[(index + 1) % profileNames.length]
-        } else if (id === "compress") prepareCompression()
-        else if (id === "optimization-profile" || id === "gamemode" || id === "gamescope" || id === "fps" || id === "resolution") openOptimizationOverlay()
-        else if (id === "mangohud-profile") openMangoHudOverlay()
-        else if (id === "optiscaler-launch") controller.launchGame(String(game.id || ""))
-        else if (id === "optiscaler-remove") {
+            return "adjust"
+        }
+        if (id === "compress")
+            return prepareCompression() ? "open" : "error"
+        if (id.indexOf("narrator-") === 0) {
+            var narratorResult = activateNarratorAction(id)
+            return narratorResult ? (id === "narrator-region" ? "open" : "confirm") : "error"
+        }
+        if (id === "optimization-profile" || id === "gamemode"
+                || id === "gamescope" || id === "fps" || id === "resolution") {
+            openOptimizationOverlay()
+            return "open"
+        }
+        if (id === "mangohud-profile") {
+            openMangoHudOverlay()
+            return "open"
+        }
+        if (id === "optiscaler-refresh")
+            return refreshCouchOptiScaler() ? "confirm" : "error"
+        if (id === "optiscaler-install")
+            return openOptiScalerConfirmation(optiScalerOperation()) ? "open" : "error"
+        if (id === "optiscaler-configure")
+            return configureCouchOptiScaler() ? "adjust" : "error"
+        if (id === "optiscaler-verify")
+            return controller.verifyOptiScaler
+                    && controller.verifyOptiScaler(String(game.id || "")) ? "confirm" : "error"
+        if (id === "optiscaler-launch")
+            return controller.launchGame(String(game.id || "")) ? "confirm" : "error"
+        if (id === "optiscaler-remove") {
             confirmationChoice = 0
             confirmationKind = "optiscaler_remove"
             confirmationOpen = true
             if (navigation) navigation.openModal("optiscaler-remove", "cancel")
             restoreActiveFocus()
+            return "open"
         }
-        
+        return "error"
     }
     function handleAction(action) {
+        if (action === "ContextMenu" || action === "Search") action = "MoreActions"
+        else if (action === "PageLeft" || action === "PreviousSection") action = "PreviousTab"
+        else if (action === "PageRight" || action === "NextSection") action = "NextTab"
         if (optimizationOverlayOpen) {
             handleOptimizationAction(action)
             return
@@ -461,62 +900,109 @@ FocusScope {
             return
         }
         if (confirmationOpen) {
-            if (action === "Back") closeConfirmation()
-            else if (action === "NavigateLeft" || action === "NavigateUp") confirmationChoice = 0
-            else if (action === "NavigateRight" || action === "NavigateDown") confirmationChoice = 1
-            else if (action === "Confirm") {
+            if (action === "Back") {
+                closeConfirmation()
+                playSemanticSound("back")
+            } else if (action === "NavigateLeft" || action === "NavigateUp"
+                       || action === "NavigateRight" || action === "NavigateDown") {
+                var previousConfirmationChoice = confirmationChoice
+                confirmationChoice = (action === "NavigateLeft" || action === "NavigateUp") ? 0 : 1
+                if (confirmationChoice !== previousConfirmationChoice)
+                    playSemanticSound("navigate")
+            } else if (action === "Confirm") {
+                var completed = true
                 if (confirmationChoice === 1 && controller) {
                     if (confirmationKind === "optiscaler_remove")
-                        controller.removeOptiScaler(String(game.id || ""))
+                        completed = Boolean(controller.removeOptiScaler(String(game.id || "")))
+                    else if (confirmationKind.indexOf("optiscaler_") === 0)
+                        completed = beginCouchOptiScalerOperation()
                     else {
                         var planId = String(pendingPlan.planId || pendingPlan.plan_id || "")
-                        if (planId.length) controller.startCompression(planId)
+                        completed = Boolean(planId.length && controller.startCompression(planId))
                     }
                 }
                 closeConfirmation()
+                playSemanticSound(completed ? "confirm" : "error")
             }
             return
         }
-        if (action === "Back") backRequested()
-        else if (action === "PageLeft") changeTab(-1)
-        else if (action === "PageRight") changeTab(1)
-        else if (action === "NavigateUp" && contentFocus) {
+        if (action === "Back") {
+            backRequested()
+            playSemanticSound("back")
+        } else if (action === "PreviousTab" || action === "NextTab") {
+            if (changeTab(action === "PreviousTab" ? -1 : 1))
+                playSemanticSound("navigate")
+        } else if (action === "PageUp" || action === "PageDown") {
+            var previousContentFocus = contentFocus
+            var previousPageY = detailsContentFlick.contentY
+            contentFocus = true
+            if (action === "PageUp")
+                detailsContentFlick.contentY = Math.max(0, detailsContentFlick.contentY - detailsContentFlick.height * 0.72)
+            else
+                detailsContentFlick.contentY = Math.min(
+                    Math.max(0, detailsContentFlick.contentHeight - detailsContentFlick.height),
+                    detailsContentFlick.contentY + detailsContentFlick.height * 0.72)
+            if (contentFocus !== previousContentFocus
+                    || detailsContentFlick.contentY !== previousPageY)
+                playSemanticSound("navigate")
+        } else if (action === "NavigateUp" && contentFocus) {
+            var previousUpY = detailsContentFlick.contentY
             if (detailsContentFlick.contentY > 0)
                 detailsContentFlick.contentY = Math.max(0, detailsContentFlick.contentY - 96 * couchScale)
             else {
                 contentFocus = false
                 tabFocus = true
             }
+            if (detailsContentFlick.contentY !== previousUpY || tabFocus)
+                playSemanticSound("navigate")
         } else if (action === "NavigateDown" && contentFocus) {
+            var previousDownY = detailsContentFlick.contentY
             detailsContentFlick.contentY = Math.min(
                 Math.max(0, detailsContentFlick.contentHeight - detailsContentFlick.height),
                 detailsContentFlick.contentY + 96 * couchScale)
+            if (detailsContentFlick.contentY !== previousDownY)
+                playSemanticSound("navigate")
         } else if (action === "NavigateUp" && tabFocus) {
             tabFocus = false
             contentFocus = false
             ensureAction()
+            playSemanticSound("navigate")
         } else if (action === "NavigateDown" && tabFocus) {
             tabFocus = false
             contentFocus = true
-        } else if (action === "NavigateDown") {
+            playSemanticSound("navigate")
+        } else if (action === "NavigateDown" && !contentFocus) {
             tabFocus = true
             contentFocus = false
-        } else if (tabFocus && action === "NavigateLeft") changeTab(-1)
-        else if (tabFocus && action === "NavigateRight") changeTab(1)
-        else if (!contentFocus && action === "NavigateLeft") moveAction(-1)
-        else if (!contentFocus && action === "NavigateRight") moveAction(1)
-        else if (action === "Confirm" && tabFocus) {
+            playSemanticSound("navigate")
+        } else if (tabFocus && (action === "NavigateLeft" || action === "NavigateRight")) {
+            if (changeTab(action === "NavigateLeft" ? -1 : 1))
+                playSemanticSound("navigate")
+        } else if (!contentFocus && (action === "NavigateLeft" || action === "NavigateRight")) {
+            if (moveAction(action === "NavigateLeft" ? -1 : 1))
+                playSemanticSound("navigate")
+        } else if (action === "Confirm" && tabFocus) {
             tabFocus = false
             contentFocus = true
-        } else if (action === "Confirm" && !contentFocus) activateAction()
-        else if (action === "ContextMenu") { selectedTab = 0; tabFocus = false; contentFocus = false; selectedAction = 0 }
+            playSemanticSound("navigate")
+        } else if (action === "Confirm" && !contentFocus) {
+            playSemanticSound(activateAction())
+        } else if (action === "MoreActions") {
+            var changed = selectedTab !== 0 || tabFocus || contentFocus || selectedAction !== 0
+            selectedTab = 0
+            tabFocus = false
+            contentFocus = false
+            selectedAction = 0
+            if (changed)
+                playSemanticSound("navigate")
+        }
     }
     Timer { id: launchGuard; interval: 1800; onTriggered: page.launchPending = false }
     onSelectedTabChanged: Qt.callLater(ensureAction)
     focus: visible
-    Component.onCompleted: { loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); restoreActiveFocus() }
-    onVisibleChanged: if (visible) { loadMangoHudProfile(); restoreActiveFocus() }
-    onGameChanged: { loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks() }
+    Component.onCompleted: { loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); loadNarrator(); restoreActiveFocus() }
+    onVisibleChanged: if (visible) { loadMangoHudProfile(); loadNarrator(); restoreActiveFocus() }
+    onGameChanged: { loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); loadNarrator() }
 
     Connections {
         target: page.controller || null
@@ -529,6 +1015,14 @@ FocusScope {
             if (String(changedGameId) === String(page.game.id || "")
                     && result && result.success)
                 page.optiScalerData = result
+        }
+        function onNarratorChanged(changedGameId) {
+            if (String(changedGameId) === String(page.game.id || ""))
+                page.loadNarrator()
+        }
+        function onNarratorRegionSelectionChanged(changedGameId, region) {
+            if (String(changedGameId) === String(page.game.id || ""))
+                page.loadNarrator()
         }
         function onProtonTweaksChanged(appId) {
             if (String(appId) === String(page.game.steamAppId || ""))
@@ -699,12 +1193,12 @@ FocusScope {
                 onClicked: { page.selectedTab = index; page.tabFocus = false }
                 background: Rectangle {
                     radius: 16 * page.couchScale
-                    color: page.selectedTab === index
+                    color: page.selectedTab === tabButton.index
                            ? App.Theme.surfaceSelected : App.Theme.surface
                     border.width: tabButton.activeFocus ? 4 * page.couchScale
-                                                        : page.selectedTab === index ? 2 : 1
+                                                        : page.selectedTab === tabButton.index ? 2 : 1
                     border.color: tabButton.activeFocus ? "white"
-                                  : page.selectedTab === index
+                                  : page.selectedTab === tabButton.index
                                     ? App.Theme.accent : App.Theme.border
                     scale: tabButton.activeFocus ? 1.035 : 1.0
                     Behavior on scale { NumberAnimation { duration: 140 } }
@@ -728,7 +1222,7 @@ FocusScope {
                 boundsBehavior: Flickable.StopAtBounds
                 contentWidth: width
                 contentHeight: detailsContentLoader.item
-                               ? Math.max(height, detailsContentLoader.item.implicitHeight)
+                               ? Math.max(height, page.loadedImplicitHeight(detailsContentLoader.item))
                                : height
                 ScrollBar.vertical: ScrollBar {
                     visible: detailsContentFlick.contentHeight
@@ -738,8 +1232,13 @@ FocusScope {
                     id: detailsContentLoader
                     width: detailsContentFlick.width
                     height: Math.max(detailsContentFlick.height,
-                                     item ? item.implicitHeight : 0)
-                sourceComponent: page.selectedTab === 0 ? overviewContent : page.selectedTab === 1 ? storageContent : page.selectedTab === 3 ? optimizationContent : unavailableContent
+                                     page.loadedImplicitHeight(item))
+                    sourceComponent: page.selectedTab === 0 ? overviewContent
+                                     : page.selectedTab === 1 ? storageContent
+                                     : page.selectedTab === 2 ? optimizationContent
+                                     : page.selectedTab === 3 ? optiScalerContent
+                                     : page.selectedTab === 4 ? narratorContent
+                                     : unavailableContent
                 }
             }
         }
@@ -762,6 +1261,7 @@ FocusScope {
                         { "label": qsTr("Compression"), "value": page.classificationLabel() }
                     ]
                     delegate: Rectangle {
+                        id: overviewMetric
                         required property var modelData
                         Layout.fillWidth: true
                         Layout.preferredHeight: 78 * page.couchScale
@@ -771,8 +1271,8 @@ FocusScope {
                             anchors.fill: parent
                             anchors.margins: 11 * page.couchScale
                             spacing: 2
-                            Label { Layout.fillWidth: true; text: modelData.label; color: App.Theme.textMuted; font.pixelSize: 14 * page.couchScale; elide: Text.ElideRight }
-                            Label { Layout.fillWidth: true; text: modelData.value; color: App.Theme.text; font.pixelSize: 19 * page.couchScale; font.weight: Font.Bold; elide: Text.ElideRight }
+                            Label { Layout.fillWidth: true; text: overviewMetric.modelData.label; color: App.Theme.textMuted; font.pixelSize: 14 * page.couchScale; elide: Text.ElideRight }
+                            Label { Layout.fillWidth: true; text: overviewMetric.modelData.value; color: App.Theme.text; font.pixelSize: 19 * page.couchScale; font.weight: Font.Bold; elide: Text.ElideRight }
                         }
                     }
                 }
@@ -799,6 +1299,7 @@ FocusScope {
                     { "label": qsTr("Additional potential"), "value": page.selectedProjection().available === true ? page.formatBytes(page.selectedProjection().estimatedAdditionalSavingBytes) : qsTr("Unavailable") }
                 ]
                 delegate: Rectangle {
+                    id: storageMetric
                     required property var modelData
                     Layout.fillWidth: true
                     Layout.preferredHeight: 86 * page.couchScale
@@ -808,8 +1309,8 @@ FocusScope {
                         anchors.fill: parent
                         anchors.margins: 13 * page.couchScale
                         spacing: 3
-                        Label { Layout.fillWidth: true; text: modelData.label; color: App.Theme.textSecondary; font.pixelSize: 15 * page.couchScale; elide: Text.ElideRight }
-                        Label { Layout.fillWidth: true; text: modelData.value; color: App.Theme.text; font.pixelSize: 24 * page.couchScale; font.weight: Font.Bold; elide: Text.ElideRight }
+                        Label { Layout.fillWidth: true; text: storageMetric.modelData.label; color: App.Theme.textSecondary; font.pixelSize: 15 * page.couchScale; elide: Text.ElideRight }
+                        Label { Layout.fillWidth: true; text: storageMetric.modelData.value; color: App.Theme.text; font.pixelSize: 24 * page.couchScale; font.weight: Font.Bold; elide: Text.ElideRight }
                     }
                 }
             }
@@ -822,10 +1323,10 @@ FocusScope {
             spacing: 12 * page.couchScale
             RowLayout {
                 Layout.fillWidth: true
-                Label { Layout.fillWidth: true; text: qsTr("Launch configuration preview"); color: App.Theme.text; font.pixelSize: 27 * page.couchScale; font.weight: Font.Bold }
-                Label { text: qsTr("Preview only"); color: App.Theme.warning; font.pixelSize: 16 * page.couchScale; font.weight: Font.Bold }
+                Label { Layout.fillWidth: true; text: qsTr("Launch configuration"); color: App.Theme.text; font.pixelSize: 27 * page.couchScale; font.weight: Font.Bold }
+                Label { text: qsTr("Controller ready"); color: App.Theme.accent; font.pixelSize: 16 * page.couchScale; font.weight: Font.Bold }
             }
-            Label { Layout.fillWidth: true; text: qsTr("MangoHud uses its saved per-game profile. Other launch helpers remain preview-only and no Steam launch options are written."); color: App.Theme.textSecondary; font.pixelSize: 18 * page.couchScale; wrapMode: Text.WordWrap }
+            Label { Layout.fillWidth: true; text: qsTr("MangoHud uses its saved per-game profile. GameMode and Gamescope remain previews until launch integration is available."); color: App.Theme.textSecondary; font.pixelSize: 18 * page.couchScale; wrapMode: Text.WordWrap }
             GridLayout {
                 Layout.fillWidth: true; columns: 3; columnSpacing: 18 * page.couchScale; rowSpacing: 10 * page.couchScale
                 Label { text: "GameMode"; color: App.Theme.textSecondary; font.pixelSize: 16 * page.couchScale }
@@ -835,7 +1336,166 @@ FocusScope {
                 Label { text: page.gamescopeEnabled ? qsTr("On") : qsTr("Off"); color: App.Theme.text; font.pixelSize: 20 * page.couchScale; font.weight: Font.Bold }
                 Label { text: page.mangoHudEnabled ? qsTr("On") : qsTr("Off"); color: App.Theme.text; font.pixelSize: 20 * page.couchScale; font.weight: Font.Bold }
             }
-            Label { Layout.fillWidth: true; text: controller && controller.buildLaunchPreview ? String(controller.buildLaunchPreview(String(page.game.id || ""), { "profile": page.legacyOptimizationProfileLabel(), "gamemode": page.gameModeEnabled, "gamescope": page.gamescopeEnabled, "mangohud": page.mangoHudEnabled, "fpsLimit": page.fpsLimit })) : "%command%"; color: App.Theme.textSecondary; font.family: "monospace"; font.pixelSize: 15 * page.couchScale; elide: Text.ElideMiddle }
+            Label { Layout.fillWidth: true; text: page.controller && page.controller.buildLaunchPreview ? String(page.controller.buildLaunchPreview(String(page.game.id || ""), { "profile": page.legacyOptimizationProfileLabel(), "gamemode": page.gameModeEnabled, "gamescope": page.gamescopeEnabled, "mangohud": page.mangoHudEnabled, "fpsLimit": page.fpsLimit })) : "%command%"; color: App.Theme.textSecondary; font.family: "monospace"; font.pixelSize: 15 * page.couchScale; elide: Text.ElideMiddle }
+            Item { Layout.fillHeight: true }
+        }
+    }
+    Component {
+        id: optiScalerContent
+        ColumnLayout {
+            spacing: 12 * page.couchScale
+            RowLayout {
+                Layout.fillWidth: true
+                Label { Layout.fillWidth: true; text: qsTr("OptiScaler upscaling"); color: App.Theme.text; font.pixelSize: 27 * page.couchScale; font.weight: Font.Bold }
+                Rectangle {
+                    implicitWidth: optiScalerStateLabel.implicitWidth + 28 * page.couchScale
+                    implicitHeight: 38 * page.couchScale
+                    radius: height / 2
+                    color: page.optiScalerData.installed === true ? App.Theme.successSoft : App.Theme.surfaceRaised
+                    border.width: 1
+                    border.color: page.optiScalerData.installed === true ? App.Theme.success : App.Theme.border
+                    Label {
+                        id: optiScalerStateLabel
+                        anchors.centerIn: parent
+                        text: page.optiScalerData.installed === true ? qsTr("Installed") : qsTr("Not installed")
+                        color: page.optiScalerData.installed === true ? App.Theme.success : App.Theme.textSecondary
+                        font.pixelSize: 15 * page.couchScale
+                        font.weight: Font.Bold
+                    }
+                }
+            }
+            Label { Layout.fillWidth: true; text: qsTr("Install, update and configure OptiScaler for this game with the controller. Use the action cards below."); color: App.Theme.textSecondary; font.pixelSize: 18 * page.couchScale; wrapMode: Text.WordWrap }
+            GridLayout {
+                Layout.fillWidth: true; columns: 2; columnSpacing: 18 * page.couchScale; rowSpacing: 10 * page.couchScale
+                Label { text: qsTr("Upscaling mode"); color: App.Theme.textSecondary; font.pixelSize: 16 * page.couchScale }
+                Label { text: qsTr("Executable"); color: App.Theme.textSecondary; font.pixelSize: 16 * page.couchScale }
+                Label { text: page.optiScalerModeLabel(); color: App.Theme.text; font.pixelSize: 20 * page.couchScale; font.weight: Font.Bold }
+                Label { text: page.optiScalerExecutable().length > 0 ? page.optiScalerExecutable() : qsTr("Not detected"); color: App.Theme.text; font.pixelSize: 18 * page.couchScale; elide: Text.ElideMiddle }
+            }
+            Item { Layout.fillHeight: true }
+        }
+    }
+    Component {
+        id: narratorContent
+        ColumnLayout {
+            spacing: 14 * page.couchScale
+            RowLayout {
+                Layout.fillWidth: true
+                Label {
+                    Layout.fillWidth: true
+                    text: qsTr("Per-game Narrator")
+                    color: App.Theme.text
+                    font.pixelSize: 27 * page.couchScale
+                    font.weight: Font.Bold
+                }
+                Rectangle {
+                    implicitWidth: narratorStateLabel.implicitWidth + 28 * page.couchScale
+                    implicitHeight: 38 * page.couchScale
+                    radius: height / 2
+                    color: page.narratorSessionActive() ? App.Theme.successSoft : App.Theme.surfaceRaised
+                    border.width: 1
+                    border.color: page.narratorSessionActive() ? App.Theme.success : App.Theme.border
+                    Label {
+                        id: narratorStateLabel
+                        anchors.centerIn: parent
+                        text: page.narratorStatusLabel()
+                        color: page.narratorSessionActive() ? App.Theme.success : App.Theme.textSecondary
+                        font.pixelSize: 15 * page.couchScale
+                        font.weight: Font.Bold
+                    }
+                }
+            }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("These settings are saved only for %1. Use the action cards above to configure and start narration with the controller.").arg(String(page.game.name || qsTr("this game")))
+                color: App.Theme.textSecondary
+                font.pixelSize: 17 * page.couchScale
+                wrapMode: Text.WordWrap
+            }
+            GridLayout {
+                Layout.fillWidth: true
+                columns: 4
+                columnSpacing: 10 * page.couchScale
+                Repeater {
+                    model: [
+                        { "label": qsTr("Capture"), "value": page.narratorCaptureStateLabel(String(page.narratorSession.captureState || "stopped")) },
+                        { "label": qsTr("OCR"), "value": page.narratorOcrStateLabel(String(page.narratorSession.ocrStatus || "component_missing")) },
+                        { "label": qsTr("Translation"), "value": page.narratorInferenceStateLabel(String(page.narratorSession.translationStatus || "component_missing"), qsTr("Translating"), qsTr("Translation error")) },
+                        { "label": qsTr("Speech"), "value": page.narratorInferenceStateLabel(String(page.narratorSession.ttsStatus || "component_missing"), qsTr("Generating speech"), qsTr("Speech error")) }
+                    ]
+                    delegate: Rectangle {
+                        id: narratorMetric
+                        required property var modelData
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 74 * page.couchScale
+                        radius: 14 * page.couchScale
+                        color: App.Theme.surfaceRaised
+                        border.width: 1
+                        border.color: App.Theme.border
+                        ColumnLayout {
+                            anchors.fill: parent
+                            anchors.margins: 11 * page.couchScale
+                            spacing: 2 * page.couchScale
+                            Label { Layout.fillWidth: true; text: narratorMetric.modelData.label; color: App.Theme.textMuted; font.pixelSize: 13 * page.couchScale; elide: Text.ElideRight }
+                            Label { Layout.fillWidth: true; text: narratorMetric.modelData.value; color: App.Theme.text; font.pixelSize: 17 * page.couchScale; font.weight: Font.Bold; elide: Text.ElideRight }
+                        }
+                    }
+                }
+            }
+            Rectangle {
+                Layout.fillWidth: true
+                Layout.preferredHeight: narratorSummary.implicitHeight + 24 * page.couchScale
+                radius: 14 * page.couchScale
+                color: App.Theme.surfaceRaised
+                border.width: 1
+                border.color: (page.narratorSession.missingRequirements || []).length
+                              ? App.Theme.warning : App.Theme.border
+                ColumnLayout {
+                    id: narratorSummary
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.verticalCenter: parent.verticalCenter
+                    anchors.margins: 12 * page.couchScale
+                    spacing: 5 * page.couchScale
+                    Label {
+                        Layout.fillWidth: true
+                        text: (page.narratorSession.missingRequirements || []).length
+                              ? qsTr("%1 required component(s) are missing").arg((page.narratorSession.missingRequirements || []).length)
+                              : qsTr("Local Narrator components are ready")
+                        color: (page.narratorSession.missingRequirements || []).length
+                               ? App.Theme.warning : App.Theme.success
+                        font.pixelSize: 16 * page.couchScale
+                        font.weight: Font.Bold
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Language: %1 · Voice: %2 · Volume: %3% · Speech: %4×")
+                              .arg(page.narratorLanguageLabel())
+                              .arg(page.narratorVoiceLabel())
+                              .arg(Math.round(Number(page.narratorData.volume || 0) * 100))
+                              .arg(Number(page.narratorData.speechRate || 1).toFixed(1))
+                        color: App.Theme.textSecondary
+                        font.pixelSize: 15 * page.couchScale
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+            Label {
+                Layout.fillWidth: true
+                visible: String(page.narratorSession.lastDetectedText || "").length > 0
+                text: qsTr("Last subtitle: %1").arg(String(page.narratorSession.lastDetectedText || ""))
+                color: App.Theme.textSecondary
+                font.pixelSize: 16 * page.couchScale
+                elide: Text.ElideRight
+            }
+            Label {
+                Layout.fillWidth: true
+                visible: String(page.narratorSession.lastTranslation || "").length > 0
+                text: qsTr("Last translation: %1").arg(String(page.narratorSession.lastTranslation || ""))
+                color: App.Theme.textSecondary
+                font.pixelSize: 16 * page.couchScale
+                elide: Text.ElideRight
+            }
             Item { Layout.fillHeight: true }
         }
     }
@@ -968,14 +1628,14 @@ FocusScope {
 
         ColumnLayout {
                 anchors.fill: parent; spacing: 14 * page.couchScale
-                Label { Layout.fillWidth: true; text: page.confirmationKind === "optiscaler_remove" ? qsTr("Remove OptiScaler?") : qsTr("Review compression plan"); color: App.Theme.text; font.pixelSize: 29 * page.couchScale; font.weight: Font.Bold }
-                Label { Layout.fillWidth: true; text: page.confirmationKind === "optiscaler_remove" ? qsTr("Only files recorded as created by Game Optimization will be removed. Replaced files remain available for restoration in Desktop Mode.") : qsTr("Profile: %1. Review warnings before starting. No operation starts until explicit confirmation.").arg(page.selectedProfile); color: App.Theme.textSecondary; font.pixelSize: 16 * page.couchScale; wrapMode: Text.WordWrap }
-                Label { Layout.fillWidth: true; visible: page.confirmationKind !== "optiscaler_remove"; text: page.pendingPlan && page.pendingPlan.warnings && page.pendingPlan.warnings.length ? String(page.pendingPlan.warnings[0]) : qsTr("The estimate does not guarantee the same change in free disk space."); color: App.Theme.warning; font.pixelSize: 15 * page.couchScale; wrapMode: Text.WordWrap }
+                Label { Layout.fillWidth: true; text: page.confirmationTitle(); color: App.Theme.text; font.pixelSize: 29 * page.couchScale; font.weight: Font.Bold }
+                Label { Layout.fillWidth: true; text: page.confirmationDescription(); color: App.Theme.textSecondary; font.pixelSize: 16 * page.couchScale; wrapMode: Text.WordWrap }
+                Label { Layout.fillWidth: true; visible: page.confirmationKind === "compression"; text: page.pendingPlan && page.pendingPlan.warnings && page.pendingPlan.warnings.length ? String(page.pendingPlan.warnings[0]) : qsTr("The estimate does not guarantee the same change in free disk space."); color: App.Theme.warning; font.pixelSize: 15 * page.couchScale; wrapMode: Text.WordWrap }
                 Item { Layout.fillHeight: true }
                 RowLayout {
                     Layout.fillWidth: true
                     CouchButton { id: detailsCancelButton; Layout.fillWidth: true; couchScale: page.couchScale; text: qsTr("Cancel"); focus: page.confirmationOpen && page.confirmationChoice === 0; onClicked: page.closeConfirmation() }
-                    CouchButton { id: detailsConfirmButton; Layout.fillWidth: true; couchScale: page.couchScale; text: qsTr("Start task"); focus: page.confirmationOpen && page.confirmationChoice === 1; onClicked: { page.confirmationChoice = 1; page.handleAction("Confirm") } }
+                    CouchButton { id: detailsConfirmButton; Layout.fillWidth: true; couchScale: page.couchScale; text: page.confirmationButtonLabel(); focus: page.confirmationOpen && page.confirmationChoice === 1; onClicked: { page.confirmationChoice = 1; page.handleAction("Confirm") } }
                 }
         }
     }

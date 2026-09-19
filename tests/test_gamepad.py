@@ -79,7 +79,7 @@ def test_gamepad_service_hotplug_active_device_and_safe_disconnect() -> None:
         provider.emit(GamepadEvent("button", 8, "north", True, 1.0))
         service.pollNow()
         assert service.activeController["name"] == second.name
-        assert actions[-1] == "ContextMenu"
+        assert actions[-1] == "MoreActions"
 
         remapped = GamepadDevice(8, second.name, GamepadType.XBOX, "Updated mapping")
         provider.emit(GamepadEvent("remapped", 8), remapped)
@@ -152,7 +152,7 @@ def test_interface_sounds_are_opt_in_and_use_no_files() -> None:
     assert played == []
     service.set_enabled(True)
     assert service.play("accept") is True
-    assert played == ["accept"]
+    assert played == ["confirm"]
 
 
 class _FakeAudioSink:
@@ -329,6 +329,10 @@ def test_fixed_controller_modes_and_settings_persistence(tmp_path: Path) -> None
         assert controller.saveSetting("startCouchModeFullscreen", False)
         assert controller.saveSetting("postLaunchBehavior", "Stay open")
         assert controller.saveSetting("interfaceSounds", True)
+        assert controller.saveSetting("couchMenuSoundsEnabled", False)
+        assert controller.saveSetting("couchMenuSoundsVolume", 55)
+        assert controller.saveSetting("couchMusicEnabled", False)
+        assert controller.saveSetting("couchMusicVolume", 25)
         assert controller.interfaceMode == "couch"
         mapper = controller._gamepad_service._mapper
         assert mapper.swap_accept_back is True
@@ -348,6 +352,10 @@ def test_fixed_controller_modes_and_settings_persistence(tmp_path: Path) -> None
     assert restored.hide_cursor_in_couch_mode is False
     assert restored.start_couch_mode_fullscreen is False
     assert restored.interface_sounds is True
+    assert restored.couch_menu_sounds_enabled is False
+    assert restored.couch_menu_sounds_volume == 55
+    assert restored.couch_music_enabled is False
+    assert restored.couch_music_volume == 25
 
 
 def test_ui_mode_emergency_override_and_persistent_reset(tmp_path: Path) -> None:
@@ -432,20 +440,27 @@ def test_couch_launch_uses_existing_launcher_and_default_minimize_behavior(
 def test_semantic_mapping_and_long_view_hold_open_system_menu() -> None:
     mapper = GamepadInputMapper()
     assert mapper.process(GamepadEvent("button", 9, "south", True), now=1.0) == (GamepadAction.CONFIRM,)
-    assert mapper.process(GamepadEvent("button", 9, "north", True), now=1.2) == (GamepadAction.CONTEXT_MENU,)
-    assert mapper.process(GamepadEvent("button", 9, "left_shoulder", True), now=1.4) == (GamepadAction.PAGE_LEFT,)
-    assert mapper.process(GamepadEvent("button", 9, "right_shoulder", True), now=1.6) == (GamepadAction.PAGE_RIGHT,)
-    assert mapper.process(GamepadEvent("button", 9, "start", True), now=1.8) == (GamepadAction.OPEN_SYSTEM_MENU,)
-    assert mapper.process(GamepadEvent("button", 9, "guide", True), now=2.0) == (GamepadAction.TOGGLE_DESKTOP_COUCH,)
+    assert mapper.process(GamepadEvent("button", 9, "west", True), now=1.2) == (GamepadAction.SECONDARY_ACTION,)
+    assert mapper.process(GamepadEvent("button", 9, "north", True), now=1.4) == (GamepadAction.MORE_ACTIONS,)
+    assert mapper.process(GamepadEvent("button", 9, "left_shoulder", True), now=1.6) == (GamepadAction.PREVIOUS_TAB,)
+    assert mapper.process(GamepadEvent("button", 9, "right_shoulder", True), now=1.8) == (GamepadAction.NEXT_TAB,)
+    assert mapper.process(GamepadEvent("button", 9, "left_stick", True), now=2.0) == (GamepadAction.CONTEXT_ACTION_1,)
+    assert mapper.process(GamepadEvent("button", 9, "right_stick", True), now=2.2) == (GamepadAction.CONTEXT_ACTION_2,)
+    assert mapper.process(GamepadEvent("button", 9, "start", True), now=2.4) == (GamepadAction.OPEN_SYSTEM_MENU,)
+    assert mapper.process(GamepadEvent("button", 9, "guide", True), now=2.6) == (GamepadAction.OPEN_SYSTEM_MENU,)
+    assert mapper.process(GamepadEvent("axis", 9, "right_y", True, 0.8), now=2.8) == (GamepadAction.PAGE_DOWN,)
+    assert mapper.process(GamepadEvent("axis", 9, "right_y", False, 0.0), now=2.9) == ()
+    assert mapper.process(GamepadEvent("axis", 9, "left_trigger", True, 0.9), now=3.0) == (GamepadAction.PAGE_UP,)
 
-    assert mapper.process(GamepadEvent("button", 9, "back", True), now=3.0) == ()
-    assert mapper.poll_repeats(now=4.99) == ()
-    assert mapper.poll_repeats(now=5.01) == (GamepadAction.OPEN_SYSTEM_MENU,)
-    assert mapper.poll_repeats(now=5.5) == ()
-    assert mapper.process(GamepadEvent("button", 9, "back", False), now=5.6) == ()
+    assert mapper.process(GamepadEvent("button", 9, "back", True), now=4.0) == ()
+    assert mapper.poll_repeats(now=5.99) == (GamepadAction.PAGE_UP,)
+    assert mapper.poll_repeats(now=6.01) == (GamepadAction.OPEN_SYSTEM_MENU,)
+    assert mapper.poll_repeats(now=6.5) == (GamepadAction.PAGE_UP,)
+    assert mapper.process(GamepadEvent("button", 9, "back", False), now=6.6) == ()
+    assert mapper.process(GamepadEvent("axis", 9, "left_trigger", False, 0.0), now=6.7) == ()
 
-    assert mapper.process(GamepadEvent("button", 9, "back", True), now=6.0) == ()
-    assert mapper.process(GamepadEvent("button", 9, "back", False), now=6.4) == (GamepadAction.CONTEXT_MENU,)
+    assert mapper.process(GamepadEvent("button", 9, "back", True), now=7.0) == ()
+    assert mapper.process(GamepadEvent("button", 9, "back", False), now=7.4) == (GamepadAction.CONTEXT_ACTION_1,)
 
 
 def test_couch_navigation_retains_focus_reconciles_removal_and_restores_modal() -> None:
@@ -485,3 +500,85 @@ def test_couch_navigation_disconnect_blocks_pad_and_5000_inputs_keep_focus() -> 
     navigation.setControllerConnected(True)
     assert navigation.focusedId == "steam-17"
     assert navigation.dispatch("Confirm") is True
+    assert navigation.inputModality == "controller"
+    navigation.setInputModality("keyboard")
+    assert navigation.inputModality == "keyboard"
+
+
+def test_couch_audio_semantics_rate_limit_music_duck_and_launch() -> None:
+    now = [10.0]
+    effects: list[str] = []
+    music: list[tuple[str, float]] = []
+    service = UiSoundService(
+        player=effects.append,
+        music_player=lambda event, volume: music.append((event, volume)),
+        clock=lambda: now[0],
+    )
+    service.configure_menu(
+        sounds_enabled=True,
+        sounds_volume=50,
+        music_enabled=True,
+        music_volume=20,
+    )
+    service.set_couch_active(True)
+    service.set_window_active(True)
+    assert music[0] == ("start", 0.2)
+
+    assert service.playNavigate() is True
+    assert service.playNavigate() is False
+    now[0] += 0.08
+    assert service.playNavigate() is True
+    assert service.playConfirm() is True
+    assert effects == ["navigate", "navigate", "confirm"]
+
+    service.set_music_ducked(True)
+    assert music[-1] == ("volume", 0.05600000000000001)
+    service.begin_game_launch()
+    assert effects[-1] == "launch"
+    assert music[-1] == ("pause", 0.0)
+    service.set_window_active(False)
+    service.set_window_active(True)
+    assert music[-2:] == [("start", 0.2), ("volume", 0.05600000000000001)]
+
+    service.set_couch_active(False)
+    assert service.playConfirm() is False
+    assert music[-1] == ("pause", 0.0)
+
+
+def test_couch_audio_assets_are_original_packaged_wave_files() -> None:
+    import wave
+
+    root = Path(__file__).resolve().parents[1]
+    audio = root / "src/game_optimization_linux/assets/audio"
+    expected = {
+        "navigate.wav", "confirm.wav", "back.wav", "open.wav", "close.wav",
+        "adjust.wav", "error.wav", "launch.wav", "menu-ambient.wav",
+    }
+    assert expected == {path.name for path in audio.glob("*.wav")}
+    assert "original procedural assets" in (audio / "NOTICE.md").read_text(encoding="utf-8")
+    assert "generate-couch-audio.py" in (audio / "NOTICE.md").read_text(encoding="utf-8")
+    effects = expected - {"menu-ambient.wav"}
+    for name in effects:
+        with wave.open(str(audio / name), "rb") as source:
+            assert source.getnchannels() == 1
+            assert source.getsampwidth() == 2
+            assert source.getframerate() == 22_050
+            assert source.getnframes() > 0
+    with wave.open(str(audio / "menu-ambient.wav"), "rb") as source:
+        assert source.getnchannels() == 2
+        assert source.getsampwidth() == 2
+        assert source.getframerate() == 44_100
+        assert source.getnframes() == 120 * 44_100
+
+
+def test_new_couch_audio_settings_recover_from_malformed_values() -> None:
+    restored = AppSettings.from_dict({
+        "couch_menu_sounds_enabled": "yes",
+        "couch_menu_sounds_volume": 999,
+        "couch_music_enabled": None,
+        "couch_music_volume": -12,
+    })
+    assert restored.couch_menu_sounds_enabled is True
+    assert restored.couch_menu_sounds_volume == 100
+    assert restored.couch_music_enabled is True
+    assert restored.couch_music_volume == 0

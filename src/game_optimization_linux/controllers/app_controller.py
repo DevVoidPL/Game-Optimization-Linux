@@ -34,6 +34,7 @@ from ..config import (
     APP_VERSION,
     COMPRESSION_HISTORY_FILE,
     COMPRESSION_BENCHMARK_REPORTS_DIR,
+    CACHE_DIR,
     DATA_DIR,
     LIBRARY_CACHE_FILE,
     MANUAL_GAMES_FILE,
@@ -62,6 +63,7 @@ from ..models import (
     TaskStatus,
     TaskType,
     is_exact_compsize_measurement_source,
+    normalize_gamepad_action,
 )
 from ..providers import (
     BtrfsCompressionProvider,
@@ -101,6 +103,8 @@ from ..services import (
     MangoHudLogParser,
     OptimizationLaunchPlanner,
     OptiScalerService,
+    OptiPatcherReleaseClient,
+    OptiPatcherService,
     RuntimeToolDetector,
     RunnerIntegration,
     GameUpdateStateStore,
@@ -332,6 +336,7 @@ class AppController(QObject):
         directory_size_scanner: DirectorySizeScannerLike | None = None,
         library_cache: LibraryCacheLike | None = None,
         gamepad_service: GamepadService | None = None,
+        ui_sound_service: Any | None = None,
         compression_service: CompressionService | None = None,
         update_tracker: GameUpdateTracker | None = None,
         update_display_store: UpdateDisplayStateStore | None = None,
@@ -580,6 +585,13 @@ class AppController(QObject):
         self._optiscaler_release_client = (
             optiscaler_release_client or OptiScalerReleaseClient()
         )
+        self._optipatcher_release_client = OptiPatcherReleaseClient(
+            CACHE_DIR / "optipatcher"
+        )
+        self._optipatcher_service = OptiPatcherService(
+            self._optiscaler_service,
+            self._optipatcher_release_client,
+        )
         self._optiscaler_online_errors: dict[str, str] = {}
         self._proton_tweaks_repository = (
             proton_tweaks_repository or ProtonTweaksRepository()
@@ -704,8 +716,15 @@ class AppController(QObject):
             "audio.qt-pcm",
         ):
             self._narrator_controller._refresh_component_runtime(component_id)
-        self._ui_sound_service = UiSoundService(parent=self)
+        self._ui_sound_service = (
+            UiSoundService(parent=self)
+            if ui_sound_service is None
+            else ui_sound_service
+        )
+        if isinstance(self._ui_sound_service, QObject) and self._ui_sound_service.parent() is None:
+            self._ui_sound_service.setParent(self)
         self._ui_sound_service.set_enabled(self._settings_model.interface_sounds)
+        self._configure_couch_audio()
         self._gamepad_service = gamepad_service or GamepadService(parent=self)
         self._couch_navigation = CouchNavigationController(self)
         self._gamepad_service.availabilityChanged.connect(
@@ -769,6 +788,7 @@ class AppController(QObject):
             if self._settings_model.controller_mode is ControllerMode.COUCH_ONLY
             else "desktop"
         )
+        self._ui_sound_service.set_couch_active(self._interface_mode == "couch")
         self._update_executor: ThreadPoolExecutor | None = (
             ThreadPoolExecutor(
                 max_workers=1,
@@ -831,6 +851,7 @@ class AppController(QObject):
                 "falling back to Desktop Mode"
             )
             self._interface_mode = "desktop"
+            self._ui_sound_service.set_couch_active(False)
 
         domain_games = [
             self._resolve_game_artwork(game)
@@ -1489,6 +1510,14 @@ class AppController(QObject):
         self._emit_toast("Demo backup removed from the in-memory list", "success")
         return True
 
+    def _begin_couch_launch_audio(self) -> None:
+        if self._interface_mode == "couch":
+            self._ui_sound_service.begin_game_launch()
+
+    def _cancel_couch_launch_audio(self) -> None:
+        if self._interface_mode == "couch":
+            self._ui_sound_service.cancel_game_launch()
+
     @Slot(str, result=bool)
     def launchGame(self, game_id: str) -> bool:
         game = self._resolve_game(game_id)
@@ -1512,8 +1541,10 @@ class AppController(QObject):
             return False
         self._last_launch_request[game.id] = now
         if self._demo_mode:
+            self._begin_couch_launch_audio()
             logger.info("Demo launch requested for %s; no process was started", game.id)
             self._emit_toast(f"Demo launch requested for {game.name}", "info")
+            self._cancel_couch_launch_audio()
             return True
         if explicit_manual:
             from ..services.launcher_native import ManualLaunchError
@@ -1542,6 +1573,7 @@ class AppController(QObject):
                 list(plan.game_command),
                 sorted(key for key, _value in plan.environment),
             )
+            self._begin_couch_launch_audio()
             self._manual_launch_jobs[game.id] = self._manual_launch_executor.submit(
                 self._manual_game_launcher.execute, plan
             )
@@ -1549,26 +1581,33 @@ class AppController(QObject):
             self.windowActionRequested.emit("stay")
             return True
         if game.launcher is Launcher.MANUAL and game.data_source.casefold() == "local":
+            self._begin_couch_launch_audio()
             try:
                 command = self._runner_integration.launch_local(game)
             except Exception as error:
+                self._cancel_couch_launch_audio()
                 logger.warning("Could not launch local game %s: %s", game.id, error)
                 self._emit_toast(str(error), "error")
                 return False
             logger.info("Started local game %s through Game Optimization Runner", game.id)
             self._emit_toast(f"Starting {game.name}", "success")
             self.windowActionRequested.emit("stay")
+            if not command:
+                self._cancel_couch_launch_audio()
             return bool(command)
         if game.launcher in {Launcher.HEROIC, Launcher.LUTRIS}:
             from ..services.launcher_native import LauncherNativeError
 
+            self._begin_couch_launch_audio()
             try:
                 command = self._launcher_native.launch(game)
             except LauncherNativeError as error:
+                self._cancel_couch_launch_audio()
                 logger.warning("Could not launch %s: %s", game.id, error)
                 self._emit_toast(str(error), "error")
                 return False
             except Exception as error:
+                self._cancel_couch_launch_audio()
                 logger.exception("Unexpected launcher-native error for %s", game.id)
                 self._emit_toast(
                     f"Could not start {game.launcher.value}: {error}", "error"
@@ -1583,6 +1622,7 @@ class AppController(QObject):
             self._emit_toast(f"Starting {game.name}", "success")
             self.windowActionRequested.emit("stay")
             return True
+        self._begin_couch_launch_audio()
         try:
             activation = None
             profile = self._mangohud_profile_for_game(game)
@@ -1596,10 +1636,12 @@ class AppController(QObject):
                 else self._game_launcher.launch(game)
             )
         except SteamLaunchError as error:
+            self._cancel_couch_launch_audio()
             logger.warning("Could not launch %s: %s", game.id, error)
             self._emit_toast(str(error), "error")
             return False
         except Exception as error:
+            self._cancel_couch_launch_audio()
             logger.exception("Unexpected launch error for %s", game.id)
             self._emit_toast(f"Could not start Steam: {error}", "error")
             return False
@@ -1671,6 +1713,18 @@ class AppController(QObject):
         return self._optiscaler_controller.requestOptiScalerStatus(
             game_id, force_refresh
         )
+
+    @Slot(str, bool, result="QVariantMap")
+    def installOptiPatcher(
+        self, game_id: str, force_refresh: bool = False
+    ) -> dict[str, Any]:
+        return self._optiscaler_controller.installOptiPatcher(
+            game_id, force_refresh
+        )
+
+    @Slot(str, result="QVariantMap")
+    def removeOptiPatcher(self, game_id: str) -> dict[str, Any]:
+        return self._optiscaler_controller.removeOptiPatcher(game_id)
 
     @staticmethod
     def _normalized_release_version(value: str) -> str:
@@ -1810,6 +1864,49 @@ class AppController(QObject):
     def playUiSound(self, kind: str) -> bool:
         return self._optimization_controller.playUiSound(kind)
 
+    @Slot(str, result=bool)
+    def playCouchSound(self, kind: str) -> bool:
+        if self._interface_mode != "couch":
+            return False
+        return self._ui_sound_service.play_couch(kind)
+
+    @Slot(str, "QVariant", result=bool)
+    def previewCouchAudioSetting(self, key: str, value: Any) -> bool:
+        """Apply a Couch volume preview without mutating persisted settings."""
+
+        if self._interface_mode != "couch" or key not in {
+            "couchMenuSoundsVolume",
+            "couchMusicVolume",
+        }:
+            return False
+        try:
+            percentage = max(0, min(100, int(round(float(value)))))
+        except (TypeError, ValueError, OverflowError):
+            return False
+        self._ui_sound_service.configure_menu(
+            sounds_enabled=self._settings_model.couch_menu_sounds_enabled,
+            sounds_volume=(
+                percentage
+                if key == "couchMenuSoundsVolume"
+                else self._settings_model.couch_menu_sounds_volume
+            ),
+            music_enabled=self._settings_model.couch_music_enabled,
+            music_volume=(
+                percentage
+                if key == "couchMusicVolume"
+                else self._settings_model.couch_music_volume
+            ),
+        )
+        return True
+
+    @Slot(bool)
+    def setCouchWindowActive(self, active: bool) -> None:
+        self._ui_sound_service.set_window_active(bool(active))
+
+    @Slot(bool)
+    def setCouchMusicDucked(self, ducked: bool) -> None:
+        self._ui_sound_service.set_music_ducked(bool(ducked))
+
     @Slot(str, result="QVariantMap")
     def optimizationDefaults(self, profile: str) -> dict[str, Any]:
         return self._optimization_controller.optimizationDefaults(profile)
@@ -1928,6 +2025,14 @@ class AppController(QObject):
         return self._optimization_controller.keepOptimizationChange(
             game_id, change_id
         )
+
+    @Slot(result="QVariantMap")
+    def getNarratorGlobalSettings(self) -> dict[str, Any]:
+        return self._narrator_controller.get_global_settings()
+
+    @Slot("QVariantMap", result=bool)
+    def saveNarratorGlobalSettings(self, values: Mapping[str, Any]) -> bool:
+        return self._narrator_controller.save_global_settings(values)
 
     @Slot(str, result="QVariantMap")
     def getNarratorGameSettings(self, game_id: str) -> dict[str, Any]:
@@ -2090,7 +2195,7 @@ class AppController(QObject):
         if hasattr(self, "_gamepad_service"):
             self._gamepad_service.stop()
         if hasattr(self, "_ui_sound_service"):
-            self._ui_sound_service.stop()
+            self._ui_sound_service.shutdown()
         narrator_controller = getattr(self, "_narrator_controller", None)
         narrator_region_selector = getattr(
             self, "_narrator_region_selector", None
@@ -2220,6 +2325,14 @@ class AppController(QObject):
             swap_accept_back=bool(self._settings_model.swap_accept_back),
         )
 
+    def _configure_couch_audio(self) -> None:
+        self._ui_sound_service.configure_menu(
+            sounds_enabled=self._settings_model.couch_menu_sounds_enabled,
+            sounds_volume=self._settings_model.couch_menu_sounds_volume,
+            music_enabled=self._settings_model.couch_music_enabled,
+            music_volume=self._settings_model.couch_music_volume,
+        )
+
     def _add_gamepad_system_info(self) -> None:
         return self._system_controller._add_gamepad_system_info()
 
@@ -2244,6 +2357,10 @@ class AppController(QObject):
     @Slot()
     def _on_active_controller_changed(self) -> None:
         self.activeControllerChanged.emit()
+        active = self._gamepad_service.activeController
+        name = str(active.get("name") or "") if isinstance(active, Mapping) else ""
+        if name and self._interface_mode == "couch":
+            self._emit_toast(f"Active controller: {name}", "info")
         self._add_gamepad_system_info()
         self.systemInfoChanged.emit()
 
@@ -2265,6 +2382,7 @@ class AppController(QObject):
 
     @Slot(str)
     def _on_gamepad_activity(self, action: str) -> None:
+        self._couch_navigation.setInputModality("controller")
         if (
             self._settings_model.controller_mode is ControllerMode.AUTOMATIC
             and self._interface_mode == "desktop"
@@ -2282,8 +2400,11 @@ class AppController(QObject):
             return
         if self._interface_mode == "desktop":
             return
-        self._couch_navigation.dispatch(str(action))
-        self.gamepadAction.emit(str(action))
+        normalized = normalize_gamepad_action(action)
+        if normalized is None:
+            return
+        if self._couch_navigation.dispatch(normalized.value):
+            self.gamepadAction.emit(normalized.value)
 
     def _set_interface_mode(self, mode: str) -> None:
         normalized = "couch" if mode == "couch" else "desktop"
@@ -2291,7 +2412,8 @@ class AppController(QObject):
             return
         self._interface_mode = normalized
         if normalized == "couch":
-            self._ui_sound_service.stop()
+            self._ui_sound_service.stop_effects()
+        self._ui_sound_service.set_couch_active(normalized == "couch")
         self.interfaceModeChanged.emit()
         logger.info("Interface mode changed to %s", normalized)
 
@@ -2832,6 +2954,7 @@ class AppController(QObject):
             if not future.done():
                 continue
             self._manual_launch_jobs.pop(game_id, None)
+            self._cancel_couch_launch_audio()
             game = self._domain_games.get(game_id)
             name = game.name if game is not None else "Manual game"
             try:

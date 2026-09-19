@@ -231,7 +231,6 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
     assert "updateColumn" not in sidebar
     for name, property_name in (
         ("games", "sidebarGames"),
-        ("narrator", "sidebarNarrator"),
         ("updates", "sidebarUpdates"),
         ("tasks", "sidebarTasks"),
         ("system", "sidebarSystem"),
@@ -240,6 +239,11 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
         assert f"App.UiIcons.{property_name}" in sidebar
         assert f'assets/ui-icons/sidebar-{name}.svg' in ui_icons
         assert (qml_root.parent / "assets" / "ui-icons" / f"sidebar-{name}.svg").is_file()
+    # The global "Narrator" sidebar destination was removed (Narrator is now a
+    # per-game tab); the icon asset itself stays registered for Couch's use.
+    assert '"page": "narrator"' not in sidebar
+    assert "assets/ui-icons/sidebar-narrator.svg" in ui_icons
+    assert (qml_root.parent / "assets" / "ui-icons" / "sidebar-narrator.svg").is_file()
 
 
 def test_kde_breeze_read_only_preview_has_no_textarea_warning(tmp_path: Path) -> None:

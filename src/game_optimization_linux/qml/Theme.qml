@@ -89,6 +89,13 @@ QtObject {
     readonly property int couchBodySize: 18
     readonly property int couchHelperSize: 16
     readonly property int couchAnimation: 150
+    // Icon sizes are keyed by component type so every Couch surface renders
+    // icons at a predictable, non-distorted size instead of ad-hoc pixels.
+    readonly property int couchIconSizeNav: 26
+    readonly property int couchIconSizeTile: 36
+    readonly property int couchIconSizeButton: 22
+    readonly property int couchIconSizeAction: 22
+    readonly property int couchIconSizeStatus: 16
 
     function statusColor(status) {
         var value = String(status || "").toLowerCase()

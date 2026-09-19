@@ -106,7 +106,6 @@ def test_requested_ui_surfaces_use_the_final_icon_mappings() -> None:
         assert f"App.UiIcons.{name}" in overview
     for name in (
         "sidebarGames",
-        "sidebarNarrator",
         "sidebarUpdates",
         "sidebarTasks",
         "sidebarSystem",

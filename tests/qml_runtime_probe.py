@@ -41,6 +41,7 @@ from PySide6.QtWidgets import QApplication
 
 from game_optimization_linux.controllers.presenters import game_to_qml
 from game_optimization_linux.models import FilesystemType, Game, Launcher
+from game_optimization_linux.services.ui_sound import NoOpUiSoundService
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -98,6 +99,111 @@ class StorageProbeController(QObject):
     def startCompression(self, plan_id: str) -> bool:
         self.start_calls.append(plan_id)
         return True
+
+
+class CouchSettingsProbeController(QObject):
+    """Minimal controller for the isolated Couch Settings probe."""
+
+    settingsChanged = Signal()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._settings: dict[str, Any] = {
+            "language": "en",
+            "themeMode": "system",
+            "automaticCompressionMode": "Off",
+            "couchMenuSoundsEnabled": True,
+            "couchMenuSoundsVolume": 40,
+            "couchMusicEnabled": True,
+            "couchMusicVolume": 20,
+            "steamInstallationDirectories": ["/steam/one"],
+            "libraryDirectories": ["/games/one"],
+            "ignoredSteamLibraries": ["/steam/forgotten"],
+            "backupDirectory": "backups",
+            "quarantineDirectory": "quarantine",
+        }
+        self.save_calls: list[tuple[str, Any]] = []
+        self.preview_calls: list[tuple[str, Any]] = []
+        self.sound_calls: list[str] = []
+        self.interface_calls: list[str] = []
+        self.fail_next_save = False
+
+    @Property("QVariantMap", notify=settingsChanged)
+    def settings(self) -> dict[str, Any]:
+        return dict(self._settings)
+
+    @Property("QVariantMap", constant=True)
+    def gamepadButtonHints(self) -> dict[str, str]:
+        return {"pageUp": "L2", "pageDown": "R2", "back": "B"}
+
+    @Slot(str, "QVariant", result=bool)
+    def saveSetting(self, key: str, value: Any) -> bool:
+        converted = _variant(value)
+        if self.fail_next_save:
+            self.fail_next_save = False
+            return False
+        self._settings[key] = converted
+        self.save_calls.append((key, converted))
+        self.settingsChanged.emit()
+        return True
+
+    @Slot(str, "QVariant", result=bool)
+    def previewCouchAudioSetting(self, key: str, value: Any) -> bool:
+        if key not in {"couchMenuSoundsVolume", "couchMusicVolume"}:
+            return False
+        self.preview_calls.append((key, _variant(value)))
+        return True
+
+    @Slot(str)
+    def playCouchSound(self, kind: str) -> None:
+        self.sound_calls.append(kind)
+
+    @Slot(str)
+    def setInterfaceMode(self, mode: str) -> None:
+        self.interface_calls.append(mode)
+
+    @Slot(str, result=bool)
+    def restoreIgnoredLibrary(self, path: str) -> bool:
+        libraries = list(self._settings.get("ignoredSteamLibraries", []))
+        if path not in libraries:
+            return False
+        libraries.remove(path)
+        self._settings["ignoredSteamLibraries"] = libraries
+        self.settingsChanged.emit()
+        return True
+
+
+class CouchSettingsProbeNavigation(QObject):
+    focusedIdChanged = Signal()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._focused_id = ""
+        self.modal_open = False
+
+    @Property(str, notify=focusedIdChanged)
+    def focusedId(self) -> str:
+        return self._focused_id
+
+    @Slot(str, str, int)
+    def rememberFocus(self, _page: str, item_id: str, _index: int) -> None:
+        self._focused_id = item_id
+        self.focusedIdChanged.emit()
+
+    @Slot(str, str)
+    def openModal(self, _modal_id: str, _focus_id: str) -> None:
+        self.modal_open = True
+
+    @Slot()
+    def closeModal(self) -> None:
+        self.modal_open = False
+
+
+_UPDATES_PROBE_ARTWORK_URL = (
+    "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' "
+    "width='2' height='3'%3E%3Crect width='2' height='3' "
+    "fill='%23446688'/%3E%3C/svg%3E"
+)
 
 
 class UpdatesProbeController(QObject):
@@ -470,12 +576,22 @@ def _update_row(
         if long_text
         else ""
     )
+    game_id = f"steam-update-{index}"
+    game_name = f"Update fixture game {index}{suffix}"
+    app_id = str(9_000_000 + index)
     return {
-        "rowId": f"{section}:steam-update-{index}:fixture-{index}",
+        "rowId": f"{section}:{game_id}:fixture-{index}",
         "sectionKey": section,
-        "gameId": f"steam-update-{index}",
-        "name": f"Update fixture game {index}{suffix}",
+        "gameId": game_id,
+        "gameKnown": True,
+        "gameName": game_name,
+        "name": game_name,
+        "provider": "Steam",
         "launcher": "Steam",
+        "appId": app_id,
+        "steamAppId": app_id,
+        "artworkUrl": _UPDATES_PROBE_ARTWORK_URL,
+        "effectiveArtworkUrl": _UPDATES_PROBE_ARTWORK_URL,
         "buildId": f"20260726{index:03d}",
         "detectedAt": "2026-07-26T10:15:00+00:00",
         "lastCompressionAt": "2026-07-25T08:00:00+00:00",
@@ -493,7 +609,7 @@ def _update_row(
         "portraitArtwork": "",
         "path": (
             "/run/media/fixture/SteamLibrary/steamapps/common/"
-            f"Update fixture game {index}{suffix}"
+            f"{game_name}"
         ),
     }
 
@@ -2633,6 +2749,7 @@ def probe_signal_shutdown(application: QGuiApplication) -> dict[str, Any]:
     service = BtrfsAnalysisTaskService(analyzer=Analyzer())  # type: ignore[arg-type]
     controller = AppController(
         parent=application,
+        ui_sound_service=NoOpUiSoundService(),
         game_provider=Provider(),
         task_service=service,
         settings_store=SettingsStore(temporary_root / "settings.json"),
@@ -2719,6 +2836,7 @@ def probe_close_during_compression(
     tasks = ActiveCompressionTasks()
     controller = AppController(
         parent=application,
+        ui_sound_service=NoOpUiSoundService(),
         game_provider=DemoGameProvider(),
         task_service=tasks,  # type: ignore[arg-type]
         settings_store=SettingsStore(temporary_root / "settings.json"),
@@ -2788,6 +2906,7 @@ def probe_tasks_lifecycle(application: QGuiApplication) -> dict[str, Any]:
     temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-tasks-probe-"))
     controller = AppController(
         parent=application,
+        ui_sound_service=NoOpUiSoundService(),
         game_provider=DemoGameProvider(),
         settings_store=SettingsStore(temporary_root / "settings.json"),
         gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
@@ -2878,6 +2997,7 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     )
     controller = AppController(
         parent=application,
+        ui_sound_service=NoOpUiSoundService(),
         game_provider=DemoGameProvider((game,)),
         settings_store=SettingsStore(temporary_root / "settings.json"),
         gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
@@ -3065,6 +3185,7 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
 
     controller = AppController(
         parent=application,
+        ui_sound_service=NoOpUiSoundService(),
         game_provider=DemoGameProvider((game,)),
         settings_store=SettingsStore(temporary_root / "settings.json"),
         gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
@@ -3438,6 +3559,184 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+def probe_couch_settings(
+    application: QGuiApplication,
+    width: int,
+    height: int,
+) -> dict[str, Any]:
+    """Exercise Settings and its keyboard without enumerating QML children."""
+
+    controller = CouchSettingsProbeController()
+    navigation = CouchSettingsProbeNavigation()
+    view, root = _view(application, "couch/CouchSettings.qml", width, height)
+    root.setProperty("controller", controller)
+    root.setProperty("navigation", navigation)
+    root.setProperty("couchScale", min(width / 1920.0, height / 1080.0))
+    _settle(application, 30)
+
+    settings_list = _qt_side_item(root, "couchSettingsList")
+    keyboard = _qt_side_item(root, "couchOnScreenKeyboard")
+    _assert_inside(settings_list, root)
+    if settings_list.width() <= 0 or settings_list.height() <= 0:
+        raise AssertionError("Couch Settings list has invalid geometry")
+
+    rows = _variant(root.property("rows")) or []
+    row_indexes = {
+        str(row.get("id", "")): index
+        for index, row in enumerate(rows)
+        if isinstance(row, dict)
+    }
+    required_rows = {
+        "auto-compression", "auto-profile", "menu-volume",
+        "steam-paths", "game-paths", "backup-path"
+    }
+    if not required_rows.issubset(row_indexes):
+        raise AssertionError(f"Missing Couch Settings rows: {required_rows - row_indexes.keys()}")
+
+    _invoke_qml(root, "selectCategory", 1)
+    _settle(application, 5)
+    before_disabled_move = _variant(root.property("selectedRow")) or {}
+    _invoke_qml(root, "handleAction", "NavigateDown")
+    after_disabled_move = _variant(root.property("selectedRow")) or {}
+    if (
+        before_disabled_move.get("id") != "auto-compression"
+        or after_disabled_move.get("id") != "auto-compression"
+        or int(root.property("activeCategoryIndex")) != 1
+    ):
+        raise AssertionError("Disabled automation rows broke category-local selection")
+    if controller.sound_calls:
+        raise AssertionError(
+            f"A blocked Settings move emitted audio: {controller.sound_calls!r}"
+        )
+
+    # Repeated volume input previews every value immediately but persists only
+    # the final value after the 450 ms quiet period.
+    _invoke_qml(root, "selectIndex", row_indexes["menu-volume"], True)
+    saves_before_volume = len(controller.save_calls)
+    for _ in range(3):
+        _invoke_qml(root, "handleAction", "NavigateRight")
+    _settle(application, 25)
+    expected_previews = [
+        ("couchMenuSoundsVolume", 45),
+        ("couchMenuSoundsVolume", 50),
+        ("couchMenuSoundsVolume", 55),
+    ]
+    if controller.preview_calls != expected_previews:
+        raise AssertionError(
+            f"Couch volume preview was not immediate: {controller.preview_calls!r}"
+        )
+    if len(controller.save_calls) != saves_before_volume:
+        raise AssertionError("Couch volume was persisted before the debounce elapsed")
+    if int(root.property("effectiveMenuVolume")) != 55:
+        raise AssertionError("Pending Couch volume did not drive the displayed value")
+    _settle(application, 165)
+    volume_saves = controller.save_calls[saves_before_volume:]
+    if volume_saves != [("couchMenuSoundsVolume", 55)]:
+        raise AssertionError(f"Couch volume write was not debounced: {volume_saves!r}")
+    volume_sounds = list(controller.sound_calls)
+
+    # A successful focus transition sounds once; the same direction at the
+    # boundary is silent. Disabled activation is an explicit error.
+    controller.sound_calls.clear()
+    _invoke_qml(root, "selectIndex", row_indexes["menu-volume"], True)
+    _invoke_qml(root, "handleAction", "NavigateUp")
+    _invoke_qml(root, "handleAction", "NavigateUp")
+    if controller.sound_calls != ["navigate"]:
+        raise AssertionError(
+            f"Settings focus semantics were not state-aware: {controller.sound_calls!r}"
+        )
+    root.setProperty("activeCategoryIndex", 1)
+    root.setProperty("selectedIndex", row_indexes["auto-profile"])
+    _invoke_qml(root, "handleAction", "Confirm")
+    if controller.sound_calls[-1:] != ["error"]:
+        raise AssertionError("Disabled Settings activation did not emit error audio")
+    semantic_sounds = list(controller.sound_calls)
+
+    _invoke_qml(root, "selectIndex", row_indexes["steam-paths"], True)
+    _invoke_qml(root, "handleAction", "Confirm")
+    _settle(application, 8)
+    if not bool(root.property("keyboardOpen")) or not navigation.modal_open:
+        raise AssertionError("Steam path editor did not open the controller keyboard")
+
+    key_model = _variant(keyboard.property("keyModel")) or []
+    if len(key_model) != 48:
+        raise AssertionError(f"Controller keyboard has {len(key_model)} keys, expected 48")
+    semantic_keys = {
+        36: "space",
+        37: "backspace",
+        38: "clear",
+        39: "shift",
+        40: "symbols",
+        46: "confirm",
+        47: "cancel",
+    }
+    for index, action in semantic_keys.items():
+        if not isinstance(key_model[index], dict) or key_model[index].get("action") != action:
+            raise AssertionError(f"Keyboard index {index} is not stable for {action}")
+
+    keyboard.setProperty("text", " /steam/two ; /steam/one ; /steam/two ")
+    keyboard.setProperty("selectedIndex", 46)
+    _invoke_qml(root, "handleAction", "Confirm")
+    _settle(application, 12)
+    saved_paths = controller._settings.get("steamInstallationDirectories")
+    if saved_paths != ["/steam/two", "/steam/one"]:
+        raise AssertionError(f"Couch path parsing did not trim/deduplicate: {saved_paths!r}")
+    if bool(root.property("keyboardOpen")) or navigation.modal_open:
+        raise AssertionError("Successful keyboard save did not close its modal")
+
+    _invoke_qml(root, "selectIndex", row_indexes["backup-path"], True)
+    _invoke_qml(root, "handleAction", "Confirm")
+    _settle(application, 5)
+    keyboard.setProperty("text", "keep-this-value")
+    keyboard.setProperty("selectedIndex", 46)
+    controller.fail_next_save = True
+    _invoke_qml(root, "handleAction", "Confirm")
+    _settle(application, 12)
+    if (
+        not bool(root.property("keyboardOpen"))
+        or str(keyboard.property("text")) != "keep-this-value"
+        or not navigation.modal_open
+    ):
+        raise AssertionError("Failed keyboard save did not preserve and reopen the editor")
+
+    _invoke_qml(root, "handleAction", "Back")
+    _settle(application, 12)
+    focus_object = application.focusObject()
+    focus_name = focus_object.objectName() if isinstance(focus_object, QObject) else ""
+    focus_visible = not isinstance(focus_object, QQuickItem) or focus_object.isVisible()
+    if bool(root.property("keyboardOpen")) or navigation.modal_open:
+        raise AssertionError("Back did not cancel and close the controller keyboard")
+    if not focus_visible:
+        raise AssertionError("Keyboard cancellation restored focus to an invisible item")
+
+    _invoke_qml(root, "handleAction", "Back")
+    all_semantic_sounds = volume_sounds + list(controller.sound_calls)
+    required_sounds = {"navigate", "confirm", "back", "adjust", "error"}
+    if not required_sounds.issubset(all_semantic_sounds):
+        raise AssertionError(
+            "Couch Settings semantic audio is incomplete: "
+            f"{all_semantic_sounds!r}"
+        )
+
+    result = {
+        "resolution": [width, height],
+        "activeCategory": int(root.property("activeCategoryIndex")),
+        "disabledRowsSkipped": True,
+        "keyboardKeys": len(key_model),
+        "keyboardSemanticKeys": semantic_keys,
+        "keyboardClosed": not bool(root.property("keyboardOpen")),
+        "pathList": saved_paths,
+        "focusAfterCancel": focus_name,
+        "focusAfterCancelVisible": focus_visible,
+        "settingsListGeometry": [
+            settings_list.x(), settings_list.y(),
+            settings_list.width(), settings_list.height(),
+        ],
+    }
+    view.close()
+    return result
+
+
 def probe_couch(
     application: QGuiApplication,
     width: int,
@@ -3480,6 +3779,7 @@ def probe_couch(
     )
     controller = AppController(
         parent=application,
+        ui_sound_service=NoOpUiSoundService(),
         game_provider=DemoGameProvider(demo_fixture),
         settings_store=SettingsStore(temporary_root / "settings.json"),
         gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
@@ -3502,7 +3802,7 @@ def probe_couch(
     root.setProperty("controller", controller)
     _invoke_qml(root, "setSection", "home", "")
     _settle(application, 24)
-    home = _item(root, "couchHome")
+    home = _qt_side_item(root, "couchHome")
     base_games = [dict(game) for game in controller.games]
     if scenario == "one":
         fixture_games = base_games[:1]
@@ -3528,30 +3828,26 @@ def probe_couch(
         fixture_games = base_games
     home.setProperty("games", fixture_games)
     _settle(application, 20)
-    strip = _item(root, "couchGameStrip")
-    home_title = _item(root, "couchHomeHeroTitle")
-    home_navigation = _item(root, "couchHomeNavigation")
-    home_actions = [
-        item for item in _named(root, "couchHomeHeroAction")
-        if isinstance(item, QQuickItem) and item.isVisible()
-    ]
-    home_cards = [
-        item for item in _named(root, "couchHomeGameCard")
-        if isinstance(item, QQuickItem) and item.isVisible()
-    ]
+    strip = _qt_side_item(root, "couchGameStrip")
+    home_title = _qt_side_item(root, "couchHomeHeroTitle")
+    home_navigation = _qt_side_item(root, "couchHomeNavigation")
+    home.setProperty(
+        "runtimeProbeSerial", int(home.property("runtimeProbeSerial")) + 1
+    )
+    _settle(application, 2)
+    home_metrics = _variant(home.property("runtimeProbeMetrics")) or {}
     tv_metrics = {
         "homeTitlePx": _font_pixel_size(home_title),
-        "homeActionMinHeight": min((item.height() for item in home_actions), default=0),
-        "homeCardMaxWidth": max((item.width() * item.scale() for item in home_cards), default=0),
-        "homeCardMaxHeight": max((item.height() * item.scale() for item in home_cards), default=0),
+        "homeActionMinHeight": float(home_metrics.get("homeActionMinHeight", 0)),
+        "homeCardMaxWidth": float(home_metrics.get("homeCardMaxWidth", 0)),
+        "homeCardMaxHeight": float(home_metrics.get("homeCardMaxHeight", 0)),
         "homeNavigationHeight": home_navigation.height(),
     }
     _assert_inside(strip, home)
     if strip.width() <= 0 or strip.height() <= 0:
         raise AssertionError("Couch game strip has invalid geometry")
-    for tile in _named(home, "couchHomeTile"):
-        if isinstance(tile, QQuickItem) and tile.isVisible():
-            _assert_inside(tile, home)
+    if home_metrics.get("firstTileInside") is not True:
+        raise AssertionError("Couch Home navigation tile is outside the page")
     retained = ""
     if scenario == "many" and len(fixture_games) > 2:
         strip.setProperty("currentIndex", 1)
@@ -3569,10 +3865,10 @@ def probe_couch(
             )
     _invoke_qml(root, "openGameFrom", "home", "dying-light")
     _settle(application, 20)
-    details = _item(root, "couchGameDetails")
-    details_cover = _item(root, "couchDetailsCover")
-    details_title = _item(root, "couchDetailsTitle")
-    details_content = _item(root, "couchDetailsContent")
+    details = _qt_side_item(root, "couchGameDetails")
+    details_cover = _qt_side_item(root, "couchDetailsCover")
+    details_title = _qt_side_item(root, "couchDetailsTitle")
+    details_content = _qt_side_item(root, "couchDetailsContent")
     _assert_inside(details, root)
     _assert_inside(details_cover, details)
     _assert_inside(details_content, details)
@@ -3582,19 +3878,48 @@ def probe_couch(
         "detailsTitlePx": _font_pixel_size(details_title),
         "detailsContentHeight": details_content.height(),
     })
-    # Overview, Storage, Graphics and Optimization. The former Backups tab was
-    # intentionally removed from both detail views.
-    for expected_tab in range(1, 4):
+    tabs = _variant(details.property("tabs"))
+    required_tabs = [
+        {"id": "overview", "title": "Overview"},
+        {"id": "storage", "title": "Storage"},
+        {"id": "optimization", "title": "Optimization"},
+        {"id": "optiscaler", "title": "OptiScaler"},
+        {"id": "narrator", "title": "Narrator"},
+    ]
+    if not isinstance(tabs, list):
+        raise AssertionError(f"Couch details exposed an invalid tabs model: {tabs!r}")
+    actual_tabs = [
+        {
+            "id": str(tab.get("id", "")),
+            "title": str(tab.get("title", "")),
+        }
+        if isinstance(tab, dict)
+        else {"id": "", "title": ""}
+        for tab in tabs
+    ]
+    if actual_tabs != required_tabs:
+        raise AssertionError(
+            "Couch details tabs do not match the required product order: "
+            f"expected={required_tabs!r}, actual={actual_tabs!r}"
+        )
+    if int(details.property("selectedTab")) != 0:
+        raise AssertionError("Couch details did not open on Overview")
+
+    for expected_index, expected_tab in enumerate(actual_tabs[1:], start=1):
         _invoke_qml(root, "handleAction", "PageRight")
         _settle(application, 3)
-        if int(details.property("selectedTab")) != expected_tab:
+        if int(details.property("selectedTab")) != expected_index:
             raise AssertionError(
-                f"Couch details did not switch to tab {expected_tab} with PageRight"
+                "Couch details did not switch with PageRight: "
+                f"expected={expected_index}/{expected_tab!r}, "
+                f"actual={details.property('selectedTab')!r}"
             )
     _invoke_qml(root, "handleAction", "PageRight")
+    _settle(application, 3)
     if int(details.property("selectedTab")) != 0:
         raise AssertionError("Couch details tabs did not wrap to Overview")
-    details.setProperty("selectedTab", 3)
+    tab_ids = [tab["id"] for tab in actual_tabs]
+    details.setProperty("selectedTab", tab_ids.index("optimization"))
     details.setProperty("selectedAction", 0)
     previous_profile = str(details.property("optimizationProfile"))
     _invoke_qml(root, "handleAction", "Confirm")
@@ -3667,8 +3992,8 @@ def probe_couch(
     # even when the details page was opened from Home.
     _invoke_qml(root, "handleAction", "Back")
     _settle(application, 12)
-    library = _item(root, "couchLibrary")
-    library_grid = _item(root, "couchLibraryGrid")
+    library = _qt_side_item(root, "couchLibrary")
+    library_grid = _qt_side_item(root, "couchLibraryGrid")
     if str(root.property("section")) != "library":
         raise AssertionError("Back from Couch details did not return to Library")
     filtered_games = _variant(library.property("filteredGames")) or []
@@ -3690,7 +4015,7 @@ def probe_couch(
 
     _invoke_qml(root, "handleAction", "OpenSystemMenu")
     _settle(application, 5)
-    system_menu = _item(root, "couchSystemMenu")
+    system_menu = _qt_side_item(root, "couchSystemMenu")
     if not system_menu.isVisible() or int(system_menu.property("selectedIndex")) != 0:
         raise AssertionError("Couch system menu did not use Resume as its safe default")
     _invoke_qml(root, "handleAction", "Back")
@@ -3784,7 +4109,7 @@ def probe_couch(
 
     _invoke_qml(root, "setSection", "settings", "")
     _settle(application, 20)
-    settings = _item(root, "couchSettings")
+    settings = _qt_side_item(root, "couchSettings")
     _assert_inside(settings, root)
     result = {
         "resolution": [width, height],
@@ -3937,6 +4262,36 @@ def _probe_couch_updates(
     if not updates and (cards or not empty_state.isVisible()):
         raise AssertionError("Couch Updates empty state is inconsistent")
 
+    for update in updates:
+        effective_artwork = str(update.get("effectiveArtworkUrl", ""))
+        direct_artwork = str(update.get("artworkUrl", ""))
+        if (
+            not str(update.get("gameId", ""))
+            or not str(update.get("provider", ""))
+            or not str(update.get("appId", ""))
+            or str(update.get("steamAppId", "")) != str(update.get("appId", ""))
+            or not effective_artwork
+            or direct_artwork != effective_artwork
+        ):
+            raise AssertionError(
+                f"Updates fixture is not presenter-shaped: {update!r}"
+            )
+
+    artwork_probe = _variant(root.property("renderedArtworkProbe")) or {}
+    if updates:
+        expected_game_id = str(updates[0]["gameId"])
+        expected_artwork = str(updates[0]["effectiveArtworkUrl"])
+        if artwork_probe != {
+            "gameId": expected_game_id,
+            "artworkSource": expected_artwork,
+        }:
+            raise AssertionError(
+                "Couch Updates did not pass resolved artwork to GameCover: "
+                f"{artwork_probe!r}"
+            )
+    elif artwork_probe.get("gameId") or artwork_probe.get("artworkSource"):
+        raise AssertionError(f"Empty Couch Updates exposed artwork: {artwork_probe!r}")
+
     for card in cards:
         if card.width() <= 0 or card.height() <= 0:
             raise AssertionError(
@@ -4041,6 +4396,7 @@ def main() -> int:
             "mangohud",
             "optimization",
             "couch",
+            "couch_settings",
             "updates",
             "popups",
             "artwork",
@@ -4080,6 +4436,8 @@ def main() -> int:
         result = probe_optimization_editor(application)
     elif args.mode == "couch":
         result = probe_couch(application, args.width, args.height, args.scenario, args.theme)
+    elif args.mode == "couch_settings":
+        result = probe_couch_settings(application, args.width, args.height)
     elif args.mode == "popups":
         result = probe_game_popups(application)
     elif args.mode == "artwork":

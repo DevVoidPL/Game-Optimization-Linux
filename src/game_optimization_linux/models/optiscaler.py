@@ -11,7 +11,7 @@ from typing import Any, Mapping
 from .mangohud import validate_app_id
 
 
-OPTISCALER_SCHEMA_VERSION = 2
+OPTISCALER_SCHEMA_VERSION = 3
 OPTISCALER_PROXY_DLLS = (
     "dxgi.dll",
     "d3d12.dll",
@@ -32,6 +32,8 @@ OPTISCALER_STATES = (
     "removed",
 )
 OPTISCALER_CHANNELS = ("stable", "edge")
+OPTISCALER_BACKENDS = ("none", "optiscaler", "dlss_enabler")
+OPTISCALER_COMPATIBILITY_STATES = ("supported", "unsupported", "unknown", "warning")
 OPTISCALER_FSR4_MODES = ("automatic", "normal", "force_int8", "disabled")
 OPTISCALER_SOURCE_IDENTITIES = ("", "official_optiscaler", "local_archive")
 OPTISCALER_RUNTIME_VERIFICATION_STATES = (
@@ -81,6 +83,7 @@ class OptiScalerProfile:
     schema_version: int
     app_id: str
     enabled: bool = False
+    backend: str = "optiscaler"
     executable: str = ""
     install_directory: str = ""
     installed_version: str = ""
@@ -97,6 +100,11 @@ class OptiScalerProfile:
     dx11_upscaler: str = "auto"
     dx12_upscaler: str = "auto"
     vulkan_upscaler: str = "auto"
+    optipatcher_enabled: bool = False
+    fake_nvapi_mode: str = "auto"
+    dxgi_spoofing_mode: str = "auto"
+    reflex_emulation: bool = False
+    optipatcher_compatibility: str = "unknown"
     configuration_applied: bool = False
     runtime_verification_status: str = "not_verified"
     manifest_id: str = ""
@@ -108,6 +116,10 @@ class OptiScalerProfile:
         if self.schema_version != OPTISCALER_SCHEMA_VERSION:
             raise ValueError("unsupported OptiScaler profile schema")
         object.__setattr__(self, "app_id", validate_optiscaler_game_id(self.app_id))
+        backend = str(self.backend or "optiscaler").strip().casefold()
+        if backend not in OPTISCALER_BACKENDS:
+            raise ValueError("unsupported OptiScaler backend")
+        object.__setattr__(self, "backend", backend)
         object.__setattr__(
             self, "executable", _relative_path(self.executable, "executable")
         )
@@ -144,11 +156,22 @@ class OptiScalerProfile:
         if verification not in OPTISCALER_RUNTIME_VERIFICATION_STATES:
             raise ValueError("unsupported OptiScaler runtime verification state")
         object.__setattr__(self, "runtime_verification_status", verification)
+        compatibility = str(self.optipatcher_compatibility or "unknown").strip().casefold()
+        if compatibility not in OPTISCALER_COMPATIBILITY_STATES:
+            raise ValueError("unsupported OptiPatcher compatibility state")
+        object.__setattr__(self, "optipatcher_compatibility", compatibility)
+        for name in ("fake_nvapi_mode", "dxgi_spoofing_mode"):
+            value = str(getattr(self, name) or "auto").strip().casefold()
+            if value not in {"auto", "enabled", "disabled"}:
+                raise ValueError(f"unsupported {name}")
+            object.__setattr__(self, name, value)
         for name in (
             "enabled",
             "fsr_agility_sdk_upgrade",
             "fsr4_watermark",
             "configuration_applied",
+            "optipatcher_enabled",
+            "reflex_emulation",
         ):
             if not isinstance(getattr(self, name), bool):
                 raise ValueError(f"{name} must be a boolean")
@@ -169,6 +192,7 @@ class OptiScalerProfile:
             "schema_version": self.schema_version,
             "app_id": self.app_id,
             "enabled": self.enabled,
+            "backend": self.backend,
             "executable": self.executable,
             "install_directory": self.install_directory,
             "installed_version": self.installed_version,
@@ -185,6 +209,11 @@ class OptiScalerProfile:
             "dx11_upscaler": self.dx11_upscaler,
             "dx12_upscaler": self.dx12_upscaler,
             "vulkan_upscaler": self.vulkan_upscaler,
+            "optipatcher_enabled": self.optipatcher_enabled,
+            "fake_nvapi_mode": self.fake_nvapi_mode,
+            "dxgi_spoofing_mode": self.dxgi_spoofing_mode,
+            "reflex_emulation": self.reflex_emulation,
+            "optipatcher_compatibility": self.optipatcher_compatibility,
             "configuration_applied": self.configuration_applied,
             "runtime_verification_status": self.runtime_verification_status,
             "manifest_id": self.manifest_id,
@@ -208,9 +237,19 @@ class OptiScalerProfile:
         if expected_app_id is not None and app_id != validate_optiscaler_game_id(expected_app_id):
             raise ValueError("OptiScaler profile AppID does not match its directory")
         raw = dict(data)
-        schema = int(raw.get("schema_version", 0))
-        if schema in (0, 1):
+        schema_value = raw.get("schema_version", 0)
+        try:
+            schema = int(schema_value)
+        except (TypeError, ValueError) as error:
+            raise ValueError("invalid OptiScaler profile schema") from error
+        if schema < 0:
+            raise ValueError("invalid OptiScaler profile schema")
+        if schema in (0, 1, 2):
             raw["schema_version"] = OPTISCALER_SCHEMA_VERSION
+        elif schema != OPTISCALER_SCHEMA_VERSION:
+            raise ValueError(
+                f"unsupported OptiScaler profile schema: {schema}"
+            )
         defaults = cls.default(app_id).to_dict()
         defaults.update({key: value for key, value in raw.items() if key in defaults})
         defaults["app_id"] = app_id

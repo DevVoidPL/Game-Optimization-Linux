@@ -1,6 +1,9 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import "components"
 import ".." as App
 
 FocusScope {
@@ -12,62 +15,71 @@ FocusScope {
     property int selectedIndex: 0
     property int activeCategoryIndex: 0
     property var settingsData: controller && controller.settings ? controller.settings : ({})
+    property var narratorGlobalData: ({})
+    property string editingSettingId: ""
+    property int ignoredLibraryIndex: 0
+    property int pendingMenuVolume: -1
+    property int pendingMusicVolume: -1
+    readonly property int effectiveMenuVolume: pendingMenuVolume >= 0
+            ? pendingMenuVolume : Number(setting("couchMenuSoundsVolume", 40))
+    readonly property int effectiveMusicVolume: pendingMusicVolume >= 0
+            ? pendingMusicVolume : Number(setting("couchMusicVolume", 20))
+    readonly property bool keyboardOpen: onScreenKeyboard.opened
+    readonly property var narratorComponents: controller && controller.narratorComponents
+            ? controller.narratorComponents : []
 
     readonly property var categories: [
-        {
-            "id": "general",
-            "title": qsTr("General"),
-            "subtitle": qsTr("Language and appearance")
-        },
-        {
-            "id": "couch",
-            "title": qsTr("Couch Mode"),
-            "subtitle": qsTr("TV interface behaviour")
-        },
-        {
-            "id": "system",
-            "title": qsTr("System"),
-            "subtitle": qsTr("Mode and safe defaults")
-        }
+        { "id": "general", "title": qsTr("General"), "subtitle": qsTr("Language, appearance and startup") },
+        { "id": "libraries", "title": qsTr("Libraries"), "subtitle": qsTr("Game locations and storage") },
+        { "id": "automation", "title": qsTr("Automation"), "subtitle": qsTr("Updates and compression") },
+        { "id": "controller", "title": qsTr("Controller"), "subtitle": qsTr("Input and Couch behaviour") },
+        { "id": "audio", "title": qsTr("Audio"), "subtitle": qsTr("Menu sounds and music") },
+        { "id": "narrator", "title": qsTr("Narrator"), "subtitle": qsTr("Local speech components") },
+        { "id": "advanced", "title": qsTr("Advanced"), "subtitle": qsTr("Resources, diagnostics and mode") }
     ]
     readonly property var rows: [
-        {
-            "id": "language", "category": "general", "title": qsTr("Language"),
-            "value": String(setting("language", "English")), "enabled": true,
-            "description": qsTr("Choose the language used throughout the Game Optimization interface.")
-        },
-        {
-            "id": "appearance", "category": "general", "title": qsTr("Appearance"),
-            "value": String(setting("themeMode", "System")), "enabled": true,
-            "description": qsTr("Follow the system colours or force a light or dark interface.")
-        },
-        {
-            "id": "interface", "category": "couch", "title": qsTr("Interface mode"),
-            "value": String(setting("controllerMode", "Automatic")), "enabled": true,
-            "description": qsTr("Choose when Game Optimization should use the television-friendly Couch Mode interface.")
-        },
-        {
-            "id": "fullscreen", "category": "couch", "title": qsTr("Start Couch Mode fullscreen"),
-            "value": boolLabel(setting("startCouchModeFullscreen", true)), "enabled": true,
-            "description": qsTr("Open Couch Mode in fullscreen when it is selected at startup.")
-        },
-        {
-            "id": "detect", "category": "couch", "title": qsTr("Switch after controller input"),
-            "value": String(setting("controllerMode", "Automatic")) === "Automatic" ? qsTr("On") : qsTr("Controlled by interface mode"),
-            "enabled": true,
-            "description": qsTr("Automatically enter Couch Mode after Game Optimization detects controller input.")
-        },
-        {
-            "id": "desktop", "category": "system", "title": qsTr("Switch to Desktop Mode"),
-            "value": qsTr("Always available"), "enabled": true,
-            "description": qsTr("Leave Couch Mode and return to the standard desktop interface.")
-        },
-        {
-            "id": "reset", "category": "system", "title": qsTr("Reset Couch Mode settings"),
-            "value": qsTr("Safe defaults"), "enabled": true,
-            "description": qsTr("Restore safe controller and Couch Mode defaults without changing game data.")
-        }
-    ]
+        { "id": "language", "category": "general", "title": qsTr("Language"), "value": languageLabel(setting("language", "English")), "enabled": true, "description": qsTr("Choose the interface language.") },
+        { "id": "appearance", "category": "general", "title": qsTr("Appearance"), "value": themeLabel(setting("themeMode", "system")), "enabled": true, "description": qsTr("Follow the system colours or force a light or dark interface.") },
+        { "id": "automatic-updates", "category": "automation", "title": qsTr("Automatic update checks"), "value": boolLabel(setting("automaticUpdates", true)), "enabled": true, "description": qsTr("Check for new releases without installing automatically.") },
+        { "id": "log-level", "category": "advanced", "title": qsTr("Logging level"), "value": String(setting("logLevel", "INFO")), "enabled": true, "description": qsTr("Choose how much diagnostic information is recorded.") },
+        { "id": "default-profile", "category": "automation", "title": qsTr("Default compression profile"), "value": String(setting("defaultCompressionProfile", "Auto")), "enabled": true, "description": qsTr("Preselected mode for storage operations.") },
+
+        { "id": "auto-compression", "category": "automation", "title": qsTr("Automatic compression"), "value": String(setting("automaticCompressionMode", "Off")), "enabled": true, "description": qsTr("Choose which launcher events may trigger the guarded workflow.") },
+        { "id": "auto-profile", "category": "automation", "title": qsTr("Automatic profile"), "value": String(setting("automaticCompressionProfile", "Auto")), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Auto compares measured levels; fixed profiles remain predictable.") },
+        { "id": "auto-delay", "category": "automation", "title": qsTr("Safety delay"), "value": qsTr("%1 s").arg(Number(setting("automaticCompressionDelaySeconds", 300))), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Wait after the launcher becomes stable.") },
+        { "id": "auto-jobs", "category": "automation", "title": qsTr("Maximum parallel jobs"), "value": String(Number(setting("automaticCompressionMaxJobs", 1))), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Limit concurrent automatic compression work from one to eight jobs.") },
+        { "id": "auto-free", "category": "automation", "title": qsTr("Minimum free space"), "value": qsTr("%1 GiB").arg(Number(setting("automaticCompressionMinFreeGb", 10)).toFixed(1)), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Block automatic work below this free-space limit.") },
+        { "id": "auto-notify", "category": "automation", "title": qsTr("Completion notifications"), "value": boolLabel(setting("automaticCompressionNotify", true)), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Notify when automatic work finishes or is blocked.") },
+        { "id": "auto-libraries", "category": "automation", "title": qsTr("Automatic compression libraries"), "value": listLabel("automaticCompressionLibraries"), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Restrict automatic work to these existing library paths; separate paths with semicolons.") },
+        { "id": "auto-skipped", "category": "automation", "title": qsTr("Skipped Steam AppIDs"), "value": listLabel("automaticCompressionSkippedAppIds"), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Never process these Steam games automatically; separate AppIDs with spaces or semicolons.") },
+
+        { "id": "interface", "category": "general", "title": qsTr("Interface mode"), "value": String(setting("controllerMode", "Automatic")), "enabled": true, "description": qsTr("Choose whether GameOpti starts in the desktop or television-friendly interface.") },
+        { "id": "swap", "category": "controller", "title": qsTr("Swap Confirm and Back"), "value": boolLabel(setting("swapAcceptBack", false)), "enabled": true, "description": qsTr("Reverse the two primary face-button actions.") },
+        { "id": "deadzone", "category": "controller", "title": qsTr("Analog dead zone"), "value": qsTr("%1%").arg(Math.round(Number(setting("analogDeadzone", 0.20)) * 100)), "enabled": true, "description": qsTr("Ignore small stick movement around the center.") },
+        { "id": "repeat-delay", "category": "controller", "title": qsTr("Navigation repeat delay"), "value": qsTr("%1 ms").arg(Number(setting("navigationRepeatDelayMs", 350))), "enabled": true, "description": qsTr("Delay before a held direction repeats.") },
+        { "id": "repeat-rate", "category": "controller", "title": qsTr("Navigation repeat interval"), "value": qsTr("%1 ms").arg(Number(setting("navigationRepeatRateMs", 110))), "enabled": true, "description": qsTr("Time between repeated navigation steps.") },
+        { "id": "cursor", "category": "controller", "title": qsTr("Hide cursor in Couch Mode"), "value": boolLabel(setting("hideCursorInCouchMode", true)), "enabled": true, "description": qsTr("The cursor returns after meaningful mouse movement.") },
+        { "id": "fullscreen", "category": "controller", "title": qsTr("Start Couch Mode fullscreen"), "value": boolLabel(setting("startCouchModeFullscreen", true)), "enabled": true, "description": qsTr("Use the whole display when Couch Mode opens.") },
+        { "id": "post-launch", "category": "controller", "title": qsTr("After launching a game"), "value": String(setting("postLaunchBehavior", "Minimize")), "enabled": true, "description": qsTr("Choose what the GameOpti window should do.") },
+
+        { "id": "menu-sounds", "category": "audio", "title": qsTr("Enable menu sounds"), "value": boolLabel(setting("couchMenuSoundsEnabled", true)), "enabled": true, "description": qsTr("Play subtle semantic feedback in Couch Mode.") },
+        { "id": "menu-volume", "category": "audio", "title": qsTr("Menu sound volume"), "value": qsTr("%1%").arg(effectiveMenuVolume), "enabled": setting("couchMenuSoundsEnabled", true) === true, "description": qsTr("Adjust short navigation and action effects.") },
+        { "id": "music", "category": "audio", "title": qsTr("Enable Couch Mode music"), "value": boolLabel(setting("couchMusicEnabled", true)), "enabled": true, "description": qsTr("Play the packaged ambient loop only in Couch Mode.") },
+        { "id": "music-volume", "category": "audio", "title": qsTr("Music volume"), "value": qsTr("%1%").arg(effectiveMusicVolume), "enabled": setting("couchMusicEnabled", true) === true, "description": qsTr("Keep the ambient loop below game and Narrator audio.") },
+
+        { "id": "steam-tools", "category": "libraries", "title": qsTr("Show Steam tools and runtimes"), "value": boolLabel(setting("showSteamToolsAndRuntimes", false)), "enabled": true, "description": qsTr("Include Proton, runtimes, SDKs and dedicated servers.") },
+        { "id": "steam-paths", "category": "libraries", "title": qsTr("Additional Steam locations"), "value": listLabel("steamInstallationDirectories"), "enabled": true, "description": qsTr("Separate multiple paths with semicolons in the controller keyboard.") },
+        { "id": "game-paths", "category": "libraries", "title": qsTr("Local game library directories"), "value": listLabel("libraryDirectories"), "enabled": true, "description": qsTr("Add existing local library roots; use semicolons between paths.") },
+        { "id": "forgotten-library", "category": "libraries", "title": qsTr("Restore forgotten Steam library"), "value": ignoredLibraryLabel(), "enabled": stringList("ignoredSteamLibraries").length > 0, "description": qsTr("Use left/right to choose a path, then Confirm to restore it.") },
+        { "id": "backup-path", "category": "libraries", "title": qsTr("Backup directory"), "value": String(setting("backupDirectory", "backups")), "enabled": true, "description": qsTr("Edit the backup destination with the controller keyboard.") },
+        { "id": "quarantine-path", "category": "libraries", "title": qsTr("Quarantine directory"), "value": String(setting("quarantineDirectory", "quarantine")), "enabled": true, "description": qsTr("Edit the safe quarantine destination with the controller keyboard.") },
+
+        { "id": "cpu-limit", "category": "advanced", "title": qsTr("CPU usage limit"), "value": qsTr("%1%").arg(Number(setting("cpuUsageLimit", 75))), "enabled": true, "description": qsTr("Limit CPU use for managed background work.") },
+        { "id": "gpu-limit", "category": "advanced", "title": qsTr("GPU usage limit"), "value": qsTr("%1%").arg(Number(setting("gpuUsageLimit", 75))), "enabled": true, "description": qsTr("Limit GPU use for managed background work.") },
+        { "id": "experimental", "category": "advanced", "title": qsTr("Experimental features"), "value": boolLabel(setting("experimentalFeatures", false)), "enabled": true, "description": qsTr("Show unfinished capabilities without bypassing safeguards.") },
+        { "id": "desktop", "category": "advanced", "title": qsTr("Switch to Desktop Mode"), "value": qsTr("Always available"), "enabled": true, "description": qsTr("Return to the standard desktop interface.") },
+        { "id": "reset", "category": "advanced", "title": qsTr("Reset Couch Mode settings"), "value": qsTr("Safe defaults"), "enabled": true, "description": qsTr("Restore controller and Couch audio defaults without changing game data.") }
+    ].concat(narratorRows())
     readonly property var activeRows: rowsForCategory(activeCategoryIndex)
     readonly property int selectedActiveIndex: activeIndexForGlobal(selectedIndex)
     readonly property var selectedRow: rows[selectedIndex] || ({})
@@ -75,9 +87,14 @@ FocusScope {
     signal backRequested()
 
     function restoreActiveFocus() {
+        if (onScreenKeyboard.opened) {
+            onScreenKeyboard.forceActiveFocus()
+            onScreenKeyboard.focusSelected()
+            return
+        }
         forceActiveFocus()
         Qt.callLater(function() {
-            if (page.visible)
+            if (page.visible && !onScreenKeyboard.opened)
                 settingsList.forceActiveFocus()
         })
     }
@@ -89,6 +106,232 @@ FocusScope {
 
     function boolLabel(value) {
         return value === true ? qsTr("On") : qsTr("Off")
+    }
+
+    function languageCode(value) {
+        var normalized = String(value || "en").toLowerCase().replace("-", "_")
+        if (normalized === "pl" || normalized === "pl_pl" || normalized === "polski" || normalized === "polish")
+            return "pl"
+        if (normalized === "es" || normalized === "es_es" || normalized === "español" || normalized === "espanol" || normalized === "spanish")
+            return "es"
+        return "en"
+    }
+
+    function languageLabel(value) {
+        var code = languageCode(value)
+        return code === "pl" ? "Polski" : code === "es" ? "Español" : "English"
+    }
+
+    function themeCode(value) {
+        var normalized = String(value || "system").toLowerCase()
+        return normalized === "dark" || normalized === "light" ? normalized : "system"
+    }
+
+    function themeLabel(value) {
+        var code = themeCode(value)
+        return code === "dark" ? qsTr("Dark") : code === "light" ? qsTr("Light") : qsTr("System")
+    }
+
+    function stringList(key) {
+        var source = setting(key, []) || []
+        return Array.from(source).map(function(value) { return String(value) })
+    }
+
+    function parsePathList(value) {
+        var parts = String(value || "").split(";")
+        var result = []
+        for (var index = 0; index < parts.length; ++index) {
+            var path = String(parts[index]).trim()
+            if (path.length && result.indexOf(path) < 0)
+                result.push(path)
+        }
+        return result
+    }
+
+    function listLabel(key) {
+        var values = stringList(key)
+        return values.length ? values.join("; ") : qsTr("None")
+    }
+
+    function ignoredLibraryLabel() {
+        var values = stringList("ignoredSteamLibraries")
+        if (!values.length)
+            return qsTr("None")
+        var index = Math.max(0, Math.min(values.length - 1, ignoredLibraryIndex))
+        return values[index]
+    }
+
+    function parseAppIdList(value) {
+        var tokens = String(value || "").trim().split(/[;,\s]+/)
+        var result = []
+        for (var index = 0; index < tokens.length; ++index) {
+            var appId = String(tokens[index]).trim()
+            if (!appId.length)
+                continue
+            if (!/^[0-9]+$/.test(appId) || Number(appId) <= 0)
+                return null
+            if (result.indexOf(appId) < 0)
+                result.push(appId)
+        }
+        return result
+    }
+
+    function narratorComponentName(componentId, fallback) {
+        if (componentId === "capture.portal-pipewire")
+            return qsTr("Screen capture portal")
+        if (componentId === "ocr.english-local")
+            return qsTr("English subtitle OCR")
+        if (componentId === "ocr.polish-local")
+            return qsTr("Polish subtitle OCR")
+        if (componentId === "translation.opus-en-pl")
+            return qsTr("English to Polish translation")
+        if (componentId === "tts.polish-voice")
+            return qsTr("Polish voice - Gosia")
+        if (componentId === "tts.polish-bass")
+            return qsTr("Polish voice - Bass")
+        if (componentId === "audio.qt-pcm")
+            return qsTr("Narrator audio output")
+        return String(fallback || componentId)
+    }
+
+    function narratorComponentDescription(code) {
+        if (code === "capture_runtime")
+            return qsTr("Capture support supplied by the application runtime.")
+        if (code === "ocr_model_required")
+            return qsTr("Local English subtitle recognition model.")
+        if (code === "polish_ocr_model_required")
+            return qsTr("Local Polish subtitle recognition model.")
+        if (code === "translation_model_required")
+            return qsTr("Local CPU translation model for English subtitles.")
+        if (code === "polish_voice_required")
+            return qsTr("Local Polish speech voice used by per-game Narrator settings.")
+        if (code === "audio_runtime")
+            return qsTr("Audio playback supplied by the application runtime.")
+        return qsTr("Local Narrator component.")
+    }
+
+    function narratorComponentState(component) {
+        var state = String(component && component.state || "")
+        if (state === "available")
+            return qsTr("Ready")
+        if (state === "not_installed")
+            return qsTr("Not installed")
+        if (state === "installing")
+            return qsTr("Installing…")
+        if (state === "update_available")
+            return qsTr("Update available")
+        if (state === "error")
+            return qsTr("Needs attention")
+        if (state === "unsupported")
+            return qsTr("Unavailable on this system")
+        return qsTr("Unknown")
+    }
+
+    function narratorGlobalVoices() {
+        var source = narratorGlobalData && narratorGlobalData.voices
+                ? Array.from(narratorGlobalData.voices) : []
+        return source.filter(function(voice) {
+            return voice && (voice.available === true || voice.installed === true)
+        })
+    }
+
+    function narratorGlobalVoiceLabel() {
+        var voices = narratorGlobalVoices()
+        var selected = String(narratorGlobalData.voiceId || "")
+        for (var index = 0; index < voices.length; ++index) {
+            if (String(voices[index].id || "") === selected)
+                return String(voices[index].name || voices[index].id)
+        }
+        return voices.length ? String(voices[0].name || voices[0].id)
+                             : qsTr("No installed voice")
+    }
+
+    function narratorGlobalRegionLabel() {
+        var region = narratorGlobalData.subtitleRegion || ({})
+        var y = Number(region.y === undefined ? 0.62 : region.y)
+        var height = Number(region.height === undefined ? 0.30 : region.height)
+        if (y <= 0.08 && height >= 0.82)
+            return qsTr("Full frame")
+        if (y <= 0.45)
+            return qsTr("Lower half")
+        return qsTr("Bottom subtitles")
+    }
+
+    function narratorRows() {
+        var components = Array.from(page.narratorComponents || [])
+        var articulation = narratorGlobalData.noiseScale !== null
+                && narratorGlobalData.noiseScale !== undefined
+                || narratorGlobalData.noiseWScale !== null
+                && narratorGlobalData.noiseWScale !== undefined
+        var profiles = Array.from(narratorGlobalData.translationProfiles || [])
+        var result = [
+            { "id": "narrator-global-enabled", "category": "narrator", "title": qsTr("Enable Narrator by default"), "value": boolLabel(narratorGlobalData.enabled === true), "enabled": narratorGlobalData.success === true, "description": qsTr("New per-game profiles inherit this default; existing game profiles remain unchanged.") },
+            { "id": "narrator-global-language", "category": "narrator", "title": qsTr("Subtitle recognition language"), "value": String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") === "polish" ? qsTr("Polish subtitles") : qsTr("English → Polish"), "enabled": narratorGlobalData.success === true, "description": qsTr("Recognize Polish directly or translate recognized English subtitles to Polish.") },
+            { "id": "narrator-global-source", "category": "narrator", "title": qsTr("Recognition source"), "value": String(narratorGlobalData.sourceMode || "auto") === "ocr" ? qsTr("OCR only") : qsTr("Automatic"), "enabled": narratorGlobalData.success === true, "description": qsTr("Use automatic source selection or always use screen OCR.") },
+            { "id": "narrator-global-capture", "category": "narrator", "title": qsTr("Capture source"), "value": String(narratorGlobalData.captureSource || "window") === "monitor" ? qsTr("Monitor") : qsTr("Game window"), "enabled": narratorGlobalData.success === true, "description": qsTr("Choose whether new profiles capture a game window or the full monitor.") },
+            { "id": "narrator-global-translation", "category": "narrator", "title": qsTr("Translation profile"), "value": String(narratorGlobalData.translationProfileId || qsTr("Automatic")), "enabled": narratorGlobalData.success === true && String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") !== "polish" && profiles.length > 0, "description": qsTr("Select the installed local translation profile.") },
+            { "id": "narrator-global-voice", "category": "narrator", "title": qsTr("Speech voice"), "value": narratorGlobalVoiceLabel(), "enabled": narratorGlobalData.success === true && narratorGlobalVoices().length > 0, "description": qsTr("Select the default installed voice for Polish speech.") },
+            { "id": "narrator-global-volume", "category": "narrator", "title": qsTr("Speech volume"), "value": qsTr("%1%").arg(Math.round(Number(narratorGlobalData.volume === undefined ? 0.85 : narratorGlobalData.volume) * 100)), "enabled": narratorGlobalData.success === true, "description": qsTr("Set the default Narrator playback volume.") },
+            { "id": "narrator-global-rate", "category": "narrator", "title": qsTr("Speech rate"), "value": qsTr("%1×").arg(Number(narratorGlobalData.speechRate || 1).toFixed(2)), "enabled": narratorGlobalData.success === true, "description": qsTr("Adjust default speech speed from 0.5× to 2.0×.") },
+            { "id": "narrator-global-sampling", "category": "narrator", "title": qsTr("Capture sampling rate"), "value": qsTr("%1 Hz").arg(Number(narratorGlobalData.captureSamplingHz || 6).toFixed(1)), "enabled": narratorGlobalData.success === true, "description": qsTr("Choose how often the subtitle region is sampled.") },
+            { "id": "narrator-global-change", "category": "narrator", "title": qsTr("Visual change threshold"), "value": qsTr("%1%").arg(Math.round(Number(narratorGlobalData.visualChangeThreshold || 0.08) * 100)), "enabled": narratorGlobalData.success === true, "description": qsTr("Ignore frames whose subtitle region changed less than this amount.") },
+            { "id": "narrator-global-stabilization", "category": "narrator", "title": qsTr("Subtitle stabilization"), "value": qsTr("%1 ms").arg(Number(narratorGlobalData.stabilizationMs || 240)), "enabled": narratorGlobalData.success === true, "description": qsTr("Wait for subtitles to settle before recognition.") },
+            { "id": "narrator-global-confidence", "category": "narrator", "title": qsTr("Minimum OCR confidence"), "value": qsTr("%1%").arg(Math.round(Number(narratorGlobalData.ocrMinConfidence || 0.62) * 100)), "enabled": narratorGlobalData.success === true, "description": qsTr("Reject recognition results below this confidence.") },
+            { "id": "narrator-global-cooldown", "category": "narrator", "title": qsTr("Duplicate subtitle cooldown"), "value": qsTr("%1 s").arg((Number(narratorGlobalData.duplicateCooldownMs || 4500) / 1000).toFixed(1)), "enabled": narratorGlobalData.success === true, "description": qsTr("Delay before the same subtitle may be spoken again.") },
+            { "id": "narrator-global-articulation", "category": "narrator", "title": qsTr("Voice articulation overrides"), "value": articulation ? qsTr("Custom") : qsTr("Voice defaults"), "enabled": narratorGlobalData.success === true, "description": qsTr("Use each voice's tuned defaults or expose custom Piper articulation values.") },
+            { "id": "narrator-global-noise-w", "category": "narrator", "title": qsTr("Phoneme width variation"), "value": Number(narratorGlobalData.noiseWScale === null || narratorGlobalData.noiseWScale === undefined ? 0.8 : narratorGlobalData.noiseWScale).toFixed(3), "enabled": narratorGlobalData.success === true && articulation, "description": qsTr("Advanced Piper timing variation for newly created profiles.") },
+            { "id": "narrator-global-noise", "category": "narrator", "title": qsTr("Voice variation"), "value": Number(narratorGlobalData.noiseScale === null || narratorGlobalData.noiseScale === undefined ? 0.667 : narratorGlobalData.noiseScale).toFixed(3), "enabled": narratorGlobalData.success === true && articulation, "description": qsTr("Advanced Piper voice variation for newly created profiles.") },
+            { "id": "narrator-global-region", "category": "narrator", "title": qsTr("Default subtitle region"), "value": narratorGlobalRegionLabel(), "enabled": narratorGlobalData.success === true, "description": qsTr("Cycle a controller-friendly default capture region; games can override it individually.") },
+            {
+                "id": "narrator-overview",
+                "category": "narrator",
+                "title": qsTr("Narrator components"),
+                "value": qsTr("%1 components").arg(components.length),
+                "enabled": true,
+                "description": qsTr("Install and maintain the local capture, OCR, translation and speech building blocks used by each game.")
+            }
+        ]
+        for (var index = 0; index < components.length; ++index) {
+            var component = components[index] || ({})
+            var componentId = String(component.componentId || "")
+            if (!componentId.length)
+                continue
+            var state = String(component.state || "")
+            var action = ""
+            var actionLabel = narratorComponentState(component)
+            if (state === "update_available" && component.canUpdate === true) {
+                action = "update"
+                actionLabel = qsTr("Update")
+            } else if ((state === "not_installed" || state === "error")
+                       && component.canInstall === true) {
+                action = "install"
+                actionLabel = qsTr("Install")
+            }
+            var title = narratorComponentName(componentId, component.name)
+            result.push({
+                "id": "narrator-component-" + componentId,
+                "category": "narrator",
+                "title": title,
+                "value": actionLabel,
+                "enabled": true,
+                "componentId": componentId,
+                "componentAction": action,
+                "description": narratorComponentDescription(String(component.descriptionCode || ""))
+            })
+            if (component.canRemove === true) {
+                result.push({
+                    "id": "narrator-remove-" + componentId,
+                    "category": "narrator",
+                    "title": qsTr("Remove %1").arg(title),
+                    "value": qsTr("Remove"),
+                    "enabled": true,
+                    "componentId": componentId,
+                    "componentAction": "remove",
+                    "description": qsTr("Remove only the component files managed by GameOpti.")
+                })
+            }
+        }
+        return result
     }
 
     function cycle(values, current, delta) {
@@ -145,9 +388,15 @@ FocusScope {
         return -1
     }
 
+    function playSemanticSound(kind) {
+        if (controller && controller.playCouchSound && String(kind || "").length)
+            controller.playCouchSound(String(kind))
+    }
+
     function selectIndex(index, rememberFocus) {
         if (index < 0 || index >= rows.length || !rows[index].enabled)
-            return
+            return false
+        var changed = selectedIndex !== index
         selectedIndex = index
         activeCategoryIndex = categoryIndexForId(rows[index].category)
         Qt.callLater(function() {
@@ -156,113 +405,456 @@ FocusScope {
         })
         if (rememberFocus && navigation)
             navigation.rememberFocus("settings", rows[index].id, index)
+        return changed
     }
 
     function selectCategory(index) {
         var target = Math.max(0, Math.min(categories.length - 1, index))
         if (target === activeCategoryIndex && rows[selectedIndex]
-                && rows[selectedIndex].category === categories[target].id)
-            return
+                && rows[selectedIndex].category === categories[target].id
+                && rows[selectedIndex].enabled)
+            return false
         var rowIndex = firstEnabledIndex(target)
-        if (rowIndex >= 0)
-            selectIndex(rowIndex, true)
+        return rowIndex >= 0 ? selectIndex(rowIndex, true) : false
     }
 
     function changeCategory(delta) {
-        selectCategory(Math.max(0, Math.min(categories.length - 1,
-                                             activeCategoryIndex + delta)))
+        var changed = selectCategory(Math.max(0, Math.min(categories.length - 1,
+                                                          activeCategoryIndex + delta)))
+        if (changed)
+            playSemanticSound("navigate")
+        return changed
+    }
+
+    function reconcileSelection() {
+        var ignored = stringList("ignoredSteamLibraries")
+        ignoredLibraryIndex = ignored.length
+                ? Math.max(0, Math.min(ignored.length - 1, ignoredLibraryIndex)) : 0
+        if (rows[selectedIndex] && rows[selectedIndex].enabled
+                && rows[selectedIndex].category === categories[activeCategoryIndex].id)
+            return
+        var categoryRows = rowsForCategory(activeCategoryIndex)
+        var preferred = Math.max(0, activeIndexForGlobal(selectedIndex))
+        for (var distance = 0; distance < categoryRows.length; ++distance) {
+            var before = preferred - distance
+            if (before >= 0 && categoryRows[before].enabled) {
+                selectIndex(globalIndexForId(categoryRows[before].id), true)
+                return
+            }
+            var after = preferred + distance
+            if (after < categoryRows.length && categoryRows[after].enabled) {
+                selectIndex(globalIndexForId(categoryRows[after].id), true)
+                return
+            }
+        }
+        selectCategory(activeCategoryIndex)
+    }
+
+    function clamp(value, minimum, maximum) {
+        return Math.max(minimum, Math.min(maximum, value))
+    }
+
+    function valuesEqual(left, right) {
+        if (typeof left === "number" || typeof right === "number")
+            return Number(left) === Number(right)
+        return left === right
+    }
+
+    function saveAdjusted(key, value) {
+        if (!controller)
+            return false
+        if (pendingMenuVolume >= 0 || pendingMusicVolume >= 0)
+            commitPendingVolumes()
+        var current = settingsData ? settingsData[key] : undefined
+        if (current !== undefined && valuesEqual(current, value))
+            return false
+        var saved = Boolean(controller.saveSetting(key, value))
+        playSemanticSound(saved ? "adjust" : "error")
+        return saved
+    }
+
+    function loadNarratorGlobal() {
+        if (controller && controller.getNarratorGlobalSettings)
+            narratorGlobalData = controller.getNarratorGlobalSettings() || ({})
+        else
+            narratorGlobalData = ({})
+    }
+
+    function saveNarratorGlobal(values) {
+        if (!controller || !controller.saveNarratorGlobalSettings)
+            return false
+        var saved = Boolean(controller.saveNarratorGlobalSettings(values || ({})))
+        if (saved)
+            loadNarratorGlobal()
+        playSemanticSound(saved ? "adjust" : "error")
+        return saved
+    }
+
+    function changeNarratorGlobal(id, delta) {
+        if (id === "narrator-global-enabled")
+            return saveNarratorGlobal({ "enabled": narratorGlobalData.enabled !== true })
+        if (id === "narrator-global-language")
+            return saveNarratorGlobal({ "subtitleLanguageMode": String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") === "polish" ? "english_to_polish" : "polish" })
+        if (id === "narrator-global-source")
+            return saveNarratorGlobal({ "sourceMode": String(narratorGlobalData.sourceMode || "auto") === "ocr" ? "auto" : "ocr" })
+        if (id === "narrator-global-capture")
+            return saveNarratorGlobal({ "captureSource": String(narratorGlobalData.captureSource || "window") === "monitor" ? "window" : "monitor" })
+        if (id === "narrator-global-translation") {
+            var profiles = Array.from(narratorGlobalData.translationProfiles || [])
+            var profileIds = profiles.map(function(profile) { return String(profile.id || "") })
+            if (!profileIds.length) return false
+            return saveNarratorGlobal({ "translationProfileId": cycle(profileIds, String(narratorGlobalData.translationProfileId || profileIds[0]), delta) })
+        }
+        if (id === "narrator-global-voice") {
+            var voices = narratorGlobalVoices()
+            var voiceIds = voices.map(function(voice) { return String(voice.id || "") })
+            if (!voiceIds.length) return false
+            return saveNarratorGlobal({ "voiceId": cycle(voiceIds, String(narratorGlobalData.voiceId || voiceIds[0]), delta) })
+        }
+        if (id === "narrator-global-volume")
+            return saveNarratorGlobal({ "volume": clamp(Number(narratorGlobalData.volume === undefined ? 0.85 : narratorGlobalData.volume) + delta * 0.05, 0, 1) })
+        if (id === "narrator-global-rate")
+            return saveNarratorGlobal({ "speechRate": clamp(Number(narratorGlobalData.speechRate || 1) + delta * 0.05, 0.5, 2) })
+        if (id === "narrator-global-sampling")
+            return saveNarratorGlobal({ "captureSamplingHz": clamp(Number(narratorGlobalData.captureSamplingHz || 6) + delta * 0.5, 1, 10) })
+        if (id === "narrator-global-change")
+            return saveNarratorGlobal({ "visualChangeThreshold": clamp(Number(narratorGlobalData.visualChangeThreshold || 0.08) + delta * 0.01, 0.001, 1) })
+        if (id === "narrator-global-stabilization")
+            return saveNarratorGlobal({ "stabilizationMs": clamp(Number(narratorGlobalData.stabilizationMs || 240) + delta * 50, 50, 3000) })
+        if (id === "narrator-global-confidence")
+            return saveNarratorGlobal({ "ocrMinConfidence": clamp(Number(narratorGlobalData.ocrMinConfidence || 0.62) + delta * 0.05, 0, 1) })
+        if (id === "narrator-global-cooldown")
+            return saveNarratorGlobal({ "duplicateCooldownMs": clamp(Number(narratorGlobalData.duplicateCooldownMs || 4500) + delta * 250, 250, 60000) })
+        if (id === "narrator-global-articulation") {
+            var overridden = narratorGlobalData.noiseScale !== null
+                    && narratorGlobalData.noiseScale !== undefined
+                    || narratorGlobalData.noiseWScale !== null
+                    && narratorGlobalData.noiseWScale !== undefined
+            return saveNarratorGlobal(overridden
+                    ? { "noiseScale": null, "noiseWScale": null }
+                    : { "noiseScale": 0.667, "noiseWScale": 0.8 })
+        }
+        if (id === "narrator-global-noise-w")
+            return saveNarratorGlobal({ "noiseWScale": clamp(Number(narratorGlobalData.noiseWScale || 0.8) + delta * 0.025, 0, 2) })
+        if (id === "narrator-global-noise")
+            return saveNarratorGlobal({ "noiseScale": clamp(Number(narratorGlobalData.noiseScale || 0.667) + delta * 0.025, 0, 2) })
+        if (id === "narrator-global-region") {
+            var regions = [
+                { "x": 0.05, "y": 0.62, "width": 0.90, "height": 0.30 },
+                { "x": 0.05, "y": 0.45, "width": 0.90, "height": 0.50 },
+                { "x": 0.05, "y": 0.05, "width": 0.90, "height": 0.90 }
+            ]
+            var currentRegion = narratorGlobalRegionLabel()
+            var currentIndex = currentRegion === qsTr("Full frame") ? 2
+                    : currentRegion === qsTr("Lower half") ? 1 : 0
+            return saveNarratorGlobal({ "subtitleRegion": regions[(currentIndex + delta + regions.length) % regions.length] })
+        }
+        return false
+    }
+
+    function runNarratorComponentAction(row) {
+        if (!controller || !row || !row.componentAction)
+            return false
+        var action = String(row.componentAction)
+        var componentId = String(row.componentId || "")
+        var started = false
+        if (action === "install" && controller.installNarratorComponent)
+            started = Boolean(controller.installNarratorComponent(componentId))
+        else if (action === "update" && controller.updateNarratorComponent)
+            started = Boolean(controller.updateNarratorComponent(componentId))
+        else if (action === "remove" && controller.removeNarratorComponent)
+            started = Boolean(controller.removeNarratorComponent(componentId))
+        playSemanticSound(started ? "confirm" : "error")
+        return started
+    }
+
+    function previewVolume(key, value) {
+        if (!controller || !controller.previewCouchAudioSetting)
+            return false
+        var normalized = clamp(Math.round(Number(value)), 0, 100)
+        var current = key === "couchMenuSoundsVolume"
+                ? effectiveMenuVolume : effectiveMusicVolume
+        if (normalized === current)
+            return false
+        if (!controller.previewCouchAudioSetting(key, normalized)) {
+            playSemanticSound("error")
+            return false
+        }
+        if (key === "couchMenuSoundsVolume")
+            pendingMenuVolume = normalized
+        else
+            pendingMusicVolume = normalized
+        volumePersistenceTimer.restart()
+        playSemanticSound("adjust")
+        return true
+    }
+
+    function commitPendingVolumes() {
+        volumePersistenceTimer.stop()
+        var menuValue = pendingMenuVolume
+        var musicValue = pendingMusicVolume
+        pendingMenuVolume = -1
+        pendingMusicVolume = -1
+        var succeeded = true
+        if (menuValue >= 0)
+            succeeded = Boolean(controller && controller.saveSetting(
+                                    "couchMenuSoundsVolume", menuValue)) && succeeded
+        if (musicValue >= 0)
+            succeeded = Boolean(controller && controller.saveSetting(
+                                    "couchMusicVolume", musicValue)) && succeeded
+        if (!succeeded)
+            playSemanticSound("error")
+        return succeeded
+    }
+
+    function openKeyboard(settingId, value, heading) {
+        commitPendingVolumes()
+        editingSettingId = settingId
+        if (navigation)
+            navigation.openModal("couch-keyboard", "keyboard-key")
+        onScreenKeyboard.open(value, heading)
+        playSemanticSound("open")
+    }
+
+    function closeKeyboard() {
+        if (onScreenKeyboard.opened)
+            onScreenKeyboard.close(false)
     }
 
     function change(delta) {
-        if (!controller || !rows[selectedIndex] || !rows[selectedIndex].enabled)
-            return
-        var id = rows[selectedIndex].id
+        if (!controller || !rows[selectedIndex] || !rows[selectedIndex].enabled) {
+            playSemanticSound("error")
+            return false
+        }
+        var row = rows[selectedIndex]
+        var id = row.id
+        if (id.indexOf("narrator-global-") === 0)
+            return changeNarratorGlobal(id, delta)
+        if (row.componentAction)
+            return runNarratorComponentAction(row)
+        if (id === "narrator-overview") {
+            playSemanticSound("confirm")
+            return true
+        }
         if (id === "language") {
-            var language = cycle(["English", "Polski", "Español"], setting("language", "English"), delta)
-            if (controller.saveSetting("language", language)
+            commitPendingVolumes()
+            var language = cycle(["en", "pl", "es"], languageCode(setting("language", "en")), delta)
+            var languageSaved = controller.saveSetting("language", language)
+            // translationManager is an application context property.
+            // qmllint disable unqualified
+            if (languageSaved
                     && typeof translationManager !== "undefined"
                     && translationManager && translationManager.setLanguage)
                 translationManager.setLanguage(language)
-        } else if (id === "interface") {
-            controller.saveSetting("controllerMode", cycle(["Automatic", "Desktop only", "Couch only"], setting("controllerMode", "Automatic"), delta))
-        } else if (id === "appearance") {
-            controller.saveSetting("themeMode", cycle(["System", "Dark", "Light"], setting("themeMode", "System"), delta))
-        } else if (id === "fullscreen") {
-            controller.saveSetting("startCouchModeFullscreen", setting("startCouchModeFullscreen", true) !== true)
-        } else if (id === "detect") {
-            controller.saveSetting("controllerMode", String(setting("controllerMode", "Automatic")) === "Automatic" ? "Couch only" : "Automatic")
-        }
+            // qmllint enable unqualified
+            playSemanticSound(languageSaved ? "adjust" : "error")
+        } else if (id === "appearance")
+            saveAdjusted("themeMode", cycle(["system", "dark", "light"], themeCode(setting("themeMode", "system")), delta))
+        else if (id === "automatic-updates")
+            saveAdjusted("automaticUpdates", setting("automaticUpdates", true) !== true)
+        else if (id === "log-level")
+            saveAdjusted("logLevel", cycle(["DEBUG", "INFO", "WARNING", "ERROR"], setting("logLevel", "INFO"), delta))
+        else if (id === "default-profile")
+            saveAdjusted("defaultCompressionProfile", cycle(["Fast", "Balanced", "Maximum", "Auto"], setting("defaultCompressionProfile", "Auto"), delta))
+        else if (id === "auto-compression")
+            saveAdjusted("automaticCompressionMode", cycle(["Off", "After new game installation", "After game update", "After installation and update"], setting("automaticCompressionMode", "Off"), delta))
+        else if (id === "auto-profile")
+            saveAdjusted("automaticCompressionProfile", cycle(["Fast", "Balanced", "Maximum", "Auto"], setting("automaticCompressionProfile", "Auto"), delta))
+        else if (id === "auto-delay")
+            saveAdjusted("automaticCompressionDelaySeconds", clamp(Number(setting("automaticCompressionDelaySeconds", 300)) + delta * 30, 0, 86400))
+        else if (id === "auto-jobs")
+            saveAdjusted("automaticCompressionMaxJobs", clamp(Number(setting("automaticCompressionMaxJobs", 1)) + delta, 1, 8))
+        else if (id === "auto-free")
+            saveAdjusted("automaticCompressionMinFreeGb", clamp(Number(setting("automaticCompressionMinFreeGb", 10)) + delta, 0, 1000000))
+        else if (id === "auto-notify")
+            saveAdjusted("automaticCompressionNotify", setting("automaticCompressionNotify", true) !== true)
+        else if (id === "auto-libraries")
+            openKeyboard(id, stringList("automaticCompressionLibraries").join("; "), rows[selectedIndex].title)
+        else if (id === "auto-skipped")
+            openKeyboard(id, stringList("automaticCompressionSkippedAppIds").join("; "), rows[selectedIndex].title)
+        else if (id === "interface")
+            saveAdjusted("controllerMode", cycle(["Automatic", "Desktop only", "Couch only"], setting("controllerMode", "Automatic"), delta))
+        else if (id === "swap")
+            saveAdjusted("swapAcceptBack", setting("swapAcceptBack", false) !== true)
+        else if (id === "deadzone")
+            saveAdjusted("analogDeadzone", clamp(Number(setting("analogDeadzone", 0.20)) + delta * 0.05, 0.05, 0.75))
+        else if (id === "repeat-delay")
+            saveAdjusted("navigationRepeatDelayMs", clamp(Number(setting("navigationRepeatDelayMs", 350)) + delta * 50, 150, 1500))
+        else if (id === "repeat-rate")
+            saveAdjusted("navigationRepeatRateMs", clamp(Number(setting("navigationRepeatRateMs", 110)) + delta * 10, 50, 500))
+        else if (id === "cursor")
+            saveAdjusted("hideCursorInCouchMode", setting("hideCursorInCouchMode", true) !== true)
+        else if (id === "fullscreen")
+            saveAdjusted("startCouchModeFullscreen", setting("startCouchModeFullscreen", true) !== true)
+        else if (id === "post-launch")
+            saveAdjusted("postLaunchBehavior", cycle(["Minimize", "Stay open", "Close launcher"], setting("postLaunchBehavior", "Minimize"), delta))
+        else if (id === "menu-sounds")
+            saveAdjusted("couchMenuSoundsEnabled", setting("couchMenuSoundsEnabled", true) !== true)
+        else if (id === "menu-volume")
+            previewVolume("couchMenuSoundsVolume", effectiveMenuVolume + delta * 5)
+        else if (id === "music")
+            saveAdjusted("couchMusicEnabled", setting("couchMusicEnabled", true) !== true)
+        else if (id === "music-volume")
+            previewVolume("couchMusicVolume", effectiveMusicVolume + delta * 5)
+        else if (id === "steam-tools")
+            saveAdjusted("showSteamToolsAndRuntimes", setting("showSteamToolsAndRuntimes", false) !== true)
+        else if (id === "steam-paths")
+            openKeyboard(id, stringList("steamInstallationDirectories").join("; "), rows[selectedIndex].title)
+        else if (id === "game-paths")
+            openKeyboard(id, stringList("libraryDirectories").join("; "), rows[selectedIndex].title)
+        else if (id === "forgotten-library") {
+            var ignored = stringList("ignoredSteamLibraries")
+            if (ignored.length) {
+                var previousIgnoredIndex = ignoredLibraryIndex
+                ignoredLibraryIndex = (ignoredLibraryIndex + delta + ignored.length) % ignored.length
+                if (ignoredLibraryIndex !== previousIgnoredIndex)
+                    playSemanticSound("adjust")
+            }
+        } else if (id === "cpu-limit")
+            saveAdjusted("cpuUsageLimit", clamp(Number(setting("cpuUsageLimit", 75)) + delta * 5, 1, 100))
+        else if (id === "gpu-limit")
+            saveAdjusted("gpuUsageLimit", clamp(Number(setting("gpuUsageLimit", 75)) + delta * 5, 1, 100))
+        else if (id === "experimental")
+            saveAdjusted("experimentalFeatures", setting("experimentalFeatures", false) !== true)
+        else if (id === "backup-path" || id === "quarantine-path")
+            openKeyboard(id, rows[selectedIndex].value, rows[selectedIndex].title)
     }
 
     function activate() {
-        if (!rows[selectedIndex] || !rows[selectedIndex].enabled || !controller)
-            return
-        var id = rows[selectedIndex].id
-        if (id === "desktop") {
-            controller.setInterfaceMode("desktop")
-        } else if (id === "reset") {
-            controller.saveSetting("controllerMode", "Automatic")
-            controller.saveSetting("swapAcceptBack", false)
-            controller.saveSetting("analogDeadzone", 0.20)
-            controller.saveSetting("navigationRepeatDelayMs", 350)
-            controller.saveSetting("navigationRepeatRateMs", 110)
-            controller.saveSetting("hideCursorInCouchMode", true)
-            controller.saveSetting("startCouchModeFullscreen", true)
-        } else {
-            change(1)
+        if (!rows[selectedIndex] || !rows[selectedIndex].enabled || !controller) {
+            playSemanticSound("error")
+            return false
         }
+        var row = rows[selectedIndex]
+        var id = row.id
+        if (row.componentAction)
+            return runNarratorComponentAction(row)
+        if (id === "narrator-overview") {
+            playSemanticSound("confirm")
+            return true
+        }
+        if (id === "desktop") {
+            commitPendingVolumes()
+            controller.setInterfaceMode("desktop")
+            playSemanticSound("confirm")
+            return true
+        }
+        if (id === "forgotten-library") {
+            var ignored = stringList("ignoredSteamLibraries")
+            var restoreIndex = Math.max(0, Math.min(ignored.length - 1, ignoredLibraryIndex))
+            var restored = Boolean(ignored.length && controller.restoreIgnoredLibrary
+                    && controller.restoreIgnoredLibrary(ignored[restoreIndex]))
+            if (restored) {
+                ignoredLibraryIndex = Math.max(0, restoreIndex - 1)
+                Qt.callLater(reconcileSelection)
+            }
+            playSemanticSound(restored ? "confirm" : "error")
+            return restored
+        }
+        if (id === "reset") {
+            commitPendingVolumes()
+            var saved = true
+            saved = Boolean(controller.saveSetting("controllerMode", "Automatic")) && saved
+            saved = Boolean(controller.saveSetting("swapAcceptBack", false)) && saved
+            saved = Boolean(controller.saveSetting("analogDeadzone", 0.20)) && saved
+            saved = Boolean(controller.saveSetting("navigationRepeatDelayMs", 350)) && saved
+            saved = Boolean(controller.saveSetting("navigationRepeatRateMs", 110)) && saved
+            saved = Boolean(controller.saveSetting("hideCursorInCouchMode", true)) && saved
+            saved = Boolean(controller.saveSetting("startCouchModeFullscreen", true)) && saved
+            saved = Boolean(controller.saveSetting("postLaunchBehavior", "Minimize")) && saved
+            saved = Boolean(controller.saveSetting("couchMenuSoundsEnabled", true)) && saved
+            saved = Boolean(controller.saveSetting("couchMenuSoundsVolume", 40)) && saved
+            saved = Boolean(controller.saveSetting("couchMusicEnabled", true)) && saved
+            saved = Boolean(controller.saveSetting("couchMusicVolume", 20)) && saved
+            playSemanticSound(saved ? "confirm" : "error")
+            return saved
+        }
+        change(1)
+        return true
     }
 
     function move(delta) {
-        var candidate = selectedIndex
-        for (var count = 0; count < rows.length; ++count) {
-            candidate = Math.max(0, Math.min(rows.length - 1, candidate + delta))
-            if (rows[candidate].enabled) {
-                selectIndex(candidate, true)
-                break
-            }
-            if (candidate === 0 || candidate === rows.length - 1)
-                break
+        if (!activeRows.length)
+            return false
+        var current = selectedActiveIndex >= 0 ? selectedActiveIndex : 0
+        var direction = delta < 0 ? -1 : 1
+        var candidate = Math.max(0, Math.min(activeRows.length - 1, current + delta))
+        while (candidate >= 0 && candidate < activeRows.length) {
+            if (activeRows[candidate].enabled)
+                return selectIndex(globalIndexForId(activeRows[candidate].id), true)
+            candidate += direction
         }
+        return false
     }
 
     function restoreFocus() {
-        if (!navigation)
+        if (!navigation) {
+            reconcileSelection()
             return
+        }
         var rememberedIndex = globalIndexForId(String(navigation.focusedId || ""))
         if (rememberedIndex >= 0 && rows[rememberedIndex].enabled)
             selectIndex(rememberedIndex, false)
         else
-            selectIndex(selectedIndex, true)
+            reconcileSelection()
     }
 
     function handleAction(action) {
-        if (action === "Back")
+        if (action === "Accept") action = "Confirm"
+        else if (action === "PageLeft" || action === "PreviousSection") action = "PreviousTab"
+        else if (action === "PageRight" || action === "NextSection") action = "NextTab"
+        if (onScreenKeyboard.opened) {
+            onScreenKeyboard.handleAction(action)
+            return
+        }
+        if (action === "Back") {
+            commitPendingVolumes()
             backRequested()
-        else if (action === "NavigateUp")
-            move(-1)
-        else if (action === "NavigateDown")
-            move(1)
-        else if (action === "NavigateLeft")
+            playSemanticSound("back")
+        } else if (action === "NavigateUp") {
+            if (move(-1)) playSemanticSound("navigate")
+        } else if (action === "NavigateDown") {
+            if (move(1)) playSemanticSound("navigate")
+        } else if (action === "NavigateLeft")
             change(-1)
         else if (action === "NavigateRight")
             change(1)
         else if (action === "Confirm")
             activate()
-        else if (action === "PageLeft")
+        else if (action === "PreviousTab")
             changeCategory(-1)
-        else if (action === "PageRight")
+        else if (action === "NextTab")
             changeCategory(1)
+        else if (action === "PageUp") {
+            if (move(-5)) playSemanticSound("navigate")
+        } else if (action === "PageDown") {
+            if (move(5)) playSemanticSound("navigate")
+        }
     }
 
     focus: visible
     Component.onCompleted: {
+        loadNarratorGlobal()
         restoreFocus()
         restoreActiveFocus()
     }
-    onVisibleChanged: if (visible) {
-        Qt.callLater(restoreFocus)
-        restoreActiveFocus()
+    onSettingsDataChanged: Qt.callLater(reconcileSelection)
+    onActiveRowsChanged: Qt.callLater(reconcileSelection)
+    onVisibleChanged: {
+        if (visible) {
+            loadNarratorGlobal()
+            Qt.callLater(restoreFocus)
+            restoreActiveFocus()
+        } else {
+            commitPendingVolumes()
+        }
+    }
+
+    Timer {
+        id: volumePersistenceTimer
+        interval: 450
+        repeat: false
+        onTriggered: page.commitPendingVolumes()
     }
 
     Rectangle {
@@ -578,6 +1170,56 @@ FocusScope {
                     }
                 }
             }
+        }
+    }
+
+    CouchOnScreenKeyboard {
+        id: onScreenKeyboard
+        anchors.fill: parent
+        couchScale: page.couchScale
+        buttonHints: page.controller && page.controller.gamepadButtonHints
+                     ? page.controller.gamepadButtonHints : ({})
+        onSemanticSound: function(kind) {
+            if (page.controller && page.controller.playCouchSound)
+                page.controller.playCouchSound(kind)
+        }
+        onAccepted: function(value) {
+            var settingId = page.editingSettingId
+            var saved = false
+            var trimmed = String(value || "").trim()
+            if (page.controller) {
+                if (settingId === "steam-paths")
+                    saved = page.controller.saveSetting("steamInstallationDirectories", page.parsePathList(value))
+                else if (settingId === "game-paths")
+                    saved = page.controller.saveSetting("libraryDirectories", page.parsePathList(value))
+                else if (settingId === "auto-libraries")
+                    saved = page.controller.saveSetting("automaticCompressionLibraries", page.parsePathList(value))
+                else if (settingId === "auto-skipped") {
+                    var appIds = page.parseAppIdList(value)
+                    saved = appIds !== null
+                            && page.controller.saveSetting("automaticCompressionSkippedAppIds", appIds)
+                } else if (settingId === "backup-path")
+                    saved = page.controller.saveSetting("backupDirectory", trimmed)
+                else if (settingId === "quarantine-path")
+                    saved = page.controller.saveSetting("quarantineDirectory", trimmed)
+            }
+            if (!saved) {
+                page.playSemanticSound("error")
+                var heading = onScreenKeyboard.title
+                Qt.callLater(function() { onScreenKeyboard.open(value, heading) })
+                return
+            }
+            page.playSemanticSound("confirm")
+            page.editingSettingId = ""
+            if (page.navigation)
+                page.navigation.closeModal()
+            Qt.callLater(page.restoreActiveFocus)
+        }
+        onCancelled: {
+            page.editingSettingId = ""
+            if (page.navigation)
+                page.navigation.closeModal()
+            Qt.callLater(page.restoreActiveFocus)
         }
     }
 }

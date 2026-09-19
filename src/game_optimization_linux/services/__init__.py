@@ -92,6 +92,13 @@ from .optiscaler import (
     OptiScalerService,
     merge_wine_dll_overrides,
 )
+from .optipatcher import OptiPatcherService
+from .optipatcher_online import (
+    OPTIPATCHER_REPOSITORY,
+    OptiPatcherOnlineError,
+    OptiPatcherRelease,
+    OptiPatcherReleaseClient,
+)
 from .optiscaler_online import (
     CachedOptiScalerArchive,
     OptiScalerCacheError,
@@ -309,7 +316,7 @@ from .steam_launch import (
     build_steam_launch_plan,
     uses_flatpak_steam,
 )
-from .ui_sound import UiSoundService
+from .ui_sound import NoOpUiSoundService, UiSoundService
 from .update_display_state import UpdateDisplayStateStore
 from .unavailable import (
     FeatureUnavailableError,
@@ -460,6 +467,11 @@ __all__ = [
     "OptiScalerInstallPlan",
     "OptiScalerProfileRepository",
     "OptiScalerService",
+    "OptiPatcherService",
+    "OptiPatcherOnlineError",
+    "OptiPatcherRelease",
+    "OptiPatcherReleaseClient",
+    "OPTIPATCHER_REPOSITORY",
     "CachedOptiScalerArchive",
     "OptiScalerCacheError",
     "OptiScalerDownloadError",
@@ -561,6 +573,7 @@ __all__ = [
     "SteamLaunchError",
     "SteamLaunchPlan",
     "SteamLauncher",
+    "NoOpUiSoundService",
     "UnavailableBackupService",
     "UnavailableTaskService",
     "UiSoundService",

@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -8,7 +10,10 @@ import "." as App
 ApplicationWindow {
     id: window
 
+    // appController is installed as an application context property.
+    // qmllint disable unqualified
     property var controller: appController
+    // qmllint enable unqualified
     property bool manuallyCollapsed: false
     property bool closeAfterCompressionCancellation: false
     property bool shuttingDown: false
@@ -65,9 +70,20 @@ ApplicationWindow {
             showFullScreen()
         else if (visibility === Window.FullScreen)
             showNormal()
+        updateCouchAudioActivity()
+    }
+
+    function updateCouchAudioActivity() {
+        if (controller && controller.setCouchWindowActive)
+            controller.setCouchWindowActive(interfaceMode === "couch"
+                                            && visible
+                                            && visibility !== Window.Minimized
+                                            && active)
     }
 
     onInterfaceModeChanged: Qt.callLater(synchronizeWindowMode)
+    onVisibilityChanged: Qt.callLater(updateCouchAudioActivity)
+    onActiveChanged: Qt.callLater(updateCouchAudioActivity)
     Component.onCompleted: Qt.callLater(synchronizeWindowMode)
 
     function prepareForShutdown() {
@@ -398,7 +414,6 @@ ApplicationWindow {
     Shortcut { sequence: "Ctrl+3"; onActivated: window.navigate("system") }
     Shortcut { sequence: "Ctrl+4"; onActivated: window.navigate("settings") }
     Shortcut { sequence: "Ctrl+5"; onActivated: window.navigate("updates") }
-    Shortcut { sequence: "Ctrl+6"; onActivated: window.navigate("narrator") }
     Shortcut {
         sequence: "F11"
         onActivated: {

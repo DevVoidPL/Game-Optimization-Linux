@@ -6,6 +6,8 @@ from typing import Any, Sequence
 
 from PySide6.QtCore import QObject, Property, Signal, Slot
 
+from ..models import normalize_gamepad_action
+
 
 class CouchNavigationController(QObject):
     """Remember stable focus IDs without owning any business data."""
@@ -15,6 +17,7 @@ class CouchNavigationController(QObject):
     modalChanged = Signal()
     inputBlockedChanged = Signal()
     controllerConnectedChanged = Signal()
+    inputModalityChanged = Signal()
     actionRequested = Signal(str)
 
     def __init__(self, parent: QObject | None = None) -> None:
@@ -28,6 +31,7 @@ class CouchNavigationController(QObject):
         self._modal_return: tuple[str, str] | None = None
         self._input_blocked = False
         self._controller_connected = True
+        self._input_modality = "keyboard"
 
     @Property(str, notify=activeScreenChanged)
     def activeScreen(self) -> str:
@@ -52,6 +56,10 @@ class CouchNavigationController(QObject):
     @Property(bool, notify=controllerConnectedChanged)
     def controllerConnected(self) -> bool:
         return self._controller_connected
+
+    @Property(str, notify=inputModalityChanged)
+    def inputModality(self) -> str:
+        return self._input_modality
 
     @Slot(str, str)
     def enterScreen(self, screen: str, preferred_id: str = "") -> None:
@@ -147,12 +155,27 @@ class CouchNavigationController(QObject):
         self._controller_connected = normalized
         self.controllerConnectedChanged.emit()
 
+    @Slot(str)
+    def setInputModality(self, modality: str) -> None:
+        normalized = str(modality).strip().casefold()
+        if normalized not in {"controller", "keyboard", "mouse"}:
+            return
+        if normalized == self._input_modality:
+            return
+        self._input_modality = normalized
+        self.inputModalityChanged.emit()
+
     @Slot(str, result=bool)
     def dispatch(self, action: str) -> bool:
-        normalized = str(action).strip()
-        if not normalized or self._input_blocked or not self._controller_connected:
+        normalized = normalize_gamepad_action(action)
+        if (
+            normalized is None
+            or self._input_blocked
+            or not self._controller_connected
+        ):
             return False
-        self.actionRequested.emit(normalized)
+        self.setInputModality("controller")
+        self.actionRequested.emit(normalized.value)
         return True
 
     def _set_focus(self, item_id: str) -> None:

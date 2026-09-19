@@ -480,6 +480,12 @@ class OcrDecisionObservation:
     candidate_similarity: float | None = None
     candidate_match_kind: str = ""
     candidate_replaced: bool = False
+    # Stable identity of the candidate this observation belongs to, plus the
+    # candidate it displaced. Lets one subtitle attempt be followed from the
+    # first observation to acceptance or abandonment.
+    candidate_id: int = 0
+    replaced_candidate_id: int = 0
+    replaced_candidate_text: str = ""
     accepted_text: str = ""
     accepted: bool = False
     tts_submitted: bool = False
@@ -515,6 +521,9 @@ class OcrDecisionObservation:
             "candidateSimilarity": self.candidate_similarity,
             "candidateMatchKind": self.candidate_match_kind,
             "candidateReplaced": self.candidate_replaced,
+            "candidateId": self.candidate_id,
+            "replacedCandidateId": self.replaced_candidate_id,
+            "replacedCandidateText": self.replaced_candidate_text,
             "acceptedText": self.accepted_text,
             "accepted": self.accepted,
             "ttsSubmitted": self.tts_submitted,

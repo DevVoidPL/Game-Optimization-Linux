@@ -260,9 +260,9 @@ Item {
                 model: [
                     qsTr("Overview"),
                     qsTr("Storage"),
-                    qsTr("Graphics Remaster"),
                     qsTr("Optimization"),
                     qsTr("OptiScaler"),
+                    qsTr("Narrator"),
                     qsTr("MangoHud")
                 ]
 
@@ -275,7 +275,7 @@ Item {
                     implicitWidth: 96
                     implicitHeight: height
                     text: modelData
-                    enabled: index < 3 || page.launcherIntegrationSupported
+                    enabled: index < 2 || page.launcherIntegrationSupported
                     ToolTip.visible: !enabled && tabDisabledHover.hovered
                     ToolTip.text: qsTr("Full optimization launch integration for this launcher is not available yet")
                     focusPolicy: Qt.StrongFocus
@@ -312,9 +312,9 @@ Item {
             Layout.fillHeight: true
             sourceComponent: {
                 if (tabBar.currentIndex === 1) return storageComponent
-                if (tabBar.currentIndex === 2) return graphicsComponent
-                if (tabBar.currentIndex === 3) return optimizationComponent
-                if (tabBar.currentIndex === 4) return optiScalerComponent
+                if (tabBar.currentIndex === 2) return optimizationComponent
+                if (tabBar.currentIndex === 3) return optiScalerComponent
+                if (tabBar.currentIndex === 4) return narratorComponent
                 if (tabBar.currentIndex === 5) return mangoHudComponent
                 return overviewComponent
             }
@@ -366,27 +366,27 @@ Item {
     }
 
     Component {
-        id: graphicsComponent
-        GraphicsTab {
-            controller: page.controller
-            gameData: page.gameData
-            onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
-        }
-    }
-
-    Component {
         id: optimizationComponent
         OptimizationTab {
             controller: page.controller
             gameData: page.gameData
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
-            onOptiScalerRequested: tabBar.currentIndex = 4
+            onOptiScalerRequested: tabBar.currentIndex = 3
         }
     }
 
     Component {
         id: optiScalerComponent
         OptiScalerTab {
+            controller: page.controller
+            gameData: page.gameData
+            onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
+        }
+    }
+
+    Component {
+        id: narratorComponent
+        NarratorTab {
             controller: page.controller
             gameData: page.gameData
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }

@@ -20,18 +20,30 @@ FocusScope {
                                           || libraryPage.filterBarFocused
                                           || detailsPage.confirmationOpen
                                           || detailsPage.mangoHudOverlayOpen
+                                          || detailsPage.optimizationOverlayOpen
                                           || updatesPage.confirmationOpen
                                           || tasksPage.cancellationOpen
+                                          || settingsPage.keyboardOpen
+    readonly property var semanticActions: [
+        "NavigateLeft", "NavigateRight", "NavigateUp", "NavigateDown",
+        "Confirm", "Back", "SecondaryAction", "MoreActions",
+        "PreviousTab", "NextTab", "PageUp", "PageDown",
+        "OpenSystemMenu", "ContextAction1", "ContextAction2"
+    ]
 
     function normalizeAction(action) {
         var value = String(action || "")
-        if (value === "Accept") return "Confirm"
-        if (value === "Search") return "ContextMenu"
-        if (value === "PreviousSection") return "PageLeft"
-        if (value === "NextSection") return "PageRight"
-        if (value === "OpenMenu") return "OpenSystemMenu"
-        if (value === "ToggleMode") return "ToggleDesktopCouch"
-        return value
+        if (value === "Accept") value = "Confirm"
+        else if (value === "Search" || value === "ContextMenu") value = "MoreActions"
+        else if (value === "PreviousSection" || value === "PageLeft") value = "PreviousTab"
+        else if (value === "NextSection" || value === "PageRight") value = "NextTab"
+        else if (value === "OpenMenu") value = "OpenSystemMenu"
+        return semanticActions.indexOf(value) >= 0 ? value : ""
+    }
+
+    function playSemanticSound(kind) {
+        if (controller && controller.playCouchSound && String(kind || "").length)
+            controller.playCouchSound(String(kind))
     }
 
     function setSection(next, preferredId) {
@@ -53,8 +65,12 @@ FocusScope {
             detailsPage.closeConfirmation()
         else if (detailsPage.mangoHudOverlayOpen)
             detailsPage.closeMangoHudOverlay()
+        else if (detailsPage.optimizationOverlayOpen)
+            detailsPage.closeOptimizationOverlay()
         else if (updatesPage.confirmationOpen)
             updatesPage.closeConfirmation()
+        else if (settingsPage.keyboardOpen)
+            settingsPage.closeKeyboard()
         else if (tasksPage.cancellationOpen) {
             tasksPage.cancellationOpen = false
             tasksPage.cancellationChoice = 0
@@ -66,6 +82,7 @@ FocusScope {
     function pageForSection(name) {
         return name === "home" ? homePage
              : name === "library" ? libraryPage
+             : name === "narrator" ? narratorPage
              : name === "details" ? detailsPage
              : name === "updates" ? updatesPage
              : name === "tasks" ? tasksPage : settingsPage
@@ -90,7 +107,7 @@ FocusScope {
     function returnToPreviousSection() {
         var target = navigation ? String(navigation.previousScreen() || "home")
                                 : "home"
-        if (["home", "library", "updates", "tasks", "settings"].indexOf(target) < 0)
+        if (["home", "library", "narrator", "updates", "tasks", "settings"].indexOf(target) < 0)
             target = "home"
         section = target
         synchronizeControllerSection(target)
@@ -125,30 +142,37 @@ FocusScope {
         if (pageName === "gameDetails") setSection("details", "tab-overview")
         else if (pageName === "updates") setSection("updates", "")
         else if (pageName === "tasks") setSection("tasks", "")
+        else if (pageName === "narrator") setSection("narrator", "")
         else if (pageName === "settings") setSection("settings", "")
         else if (pageName === "games" && ["home", "library"].indexOf(section) < 0) setSection("home", "")
     }
 
     function handleAction(rawAction) {
-        var action = normalizeAction(rawAction)
-        cursorVisible = false
-        if (!action.length) return
-        if (action === "ToggleDesktopCouch") {
-            if (controller) controller.setInterfaceMode("desktop")
+        var rawValue = String(rawAction || "")
+        if (rawValue === "ToggleMode" || rawValue === "ToggleDesktopCouch") {
+            if (controller && controller.toggleInterfaceMode)
+                controller.toggleInterfaceMode()
             return
         }
+        var action = normalizeAction(rawValue)
+        cursorVisible = false
+        if (!action.length) return
         if (systemMenu.visible) {
             systemMenu.handleAction(action)
             return
         }
         if (action === "OpenSystemMenu") {
-            if (pageModalOpen)
+            if (pageModalOpen) {
+                playSemanticSound("error")
                 return
+            }
             systemMenu.open()
+            playSemanticSound("open")
             return
         }
         if (action === "Back" && section === "home" && !pageModalOpen) {
             systemMenu.open()
+            playSemanticSound("open")
             return
         }
         var target = pageForSection(section)
@@ -171,10 +195,24 @@ FocusScope {
         else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter || event.key === Qt.Key_Space) action = "Confirm"
         else if (event.key === Qt.Key_Escape || event.key === Qt.Key_Backspace) action = "Back"
         else if (event.key === Qt.Key_Menu) action = "OpenSystemMenu"
-        else if (event.key === Qt.Key_BracketLeft) action = "PageLeft"
-        else if (event.key === Qt.Key_BracketRight) action = "PageRight"
-        else if (event.key === Qt.Key_F11) action = "ToggleDesktopCouch"
-        if (action.length > 0) { handleAction(action); event.accepted = true }
+        else if (event.key === Qt.Key_BracketLeft || event.key === Qt.Key_Q) action = "PreviousTab"
+        else if (event.key === Qt.Key_BracketRight || event.key === Qt.Key_E) action = "NextTab"
+        else if (event.key === Qt.Key_PageUp) action = "PageUp"
+        else if (event.key === Qt.Key_PageDown) action = "PageDown"
+        else if (event.key === Qt.Key_X) action = "SecondaryAction"
+        else if (event.key === Qt.Key_Y) action = "MoreActions"
+        else if (event.key === Qt.Key_F11) {
+            if (controller && controller.toggleInterfaceMode)
+                controller.toggleInterfaceMode()
+            event.accepted = true
+            return
+        }
+        if (action.length > 0) {
+            if (couch.navigation)
+                couch.navigation.setInputModality("keyboard")
+            handleAction(action)
+            event.accepted = true
+        }
     }
 
     Connections {
@@ -188,19 +226,27 @@ FocusScope {
         objectName: "couchContentStack"
         anchors.fill: parent
         currentIndex: couch.section === "home" ? 0 : couch.section === "library" ? 1
-                      : couch.section === "details" ? 2 : couch.section === "updates" ? 3
-                      : couch.section === "tasks" ? 4 : 5
+                      : couch.section === "narrator" ? 2 : couch.section === "details" ? 3
+                      : couch.section === "updates" ? 4 : couch.section === "tasks" ? 5 : 6
         CouchHome {
             id: homePage
             controller: couch.controller; navigation: couch.navigation; couchScale: couch.couchScale
             onOpenGame: function(gameId) { couch.openGameFrom("home", gameId) }
             onOpenLibrary: couch.setSection("library", "")
+            onOpenNarrator: { if (couch.controller) couch.controller.navigate("narrator"); couch.setSection("narrator", "") }
             onOpenSettings: { if (couch.controller) couch.controller.navigate("settings"); couch.setSection("settings", "") }
         }
         CouchLibrary {
             id: libraryPage
             controller: couch.controller; navigation: couch.navigation; couchScale: couch.couchScale
             onOpenGame: function(gameId) { couch.openGameFrom("library", gameId) }
+            onBackRequested: couch.returnToPreviousSection()
+        }
+        CouchNarratorPage {
+            id: narratorPage
+            controller: couch.controller
+            navigation: couch.navigation
+            couchScale: couch.couchScale
             onBackRequested: couch.returnToPreviousSection()
         }
         CouchGameDetails {
@@ -230,8 +276,10 @@ FocusScope {
         id: topBar
         visible: !systemMenu.visible && !homePage.contextMenuOpen
                  && !detailsPage.confirmationOpen && !detailsPage.mangoHudOverlayOpen
+                 && !detailsPage.optimizationOverlayOpen
                  && !updatesPage.confirmationOpen
                  && !tasksPage.cancellationOpen
+                 && !settingsPage.keyboardOpen
         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
         height: 92 * couch.couchScale; color: App.Theme.dark ? "#B80B1018" : "#C9F3F6FA"; z: 30
         RowLayout {
@@ -243,37 +291,48 @@ FocusScope {
             ColumnLayout {
                 spacing: 0
                 Label { text: couch.controller ? String(couch.controller.appName || qsTr("Game Optimization Linux")) : qsTr("Game Optimization Linux"); color: App.Theme.text; font.pixelSize: 22 * couch.couchScale; font.weight: Font.Bold }
-                Label { text: couch.section === "home" ? qsTr("Home") : couch.section === "library" ? qsTr("Library") : couch.section === "details" ? qsTr("Game details") : couch.section === "updates" ? qsTr("Updates") : couch.section === "tasks" ? qsTr("Tasks") : qsTr("Settings"); color: App.Theme.textSecondary; font.pixelSize: 15 * couch.couchScale }
+                Label { text: couch.section === "home" ? qsTr("Home") : couch.section === "library" ? qsTr("Library") : couch.section === "narrator" ? qsTr("Narrator") : couch.section === "details" ? qsTr("Game details") : couch.section === "updates" ? qsTr("Updates") : couch.section === "tasks" ? qsTr("Tasks") : qsTr("Settings"); color: App.Theme.textSecondary; font.pixelSize: 15 * couch.couchScale }
             }
             Item { Layout.fillWidth: true }
             Label { text: couch.controller && couch.controller.activeController.name ? String(couch.controller.activeController.name) : qsTr("Keyboard"); color: App.Theme.text; font.pixelSize: 16 * couch.couchScale; elide: Text.ElideRight; Layout.maximumWidth: 280 * couch.couchScale }
-            CouchButton { couchScale: couch.couchScale; implicitWidth: 52 * couch.couchScale; implicitHeight: 52 * couch.couchScale; font.pixelSize: 22 * couch.couchScale; text: "↻"; Accessible.name: qsTr("Tasks"); onClicked: { if (couch.controller) couch.controller.navigate("tasks"); couch.setSection("tasks", "") } }
-            CouchButton { couchScale: couch.couchScale; implicitWidth: 52 * couch.couchScale; implicitHeight: 52 * couch.couchScale; font.pixelSize: 22 * couch.couchScale; text: "⚙"; Accessible.name: qsTr("Settings"); onClicked: { if (couch.controller) couch.controller.navigate("settings"); couch.setSection("settings", "") } }
+            CouchButton { couchScale: couch.couchScale; implicitWidth: 52 * couch.couchScale; implicitHeight: 52 * couch.couchScale; iconSource: App.UiIcons.sidebarTasks; iconSize: App.Theme.couchIconSizeAction; Accessible.name: qsTr("Tasks"); onClicked: { if (couch.controller) couch.controller.navigate("tasks"); couch.setSection("tasks", "") } }
+            CouchButton { couchScale: couch.couchScale; implicitWidth: 52 * couch.couchScale; implicitHeight: 52 * couch.couchScale; iconSource: App.UiIcons.sidebarSettings; iconSize: App.Theme.couchIconSizeAction; Accessible.name: qsTr("Settings"); onClicked: { if (couch.controller) couch.controller.navigate("settings"); couch.setSection("settings", "") } }
             Label { text: Qt.formatTime(new Date(), "HH:mm"); color: App.Theme.text; font.pixelSize: 20 * couch.couchScale; font.weight: Font.DemiBold; Timer { interval: 30000; running: true; repeat: true; onTriggered: parent.text = Qt.formatTime(new Date(), "HH:mm") } }
         }
     }
 
     CouchHints {
-        visible: topBar.visible
+        visible: couch.navigation
+                 && couch.navigation.inputModality === "controller"
         anchors.right: parent.right; anchors.bottom: parent.bottom
         anchors.rightMargin: 52 * couch.couchScale; anchors.bottomMargin: 20 * couch.couchScale
-        z: 40; couchScale: couch.couchScale; buttonHints: couch.hints
-        showBack: couch.section !== "home"
-        showContext: couch.section === "library"
+        z: 460; couchScale: couch.couchScale; buttonHints: couch.hints
+        acceptText: couch.pageModalOpen || systemMenu.visible ? qsTr("Choose")
+                    : couch.section === "settings" ? qsTr("Change") : qsTr("Select")
+        showBack: couch.section !== "home" || couch.pageModalOpen || systemMenu.visible
+        showContext: !couch.pageModalOpen && !systemMenu.visible
+                     && (couch.section === "library"
                      || (couch.section === "home" && homePage.selectedGameIndex >= 0)
                      || (couch.section === "details" && Boolean(detailsPage.game.id))
-                     || (couch.section === "tasks" && tasksPage.contextAvailable)
-        showTabs: true
+                     || (couch.section === "tasks" && tasksPage.contextAvailable))
+        showTabs: !couch.pageModalOpen && !systemMenu.visible
+                  && (couch.section === "details" || couch.section === "settings")
+        showDirections: couch.pageModalOpen || systemMenu.visible || couch.section === "settings"
+        showPages: !couch.pageModalOpen && !systemMenu.visible
+                   && ["library", "updates", "tasks", "details", "settings"].indexOf(couch.section) >= 0
+        showMenu: !couch.pageModalOpen && !systemMenu.visible
         contextText: couch.section === "library" ? qsTr("Filters") : qsTr("More")
         sectionText: couch.section === "details" ? qsTr("Tabs")
                      : couch.section === "settings" ? qsTr("Categories")
                      : qsTr("Jump")
+        directionText: couch.section === "settings" ? qsTr("Adjust") : qsTr("Move")
     }
 
     Rectangle {
         id: disconnectedOverlay
         objectName: "couchControllerDisconnected"
-        visible: couch.navigation && !couch.navigation.controllerConnected && !systemMenu.visible
+        // Connection changes use ordinary toasts; keyboard and mouse must remain usable.
+        visible: false
         anchors.fill: parent; z: 180; color: "#C5080C12"
         Rectangle {
             anchors.centerIn: parent; width: Math.min(parent.width * 0.64, 920 * couch.couchScale); height: 340 * couch.couchScale
@@ -310,7 +369,13 @@ FocusScope {
     MouseArea {
         anchors.fill: parent; z: 500; acceptedButtons: Qt.NoButton; hoverEnabled: true
         cursorShape: !couch.hideCursor || couch.cursorVisible ? Qt.ArrowCursor : Qt.BlankCursor
-        onPositionChanged: { couch.cursorVisible = true; if (couch.hideCursor) hideCursorTimer.restart() }
+        onPositionChanged: {
+            couch.cursorVisible = true
+            if (couch.navigation)
+                couch.navigation.setInputModality("mouse")
+            if (couch.hideCursor)
+                hideCursorTimer.restart()
+        }
     }
     Timer { id: hideCursorTimer; interval: 1800; onTriggered: couch.cursorVisible = false }
     opacity: visible ? 1 : 0

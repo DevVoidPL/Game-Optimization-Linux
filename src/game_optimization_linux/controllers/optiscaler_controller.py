@@ -30,6 +30,7 @@ from ..services.optiscaler_fsr4 import (
     OptiScalerIniCapabilities,
     recommend_fsr4,
 )
+from ..services.optipatcher_online import OptiPatcherOnlineError
 
 if TYPE_CHECKING:
     from .app_controller import AppController
@@ -113,6 +114,7 @@ class OptiScalerController:
             tuple(str(item) for item in value.get("dx11Upscalers", ())),
             tuple(str(item) for item in value.get("dx12Upscalers", ())),
             tuple(str(item) for item in value.get("vulkanUpscalers", ())),
+            bool(value.get("known", bool(value))),
         )
 
     def _detected_game_context(self, app_id: str) -> dict[str, Any]:
@@ -375,6 +377,7 @@ class OptiScalerController:
                         "Could not inspect cached OptiScaler capabilities: %s", error
                     )
             detected = self._detected_game_context(app_id)
+            optimization_profile = self._app._optimization_profile_repository.load(app_id)
             recommendation = recommend_fsr4(
                 str(detected["gpu"]),
                 str(detected["graphicsApi"]),
@@ -434,9 +437,20 @@ class OptiScalerController:
                     ),
                     "runtimeOverlayStatus": "unknown",
                     "runtimeOverlayLabel": "Unknown until the game is observed",
+                    "protonVersion": "Unknown",
+                    "gamescopeEnabled": bool(optimization_profile.gamescope_enabled),
+                    "gameModeEnabled": bool(optimization_profile.gamemode_enabled),
                     **detected,
                 }
             )
+            try:
+                patcher_release = self._app._optipatcher_release_client.latest_release()
+                result["optipatcher"] = self._app._optipatcher_service.status(
+                    game, available=patcher_release
+                )
+                result["optipatcher"]["releaseUrl"] = patcher_release.html_url
+            except OptiPatcherOnlineError as error:
+                result.setdefault("optipatcher", {})["onlineError"] = str(error)
             return result
         except Exception as error:
             logger.exception("Could not inspect OptiScaler for %s", game.id)
@@ -446,6 +460,38 @@ class OptiScalerController:
                     error, "Failed to refresh OptiScaler status"
                 ),
             }
+
+    def installOptiPatcher(
+        self, game_id: str, force_refresh: bool = False
+    ) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        if game is None:
+            return {"success": False, "error": "Select an available Steam game first"}
+        try:
+            release = self._app._optipatcher_release_client.latest_release(
+                force_refresh=bool(force_refresh)
+            )
+            asset, _digest = self._app._optipatcher_release_client.ensure_asset(release)
+            status = self._app._optipatcher_service.install(game, release, asset)
+            status.update({"success": True, "availableVersion": release.version})
+            self._invalidate_status(game_id)
+            return status
+        except Exception as error:
+            logger.warning("OptiPatcher installation failed for %s: %s", game_id, error)
+            return {"success": False, "error": str(error)}
+
+    def removeOptiPatcher(self, game_id: str) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        if game is None:
+            return {"success": False, "error": "Select an available Steam game first"}
+        try:
+            result = self._app._optipatcher_service.remove(game)
+            result["success"] = True
+            self._invalidate_status(game_id)
+            return result
+        except Exception as error:
+            logger.warning("OptiPatcher removal failed for %s: %s", game_id, error)
+            return {"success": False, "error": str(error)}
 
     def _cached_optiscaler_release(
         self, channel: str = "stable"
@@ -510,6 +556,21 @@ class OptiScalerController:
             self._app.optiScalerChanged.emit(profile.app_id)
             return self._profile_update_result(profile)
         except Exception as error:
+            return {"success": False, "error": str(error)}
+
+    def setOptiScalerBackend(
+        self, game_id: str, backend: str
+    ) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        if game is None:
+            return {"success": False, "error": "Select an available Steam game first"}
+        try:
+            profile = self._app._optiscaler_service.set_backend(game, backend)
+            self._invalidate_status(profile.app_id)
+            self._app.optiScalerChanged.emit(profile.app_id)
+            return self._profile_update_result(profile)
+        except Exception as error:
+            logger.warning("Could not select OptiScaler backend for %s: %s", game.id, error)
             return {"success": False, "error": str(error)}
 
     def configureOptiScalerUpscaling(
@@ -622,6 +683,7 @@ class OptiScalerController:
         executable: str,
         injection_dll: str,
         allow_anticheat_risk: bool,
+        fsr4_mode: str = "",
     ) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
         if game is None:
@@ -645,6 +707,7 @@ class OptiScalerController:
                 archive.path,
                 executable=str(executable or ""),
                 injection_dll=str(injection_dll or "auto"),
+                requested_fsr4_mode=str(fsr4_mode or ""),
                 allow_anticheat_risk=bool(allow_anticheat_risk),
                 version_override=release.version,
             ).to_dict()
@@ -716,6 +779,7 @@ class OptiScalerController:
                     release.fidelityfx_upscaler_version
                 ),
                 release_version=release.version,
+                configuration=desired,
             )
             try:
                 requested_mode = str(
@@ -767,9 +831,16 @@ class OptiScalerController:
                     release.version,
                     error,
                 )
+                try:
+                    self._app._optiscaler_service.remove(game)
+                except OptiScalerError as rollback_error:
+                    raise OptiScalerError(
+                        "OptiScaler configuration failed and rollback also failed: "
+                        f"{error}; {rollback_error}"
+                    ) from rollback_error
                 raise OptiScalerError(
-                    "OptiScaler payload was installed, but its managed configuration "
-                    f"could not be applied: {error}"
+                    "OptiScaler configuration failed; the installation was rolled back: "
+                    f"{error}"
                 ) from error
 
         return self._app._start_optiscaler_operation(
@@ -784,6 +855,7 @@ class OptiScalerController:
         archive_value: str,
         executable: str,
         injection_dll: str,
+        fsr4_mode: str = "",
     ) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
         if game is None:
@@ -795,6 +867,7 @@ class OptiScalerController:
                 archive,
                 executable=str(executable or ""),
                 injection_dll=str(injection_dll or "auto"),
+                requested_fsr4_mode=str(fsr4_mode or ""),
             ).to_dict()
         except Exception as error:
             logger.warning("OptiScaler plan rejected for %s: %s", game.id, error)
@@ -846,6 +919,7 @@ class OptiScalerController:
         executable: str,
         injection_dll: str,
         allow_replace_conflicts: bool,
+        configuration: Mapping[str, Any] | None = None,
     ) -> bool:
         game = self._app._resolve_game(game_id, show_error=False)
         if game is None:
@@ -866,6 +940,7 @@ class OptiScalerController:
                 allow_replace_conflicts=bool(allow_replace_conflicts),
                 cancel_event=cancelled,
                 progress=progress,
+                configuration=configuration,
             ),
         )
 

@@ -25,6 +25,7 @@ SurfaceCard {
     property bool showLocalArchive: false
     property bool showAdvanced: false
     property string releaseChannel: "stable"
+    property string backend: "optiscaler"
     property string fsr4Mode: "automatic"
     property bool fsrAgilitySdkUpgrade: false
     property bool fsr4Watermark: false
@@ -108,6 +109,7 @@ SurfaceCard {
         if (result.injectionDll)
             injectionDll = String(result.injectionDll)
         releaseChannel = String(result.channel || "stable")
+        backend = String(result.backend || "optiscaler")
         fsr4Mode = String(result.requestedFsr4Mode || result.fsr4Mode || "automatic")
         fsrAgilitySdkUpgrade = Boolean(result.fsrAgilitySdkUpgrade)
         fsr4Watermark = Boolean(result.fsr4Watermark)
@@ -134,6 +136,20 @@ SurfaceCard {
             scheduleStatus(true)
         } else {
             errorMessage = String(result.error || qsTr("The release channel could not be changed"))
+        }
+    }
+
+    function selectBackend(value) {
+        if (!controller || !controller.setOptiScalerBackend)
+            return
+        var result = controller.setOptiScalerBackend(gameId, value) || ({})
+        if (result.success) {
+            backend = String(result.backend || value)
+            planData = ({})
+            errorMessage = ""
+            scheduleStatus(true)
+        } else {
+            errorMessage = String(result.error || qsTr("The backend could not be changed"))
         }
     }
 
@@ -210,7 +226,7 @@ SurfaceCard {
         if (!controller || !controller.inspectOptiScalerArchive || !archiveUrl)
             return
         var result = controller.inspectOptiScalerArchive(
-                    gameId, archiveUrl, selectedExecutable, injectionDll) || ({})
+                    gameId, archiveUrl, selectedExecutable, injectionDll, fsr4Mode) || ({})
         planData = result.success ? result : ({})
         replaceConfirmed = false
         errorMessage = result.success ? "" : String(result.error || qsTr("The archive could not be inspected"))
@@ -221,7 +237,7 @@ SurfaceCard {
             return
         var result = controller.inspectOnlineOptiScaler(
                     gameId, selectedExecutable, injectionDll,
-                    antiCheatConfirmed) || ({})
+                    antiCheatConfirmed, fsr4Mode) || ({})
         planData = result.success ? result : ({})
         replaceConfirmed = false
         errorMessage = result.success ? "" : String(result.error || qsTr("The official release could not be inspected"))
@@ -266,15 +282,30 @@ SurfaceCard {
     function beginInstall() {
         if (!controller)
             return
+        var recommendation = statusData.recommendation || ({})
+        var configuration = {
+            "fsr4Mode": fsr4Mode,
+            "effectiveFsr4Mode": fsr4Mode === "automatic"
+                               ? String(recommendation.recommendedMode || "disabled")
+                               : fsr4Mode,
+            "automaticReason": fsr4Mode === "automatic"
+                               ? String(recommendation.reason || "") : "",
+            "fsrAgilitySdkUpgrade": fsrAgilitySdkUpgrade,
+            "fsr4Watermark": fsr4Watermark,
+            "dx11Upscaler": dx11Upscaler,
+            "dx12Upscaler": dx12Upscaler,
+            "vulkanUpscaler": vulkanUpscaler
+        }
         var accepted = false
         if (Boolean(planData.officialRelease) && controller.installOnlineOptiScaler) {
             accepted = controller.installOnlineOptiScaler(
                         gameId, selectedExecutable, injectionDll,
-                        onlineOperation(), replaceConfirmed, antiCheatConfirmed)
+                        onlineOperation(), replaceConfirmed, antiCheatConfirmed,
+                        configuration)
         } else if (controller.installOptiScaler) {
             accepted = controller.installOptiScaler(
                         gameId, archiveUrl, selectedExecutable, injectionDll,
-                        replaceConfirmed)
+                        replaceConfirmed, configuration)
         }
         if (!accepted)
             errorMessage = qsTr("The OptiScaler installation task could not be started")
@@ -372,6 +403,7 @@ SurfaceCard {
 
                 GridLayout {
                     Layout.fillWidth: true
+                    visible: section.showAdvanced
                     columns: 2
                     columnSpacing: 18
                     rowSpacing: 4
@@ -381,10 +413,22 @@ SurfaceCard {
                     Label { Layout.fillWidth: true; text: String(section.statusData.graphicsApi || qsTr("Unknown")); color: App.Theme.text }
                     Label { text: qsTr("Runtime"); color: App.Theme.textMuted }
                     Label { Layout.fillWidth: true; text: String(section.statusData.runtime || qsTr("Unknown")); color: App.Theme.text }
+                    Label { text: qsTr("Proton version"); color: App.Theme.textMuted }
+                    Label { Layout.fillWidth: true; text: String(section.statusData.protonVersion || qsTr("Unknown")); color: App.Theme.text }
+                    Label { text: qsTr("Gamescope"); color: App.Theme.textMuted }
+                    Label { Layout.fillWidth: true; text: Boolean(section.statusData.gamescopeEnabled) ? qsTr("Enabled") : qsTr("Disabled"); color: App.Theme.text }
+                    Label { text: qsTr("GameMode"); color: App.Theme.textMuted }
+                    Label { Layout.fillWidth: true; text: Boolean(section.statusData.gameModeEnabled) ? qsTr("Enabled") : qsTr("Disabled"); color: App.Theme.text }
                     Label { text: qsTr("GPU"); color: App.Theme.textMuted }
                     Label { Layout.fillWidth: true; text: String(section.statusData.gpu || qsTr("Unknown")); color: App.Theme.text; elide: Text.ElideRight }
                     Label { text: qsTr("OptiScaler"); color: App.Theme.textMuted }
                     Label { Layout.fillWidth: true; text: String(section.statusData.installedVersion || section.statusData.availableVersion || qsTr("Unknown")); color: App.Theme.text }
+                    Label { text: qsTr("Installation"); color: App.Theme.textMuted }
+                    Label { Layout.fillWidth: true; text: Boolean(section.statusData.installedStatus) ? qsTr("Installed") : qsTr("Not installed"); color: App.Theme.text }
+                    Label { text: qsTr("Verification"); color: App.Theme.textMuted }
+                    Label { Layout.fillWidth: true; text: Boolean(section.statusData.verifiedStatus) ? qsTr("Verified") : qsTr("Not verified"); color: App.Theme.text }
+                    Label { text: qsTr("Configuration"); color: App.Theme.textMuted }
+                    Label { Layout.fillWidth: true; text: Boolean(section.statusData.configurationVerifiedStatus) ? qsTr("Verified") : qsTr("Not verified"); color: App.Theme.text }
                     Label { text: qsTr("Source / channel"); color: App.Theme.textMuted }
                     Label {
                         Layout.fillWidth: true
@@ -394,6 +438,10 @@ SurfaceCard {
                         color: App.Theme.text
                         wrapMode: Text.WordWrap
                     }
+                    Label { text: qsTr("Selected proxy"); color: App.Theme.textMuted }
+                    Label { Layout.fillWidth: true; text: String(section.statusData.injectionDll || qsTr("Unknown")); color: App.Theme.text }
+                    Label { text: qsTr("Managed proxy path"); color: App.Theme.textMuted }
+                    Label { Layout.fillWidth: true; text: String(section.statusData.managedProxyPath || qsTr("Unknown")); color: App.Theme.text; elide: Text.ElideMiddle }
                     Label { text: qsTr("FidelityFX upscaler"); color: App.Theme.textMuted }
                     Label {
                         Layout.fillWidth: true
@@ -417,6 +465,27 @@ SurfaceCard {
                     Layout.fillWidth: true
                     text: String((section.statusData.recommendation || {}).reason || "")
                     color: App.Theme.textSecondary
+                    wrapMode: Text.WordWrap
+                }
+
+                Label {
+                    Layout.fillWidth: true
+                    text: {
+                        var caps = section.statusData.availableIniCapabilities
+                                   || section.statusData.iniCapabilities || ({})
+                        var state = String(caps.forceInt8State || "unknown")
+                        if (state === "supported")
+                            return qsTr("FSR 4.1.1 INT8: Available in selected OptiScaler release")
+                        if (state === "unsupported")
+                            return qsTr("FSR 4.1.1 INT8: Disabled - not supported by selected OptiScaler release")
+                        return qsTr("FSR 4.1.1 INT8: Unknown until the selected release is inspected")
+                    }
+                    color: {
+                        var caps = section.statusData.availableIniCapabilities
+                                   || section.statusData.iniCapabilities || ({})
+                        return String(caps.forceInt8State || "unknown") === "unsupported"
+                               ? App.Theme.warning : App.Theme.textSecondary
+                    }
                     wrapMode: Text.WordWrap
                 }
 
@@ -451,6 +520,7 @@ SurfaceCard {
 
                 GridLayout {
                     Layout.fillWidth: true
+                    visible: section.showAdvanced
                     columns: 2
                     columnSpacing: 14
                     rowSpacing: 3
@@ -533,6 +603,77 @@ SurfaceCard {
             }
         }
 
+        ColumnLayout {
+            Layout.fillWidth: true
+            spacing: 7
+
+            SettingRow {
+                Layout.fillWidth: true
+                title: qsTr("Release channel")
+                description: qsTr("Stable uses the official stable OptiScaler release. Nightly always fetches the newest qualified official prerelease and is experimental.")
+                AppComboBox {
+                    Layout.preferredWidth: 220
+                    model: [qsTr("Stable"), qsTr("Nightly (experimental)")]
+                    currentIndex: section.releaseChannel === "edge" ? 1 : 0
+                    onActivated: function(index) { section.selectChannel(index === 1 ? "edge" : "stable") }
+                }
+            }
+
+            SettingRow {
+                Layout.fillWidth: true
+                visible: Boolean(section.statusData.optipatcher)
+                title: qsTr("OptiPatcher")
+                description: qsTr("ASI plugin status is reported from the managed manifest. Compatibility remains unknown unless upstream provides a matching game/build entry.")
+                RowLayout {
+                    Layout.fillWidth: true
+                    Label {
+                        Layout.fillWidth: true
+                        text: {
+                            var item = section.statusData.optipatcher || ({})
+                            if (item.state === "blocked") return qsTr("Unavailable: %1").arg(String(item.error || qsTr("OptiScaler is not installed")))
+                            if (item.state === "conflict") return qsTr("Conflict")
+                            if (item.installed) return qsTr("Installed · %1").arg(String(item.version || qsTr("Unknown")))
+                            return qsTr("Not installed")
+                        }
+                        color: App.Theme.textSecondary
+                    }
+                    Label {
+                        text: qsTr("Version: %1").arg(String((section.statusData.optipatcher || ({})).version || qsTr("Not installed")))
+                        color: App.Theme.textMuted
+                    }
+                    Label {
+                        text: qsTr("Available: %1").arg(String((section.statusData.optipatcher || ({})).availableVersion || qsTr("Unknown")))
+                        color: App.Theme.textMuted
+                    }
+                    AppButton {
+                        text: Boolean((section.statusData.optipatcher || ({})).installed) ? qsTr("Update") : qsTr("Install")
+                        kind: "secondary"
+                        enabled: Boolean(section.controller && section.controller.installOptiPatcher)
+                                 && String((section.statusData.optipatcher || ({})).state || "") !== "blocked"
+                                 && String((section.statusData.optipatcher || ({})).state || "") !== "conflict"
+                        onClicked: {
+                            var result = section.controller.installOptiPatcher(section.gameId, true) || ({})
+                            if (!result.success)
+                                section.errorMessage = String(result.error || qsTr("OptiPatcher installation failed"))
+                            section.scheduleStatus(true)
+                        }
+                    }
+                    AppButton {
+                        text: qsTr("Remove")
+                        kind: "danger"
+                        visible: Boolean((section.statusData.optipatcher || ({})).installed)
+                        enabled: Boolean(section.controller && section.controller.removeOptiPatcher)
+                        onClicked: {
+                            var result = section.controller.removeOptiPatcher(section.gameId) || ({})
+                            if (!result.success)
+                                section.errorMessage = String(result.error || qsTr("OptiPatcher removal failed"))
+                            section.scheduleStatus(true)
+                        }
+                    }
+                }
+            }
+        }
+
         AppButton {
             text: section.showAdvanced ? qsTr("Hide advanced") : qsTr("Advanced")
             iconSource: App.UiIcons.actionAdvancedSettings
@@ -583,13 +724,19 @@ SurfaceCard {
 
             SettingRow {
                 Layout.fillWidth: true
-                title: qsTr("Official release channel")
-                description: qsTr("Both channels remain restricted to optiscaler/OptiScaler. Edge is used only when an official prerelease exists.")
+                title: qsTr("Runtime backend")
+                description: qsTr("Only one proxy backend may be active for a game. DLSS Enabler is detection-only until its installer is verified.")
                 AppComboBox {
                     Layout.preferredWidth: 220
-                    model: [qsTr("Stable"), qsTr("Official prerelease - Experimental")]
-                    currentIndex: section.releaseChannel === "edge" ? 1 : 0
-                    onActivated: function(index) { section.selectChannel(index === 1 ? "edge" : "stable") }
+                    model: [qsTr("Disabled"), qsTr("OptiScaler"), qsTr("DLSS Enabler (detection only)")]
+                    currentIndex: backend === "none" ? 0 : backend === "dlss_enabler" ? 2 : 1
+                    onActivated: function(index) {
+                        if (index === 2) {
+                            errorMessage = qsTr("DLSS Enabler is detected only; no files were changed.")
+                            return
+                        }
+                        section.selectBackend(index === 0 ? "none" : "optiscaler")
+                    }
                 }
             }
 

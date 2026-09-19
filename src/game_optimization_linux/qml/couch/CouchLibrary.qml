@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -94,13 +96,20 @@ FocusScope {
                                      gameGrid.currentIndex)
     }
 
+    function playSemanticSound(kind) {
+        if (controller && controller.playCouchSound && String(kind || "").length)
+            controller.playCouchSound(String(kind))
+    }
+
     function selectIndex(index) {
         if (filteredGames.length === 0)
-            return
-        gameGrid.currentIndex = Math.max(0, Math.min(filteredGames.length - 1,
-                                                     index))
+            return false
+        var target = Math.max(0, Math.min(filteredGames.length - 1, index))
+        var changed = gameGrid.currentIndex !== target
+        gameGrid.currentIndex = target
         gameGrid.positionViewAtIndex(gameGrid.currentIndex, GridView.Contain)
         rememberSelection()
+        return changed
     }
 
     function openFilters() {
@@ -118,48 +127,74 @@ FocusScope {
     }
 
     function handleAction(action) {
+        if (action === "ContextMenu" || action === "Search") action = "MoreActions"
+        else if (action === "PageLeft" || action === "PreviousSection") action = "PageUp"
+        else if (action === "PageRight" || action === "NextSection") action = "PageDown"
         var columns = Math.max(1, Math.floor(gameGrid.width / gameGrid.cellWidth))
         if (filterBarFocused) {
             if (action === "Back") {
                 closeFilters()
-            } else if (action === "NavigateLeft") {
-                selectedFilter = Math.max(0, selectedFilter - 1)
-            } else if (action === "NavigateRight") {
-                selectedFilter = Math.min(filters.length - 1, selectedFilter + 1)
-            } else if (action === "NavigateUp") {
-                selectedFilter = Math.max(0, selectedFilter - 2)
-            } else if (action === "NavigateDown") {
-                selectedFilter = Math.min(filters.length - 1, selectedFilter + 2)
-            } else if (action === "Confirm" || action === "ContextMenu") {
+                playSemanticSound("back")
+            } else if (["NavigateLeft", "NavigateRight", "NavigateUp", "NavigateDown"].indexOf(action) >= 0) {
+                var previousFilter = selectedFilter
+                if (action === "NavigateLeft")
+                    selectedFilter = Math.max(0, selectedFilter - 1)
+                else if (action === "NavigateRight")
+                    selectedFilter = Math.min(filters.length - 1, selectedFilter + 1)
+                else if (action === "NavigateUp")
+                    selectedFilter = Math.max(0, selectedFilter - 2)
+                else
+                    selectedFilter = Math.min(filters.length - 1, selectedFilter + 2)
+                if (selectedFilter !== previousFilter)
+                    playSemanticSound("navigate")
+            } else if (action === "Confirm" || action === "MoreActions") {
                 closeFilters()
                 Qt.callLater(restoreSelection)
+                playSemanticSound(action === "Confirm" ? "confirm" : "back")
             }
             return
         }
 
         if (action === "Back") {
             backRequested()
-        } else if (action === "ContextMenu") {
+            playSemanticSound("back")
+        } else if (action === "MoreActions") {
             openFilters()
+            playSemanticSound("open")
         } else if (action === "NavigateLeft") {
-            selectIndex(gameGrid.currentIndex - 1)
+            if (selectIndex(gameGrid.currentIndex - 1))
+                playSemanticSound("navigate")
         } else if (action === "NavigateRight") {
-            selectIndex(gameGrid.currentIndex + 1)
+            if (selectIndex(gameGrid.currentIndex + 1))
+                playSemanticSound("navigate")
         } else if (action === "NavigateUp") {
-            if (gameGrid.currentIndex < columns)
+            if (gameGrid.currentIndex >= 0 && gameGrid.currentIndex < columns) {
                 openFilters()
-            else
-                selectIndex(gameGrid.currentIndex - columns)
+                playSemanticSound("navigate")
+            } else if (selectIndex(gameGrid.currentIndex - columns)) {
+                playSemanticSound("navigate")
+            }
         } else if (action === "NavigateDown") {
-            selectIndex(gameGrid.currentIndex + columns)
-        } else if (action === "PageLeft") {
-            selectIndex(gameGrid.currentIndex - columns * 2)
-        } else if (action === "PageRight") {
-            selectIndex(gameGrid.currentIndex + columns * 2)
-        } else if (action === "Confirm" && gameGrid.currentIndex >= 0) {
-            var game = filteredGames[gameGrid.currentIndex]
-            if (boolValue(game.libraryAvailable))
-                openGame(String(game.id || ""))
+            if (selectIndex(gameGrid.currentIndex + columns))
+                playSemanticSound("navigate")
+        } else if (action === "PageUp") {
+            if (selectIndex(gameGrid.currentIndex - columns * 2))
+                playSemanticSound("navigate")
+        } else if (action === "PageDown") {
+            if (selectIndex(gameGrid.currentIndex + columns * 2))
+                playSemanticSound("navigate")
+        } else if (action === "Confirm") {
+            if (gameGrid.currentIndex < 0) {
+                playSemanticSound("error")
+            } else {
+                var game = filteredGames[gameGrid.currentIndex]
+                if (boolValue(game.libraryAvailable)) {
+                    openGame(String(game.id || ""))
+                    playSemanticSound("confirm")
+                } else {
+                    playSemanticSound("error")
+                }
+            }
         }
     }
 
@@ -426,21 +461,27 @@ FocusScope {
                             couchScale: page.couchScale
                             Layout.fillWidth: true
                             Layout.fillHeight: true
-                            text: modelData.symbol + "   " + modelData.label
+                            text: modelData.label
+                            iconSource: modelData.id === "all" ? App.UiIcons.sidebarGames
+                                       : modelData.id === "recent" ? App.UiIcons.actionRefresh
+                                       : modelData.id === "btrfs" ? App.UiIcons.fileFolder
+                                       : modelData.id === "ready" ? App.UiIcons.statusSuccess
+                                       : modelData.id === "attention" ? App.UiIcons.statusWarning
+                                       : App.UiIcons.statusInformation
                             focus: page.filterBarFocused
                                    && page.selectedFilter === index
                             font.pixelSize: 21 * page.couchScale
                             font.weight: Font.Bold
-                            onClicked: { page.selectedFilter = index; page.closeFilters() }
+                            onClicked: { page.selectedFilter = filterChoice.index; page.closeFilters() }
                             background: Rectangle {
                                 radius: 18 * page.couchScale
-                                color: page.selectedFilter === index
+                                color: page.selectedFilter === filterChoice.index
                                        ? App.Theme.surfaceSelected : App.Theme.surface
-                                border.width: page.selectedFilter === index
+                                border.width: page.selectedFilter === filterChoice.index
                                               ? 4 * page.couchScale : 1
-                                border.color: page.selectedFilter === index
+                                border.color: page.selectedFilter === filterChoice.index
                                               ? App.Theme.accent : App.Theme.border
-                                scale: page.selectedFilter === index ? 1.025 : 1.0
+                                scale: page.selectedFilter === filterChoice.index ? 1.025 : 1.0
                                 Behavior on scale { NumberAnimation { duration: 140 } }
                             }
                         }

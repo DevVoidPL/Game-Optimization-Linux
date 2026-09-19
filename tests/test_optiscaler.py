@@ -50,10 +50,15 @@ def _game(root: Path, app_id: str = "224760") -> Game:
     )
 
 
-def _archive(path: Path, *, traversal: bool = False) -> Path:
+def _archive(
+    path: Path, *, traversal: bool = False, force_int8: bool = False
+) -> Path:
     members = {
         "OptiScaler_0.7.7/OptiScaler.dll": b"optiscaler proxy",
-        "OptiScaler_0.7.7/OptiScaler.ini": b"[OptiScaler]\nEnabled=true\n",
+        "OptiScaler_0.7.7/OptiScaler.ini": (
+            b"[OptiScaler]\nEnabled=true\n[FSR]\nFsr4Update=true\n"
+            + (b"Fsr4ForceEnableInt8=false\n" if force_int8 else b"")
+        ),
         "OptiScaler_0.7.7/plugins/helper.dll": b"helper",
     }
     if traversal:
@@ -377,6 +382,65 @@ def test_proxy_dll_selection(
     assert plan.proton_override == f"{Path(expected).stem}=n,b"
     assert any(item.target_relative_path == expected for item in plan.files)
     assert all(item.target_relative_path != "OptiScaler.dll" for item in plan.files)
+
+
+def test_plan_rejects_unsupported_force_int8_before_game_mutation(
+    setup_service: tuple[OptiScalerService, Game, Path, Path],
+) -> None:
+    service, game, _archive_path, root = setup_service
+    archive = _archive(root.parent / "OptiScaler_no_int8.zip")
+
+    with pytest.raises(OptiScalerError, match="not supported"):
+        service.plan(game, archive, requested_fsr4_mode="force_int8")
+
+    assert not (root / "Binaries" / "Win64" / "dxgi.dll").exists()
+
+
+def test_install_preflight_rejects_unsupported_force_int8_without_files(
+    setup_service: tuple[OptiScalerService, Game, Path, Path],
+) -> None:
+    service, game, _archive_path, root = setup_service
+    archive = _archive(root.parent / "OptiScaler_no_int8_install.zip")
+
+    with pytest.raises(OptiScalerError, match="not supported"):
+        service.install(
+            game,
+            archive,
+            configuration={
+                "fsr4Mode": "force_int8",
+                "fsrAgilitySdkUpgrade": False,
+                "fsr4Watermark": False,
+                "dx11Upscaler": "auto",
+                "dx12Upscaler": "auto",
+                "vulkanUpscaler": "auto",
+            },
+        )
+
+    assert not (root / "Binaries" / "Win64" / "dxgi.dll").exists()
+
+
+def test_install_records_release_capabilities(
+    setup_service: tuple[OptiScalerService, Game, Path, Path],
+) -> None:
+    service, game, _archive_path, root = setup_service
+    archive = _archive(root.parent / "OptiScaler_int8.zip", force_int8=True)
+
+    profile = service.install(
+        game,
+        archive,
+        configuration={
+            "fsr4Mode": "force_int8",
+            "fsrAgilitySdkUpgrade": False,
+            "fsr4Watermark": False,
+            "dx11Upscaler": "auto",
+            "dx12Upscaler": "auto",
+            "vulkanUpscaler": "auto",
+        },
+    )
+    manifest = service._load_manifest(profile)
+
+    assert manifest["capabilities"]["forceInt8State"] == "supported"
+    assert service.status(game)["releaseCapabilities"]["forceInt8State"] == "supported"
 
 
 def test_wine_overrides_preserve_user_values_and_do_not_duplicate() -> None:

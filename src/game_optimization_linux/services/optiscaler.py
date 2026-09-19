@@ -22,6 +22,7 @@ from game_optimization_linux.config import GAMES_CONFIG_DIR, OPTISCALER_DATA_DIR
 from game_optimization_linux.models import (
     Game,
     OptiScalerProfile,
+    OPTISCALER_BACKENDS,
     OPTISCALER_PROXY_DLLS,
     OPTISCALER_SCHEMA_VERSION,
 )
@@ -178,6 +179,7 @@ class OptiScalerInstallPlan:
     conflicts: tuple[OptiScalerConflict, ...] = ()
     blockers: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
+    capabilities: OptiScalerIniCapabilities | None = None
 
     @property
     def can_install(self) -> bool:
@@ -226,6 +228,9 @@ class OptiScalerInstallPlan:
             "conflicts": [item.to_dict() for item in self.conflicts],
             "blockers": list(self.blockers),
             "warnings": list(self.warnings),
+            "capabilities": (
+                self.capabilities.to_dict() if self.capabilities is not None else {}
+            ),
             "canInstall": self.can_install,
             "requiresConflictConfirmation": self.requires_conflict_confirmation,
         }
@@ -249,7 +254,17 @@ class OptiScalerProfileRepository:
             raise OptiScalerError(f"could not read OptiScaler profile: {error}") from error
         if not isinstance(raw, Mapping):
             raise OptiScalerError("OptiScaler profile must be a JSON object")
-        return OptiScalerProfile.from_dict(raw, expected_app_id=default.app_id)
+        raw_schema = raw.get("schema_version", 0)
+        try:
+            schema = int(raw_schema)
+        except (TypeError, ValueError) as error:
+            raise OptiScalerError("invalid OptiScaler profile schema") from error
+        profile = OptiScalerProfile.from_dict(raw, expected_app_id=default.app_id)
+        if schema < OPTISCALER_SCHEMA_VERSION:
+            # Persist only known, validated legacy data. Unknown future schemas
+            # are rejected above and are never rewritten.
+            self.save(profile)
+        return profile
 
     def save(self, profile: OptiScalerProfile) -> Path:
         path = self.path(profile.app_id)
@@ -594,6 +609,7 @@ class OptiScalerService:
         injection_dll: str = "auto",
         allow_anticheat_risk: bool = False,
         version_override: str = "",
+        requested_fsr4_mode: str = "",
     ) -> OptiScalerInstallPlan:
         game_key = self.game_key(game)
         root = self._canonical_game_root(game)
@@ -612,6 +628,12 @@ class OptiScalerService:
         archive_format, version, archive_files = self._archive_payload(
             Path(archive_path), proxy
         )
+        capabilities = self.archive_ini_capabilities(Path(archive_path))
+        requested_mode = str(requested_fsr4_mode or "").strip().casefold()
+        if requested_mode == "force_int8" and not capabilities.supports_force_int8:
+            raise OptiScalerError(
+                "FSR 4.1.1 INT8 is not supported by the selected OptiScaler release"
+            )
         if version_override:
             selected_version = str(version_override).strip()
             if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._+-]{0,99}", selected_version):
@@ -740,6 +762,7 @@ class OptiScalerService:
             conflicts=tuple(dict.fromkeys(conflicts)),
             blockers=tuple(dict.fromkeys(blockers)),
             warnings=tuple(warnings),
+            capabilities=capabilities,
         )
 
     @staticmethod
@@ -831,6 +854,7 @@ class OptiScalerService:
         channel: str = "stable",
         fidelityfx_upscaler_version: str = "",
         release_version: str = "",
+        configuration: Mapping[str, Any] | None = None,
     ) -> OptiScalerProfile:
         """Install from a local archive or a verified private snapshot.
 
@@ -856,6 +880,7 @@ class OptiScalerService:
                 channel=channel,
                 fidelityfx_upscaler_version=fidelityfx_upscaler_version,
                 release_version=release_version,
+                configuration=configuration,
             )
         if not re.fullmatch(r"[0-9a-f]{64}", expected_hash):
             raise OptiScalerError("invalid expected OptiScaler archive SHA-256")
@@ -894,6 +919,7 @@ class OptiScalerService:
                 channel=channel,
                 fidelityfx_upscaler_version=fidelityfx_upscaler_version,
                 release_version=release_version,
+                configuration=configuration,
             )
 
     def _install_from_archive(
@@ -914,6 +940,7 @@ class OptiScalerService:
         channel: str = "stable",
         fidelityfx_upscaler_version: str = "",
         release_version: str = "",
+        configuration: Mapping[str, Any] | None = None,
     ) -> OptiScalerProfile:
         emit = progress or (lambda _stage, _value: None)
         emit("Validation", 0.05)
@@ -924,7 +951,29 @@ class OptiScalerService:
             injection_dll=injection_dll,
             allow_anticheat_risk=allow_anticheat_risk,
             version_override=release_version,
+            requested_fsr4_mode=(
+                str((configuration or {}).get("fsr4Mode", "")).casefold()
+            ),
         )
+        if configuration is not None:
+            desired = dict(configuration)
+            agility = desired.get("fsrAgilitySdkUpgrade", False)
+            watermark = desired.get("fsr4Watermark", False)
+            if not isinstance(agility, bool) or not isinstance(watermark, bool):
+                raise OptiScalerError("OptiScaler switch values must be booleans")
+            try:
+                managed_ini_updates(
+                    fsr4_mode=str(desired.get("fsr4Mode", "automatic")),
+                    agility_sdk_upgrade=agility,
+                    watermark=watermark,
+                    dx11_upscaler=str(desired.get("dx11Upscaler", "auto")),
+                    dx12_upscaler=str(desired.get("dx12Upscaler", "auto")),
+                    vulkan_upscaler=str(desired.get("vulkanUpscaler", "auto")),
+                    capabilities=plan.capabilities
+                    or OptiScalerIniCapabilities(False, "none", False, False, (), (), (), False),
+                )
+            except (TypeError, ValueError) as error:
+                raise OptiScalerError(str(error)) from error
         self._check_cancel(cancel_event)
         if plan.blockers:
             raise OptiScalerError("; ".join(plan.blockers))
@@ -1352,6 +1401,10 @@ class OptiScalerService:
                 "fidelityfx_upscaler_version": str(
                     fidelityfx_upscaler_version or ""
                 ),
+                "capabilities": (
+                    plan.capabilities.to_dict()
+                    if plan.capabilities is not None else {}
+                ),
                 "backup_directory": str(backup_root),
                 "installed_at": installed_at.isoformat(),
                 "operation": effective_operation,
@@ -1372,6 +1425,7 @@ class OptiScalerService:
                 schema_version=OPTISCALER_SCHEMA_VERSION,
                 app_id=plan.app_id,
                 enabled=True,
+                backend=previous_profile.backend,
                 executable=plan.executable,
                 install_directory=plan.install_directory,
                 installed_version=plan.version,
@@ -1962,6 +2016,21 @@ class OptiScalerService:
             settings_record=record,
         )
 
+    def set_backend(self, game: Game, backend: str) -> OptiScalerProfile:
+        """Select the mutually-exclusive runtime backend for a game profile."""
+
+        value = str(backend or "").strip().casefold()
+        if value not in OPTISCALER_BACKENDS:
+            raise OptiScalerError(f"Unsupported backend: {backend}")
+        if value == "dlss_enabler":
+            raise OptiScalerError(
+                "DLSS Enabler detection is available, but installation is not implemented"
+            )
+        profile = self.profile_repository.load(self.game_key(game))
+        updated = replace(profile, backend=value, enabled=value != "none")
+        self.profile_repository.save(updated)
+        return updated
+
     def configure_fsr4_update(
         self, game: Game, enabled: bool
     ) -> OptiScalerProfile:
@@ -2334,7 +2403,7 @@ class OptiScalerService:
             )
             self.profile_repository.save(profile)
         empty_capabilities = OptiScalerIniCapabilities(
-            False, "none", False, False, (), (), ()
+            False, "none", False, False, (), (), (), False
         )
         capabilities = empty_capabilities
         ini_state = inspect_optiscaler_ini_state("")
@@ -2437,6 +2506,27 @@ class OptiScalerService:
             )
         )
         data = profile.to_dict()
+        verification_state = str(verification.get("state", "not_verified"))
+        payload_verified = verification_state == "verified"
+        configuration_verified = bool(
+            verification_state == "verified"
+            and
+            has_effective_configuration
+            and configuration_matches_requested
+            and not verification.get("managed_configuration_drift", False)
+        )
+        installed_names = {
+            Path(str(item.get("relative_path", ""))).name.casefold()
+            for item in installed_files
+            if isinstance(item, Mapping)
+        }
+        plugin_present = "optipatcher.asi" in installed_names or any(
+            str(item.get("relative_path", "")).casefold().endswith(
+                "plugins/optipatcher.asi"
+            )
+            for item in installed_files
+            if isinstance(item, Mapping)
+        )
         data.update(
             {
                 "success": True,
@@ -2459,12 +2549,36 @@ class OptiScalerService:
                 "manifestError": manifest_error,
                 "executable": profile.executable,
                 "installDirectory": profile.install_directory,
+                "managedProxyPath": (
+                    str(
+                        Path(profile.install_directory) / profile.injection_dll
+                    )
+                    if profile.install_directory and profile.injection_dll
+                    else ""
+                ),
                 "executableStatus": resolution.status,
                 "executableConfidence": resolution.status,
                 "selectedExecutable": selected.to_dict() if selected else {},
                 "executableCandidates": [item.to_dict() for item in resolution.candidates],
                 "executableMessage": resolution.message,
                 "installedFiles": installed_files,
+                "backend": profile.backend,
+                "backendState": (
+                    "installed"
+                    if profile.backend == "optiscaler" and bool(profile.enabled)
+                    else "disabled"
+                    if profile.backend == "none"
+                    else "detection_only"
+                ),
+                "optipatcher": {
+                    "requested": profile.optipatcher_enabled,
+                    "installed": plugin_present,
+                    "compatibility": profile.optipatcher_compatibility,
+                    "state": (
+                        "installed" if plugin_present else
+                        "not_installed"
+                    ),
+                },
                 "replacedFiles": list(manifest.get("replaced_files", [])),
                 "createdFiles": list(manifest.get("created_files", [])),
                 "displacedFiles": list(manifest.get("displaced_files", [])),
@@ -2537,6 +2651,11 @@ class OptiScalerService:
                 "runtimeVerified": runtime_verification_status
                 in {"verified_fsr4", "verified_fsr4_int8"},
                 "iniCapabilities": capabilities.to_dict(),
+                "releaseCapabilities": dict(
+                    manifest.get("capabilities", {})
+                    if isinstance(manifest.get("capabilities", {}), Mapping)
+                    else {}
+                ),
                 "effectiveIniState": ini_state.to_dict(),
                 "iniCapabilityError": ini_error,
                 "managedSettings": dict(
@@ -2547,6 +2666,11 @@ class OptiScalerService:
                 "installationVerificationState": str(
                     verification.get("state", "not_verified")
                 ),
+                "installedStatus": bool(
+                    profile.enabled and profile.installation_state == "installed"
+                ),
+                "verifiedStatus": payload_verified,
+                "configurationVerifiedStatus": configuration_verified,
                 "installationVerificationSummary": str(
                     verification.get("summary", "Installation has not been verified")
                 ),

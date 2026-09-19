@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -22,10 +24,11 @@ FocusScope {
     property var updatesSummary: controller && controller.updatesSummary
                                  ? controller.updatesSummary : ({})
     readonly property var homeTiles: [
-        { "symbol": "▦", "title": qsTr("Library") },
-        { "symbol": "↻", "title": qsTr("Tasks") },
-        { "symbol": "↓", "title": qsTr("Updates") },
-        { "symbol": "⚙", "title": qsTr("Settings") }
+        { "symbol": "▦", "icon": App.UiIcons.sidebarGames, "title": qsTr("Library") },
+        { "symbol": "◉", "icon": App.UiIcons.sidebarNarrator, "title": qsTr("Narrator") },
+        { "symbol": "↻", "icon": App.UiIcons.sidebarTasks, "title": qsTr("Tasks") },
+        { "symbol": "↓", "icon": App.UiIcons.sidebarUpdates, "title": qsTr("Updates") },
+        { "symbol": "⚙", "icon": App.UiIcons.sidebarSettings, "title": qsTr("Settings") }
     ]
     readonly property var displayGames: games || []
     property int selectedGameIndex: displayGames.length > 0
@@ -33,19 +36,47 @@ FocusScope {
     property var selectedGame: selectedGameIndex >= 0
             ? displayGames[selectedGameIndex] : ({})
     readonly property var heroActions: [
-        { "id": "launch", "symbol": "▶", "title": launchPending ? qsTr("Launching…") : qsTr("Launch"), "enabled": selectedGame.launchAllowed === true && !launchPending },
-        { "id": "details", "symbol": "☷", "title": qsTr("Details"), "enabled": selectedGameIndex >= 0 },
-        { "id": "more", "symbol": "•••", "title": qsTr("More"), "enabled": selectedGameIndex >= 0 }
+        { "id": "launch", "icon": App.UiIcons.actionLaunch, "title": launchPending ? qsTr("Launching…") : qsTr("Launch"), "enabled": selectedGame.launchAllowed === true && !launchPending },
+        { "id": "details", "icon": App.UiIcons.actionAdvancedSettings, "title": qsTr("Details"), "enabled": selectedGameIndex >= 0 },
+        { "id": "more", "icon": App.UiIcons.actionSearch, "title": qsTr("More"), "enabled": selectedGameIndex >= 0 }
     ]
     readonly property var contextEntries: [
-        { "id": "launch", "symbol": "▶", "title": qsTr("Launch"), "enabled": selectedGame.launchAllowed === true && !launchPending },
-        { "id": "details", "symbol": "☷", "title": qsTr("Game details"), "enabled": selectedGameIndex >= 0 },
-        { "id": "updates", "symbol": "↓", "title": qsTr("Updates"), "enabled": selectedGameIndex >= 0 },
-        { "id": "close", "symbol": "‹", "title": qsTr("Close menu"), "enabled": true }
+        { "id": "launch", "icon": App.UiIcons.actionLaunch, "title": qsTr("Launch"), "enabled": selectedGame.launchAllowed === true && !launchPending },
+        { "id": "details", "icon": App.UiIcons.actionAdvancedSettings, "title": qsTr("Game details"), "enabled": selectedGameIndex >= 0 },
+        { "id": "updates", "icon": App.UiIcons.sidebarUpdates, "title": qsTr("Updates"), "enabled": selectedGameIndex >= 0 },
+        { "id": "close", "icon": App.UiIcons.actionCancel, "title": qsTr("Close menu"), "enabled": true }
     ]
+    property int runtimeProbeSerial: 0
+    readonly property var runtimeProbeMetrics: {
+        runtimeProbeSerial
+        return buildRuntimeProbeMetrics()
+    }
     signal openGame(string gameId)
     signal openLibrary()
     signal openSettings()
+    signal openNarrator()
+
+    function buildRuntimeProbeMetrics() {
+        var minimumActionHeight = 0
+        for (var actionIndex = 0; actionIndex < heroActionRepeater.count; ++actionIndex) {
+            var action = heroActionRepeater.itemAt(actionIndex)
+            if (action && action.visible)
+                minimumActionHeight = minimumActionHeight > 0
+                        ? Math.min(minimumActionHeight, action.height) : action.height
+        }
+        var cell = gameStrip.currentItem
+        var tile = tileRepeater.itemAt(0)
+        var tilePoint = tile ? tile.mapToItem(page, 0, 0) : null
+        return {
+            "homeActionMinHeight": minimumActionHeight,
+            "homeCardMaxWidth": cell ? Number(cell.probeCardWidth) : 0,
+            "homeCardMaxHeight": cell ? Number(cell.probeCardHeight) : 0,
+            "firstTileInside": !tile || (tilePoint.x >= -1.5
+                    && tilePoint.y >= -1.5
+                    && tilePoint.x + tile.width <= page.width + 1.5
+                    && tilePoint.y + tile.height <= page.height + 1.5)
+        }
+    }
 
     function restoreActiveFocus() {
         forceActiveFocus()
@@ -87,6 +118,7 @@ FocusScope {
     }
 
     onGamesChanged: Qt.callLater(restoreRetainedSelection)
+    onSelectedGameChanged: Qt.callLater(ensureHeroAction)
 
     function restoreRetainedSelection() {
         if (displayGames.length === 0) {
@@ -103,131 +135,220 @@ FocusScope {
                                              displayGames.length - 1)))
     }
 
+    function playSemanticSound(kind) {
+        if (controller && controller.playCouchSound && String(kind || "").length)
+            controller.playCouchSound(String(kind))
+    }
+
     function selectGameIndex(index) {
         if (index < 0 || index >= displayGames.length)
-            return
+            return false
+        var changed = gameStrip.currentIndex !== index
         gameStrip.currentIndex = index
         gameStrip.positionViewAtIndex(index, ListView.Contain)
         retainedGameId = String(displayGames[index].id || "")
         if (navigation)
             navigation.rememberFocus("home", retainedGameId, index)
+        return changed
     }
 
     function activateTile() {
-        if (selectedTile === 0)
+        if (selectedTile === 0) {
             openLibrary()
-        else if (selectedTile === 1 && controller)
+            return true
+        }
+        if (selectedTile === 1 && controller) {
+            controller.navigate("narrator")
+            openNarrator()
+            return true
+        }
+        if (selectedTile === 2 && controller) {
             controller.navigate("tasks")
-        else if (selectedTile === 2 && controller)
+            return true
+        }
+        if (selectedTile === 3 && controller) {
             controller.navigate("updates")
-        else if (selectedTile === 3)
+            return true
+        }
+        if (selectedTile === 4) {
             openSettings()
+            return true
+        }
+        return false
     }
 
     function activateHeroAction() {
-        if (selectedGameIndex < 0 || !heroActions[selectedHeroAction].enabled)
-            return
+        if (selectedGameIndex < 0 || !heroActions[selectedHeroAction]
+                || !heroActions[selectedHeroAction].enabled)
+            return false
         if (selectedHeroAction === 0 && controller) {
             launchPending = true
-            controller.launchGame(String(selectedGame.id || ""))
+            var launched = controller.launchGame(String(selectedGame.id || ""))
+            if (!launched) {
+                launchPending = false
+                return false
+            }
             launchGuard.restart()
-        } else if (selectedHeroAction === 1) {
-            openGame(String(selectedGame.id || ""))
-        } else {
-            openContextMenu()
+            return true
         }
+        if (selectedHeroAction === 1) {
+            openGame(String(selectedGame.id || ""))
+            return true
+        }
+        return openContextMenu()
     }
 
     function openContextMenu() {
         if (selectedGameIndex < 0)
-            return
+            return false
         contextMenuIndex = selectedGame.launchAllowed === true ? 0 : 1
         contextMenuOpen = true
         if (navigation)
             navigation.openModal("game-context", contextEntries[contextMenuIndex].id)
         restoreActiveFocus()
+        return true
     }
 
     function closeContextMenu() {
+        if (!contextMenuOpen)
+            return false
         contextMenuOpen = false
         if (navigation)
             navigation.closeModal()
         restoreActiveFocus()
+        return true
+    }
+
+    function moveEnabled(model, current, delta) {
+        var candidate = current
+        for (var count = 0; count < model.length; ++count) {
+            candidate += delta
+            if (candidate < 0 || candidate >= model.length)
+                return current
+            if (model[candidate].enabled !== false)
+                return candidate
+        }
+        return current
+    }
+
+    function ensureHeroAction() {
+        if (heroActions[selectedHeroAction] && heroActions[selectedHeroAction].enabled)
+            return
+        selectedHeroAction = moveEnabled(heroActions, -1, 1)
     }
 
     function activateContextEntry() {
         var entry = contextEntries[contextMenuIndex]
         if (!entry || !entry.enabled)
-            return
+            return false
         if (entry.id === "close") {
-            closeContextMenu()
-        } else if (entry.id === "launch") {
+            return closeContextMenu()
+        }
+        if (entry.id === "launch") {
             closeContextMenu()
             selectedHeroAction = 0
-            activateHeroAction()
-        } else if (entry.id === "details") {
+            return activateHeroAction()
+        }
+        if (entry.id === "details") {
             closeContextMenu()
             openGame(String(selectedGame.id || ""))
-        } else if (entry.id === "updates" && controller) {
+            return true
+        }
+        if (entry.id === "updates" && controller) {
             closeContextMenu()
             controller.navigate("updates")
+            return true
         }
+        return false
     }
 
     function handleAction(action) {
+        if (action === "ContextMenu" || action === "Search") action = "MoreActions"
+        else if (action === "PageLeft" || action === "PreviousSection") action = "PageUp"
+        else if (action === "PageRight" || action === "NextSection") action = "PageDown"
         if (contextMenuOpen) {
-            if (action === "Back" || action === "ContextMenu") {
-                closeContextMenu()
-            } else if (action === "NavigateUp") {
-                contextMenuIndex = Math.max(0, contextMenuIndex - 1)
+            if (action === "Back" || action === "MoreActions") {
+                if (closeContextMenu())
+                    playSemanticSound("back")
+            } else if (action === "NavigateUp" || action === "NavigateDown") {
+                var previousContextIndex = contextMenuIndex
+                contextMenuIndex = moveEnabled(
+                    contextEntries, contextMenuIndex,
+                    action === "NavigateUp" ? -1 : 1)
                 restoreActiveFocus()
-            } else if (action === "NavigateDown") {
-                contextMenuIndex = Math.min(contextEntries.length - 1,
-                                            contextMenuIndex + 1)
-                restoreActiveFocus()
+                if (contextMenuIndex !== previousContextIndex)
+                    playSemanticSound("navigate")
             } else if (action === "Confirm") {
-                activateContextEntry()
+                var contextEntry = contextEntries[contextMenuIndex]
+                if (!contextEntry || !contextEntry.enabled) {
+                    playSemanticSound("error")
+                } else if (activateContextEntry()) {
+                    playSemanticSound(contextEntry.id === "close" ? "back" : "confirm")
+                } else {
+                    playSemanticSound("error")
+                }
             }
             return
         }
         if (action === "Back") {
             return
-        } else if (action === "NavigateUp") {
-            if (focusZone === 1)
-                focusZone = 0
-            else if (focusZone === 2)
-                focusZone = 0
-        } else if (action === "NavigateDown") {
-            if (focusZone === 0)
+        } else if (action === "NavigateUp" || action === "NavigateDown") {
+            var previousZone = focusZone
+            if (action === "NavigateUp") {
+                if (focusZone === 1 || focusZone === 2)
+                    focusZone = 0
+            } else if (focusZone === 0) {
                 focusZone = 2
-            else if (focusZone === 2)
+            } else if (focusZone === 2) {
                 focusZone = 1
+            }
+            if (focusZone !== previousZone)
+                playSemanticSound("navigate")
         } else if (action === "NavigateLeft" && focusZone === 0 && gameStrip.count > 0) {
-            selectGameIndex(Math.max(0, gameStrip.currentIndex - 1))
+            if (selectGameIndex(Math.max(0, gameStrip.currentIndex - 1)))
+                playSemanticSound("navigate")
         } else if (action === "NavigateRight" && focusZone === 0 && gameStrip.count > 0) {
-            selectGameIndex(Math.min(gameStrip.count - 1, gameStrip.currentIndex + 1))
-        } else if (action === "NavigateLeft" && focusZone === 1) {
-            selectedTile = Math.max(0, selectedTile - 1)
-        } else if (action === "NavigateRight" && focusZone === 1) {
-            selectedTile = Math.min(homeTiles.length - 1, selectedTile + 1)
-        } else if (action === "NavigateLeft" && focusZone === 2) {
-            selectedHeroAction = Math.max(0, selectedHeroAction - 1)
-        } else if (action === "NavigateRight" && focusZone === 2) {
-            selectedHeroAction = Math.min(heroActions.length - 1,
-                                          selectedHeroAction + 1)
-        } else if (action === "Confirm" && focusZone === 0 && selectedGameIndex >= 0) {
-            openGame(String(selectedGame.id || ""))
+            if (selectGameIndex(Math.min(gameStrip.count - 1, gameStrip.currentIndex + 1)))
+                playSemanticSound("navigate")
+        } else if ((action === "NavigateLeft" || action === "NavigateRight")
+                   && focusZone === 1) {
+            var previousTile = selectedTile
+            selectedTile = action === "NavigateLeft"
+                    ? Math.max(0, selectedTile - 1)
+                    : Math.min(homeTiles.length - 1, selectedTile + 1)
+            if (selectedTile !== previousTile)
+                playSemanticSound("navigate")
+        } else if ((action === "NavigateLeft" || action === "NavigateRight")
+                   && focusZone === 2) {
+            var previousHeroAction = selectedHeroAction
+            selectedHeroAction = moveEnabled(
+                heroActions, selectedHeroAction,
+                action === "NavigateLeft" ? -1 : 1)
+            if (selectedHeroAction !== previousHeroAction)
+                playSemanticSound("navigate")
+        } else if (action === "Confirm" && focusZone === 0) {
+            if (selectedGameIndex >= 0) {
+                openGame(String(selectedGame.id || ""))
+                playSemanticSound("confirm")
+            } else {
+                playSemanticSound("error")
+            }
         } else if (action === "Confirm" && focusZone === 1) {
-            activateTile()
+            playSemanticSound(activateTile() ? "confirm" : "error")
         } else if (action === "Confirm" && focusZone === 2) {
-            activateHeroAction()
-        } else if (action === "ContextMenu" && selectedGameIndex >= 0) {
-            openContextMenu()
-        } else if (action === "PageLeft" && gameStrip.count > 0) {
-            selectGameIndex(Math.max(0, gameStrip.currentIndex - 5))
-        } else if (action === "PageRight" && gameStrip.count > 0) {
-            selectGameIndex(Math.min(gameStrip.count - 1,
-                                     gameStrip.currentIndex + 5))
+            playSemanticSound(activateHeroAction() ? "confirm" : "error")
+        } else if (action === "MoreActions") {
+            if (openContextMenu())
+                playSemanticSound("open")
+            else
+                playSemanticSound("error")
+        } else if (action === "PageUp" && gameStrip.count > 0) {
+            if (selectGameIndex(Math.max(0, gameStrip.currentIndex - 5)))
+                playSemanticSound("navigate")
+        } else if (action === "PageDown" && gameStrip.count > 0) {
+            if (selectGameIndex(Math.min(gameStrip.count - 1,
+                                         gameStrip.currentIndex + 5)))
+                playSemanticSound("navigate")
         }
     }
 
@@ -321,7 +442,8 @@ FocusScope {
                     required property var modelData
                     required property int index
                     couchScale: page.couchScale
-                    text: modelData.symbol + "  " + modelData.title
+                    iconSource: modelData.icon || ""
+                    text: modelData.title
                     enabled: modelData.enabled
                     focus: page.focusZone === 2 && page.selectedHeroAction === index
                     implicitWidth: index === 0 ? 230 * page.couchScale : 205 * page.couchScale
@@ -375,6 +497,8 @@ FocusScope {
                 width: 258 * page.couchScale
                 height: gameStrip.height
                 readonly property bool selected: gameStrip.currentIndex === index
+                readonly property real probeCardWidth: gameCard.width * gameCard.scale
+                readonly property real probeCardHeight: gameCard.height * gameCard.scale
 
                 Rectangle {
                     anchors.centerIn: gameCard
@@ -507,7 +631,9 @@ FocusScope {
                         couchScale: page.couchScale
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        text: modelData.symbol + "  " + modelData.title
+                        iconSource: modelData.icon || ""
+                        iconSize: App.Theme.couchIconSizeNav
+                        text: modelData.title
                         focus: page.focusZone === 1 && page.selectedTile === index
                         font.pixelSize: 18 * page.couchScale
                         font.weight: Font.DemiBold
@@ -564,7 +690,8 @@ FocusScope {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
                         couchScale: page.couchScale
-                        symbol: modelData.symbol
+                        symbol: modelData.symbol || ""
+                        iconSource: modelData.icon || ""
                         text: modelData.title
                         enabled: modelData.enabled
                         primary: modelData.id === "launch"

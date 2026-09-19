@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 import logging
 import time
 from typing import Any
@@ -31,6 +32,14 @@ _COMPLETION_RATIO = 0.98
 _MAX_BUFFER_BYTES = 1024 * 1024
 
 
+def _expected_seconds(audio: PcmAudio) -> float:
+    """Duration implied by the PCM itself, independent of backend state."""
+
+    width = _SAMPLE_WIDTHS.get(audio.sample_format.casefold(), 2)
+    frame_bytes = max(1, width * max(1, audio.channels))
+    return len(audio.samples) / frame_bytes / max(1, audio.sample_rate)
+
+
 @dataclass(slots=True)
 class _Playback:
     audio: PcmAudio
@@ -41,15 +50,15 @@ class _Playback:
     error_callback: Callable[[str], None]
     queued_at: float
     started_at: float = 0.0
+    # Diagnostics only: lets one request_id be tied to the phrase it spoke, so a
+    # re-recognised variant of the same subtitle is identifiable in the log.
+    text: str = ""
 
     @property
     def expected_seconds(self) -> float:
         """Duration implied by the PCM itself, independent of backend state."""
 
-        width = _SAMPLE_WIDTHS.get(self.audio.sample_format.casefold(), 2)
-        frame_bytes = max(1, width * max(1, self.audio.channels))
-        rate = max(1, self.audio.sample_rate)
-        return len(self.audio.samples) / frame_bytes / rate
+        return _expected_seconds(self.audio)
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,7 +157,14 @@ class QtNarratorAudioOutput(QObject):
         started_callback: Callable[[float], None],
         completed_callback: Callable[[], None],
         error_callback: Callable[[str], None],
+        text: str = "",
     ) -> None:
+        logger.debug(
+            "Narrator playback event=submitted request=%d expected_ms=%.0f text=%r",
+            request_id,
+            _expected_seconds(audio) * 1000.0,
+            text[:120],
+        )
         self._playRequested.emit(
             _Playback(
                 audio=audio,
@@ -158,6 +174,7 @@ class QtNarratorAudioOutput(QObject):
                 completed_callback=completed_callback,
                 error_callback=error_callback,
                 queued_at=time.monotonic(),
+                text=str(text),
             )
         )
 
@@ -169,8 +186,30 @@ class QtNarratorAudioOutput(QObject):
         if not isinstance(playback, _Playback):
             return
         if self._current is not None:
+            # A newcomer NEVER stops what is playing. It waits, and only an
+            # already-waiting item can be displaced. Logged so the three cases
+            # stay distinguishable: superseded-while-queued (here),
+            # explicitly-stopped (_stop_all) and backend-cut (_state_changed).
             if self._pending is not None:
                 self._superseded_count += 1
+                logger.debug(
+                    "Narrator playback event=superseded request=%d "
+                    "replaces_request_id=%d replaced_state=queued "
+                    "similarity=%s replaced_text=%r text=%r",
+                    playback.request_id,
+                    self._pending.request_id,
+                    self._similarity(self._pending.text, playback.text),
+                    self._pending.text[:120],
+                    playback.text[:120],
+                )
+            logger.debug(
+                "Narrator playback event=queued request=%d "
+                "waits_for_request_id=%d actively_playing_text=%r text=%r",
+                playback.request_id,
+                self._current.request_id,
+                self._current.text[:120],
+                playback.text[:120],
+            )
             self._pending = playback
             return
         self._start(playback)
@@ -265,6 +304,14 @@ class QtNarratorAudioOutput(QObject):
         self._stop_requested = False
         self._current = playback
         self._sink.start(self._buffer)
+        logger.debug(
+            "Narrator playback event=started request=%d expected_ms=%.0f "
+            "buffer_bytes=%d text=%r",
+            playback.request_id,
+            playback.expected_seconds * 1000.0,
+            len(playback.audio.samples),
+            playback.text[:120],
+        )
         if self._current is playback:
             playback.started_callback(
                 max(0.0, (self._clock() - playback.queued_at) * 1000.0)
@@ -365,6 +412,19 @@ class QtNarratorAudioOutput(QObject):
             self._start(pending)
 
     @staticmethod
+    def _similarity(previous: str, current: str) -> str:
+        """Closeness of a replacement to what it replaced, for the log only.
+
+        Uses difflib, which is already how the pipeline compares phrases. It is
+        reported, never used to decide anything here.
+        """
+
+        if not previous or not current:
+            return "n/a"
+        ratio = SequenceMatcher(None, previous, current).ratio()
+        return f"{ratio:.3f}"
+
+    @staticmethod
     def _processed_seconds(sink: Any) -> float:
         """How much audio the backend actually processed."""
 
@@ -396,6 +456,22 @@ class QtNarratorAudioOutput(QObject):
     ) -> None:
         audio = playback.audio
         width = _SAMPLE_WIDTHS.get(audio.sample_format.casefold(), 2)
+        # One line per terminal event, carrying everything needed to attribute a
+        # perceived interruption to the right cause.
+        logger.debug(
+            "Narrator playback event=%s request=%d stop_reason=%r "
+            "played_ms=%.0f expected_ms=%.0f terminal_state=%s backend_error=%s "
+            "stop_requested=%s text=%r",
+            result,
+            playback.request_id,
+            reason,
+            processed_seconds * 1000.0,
+            playback.expected_seconds * 1000.0,
+            terminal_state,
+            backend_error,
+            self._stop_requested,
+            playback.text[:120],
+        )
         self._history.append(
             PlaybackRecord(
                 request_id=playback.request_id,

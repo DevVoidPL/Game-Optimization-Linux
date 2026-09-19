@@ -1801,6 +1801,11 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Choose a game from the library to open its details.</source>
         <translation>Wybierz grę z biblioteki, aby otworzyć jej szczegóły.</translation>
     </message>
+    <message>
+        <location filename="../qml/pages/GameDetailsPage.qml" line="0"/>
+        <source>Narrator</source>
+        <translation>Lektor</translation>
+    </message>
 </context>
 <context>
     <name>GameGridCard</name>
@@ -6418,6 +6423,21 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Restore</source>
         <translation>Przywróć</translation>
     </message>
+    <message>
+        <location filename="../qml/pages/details/OptiScalerSection.qml" line="0"/>
+        <source>Nightly (experimental)</source>
+        <translation>Nightly (eksperymentalny)</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptiScalerSection.qml" line="0"/>
+        <source>Release channel</source>
+        <translation>Kanał wydania</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/OptiScalerSection.qml" line="0"/>
+        <source>Stable uses the official stable OptiScaler release. Nightly always fetches the newest qualified official prerelease and is experimental.</source>
+        <translation>Stable korzysta z oficjalnego stabilnego wydania OptiScaler. Nightly zawsze pobiera najnowsze kwalifikowane oficjalne wydanie przedpremierowe i jest eksperymentalny.</translation>
+    </message>
 </context>
 <context>
     <name>OptimizationTab</name>
@@ -10809,6 +10829,252 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
     <message>
         <source>Save region</source>
         <translation type="vanished">Zapisz obszar</translation>
+    </message>
+</context>
+<context>
+    <name>NarratorTab</name>
+    <message>
+        <location filename="../qml/pages/details/NarratorTab.qml" line="0"/>
+        <source>Narrator</source>
+        <translation>Lektor</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorTab.qml" line="0"/>
+        <source>Configure live subtitle capture, translation and speech for this game. These settings are saved only for this game.</source>
+        <translation>Skonfiguruj przechwytywanie napisów na żywo, tłumaczenie i mowę dla tej gry. Te ustawienia są zapisywane tylko dla tej gry.</translation>
+    </message>
+</context>
+<context>
+    <name>NarratorSection</name>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>%1 (not installed)</source>
+        <translation>%1 (niezainstalowany)</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>%1%</source>
+        <translation>%1%</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>%1×</source>
+        <translation>%1×</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Active</source>
+        <translation>Aktywne</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Capture: %1</source>
+        <translation>Przechwytywanie: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Capturing</source>
+        <translation>Przechwytywanie</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Choose the translation style used for detected subtitles</source>
+        <translation>Wybierz styl tłumaczenia używany dla wykrytych napisów</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Component missing</source>
+        <translation>Brak komponentu</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Component status</source>
+        <translation>Stan komponentów</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Direct Polish reads native Polish subtitles without translation. Otherwise, detected text is translated into Polish.</source>
+        <translation>Direct Polish odczytuje natywne polskie napisy bez tłumaczenia. W przeciwnym razie wykryty tekst jest tłumaczony na polski.</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Enable Narrator for this game first</source>
+        <translation>Najpierw włącz Lektora dla tej gry</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Enable subtitle capture and speech for this game</source>
+        <translation>Włącz przechwytywanie napisów i mowę dla tej gry</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>English → Polish (translated)</source>
+        <translation>Angielski → polski (tłumaczone)</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Error</source>
+        <translation>Błąd</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Idle</source>
+        <translation>Bezczynny</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Launch the game before starting Narrator</source>
+        <translation>Uruchom grę przed uruchomieniem Lektora</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Narrator</source>
+        <translation>Lektor</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Narrator is already active for another game</source>
+        <translation>Lektor jest już aktywny dla innej gry</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Narrator reads on-screen subtitles for this game, translates them and speaks the result. These settings are saved only for this game.</source>
+        <translation>Lektor odczytuje napisy wyświetlane na ekranie tej gry, tłumaczy je i wypowiada wynik. Te ustawienia są zapisywane tylko dla tej gry.</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Narrator settings could not be saved</source>
+        <translation>Nie udało się zapisać ustawień Lektora</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Narrator status</source>
+        <translation>Stan Lektora</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Not needed</source>
+        <translation>Niepotrzebne</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Not used while Direct Polish is active</source>
+        <translation>Nieużywane, gdy aktywny jest Direct Polish</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>OCR: %1</source>
+        <translation>OCR: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Open the native selector to pick the screen area Narrator reads subtitles from</source>
+        <translation>Otwórz natywny selektor, aby wybrać obszar ekranu, z którego Lektor odczytuje napisy</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Polish (Direct Polish, no translation)</source>
+        <translation>Polski (Direct Polish, bez tłumaczenia)</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Polish voice</source>
+        <translation>Głos polski</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Ready</source>
+        <translation>Gotowe</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Select subtitle region</source>
+        <translation>Wybierz obszar napisów</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Speaking</source>
+        <translation>Mówi</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Speech rate</source>
+        <translation>Szybkość mowy</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Speech voice used to read translated or direct Polish subtitles</source>
+        <translation>Głos używany do odczytywania przetłumaczonych lub bezpośrednich polskich napisów</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Speech: %1</source>
+        <translation>Mowa: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Start Narrator</source>
+        <translation>Uruchom Lektora</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Starting</source>
+        <translation>Uruchamianie</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Stop Narrator</source>
+        <translation>Zatrzymaj Lektora</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Stopped</source>
+        <translation>Zatrzymany</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Stopping</source>
+        <translation>Zatrzymywanie</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Subtitle language</source>
+        <translation>Język napisów</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Subtitle region</source>
+        <translation>Obszar napisów</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Translating</source>
+        <translation>Tłumaczenie</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Translation profile</source>
+        <translation>Profil tłumaczenia</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Translation: %1</source>
+        <translation>Tłumaczenie: %1</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Unavailable</source>
+        <translation>Niedostępne</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Unknown</source>
+        <translation>Nieznany</translation>
+    </message>
+    <message>
+        <location filename="../qml/pages/details/NarratorSection.qml" line="0"/>
+        <source>Volume</source>
+        <translation>Głośność</translation>
     </message>
 </context>
 </TS>

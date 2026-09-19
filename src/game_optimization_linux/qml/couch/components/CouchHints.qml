@@ -1,3 +1,5 @@
+pragma ComponentBehavior: Bound
+
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
@@ -12,10 +14,14 @@ Rectangle {
     property string menuText: qsTr("System menu")
     property string contextText: qsTr("More")
     property string sectionText: qsTr("Tabs")
+    property string directionText: qsTr("Move")
+    property string pageText: qsTr("Scroll")
     property bool showConfirm: true
     property bool showBack: true
     property bool showContext: true
     property bool showTabs: true
+    property bool showDirections: false
+    property bool showPages: false
     property bool showMenu: true
     readonly property var visibleHints: buildHints()
 
@@ -26,9 +32,13 @@ Rectangle {
         if (showBack)
             result.push({ "button": String(buttonHints.back || "B"), "label": backText })
         if (showContext)
-            result.push({ "button": String(buttonHints.context || buttonHints.search || "Y"), "label": contextText })
+            result.push({ "button": String(buttonHints.more || buttonHints.context || buttonHints.search || "North"), "label": contextText })
         if (showTabs)
-            result.push({ "button": String(buttonHints.pageLeft || buttonHints.previous || "L1") + "/" + String(buttonHints.pageRight || buttonHints.next || "R1"), "label": sectionText })
+            result.push({ "button": String(buttonHints.previousTab || buttonHints.pageLeft || buttonHints.previous || "L1") + "/" + String(buttonHints.nextTab || buttonHints.pageRight || buttonHints.next || "R1"), "label": sectionText })
+        if (showDirections)
+            result.push({ "button": "D-pad", "label": directionText })
+        if (showPages)
+            result.push({ "button": String(buttonHints.pageUp || "L2") + "/" + String(buttonHints.pageDown || "R2"), "label": pageText })
         if (showMenu)
             result.push({ "button": String(buttonHints.systemMenu || buttonHints.menu || "Menu"), "label": menuText })
         return result
@@ -49,6 +59,7 @@ Rectangle {
         Repeater {
             model: hints.visibleHints
             delegate: RowLayout {
+                id: hintDelegate
                 required property var modelData
                 spacing: 9 * hints.couchScale
                 Rectangle {
@@ -63,14 +74,14 @@ Rectangle {
                     Label {
                         id: hintButton
                         anchors.centerIn: parent
-                        text: modelData.button
+                        text: hintDelegate.modelData.button
                         color: App.Theme.text
                         font.pixelSize: 14 * hints.couchScale
                         font.weight: Font.Bold
                     }
                 }
                 Label {
-                    text: modelData.label
+                    text: hintDelegate.modelData.label
                     color: App.Theme.text
                     font.pixelSize: 16 * hints.couchScale
                     font.weight: Font.DemiBold

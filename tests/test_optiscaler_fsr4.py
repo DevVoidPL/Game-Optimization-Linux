@@ -119,7 +119,7 @@ def test_schema_1_profile_migrates_with_conservative_fsr4_defaults() -> None:
         }
     )
 
-    assert profile.schema_version == OPTISCALER_SCHEMA_VERSION == 2
+    assert profile.schema_version == OPTISCALER_SCHEMA_VERSION == 3
     assert profile.channel == "stable"
     assert profile.fsr4_mode == "automatic"
     assert profile.effective_fsr4_mode == "disabled"
@@ -127,6 +127,92 @@ def test_schema_1_profile_migrates_with_conservative_fsr4_defaults() -> None:
     assert profile.fsr4_watermark is False
     assert profile.configuration_applied is False
     assert profile.runtime_verification_status == "not_verified"
+
+
+def test_current_schema_profile_is_accepted() -> None:
+    profile = OptiScalerProfile.from_dict(
+        {"schema_version": 3, "app_id": "3240220", "installed_version": "0.9.4"}
+    )
+
+    assert profile.schema_version == OPTISCALER_SCHEMA_VERSION
+    assert profile.installed_version == "0.9.4"
+
+
+def test_schema_2_profile_migrates_without_losing_settings() -> None:
+    profile = OptiScalerProfile.from_dict(
+        {
+            "schema_version": 2,
+            "app_id": "3240220",
+            "enabled": True,
+            "channel": "edge",
+            "installed_version": "0.7-old_nightly",
+            "fsr4_mode": "normal",
+            "effective_fsr4_mode": "normal",
+            "executable": "GTA5_Enhanced.exe",
+            "installation_state": "removed",
+        }
+    )
+
+    assert profile.schema_version == 3
+    assert profile.enabled is True
+    assert profile.channel == "edge"
+    assert profile.installed_version == "0.7-old_nightly"
+    assert profile.fsr4_mode == "normal"
+    assert profile.executable == "GTA5_Enhanced.exe"
+
+
+def test_profile_without_schema_version_uses_legacy_migration() -> None:
+    profile = OptiScalerProfile.from_dict(
+        {"app_id": "3240220", "enabled": True, "channel": "stable"}
+    )
+
+    assert profile.schema_version == OPTISCALER_SCHEMA_VERSION
+    assert profile.enabled is True
+    assert profile.channel == "stable"
+
+
+def test_unknown_schema_is_rejected_without_downgrade() -> None:
+    with pytest.raises(ValueError, match="unsupported OptiScaler profile schema: 99"):
+        OptiScalerProfile.from_dict(
+            {"schema_version": 99, "app_id": "3240220", "enabled": True}
+        )
+
+
+def test_gta_profile_round_trip_migration_is_idempotent(tmp_path: Path) -> None:
+    repository = OptiScalerProfileRepository(tmp_path / "games")
+    path = repository.path("3240220")
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        '{"schema_version": 2, "app_id": "3240220", '
+        '"enabled": true, "channel": "edge", '
+        '"installed_version": "0.7-old_nightly", '
+        '"executable": "GTA5_Enhanced.exe"}\n',
+        encoding="utf-8",
+    )
+
+    migrated = repository.load("3240220")
+    first = path.read_text(encoding="utf-8")
+    loaded_again = repository.load("3240220")
+    second = path.read_text(encoding="utf-8")
+
+    assert migrated.schema_version == 3
+    assert loaded_again.to_dict() == migrated.to_dict()
+    assert first == second
+    assert '"schema_version": 3' in second
+    assert '"installed_version": "0.7-old_nightly"' in second
+
+
+def test_unknown_schema_file_is_preserved(tmp_path: Path) -> None:
+    repository = OptiScalerProfileRepository(tmp_path / "games")
+    path = repository.path("3240220")
+    path.parent.mkdir(parents=True)
+    original = '{"schema_version": 99, "app_id": "3240220", "enabled": true}\n'
+    path.write_text(original, encoding="utf-8")
+
+    with pytest.raises(ValueError, match="unsupported OptiScaler profile schema: 99"):
+        repository.load("3240220")
+
+    assert path.read_text(encoding="utf-8") == original
 
 
 def test_new_profile_defaults_do_not_enable_or_claim_fsr4() -> None:
@@ -177,6 +263,35 @@ def test_inspection_uses_installed_ini_as_capability_authority() -> None:
         "fsr31_12",
         "dlss",
     )
+
+
+def test_force_int8_capability_is_explicitly_unsupported_when_key_is_absent() -> None:
+    capabilities = inspect_optiscaler_ini(
+        "[FSR]\nFsr4Update=true\n\n[Upscalers]\nDx12Upscaler=auto\n"
+    )
+
+    assert capabilities.known is True
+    assert capabilities.force_int8_state == "unsupported"
+    assert capabilities.supports_force_int8 is False
+
+
+def test_force_int8_capability_is_unknown_without_release_metadata() -> None:
+    capabilities = OptiScalerIniCapabilities(
+        False, "none", False, False, (), (), (), False
+    )
+
+    assert capabilities.force_int8_state == "unknown"
+    assert capabilities.supports_force_int8 is False
+
+
+def test_force_int8_capabilities_can_differ_between_channels() -> None:
+    stable = inspect_optiscaler_ini("[FSR]\nFsr4Update=true\n")
+    edge = inspect_optiscaler_ini(
+        "[FSR]\nFsr4Update=true\nFsr4ForceEnableInt8=false\n"
+    )
+
+    assert stable.force_int8_state == "unsupported"
+    assert edge.force_int8_state == "supported"
 
 
 def test_inspection_reads_current_force_model_and_ffx_backend_prose() -> None:
@@ -238,6 +353,112 @@ Fsr4EnableWatermark=auto
             watermark=False,
             dx11_upscaler="auto",
             dx12_upscaler="auto",
+            vulkan_upscaler="auto",
+            capabilities=capabilities,
+        )
+
+
+def test_stable_generation_keeps_fsr31_token() -> None:
+    capabilities = inspect_optiscaler_ini(BOOLEAN_FSR4_INI)
+
+    updates = managed_ini_updates(
+        fsr4_mode="normal",
+        agility_sdk_upgrade=False,
+        watermark=False,
+        dx11_upscaler="auto",
+        dx12_upscaler="fsr31",
+        vulkan_upscaler="auto",
+        capabilities=capabilities,
+    )
+
+    assert updates[("Upscalers", "Dx12Upscaler")] == "fsr31"
+
+
+def test_nightly_generation_maps_profile_fsr31_to_advertised_ffx() -> None:
+    ini = """\
+[Upscalers]
+; xess, fsr21, fsr22, ffx (FSR 2.3; 3.1; 4.x), dlss
+Dx12Upscaler=auto
+[FSR]
+Fsr4ForceModel=auto
+"""
+    capabilities = inspect_optiscaler_ini(ini)
+
+    updates = managed_ini_updates(
+        fsr4_mode="normal",
+        agility_sdk_upgrade=False,
+        watermark=False,
+        dx11_upscaler="auto",
+        dx12_upscaler="fsr31",
+        vulkan_upscaler="auto",
+        capabilities=capabilities,
+    )
+
+    assert updates[("Upscalers", "Dx12Upscaler")] == "ffx"
+    assert ("FSR", "Fsr4Update") not in updates
+
+
+def test_model_generation_does_not_require_optional_fsr4_update() -> None:
+    capabilities = inspect_optiscaler_ini(
+        "[FSR]\nFsr4ForceModel=auto\n"
+    )
+
+    updates = managed_ini_updates(
+        fsr4_mode="force_int8",
+        agility_sdk_upgrade=False,
+        watermark=False,
+        dx11_upscaler="auto",
+        dx12_upscaler="auto",
+        vulkan_upscaler="auto",
+        capabilities=capabilities,
+    )
+
+    assert capabilities.fsr4_update is False
+    assert updates[("FSR", "Fsr4ForceModel")] == "2"
+    assert ("FSR", "Fsr4Update") not in updates
+
+
+def test_unadvertised_upscaler_value_is_still_rejected() -> None:
+    capabilities = inspect_optiscaler_ini(
+        "[Upscalers]\n"
+        "; xess, ffx, dlss\n"
+        "Dx12Upscaler=auto\n"
+        "[FSR]\n"
+        "Fsr4ForceModel=auto\n"
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Dx12Upscaler=fsr22 is not advertised",
+    ):
+        managed_ini_updates(
+            fsr4_mode="automatic",
+            agility_sdk_upgrade=False,
+            watermark=False,
+            dx11_upscaler="auto",
+            dx12_upscaler="fsr22",
+            vulkan_upscaler="auto",
+            capabilities=capabilities,
+        )
+
+
+def test_unknown_future_ini_does_not_guess_or_write_upscaler_values() -> None:
+    capabilities = inspect_optiscaler_ini(
+        "[FutureUpscalers]\n"
+        "Dx12Upscaler=nextgen\n"
+        "[FutureFSR]\n"
+        "ModelOverride=nextgen\n"
+    )
+
+    assert capabilities.dx12_values == ()
+    assert capabilities.supports_fsr4 is False
+    with pytest.raises(ValueError, match="does not expose FSR4 controls"):
+        managed_ini_updates(
+            fsr4_mode="automatic",
+            agility_sdk_upgrade=False,
+            watermark=False,
+            dx11_upscaler="auto",
+            dx12_upscaler="fsr31",
             vulkan_upscaler="auto",
             capabilities=capabilities,
         )

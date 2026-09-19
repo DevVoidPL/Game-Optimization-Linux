@@ -225,6 +225,8 @@ class _Audio:
 
     def __init__(self, *, auto_start: bool = True) -> None:
         self.played: list[tuple[int, float]] = []
+        # Diagnostics: the phrase handed to the audio layer for each request.
+        self.spoken_texts: list[str] = []
         self.started_callbacks: list[Callable[[float], None]] = []
         self.completed_callbacks: list[Callable[[], None]] = []
         self.error_callbacks: list[Callable[[str], None]] = []
@@ -240,8 +242,10 @@ class _Audio:
         started_callback: Callable[[float], None],
         completed_callback: Callable[[], None],
         error_callback: Callable[[str], None],
+        text: str = "",
     ) -> None:
         assert audio.samples == b"\0\0"
+        self.spoken_texts.append(text)
         self.played.append((request_id, volume))
         self.started_callbacks.append(started_callback)
         self.completed_callbacks.append(completed_callback)
@@ -735,6 +739,45 @@ def test_narrator_settings_are_per_game_utf8_atomic_and_survive_restart(
     assert not list(first_path.parent.glob("*.tmp"))
 
 
+def test_global_narrator_defaults_are_persistent_and_do_not_replace_game_profiles(
+    tmp_path: Path,
+) -> None:
+    root = tmp_path / "games"
+    repository = NarratorSettingsRepository(root)
+    global_settings = replace(
+        repository.load_defaults(),
+        enabled=True,
+        subtitle_language_mode="polish",
+        voice_id="głos-globalny",
+        volume=0.7,
+        speech_rate=1.15,
+        capture_sampling_hz=7.0,
+        visual_change_threshold=0.12,
+        stabilization_ms=350,
+        ocr_min_confidence=0.75,
+        duplicate_cooldown_ms=5000,
+    )
+    repository.save_defaults(global_settings)
+
+    inherited = repository.load("292030")
+    assert inherited.game_key == "292030"
+    assert inherited.enabled is True
+    assert inherited.voice_id == "głos-globalny"
+    assert inherited.volume == 0.7
+    assert inherited.speech_rate == 1.15
+
+    per_game = replace(inherited, voice_id="głos-gry", volume=0.4)
+    repository.save(per_game)
+    repository.save_defaults(replace(global_settings, voice_id="nowy-globalny", volume=0.9))
+
+    restarted = NarratorSettingsRepository(root)
+    assert restarted.load("292030") == per_game
+    new_game = restarted.load("242550")
+    assert new_game.game_key == "242550"
+    assert new_game.voice_id == "nowy-globalny"
+    assert new_game.volume == 0.9
+
+
 def test_old_narrator_settings_default_to_english_translation_mode() -> None:
     settings = NarratorGameSettings.from_dict(
         {
@@ -935,16 +978,23 @@ def test_subtitle_region_stabilization_and_phrase_cooldown() -> None:
         transient_again, threshold=0.1, stabilization_seconds=0.2
     ) is None
 
+    # Normalization still collapses whitespace and ignores case when comparing.
+    # The re-acceptance expectations below changed deliberately: this test used to
+    # require the same phrase to pass again after a single empty frame or a lapsed
+    # cooldown, which is how a subtitle lingering on screen got read twice. One
+    # episode is now read once, and only a stable disappearance ends it.
     deduplicator = PhraseDeduplicator()
     assert deduplicator.accept("  Open   the door ", now=1.0, cooldown_seconds=5) == "Open the door"
     assert deduplicator.accept("open the door", now=2.0, cooldown_seconds=5) is None
     assert deduplicator.accept("", now=3.0, cooldown_seconds=5) is None
-    assert deduplicator.accept("OPEN THE DOOR", now=4.0, cooldown_seconds=5) == "OPEN THE DOOR"
-    deduplicator.mark_spoken("OPEN THE DOOR", now=4.0)
-    assert deduplicator.accept("", now=5.0, cooldown_seconds=5) is None
-    assert deduplicator.accept("Open the door", now=7.0, cooldown_seconds=5) is None
-    assert deduplicator.accept("", now=8.0, cooldown_seconds=5) is None
-    assert deduplicator.accept("Open the door", now=10.0, cooldown_seconds=5) == "Open the door"
+    # One empty frame is not a disappearance, so the same line stays blocked.
+    assert deduplicator.accept("OPEN THE DOOR", now=4.0, cooldown_seconds=5) is None
+    # A lapsed cooldown on its own does not re-arm it either.
+    assert deduplicator.accept("Open the door", now=10.0, cooldown_seconds=5) is None
+    # A stable run of empty observations ends the episode; then it may be read.
+    for moment in (11.0, 11.5, 12.0):
+        assert deduplicator.accept("", now=moment, cooldown_seconds=5) is None
+    assert deduplicator.accept("Open the door", now=13.0, cooldown_seconds=5) == "Open the door"
 
 
 def test_pipeline_text_consensus_accepts_a_static_subtitle_without_visual_wait(
