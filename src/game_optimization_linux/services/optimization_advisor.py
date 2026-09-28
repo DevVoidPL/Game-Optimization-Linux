@@ -210,6 +210,16 @@ class OptimizationAdvisor:
 
         if values.get("gamemode_enabled") is False and not gamemode_available:
             conflicts.append("GameMode is unavailable and will not be added")
+        # An explicit choice made in a dedicated GameMode/Gamescope menu is a
+        # manual override: the preset still controls its other fields, but it
+        # never overwrites that feature (Gamescope also owns the FPS target).
+        if profile.manual_overrides.get("gamemode"):
+            values.pop("gamemode_enabled", None)
+            reasons.append("GameMode keeps the explicit per-game choice")
+        if profile.manual_overrides.get("gamescope"):
+            for key in ("gamescope_enabled", "gamescope_mode", "target_fps_mode", "target_fps"):
+                values.pop(key, None)
+            reasons.append("Gamescope keeps the explicit per-game configuration")
         if not gamescope_available:
             conflicts.append("Gamescope is unavailable; scaling and its FPS limiter remain disabled")
         if display:

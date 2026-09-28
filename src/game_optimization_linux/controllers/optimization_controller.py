@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 import hashlib
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import re
@@ -47,6 +48,27 @@ class OptimizationController:
     def __init__(self, app: AppController) -> None:
         self._app = app
         self._analysis_cache_states: dict[str, str] = {}
+
+    _INTEGER_PROFILE_FIELDS = (
+        "target_fps", "gamescope_refresh_rate", "gamescope_input_width",
+        "gamescope_input_height", "gamescope_output_width", "gamescope_output_height",
+        "gamescope_sharpness",
+    )
+
+    @staticmethod
+    def _whole_number(value: Any, name: str) -> int:
+        """Accept int, integral finite floats (QML numbers) or integer text."""
+        if isinstance(value, bool):
+            raise ValueError(f"{name} must be a whole number")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            if math.isfinite(value) and value.is_integer():
+                return int(value)
+            raise ValueError(f"{name} must be a whole number")
+        if isinstance(value, str) and re.fullmatch(r"[+-]?\d+", value.strip()):
+            return int(value.strip())
+        raise ValueError(f"{name} must be a whole number")
 
     @staticmethod
     def _profile_key(game: Game | None) -> str:
@@ -144,10 +166,40 @@ class OptimizationController:
             profile = previous_profile
             result = self._app._optimization_profile_to_qml(profile)
             result["gameAnalysis"] = self.getGameOptimizationAnalysis(game_id)
+            result["launchActivation"] = self._launch_activation(game)
             return result
         except Exception as error:
             logger.warning("Could not load optimization profile for %s: %s", game.id, error)
             return {"success": False, "error": str(error)}
+
+    def _launch_activation(self, game: Game) -> dict[str, Any]:
+        """Report whether the real launch path applies GameOpti wrappers.
+
+        Steam games only get wrappers when Steam starts them through the
+        GameOpti runner (Launch Options); local games always run through it.
+        Heroic, Lutris and manual launcher entries start without the runner.
+        """
+        if game.launcher is Launcher.MANUAL and game.data_source.casefold() == "local":
+            return {"state": "active", "message": "Local games start through the GameOpti runner"}
+        if game.launcher is not Launcher.STEAM:
+            return {
+                "state": "unsupported",
+                "message": f"{game.launcher.value} launches do not use the GameOpti runner",
+            }
+        status_method = getattr(self._app._runner_integration, "steam_launch_option_status", None)
+        status = status_method(game) if callable(status_method) else None
+        if status is None or status.configured is None:
+            return {
+                "state": "unknown",
+                "message": status.message if status is not None else "Steam launch options could not be checked",
+            }
+        if status.configured:
+            return {"state": "active", "message": "Steam starts this game through the GameOpti runner"}
+        return {
+            "state": "runner_not_configured",
+            "message": status.message,
+            "steamLaunchCommand": status.command,
+        }
 
     def previewOptimizationProfile(
         self, game_id: str, values: Mapping[str, Any]
@@ -158,7 +210,9 @@ class OptimizationController:
             return {"success": False, "error": "Optimization profiles require a supported game"}
         try:
             profile = self._app._optimization_profile_from_payload(app_id, values)
-            return self._app._optimization_profile_to_qml(profile)
+            result = self._app._optimization_profile_to_qml(profile)
+            result["launchActivation"] = self._launch_activation(game)
+            return result
         except Exception as error:
             return {"success": False, "error": str(error)}
 
@@ -199,12 +253,14 @@ class OptimizationController:
             result = self._app._optimization_profile_to_qml(profile)
             path = self._app._optimization_profile_repository.save(profile)
             try:
-                if self._app._gamescope_owns_fps_limit(profile):
-                    self._app._clear_mangohud_fps_limit(game)
+                # Rewrites MangoHud's generated config for the new limiter owner;
+                # the stored MangoHud preference itself is never erased.
+                self._app._sync_mangohud_fps_owner(game)
             except Exception:
                 self._app._optimization_profile_repository.save(previous_profile)
                 raise
-            result.update({"success": True, "profilePath": str(path)})
+            result.update({"success": True, "profilePath": str(path),
+                           "launchActivation": self._launch_activation(game)})
             self._app._emit_toast("Optimization profile saved", "success")
             return result
         except Exception as error:
@@ -1679,6 +1735,11 @@ class OptimizationController:
             "gamescopeRefreshRate": "gamescope_refresh_rate",
             "gamescopeFullscreen": "gamescope_fullscreen",
             "gamescopeScaler": "gamescope_scaler", "gamescopeFilter": "gamescope_filter",
+            "gamescopeWindowMode": "gamescope_window_mode",
+            "gamescopeSharpness": "gamescope_sharpness",
+            "gamescopeAdaptiveSync": "gamescope_adaptive_sync",
+            "gamescopeGrabKeyboard": "gamescope_grab_keyboard",
+            "gamescopeHdr": "gamescope_hdr",
             "manualOverrides": "manual_overrides", "lastRecommendation": "last_recommendation",
         }
         data = base.to_dict()
@@ -1694,6 +1755,11 @@ class OptimizationController:
             "gamescopeFullscreen", "gamescope_fullscreen",
             "gamescopeScaler", "gamescope_scaler",
             "gamescopeFilter", "gamescope_filter",
+            "gamescopeWindowMode", "gamescope_window_mode",
+            "gamescopeSharpness", "gamescope_sharpness",
+            "gamescopeAdaptiveSync", "gamescope_adaptive_sync",
+            "gamescopeGrabKeyboard", "gamescope_grab_keyboard",
+            "gamescopeHdr", "gamescope_hdr",
         }
         if "preset" not in values and runtime_keys.intersection(values):
             data["preset"] = "custom"
@@ -1701,6 +1767,18 @@ class OptimizationController:
             normalized = aliases.get(str(key), str(key))
             if normalized in data and normalized not in {"schema_version", "app_id", "updated_at"}:
                 data[normalized] = value
+        # Callers that only know the legacy fullscreen boolean (Desktop Mode)
+        # keep their meaning: True -> fullscreen, False -> borderless.
+        if not {"gamescopeWindowMode", "gamescope_window_mode"}.intersection(values):
+            for key in ("gamescopeFullscreen", "gamescope_fullscreen"):
+                if key in values:
+                    data["gamescope_window_mode"] = (
+                        "fullscreen" if self._app._coerce_bool(values[key]) else "borderless"
+                    )
+        # QML numbers arrive as float (e.g. 10.0); only whole, finite numbers
+        # become the canonical integers. Everything else is rejected clearly.
+        for name in self._INTEGER_PROFILE_FIELDS:
+            data[name] = self._whole_number(data[name], name)
         data.update(
             {
                 "schema_version": base.schema_version,
@@ -1833,6 +1911,11 @@ class OptimizationController:
             "gamescopeFullscreen": profile.gamescope_fullscreen,
             "gamescopeScaler": profile.gamescope_scaler,
             "gamescopeFilter": profile.gamescope_filter,
+            "gamescopeWindowMode": profile.gamescope_window_mode,
+            "gamescopeSharpness": profile.gamescope_sharpness,
+            "gamescopeAdaptiveSync": profile.gamescope_adaptive_sync,
+            "gamescopeGrabKeyboard": profile.gamescope_grab_keyboard,
+            "gamescopeHdr": profile.gamescope_hdr,
             "manualOverrides": dict(profile.manual_overrides),
             "lastRecommendation": dict(profile.last_recommendation),
             "updatedAt": profile.updated_at.astimezone(UTC).isoformat(),

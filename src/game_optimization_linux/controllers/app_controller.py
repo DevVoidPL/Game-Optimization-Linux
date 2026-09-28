@@ -177,6 +177,7 @@ _VALID_PAGES = {
     "updates",
     "tasks",
     "narrator",
+    "donate",
     "system",
     "settings",
     "gameDetails",
@@ -308,9 +309,9 @@ class AppController(QObject):
     optimizationAnalysisChanged = Signal(str)
     narratorChanged = Signal(str)
     narratorComponentsChanged = Signal()
-    narratorRegionPreviewChanged = Signal(str, object)
+    narratorRegionPreviewChanged = Signal(str, "QVariantMap")
     narratorRegionPreviewStopRequested = Signal(str, int)
-    narratorRegionSelectionChanged = Signal(str, object)
+    narratorRegionSelectionChanged = Signal(str, "QVariantMap")
 
     toastRequested = Signal(str, str)
     toastDismissRequested = Signal(str)
@@ -1627,7 +1628,9 @@ class AppController(QObject):
             activation = None
             profile = self._mangohud_profile_for_game(game)
             if profile is not None and profile.enabled:
-                activation = self._mangohud_launch_integration.prepare(game, profile)
+                activation = self._mangohud_launch_integration.prepare(
+                    game, self._effective_mangohud_profile(profile)
+                )
                 if not activation.available:
                     raise SteamLaunchError(activation.message)
             command = (
@@ -2044,6 +2047,10 @@ class AppController(QObject):
     ) -> bool:
         return self._narrator_controller.save_settings(game_id, values)
 
+    @Slot(str, result=bool)
+    def clearNarratorGameOverrides(self, game_id: str) -> bool:
+        return self._narrator_controller.clear_overrides(game_id)
+
     @Slot(str, result="QVariantMap")
     def getNarratorSessionState(self, game_id: str) -> dict[str, Any]:
         return self._narrator_controller.session_state(game_id)
@@ -2101,7 +2108,7 @@ class AppController(QObject):
             game_id, generation
         )
 
-    @Slot(str, object)
+    @Slot(str, "QVariantMap")
     def _handleNarratorRegionPreviewForSelector(
         self,
         game_id: str,
@@ -2150,7 +2157,11 @@ class AppController(QObject):
                 "The subtitle area could not be saved"
             )
             return
-        values = dict(region)
+        # The native selector owns only the UI window; finish the capture
+        # preview explicitly after persistence so its lifecycle cannot remain
+        # active when the selector closes.
+        self._narrator_controller.cancel_region_preview(str(game_id))
+        values = self._narrator_controller.get_settings(str(game_id))["subtitleRegion"]
         self._narrator_region_selector.complete_selection()
         self.narratorRegionSelectionChanged.emit(str(game_id), values)
 
@@ -3002,10 +3013,18 @@ class AppController(QObject):
 
     @staticmethod
     def _gamescope_owns_fps_limit(profile: GameOptimizationProfile) -> bool:
-        return bool(profile.gamescope_enabled and profile.gamescope_mode != "disabled")
+        # Gamescope owns the limit only when it really emits -r N.
+        return bool(
+            profile.gamescope_enabled
+            and profile.gamescope_mode != "disabled"
+            and profile.target_fps_mode != "unlimited"
+        )
 
-    def _clear_mangohud_fps_limit(self, game: Game) -> None:
-        return self._mangohud_controller._clear_mangohud_fps_limit(game)
+    def _sync_mangohud_fps_owner(self, game: Game) -> None:
+        return self._mangohud_controller._sync_mangohud_fps_owner(game)
+
+    def _effective_mangohud_profile(self, profile: MangoHudProfile) -> MangoHudProfile:
+        return self._mangohud_controller._effective_mangohud_profile(profile)
 
     @staticmethod
     def _mangohud_error(message: str, *, app_id: str = "") -> dict[str, Any]:
@@ -3083,6 +3102,7 @@ class AppController(QObject):
             "updates": "updates",
             "tasks": "tasks",
             "narrator": "narrator",
+            "donate": "donate",
             "system": "system",
             "settings": "settings",
             "gamedetails": "gameDetails",

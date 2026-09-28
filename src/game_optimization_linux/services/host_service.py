@@ -265,6 +265,8 @@ class HostServiceClient:
             version = flatpak_version
 
         supported_options: tuple[str, ...] = ()
+        supported_filters: tuple[str, ...] = ()
+        supported_scalers: tuple[str, ...] = ()
         runtime_available = bool(selected or flatpak_id)
         if normalized == "gamescope" and selected:
             help_result = self._run_fixed(selected, ("--help",), timeout=8.0)
@@ -274,14 +276,9 @@ class HostServiceClient:
                 probe_error = "gamescope --help could not be executed"
             else:
                 help_text = f"{help_result.stdout or ''}\n{help_result.stderr or ''}"
-                supported_options = tuple(
-                    option
-                    for option in (
-                        "-W", "-H", "-w", "-h", "-r", "--framerate-limit",
-                        "-f", "-b", "-S", "-F", "--display-index",
-                    )
-                    if option in help_text
-                )
+                from .optimization_runtime import parse_gamescope_help
+
+                supported_options, supported_filters, supported_scalers = parse_gamescope_help(help_text)
         elif normalized == "gamemode" and selected:
             runtime_available = bool(result is not None and result.returncode == 0)
             daemon_version = self._run_fixed("gamemoded", ("--version",), timeout=8.0)
@@ -322,6 +319,8 @@ class HostServiceClient:
             "diagnostic_message": message,
             "runtime_available": runtime_available,
             "supported_options": list(supported_options),
+            "supported_filters": list(supported_filters),
+            "supported_scalers": list(supported_scalers),
         }
         if normalized == "mangohud":
             payload.update(

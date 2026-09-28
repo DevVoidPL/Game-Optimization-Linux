@@ -19,7 +19,13 @@ USER_GOALS = ("lowest_latency", "stable_image", "best_quality", "low_power", "cu
 FPS_MODES = ("automatic", "manual", "unlimited")
 GAMESCOPE_MODES = ("disabled", "automatic", "native", "performance", "quality", "custom")
 GAMESCOPE_SCALERS = ("auto", "integer", "fit", "fill", "stretch")
-GAMESCOPE_FILTERS = ("linear", "nearest", "fsr", "nis", "pixel")
+GAMESCOPE_FILTERS = ("linear", "nearest", "fsr", "nis", "pixel", "sgsr")
+# Canonical, language-independent window modes; mutually exclusive flags.
+GAMESCOPE_WINDOW_MODES = ("windowed", "borderless", "fullscreen")
+# Filters whose output is affected by --sharpness.
+GAMESCOPE_SHARPNESS_FILTERS = ("fsr", "nis")
+# Gamescope's own scale: 0 = sharpest, 20 = softest. -1 = do not pass it.
+GAMESCOPE_SHARPNESS_DEFAULT = -1
 
 
 def _choice(value: object, allowed: tuple[str, ...], name: str) -> str:
@@ -72,6 +78,11 @@ class GameOptimizationProfile:
     gamescope_fullscreen: bool = True
     gamescope_scaler: str = "auto"
     gamescope_filter: str = "linear"
+    gamescope_window_mode: str = "fullscreen"
+    gamescope_sharpness: int = GAMESCOPE_SHARPNESS_DEFAULT
+    gamescope_adaptive_sync: bool = False
+    gamescope_grab_keyboard: bool = False
+    gamescope_hdr: bool = False
     manual_overrides: Mapping[str, bool] = field(default_factory=dict)
     last_recommendation: Mapping[str, Any] = field(default_factory=dict)
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
@@ -87,6 +98,9 @@ class GameOptimizationProfile:
         object.__setattr__(self, "gamescope_mode", _choice(self.gamescope_mode, GAMESCOPE_MODES, "gamescope_mode"))
         object.__setattr__(self, "gamescope_scaler", _choice(self.gamescope_scaler, GAMESCOPE_SCALERS, "gamescope_scaler"))
         object.__setattr__(self, "gamescope_filter", _choice(self.gamescope_filter, GAMESCOPE_FILTERS, "gamescope_filter"))
+        object.__setattr__(self, "gamescope_window_mode", _choice(self.gamescope_window_mode, GAMESCOPE_WINDOW_MODES, "gamescope_window_mode"))
+        sharpness = _integer(self.gamescope_sharpness, "gamescope_sharpness", -1, 20)
+        object.__setattr__(self, "gamescope_sharpness", sharpness)
         display_id = str(self.target_display_id or "").strip()
         if "\n" in display_id or "\r" in display_id or len(display_id) > 256:
             raise ValueError("invalid target_display_id")
@@ -98,8 +112,13 @@ class GameOptimizationProfile:
             "gamescope_output_width", "gamescope_output_height",
         ):
             object.__setattr__(self, name, _integer(getattr(self, name), name, 320, 16384))
-        for name in ("gamemode_enabled", "gamescope_enabled", "gamescope_fullscreen"):
+        for name in (
+            "gamemode_enabled", "gamescope_enabled", "gamescope_fullscreen",
+            "gamescope_adaptive_sync", "gamescope_grab_keyboard", "gamescope_hdr",
+        ):
             object.__setattr__(self, name, _boolean(getattr(self, name), name))
+        # gamescope_window_mode is canonical; the legacy boolean mirrors it.
+        object.__setattr__(self, "gamescope_fullscreen", self.gamescope_window_mode == "fullscreen")
         overrides = {str(key): bool(value) for key, value in dict(self.manual_overrides).items()}
         object.__setattr__(self, "manual_overrides", overrides)
         object.__setattr__(self, "last_recommendation", dict(self.last_recommendation))
@@ -126,6 +145,11 @@ class GameOptimizationProfile:
             "gamescope_fullscreen": self.gamescope_fullscreen,
             "gamescope_scaler": self.gamescope_scaler,
             "gamescope_filter": self.gamescope_filter,
+            "gamescope_window_mode": self.gamescope_window_mode,
+            "gamescope_sharpness": self.gamescope_sharpness,
+            "gamescope_adaptive_sync": self.gamescope_adaptive_sync,
+            "gamescope_grab_keyboard": self.gamescope_grab_keyboard,
+            "gamescope_hdr": self.gamescope_hdr,
             "manual_overrides": dict(self.manual_overrides),
             "last_recommendation": dict(self.last_recommendation),
             "updated_at": self.updated_at.astimezone(UTC).isoformat(),
@@ -146,6 +170,12 @@ class GameOptimizationProfile:
             preset_aliases = {"maximum performance": "maximum_performance", "balanced": "balanced", "quiet": "quiet", "custom": "custom", "automatic": "automatic"}
             migrated["preset"] = preset_aliases.get(str(migrated.get("preset", "automatic")).casefold(), "automatic")
             migrated["schema_version"] = OPTIMIZATION_SCHEMA_VERSION
+        # Profiles saved before the explicit window mode existed only stored
+        # the fullscreen boolean (True -> -f, False -> -b); keep that behaviour.
+        if "gamescope_window_mode" not in migrated and "gamescope_fullscreen" in migrated:
+            migrated["gamescope_window_mode"] = (
+                "fullscreen" if migrated.get("gamescope_fullscreen") is not False else "borderless"
+            )
         defaults = cls.default(app_id).to_dict()
         defaults.update({key: value for key, value in migrated.items() if key in defaults})
         defaults["app_id"] = app_id
@@ -157,6 +187,7 @@ class GameOptimizationProfile:
 
 __all__ = [
     "FPS_MODES", "GAME_CATEGORIES", "GAMESCOPE_FILTERS", "GAMESCOPE_MODES",
-    "GAMESCOPE_SCALERS", "GameOptimizationProfile", "OPTIMIZATION_PRESETS",
+    "GAMESCOPE_SCALERS", "GAMESCOPE_SHARPNESS_DEFAULT", "GAMESCOPE_SHARPNESS_FILTERS",
+    "GAMESCOPE_WINDOW_MODES", "GameOptimizationProfile", "OPTIMIZATION_PRESETS",
     "OPTIMIZATION_SCHEMA_VERSION", "USER_GOALS",
 ]

@@ -5,11 +5,13 @@ from __future__ import annotations
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
+import re
 import shutil
 import subprocess
 from typing import Any
 
 from game_optimization_linux.models import GameOptimizationProfile
+from game_optimization_linux.models.optimization_profile import GAMESCOPE_SHARPNESS_FILTERS
 
 from .optiscaler import merge_wine_dll_overrides
 
@@ -87,13 +89,51 @@ class RuntimeToolAvailability:
     version: str = ""
     supported_options: tuple[str, ...] = ()
     message: str = ""
+    # Values the local release lists for -F / -S (empty = not verified).
+    supported_filters: tuple[str, ...] = ()
+    supported_scalers: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name, "available": self.available,
             "executable": self.executable, "version": self.version,
             "supportedOptions": list(self.supported_options), "message": self.message,
+            "supportedFilters": list(self.supported_filters),
+            "supportedScalers": list(self.supported_scalers),
         }
+
+
+# Gamescope flags GameOpti may emit. Only those found in the local
+# `gamescope --help` are ever used.
+GAMESCOPE_KNOWN_OPTIONS = (
+    "-W", "-H", "-w", "-h", "-r", "--framerate-limit", "-f", "-b",
+    "-S", "-F", "--display-index", "--sharpness", "--fsr-sharpness",
+    "--adaptive-sync", "-g", "--hdr-enabled", "--mangoapp",
+)
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def parse_gamescope_help(help_text: str) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
+    """Return (flags, filter values, scaler values) listed by `gamescope --help`."""
+    text = _ANSI_ESCAPE.sub("", help_text or "")
+    options = tuple(
+        option for option in GAMESCOPE_KNOWN_OPTIONS
+        if re.search(rf"(?<![\w-]){re.escape(option)}(?![\w-])", text)
+    )
+
+    def values(flag: str) -> tuple[str, ...]:
+        match = re.search(rf"^\s*{re.escape(flag)},[^\n(]*\(([^)]*)\)", text, re.MULTILINE)
+        if not match:
+            return ()
+        return tuple(item.strip().casefold() for item in match.group(1).split(",") if item.strip())
+
+    return options, values("-F"), values("-S")
+
+
+def parse_gamescope_version(output: str) -> str:
+    text = _ANSI_ESCAPE.sub("", output or "")
+    match = re.search(r"gamescope version\s+(\S+)", text)
+    return match.group(1) if match else text.strip().splitlines()[-1].strip() if text.strip() else ""
 
 
 class RuntimeToolDetector:
@@ -147,17 +187,16 @@ class RuntimeToolDetector:
             return RuntimeToolAvailability("Gamescope", False, message="gamescope is not installed")
         help_result = self._command([executable, "--help"])
         version_result = self._command([executable, "--version"])
-        help_text = (help_result.stdout or help_result.stderr) if help_result else ""
-        version = ((version_result.stdout or version_result.stderr).strip() if version_result else "")
-        known = (
-            "-W", "-H", "-w", "-h", "-r", "--framerate-limit", "-f", "-b",
-            "-S", "-F", "--display-index",
+        help_text = ((help_result.stdout or "") + "\n" + (help_result.stderr or "")) if help_result else ""
+        version = parse_gamescope_version(
+            ((version_result.stdout or "") + "\n" + (version_result.stderr or "")) if version_result else ""
         )
-        supported = tuple(option for option in known if option in help_text)
+        supported, filters, scalers = parse_gamescope_help(help_text)
         return RuntimeToolAvailability(
             "Gamescope", bool(help_result and help_result.returncode == 0), executable,
             version, supported,
             "Gamescope is available" if help_result and help_result.returncode == 0 else "gamescope --help failed",
+            filters, scalers,
         )
 
     def _host_tool(self, key: str, label: str) -> RuntimeToolAvailability:
@@ -195,6 +234,12 @@ class RuntimeToolDetector:
             )
             if isinstance(value, str)
         )
+        def string_list(key: str) -> tuple[str, ...]:
+            value = raw.get(key)
+            if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+                return ()
+            return tuple(str(item).casefold() for item in value if isinstance(item, str))
+
         return RuntimeToolAvailability(
             label,
             available,
@@ -202,6 +247,8 @@ class RuntimeToolDetector:
             str(raw.get("version") or ""),
             options,
             str(raw.get("diagnostic_message") or ""),
+            string_list("supported_filters"),
+            string_list("supported_scalers"),
         )
 
     def detect(self, *, refresh: bool = False) -> tuple[RuntimeToolAvailability, RuntimeToolAvailability]:
@@ -456,13 +503,51 @@ class OptimizationLaunchPlanner:
                     effective_fps_limit = profile.target_fps
                     reasons.append(f"Gamescope owns the FPS limit at {profile.target_fps} FPS")
                 if profile.gamescope_scaler != "auto":
+                    if gamescope.supported_scalers and profile.gamescope_scaler not in gamescope.supported_scalers:
+                        raise ValueError(
+                            f"Gamescope configuration cannot be applied: installed version does not support scaler {profile.gamescope_scaler}"
+                        )
                     add("-S", profile.gamescope_scaler)
                     reasons.append(f"Gamescope scaler: {profile.gamescope_scaler}")
                 if profile.gamescope_filter != "linear":
+                    # A filter is only emitted when the local --help lists it.
+                    if profile.gamescope_filter not in gamescope.supported_filters:
+                        raise ValueError(
+                            f"Gamescope configuration cannot be applied: installed version does not support filter {profile.gamescope_filter}"
+                        )
                     add("-F", profile.gamescope_filter)
                     reasons.append(f"Gamescope filter: {profile.gamescope_filter}")
-                add("-f" if profile.gamescope_fullscreen else "-b")
-                reasons.append("Gamescope uses fullscreen mode" if profile.gamescope_fullscreen else "Gamescope uses borderless mode")
+                    if (
+                        profile.gamescope_filter in GAMESCOPE_SHARPNESS_FILTERS
+                        and profile.gamescope_sharpness >= 0
+                    ):
+                        sharpness_flag = (
+                            "--sharpness" if "--sharpness" in supported else "--fsr-sharpness"
+                        )
+                        add(sharpness_flag, profile.gamescope_sharpness)
+                        reasons.append(
+                            f"Gamescope sharpness {profile.gamescope_sharpness} (0 sharpest, 20 softest)"
+                        )
+                # Exactly one window mode; windowed passes neither -f nor -b.
+                if profile.gamescope_window_mode == "fullscreen":
+                    add("-f")
+                    reasons.append("Gamescope uses fullscreen mode")
+                elif profile.gamescope_window_mode == "borderless":
+                    add("-b")
+                    reasons.append("Gamescope uses borderless mode")
+                else:
+                    reasons.append("Gamescope uses a normal window")
+                if profile.gamescope_adaptive_sync:
+                    add("--adaptive-sync")
+                    reasons.append("Gamescope requests adaptive sync; display support is not verified")
+                if profile.gamescope_grab_keyboard:
+                    add("-g")
+                    reasons.append("Gamescope grabs the keyboard")
+                if profile.gamescope_hdr:
+                    add("--hdr-enabled")
+                    warnings.append(
+                        "Gamescope HDR is experimental and needs a compatible display, driver and Gamescope WSI"
+                    )
                 if profile.target_display_id:
                     warnings.append(
                         "The selected Qt display cannot be mapped safely to Gamescope; desktop placement will be used"

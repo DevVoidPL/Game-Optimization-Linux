@@ -10,7 +10,11 @@ Item {
     property string description: ""
     default property alias controlData: controlSlot.data
 
-    implicitHeight: Math.max(58, descriptionColumn.implicitHeight + 18)
+    implicitHeight: Math.max(
+        58,
+        descriptionColumn.implicitHeight + 18,
+        controlSlot.implicitHeight + 18
+    )
 
     RowLayout {
         anchors.fill: parent

@@ -81,12 +81,16 @@ class MangoHudController:
             previous_profile = self._app._mangohud_repository.load(app_id)
             profile = self._app._mangohud_profile_from_payload(app_id, values)
             optimization_profile = self._app._optimization_profile_repository.load(app_id)
-            if self._app._gamescope_owns_fps_limit(optimization_profile):
+            if (
+                self._app._gamescope_owns_fps_limit(optimization_profile)
+                and profile.fps_limit is None
+            ):
+                # While Gamescope owns the limit the MangoHud value cannot be
+                # edited; an empty value must not erase the stored preference.
                 profile = replace(
                     profile,
-                    fps_limit=None,
-                    fps_limit_method="",
-                    updated_at=datetime.now(UTC),
+                    fps_limit=previous_profile.fps_limit,
+                    fps_limit_method=previous_profile.fps_limit_method,
                 )
             resolution = self._app._mangohud_launch_integration.executable_resolver.resolve(
                 game, profile.executable_path
@@ -100,12 +104,13 @@ class MangoHudController:
             if profile.enabled and not availability.available:
                 raise ValueError(availability.message)
             profile_path = self._app._mangohud_repository.save(profile)
+            effective = self._effective_mangohud_profile(profile)
             config_path = self._app._mangohud_repository.config_path(app_id)
             MangoHudConfigWriter(availability.supported_keys).write(
-                profile, config_path
+                effective, config_path
             )
             self._app._mangohud_launch_integration.synchronize(
-                game, profile, previous_profile=previous_profile
+                game, effective, previous_profile=previous_profile
             )
         except Exception as error:
             logger.warning("Could not save MangoHud profile for %s: %s", game.id, error)
@@ -163,7 +168,9 @@ class MangoHudController:
         try:
             profile = self._app._mangohud_profile_for_game(game)
             activation = (
-                self._app._mangohud_launch_integration.prepare(game, profile)
+                self._app._mangohud_launch_integration.prepare(
+                    game, self._effective_mangohud_profile(profile)
+                )
                 if profile is not None
                 else None
             )
@@ -276,6 +283,10 @@ class MangoHudController:
                 "roundCorners": profile.round_corners,
                 "tableColumns": profile.table_columns,
                 "fpsLimit": effective_profile.fps_limit or 0,
+                "fpsLimitPreference": profile.fps_limit or 0,
+                "gamescopeFpsLimit": (
+                    optimization_profile.target_fps if gamescope_owns_limit else 0
+                ),
                 "fpsLimitMethod": effective_profile.fps_limit_method,
                 "fpsLimitOwner": (
                     "gamescope" if gamescope_owns_limit
@@ -310,27 +321,34 @@ class MangoHudController:
         data["configPreview"] = writer.render(effective_profile)
         return data
 
-    def _clear_mangohud_fps_limit(self, game: Game) -> None:
+    def _effective_mangohud_profile(self, profile: MangoHudProfile) -> MangoHudProfile:
+        """Profile as MangoHud should see it: no fps_limit while Gamescope owns it.
+
+        The stored profile keeps the user's MangoHud limit; it becomes active
+        again as soon as Gamescope stops emitting its own limit.
+        """
+        try:
+            optimization_profile = self._app._optimization_profile_repository.load(profile.app_id)
+        except (OSError, ValueError):
+            return profile
+        if self._app._gamescope_owns_fps_limit(optimization_profile):
+            return replace(profile, fps_limit=None, fps_limit_method="")
+        return profile
+
+    def _sync_mangohud_fps_owner(self, game: Game) -> None:
+        """Rewrite MangoHud's generated config for the current limiter owner."""
         app_id = self._profile_key(game)
         if not app_id:
             return
         profile = self._app._mangohud_repository.load(app_id)
         if profile.fps_limit is None and not profile.fps_limit_method:
             return
-        effective = replace(
-            profile,
-            fps_limit=None,
-            fps_limit_method="",
-            updated_at=datetime.now(UTC),
-        )
+        effective = self._effective_mangohud_profile(profile)
         availability = self._app._mangohud_detector.detect(
             "flatpak" if uses_flatpak_steam(game) else "native"
         )
-        self._app._mangohud_repository.save(effective)
         MangoHudConfigWriter(availability.supported_keys).write(
             effective, self._app._mangohud_repository.config_path(app_id)
         )
-        self._app._mangohud_launch_integration.synchronize(
-            game, effective, previous_profile=profile
-        )
+        self._app._mangohud_launch_integration.synchronize(game, effective)
         self._app.mangoHudProfileChanged.emit(app_id)

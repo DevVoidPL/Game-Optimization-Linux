@@ -532,7 +532,11 @@ def main(
         plan = OptimizationLaunchPlanner().build(
             profile, game_argv, gamemode=gamemode, gamescope=gamescope,
             mangohud_fps_limit=(
-                None if baseline_session is not None else mangohud_profile.fps_limit
+                None
+                if baseline_session is not None
+                or (profile.gamescope_enabled and profile.gamescope_mode != "disabled"
+                    and profile.target_fps_mode != "unlimited")
+                else mangohud_profile.fps_limit
             ),
             optiscaler_override=optiscaler_override,
             existing_wine_overrides=steam_environment.get("WINEDLLOVERRIDES", ""),
