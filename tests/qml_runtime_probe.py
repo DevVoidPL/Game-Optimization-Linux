@@ -3828,6 +3828,10 @@ def probe_couch(
         fixture_games = base_games
     home.setProperty("games", fixture_games)
     _settle(application, 20)
+    home_tiles = _variant(home.property("homeTiles")) or []
+    if any(isinstance(tile, dict) and str(tile.get("id", "")) == "narrator"
+           for tile in home_tiles):
+        raise AssertionError("Couch home navigation still exposes a Narrator entry")
     strip = _qt_side_item(root, "couchGameStrip")
     home_title = _qt_side_item(root, "couchHomeHeroTitle")
     home_navigation = _qt_side_item(root, "couchHomeNavigation")
@@ -3884,7 +3888,7 @@ def probe_couch(
         {"id": "storage", "title": "Storage"},
         {"id": "optimization", "title": "Optimization"},
         {"id": "optiscaler", "title": "OptiScaler"},
-        {"id": "narrator", "title": "Narrator"},
+        {"id": "narrator", "title": "Lektor"},
     ]
     if not isinstance(tabs, list):
         raise AssertionError(f"Couch details exposed an invalid tabs model: {tabs!r}")
@@ -3921,6 +3925,7 @@ def probe_couch(
     tab_ids = [tab["id"] for tab in actual_tabs]
     details.setProperty("selectedTab", tab_ids.index("optimization"))
     details.setProperty("selectedAction", 0)
+    details.setProperty("focusArea", 2)  # tab action row
     previous_profile = str(details.property("optimizationProfile"))
     _invoke_qml(root, "handleAction", "Confirm")
     _settle(application, 8)
@@ -3937,7 +3942,7 @@ def probe_couch(
         raise AssertionError("Back saved an uncommitted Couch optimization change")
     _invoke_qml(root, "handleAction", "Confirm")
     _invoke_qml(root, "handleAction", "NavigateRight")
-    for _ in range(6):
+    for _ in range(4):  # profile menu: Save is row 4
         _invoke_qml(root, "handleAction", "NavigateDown")
     _invoke_qml(root, "handleAction", "Confirm")
     _settle(application, 8)
@@ -3947,6 +3952,7 @@ def probe_couch(
     # The per-game MangoHud editor is a true modal layer. Back cancels without
     # saving and returns focus to the tile that opened it.
     details.setProperty("selectedAction", 3)
+    details.setProperty("focusArea", 2)  # tab action row
     _invoke_qml(root, "handleAction", "Confirm")
     _settle(application, 8)
     if not bool(details.property("mangoHudOverlayOpen")):
@@ -3964,10 +3970,13 @@ def probe_couch(
     mangohud_back_focus = True
 
     # Saving from Couch changes the same AppID profile used by Desktop Mode.
-    _invoke_qml(root, "handleAction", "Confirm")
-    _invoke_qml(root, "handleAction", "NavigateRight")
-    for _ in range(6):
-        _invoke_qml(root, "handleAction", "NavigateDown")
+    # Rows: Use MangoHud, Preset, Position, Size, FPS limit, Save, Cancel.
+    _invoke_qml(root, "handleAction", "Confirm")          # opens the menu (tab action)
+    _invoke_qml(root, "handleAction", "Confirm")          # Use MangoHud -> on (preset basic)
+    _invoke_qml(root, "handleAction", "NavigateDown")     # Preset
+    _invoke_qml(root, "handleAction", "NavigateLeft")     # basic -> fps_only
+    for _ in range(4):
+        _invoke_qml(root, "handleAction", "NavigateDown")  # -> Save
     _invoke_qml(root, "handleAction", "Confirm")
     _settle(application, 12)
     if bool(details.property("mangoHudOverlayOpen")):
@@ -3988,24 +3997,21 @@ def probe_couch(
         raise AssertionError(f"Couch MangoHud profile was not saved: {saved_profile!r}")
     details.setProperty("selectedTab", 0)
 
-    # Details always returns to Library and restores the same stable game ID,
-    # even when the details page was opened from Home.
+    # Back returns to the screen Details was opened from (Home here) and keeps
+    # the same stable game selected and focused in the carousel.
     _invoke_qml(root, "handleAction", "Back")
     _settle(application, 12)
-    library = _qt_side_item(root, "couchLibrary")
-    library_grid = _qt_side_item(root, "couchLibraryGrid")
-    if str(root.property("section")) != "library":
-        raise AssertionError("Back from Couch details did not return to Library")
-    filtered_games = _variant(library.property("filteredGames")) or []
-    selected_library_index = int(library_grid.property("currentIndex"))
-    selected_library_id = (
-        str(filtered_games[selected_library_index].get("id", ""))
-        if 0 <= selected_library_index < len(filtered_games)
-        else ""
-    )
-    if selected_library_id != "dying-light":
+    if str(root.property("section")) != "home":
+        raise AssertionError("Back from Couch details did not return to Home")
+    home_selected = _variant(home.property("selectedGame")) or {}
+    # Home keeps the opened game when its carousel contains it; the one and
+    # disconnected fixtures do not, so Home keeps its own valid selection.
+    home_ids = {str(game.get("id", "")) for game in fixture_games}
+    expected_home = "dying-light" if "dying-light" in home_ids else str(home_selected.get("id", ""))
+    if (str(home_selected.get("id", "")) != expected_home or expected_home not in home_ids
+            or int(home.property("focusZone")) != 0):
         raise AssertionError(
-            f"Back from details restored {selected_library_id!r}, not dying-light"
+            f"Back from details restored {home_selected.get('id')!r} (zone {home.property('focusZone')!r}), not dying-light"
         )
 
     focused_after_details = application.focusObject()
@@ -4055,27 +4061,46 @@ def probe_couch(
 
     _invoke_qml(root, "setSection", "library", "dying-light")
     _settle(application, 20)
-    _assert_inside(library_grid, library)
+    library = _qt_side_item(root, "couchLibrary")
+    library_grid = _qt_side_item(root, "couchLibraryGrid")
+    _assert_inside(_qt_side_item(root, "couchLibraryGridFrame"), library)
     if library_grid.width() <= 0 or library_grid.height() <= 0:
         raise AssertionError("Couch library grid has invalid geometry")
-    initial_library_index = int(library_grid.property("currentIndex"))
+    if int(_qt_side_item(root, "couchLibraryNavigation").property("count")) != 4:
+        raise AssertionError("Couch library bottom navigation must have four entries")
+
+    # Confirm opens Details for the selected card; Back returns to that card.
+    selected_library_id = str(library.property("retainedGameId"))
+    _invoke_qml(root, "handleAction", "Confirm")
+    _settle(application, 20)
+    if str(root.property("section")) != "details":
+        raise AssertionError("Confirm on a Library card did not open game details")
+    _invoke_qml(root, "handleAction", "Back")
+    _settle(application, 20)
+    if (str(root.property("section")) != "library"
+            or str(library.property("retainedGameId")) != selected_library_id
+            or int(library.property("focusZone")) != 1):
+        raise AssertionError("Returning from details did not restore the Library card")
+
+    initial_library_index = int(library.property("selectedIndex"))
     _invoke_qml(library, "handleAction", "NavigateRight")
     _settle(application, 5)
-    moved_library_index = int(library_grid.property("currentIndex"))
+    moved_library_index = int(library.property("selectedIndex"))
     if library_grid.property("count") and moved_library_index < initial_library_index:
         raise AssertionError("Couch library directional navigation moved backwards")
 
+    # Search uses the existing on-screen keyboard as an exclusive modal layer.
     _invoke_qml(library, "handleAction", "ContextMenu")
     _settle(application, 3)
-    if not bool(library.property("filterBarFocused")):
-        raise AssertionError("Library filter overlay did not open")
+    if not bool(library.property("keyboardOpen")):
+        raise AssertionError("Library search keyboard did not open")
     _invoke_qml(root, "handleAction", "OpenSystemMenu")
     if system_menu.isVisible():
-        raise AssertionError("System menu opened on top of the Library filter overlay")
+        raise AssertionError("System menu opened on top of the Library search keyboard")
     _invoke_qml(root, "handleAction", "Back")
     _settle(application, 3)
-    if bool(library.property("filterBarFocused")):
-        raise AssertionError("Back did not close only the Library filter overlay")
+    if bool(library.property("keyboardOpen")):
+        raise AssertionError("Back did not close only the Library search keyboard")
     tv_metrics.update({
         "libraryColumns": int(library_grid.property("columnCount")),
         "libraryCellWidth": float(library_grid.property("cellWidth")),
@@ -4102,6 +4127,9 @@ def probe_couch(
     # Settings uses shared history and returns to the page that opened it.
     _invoke_qml(root, "setSection", "tasks", "")
     _invoke_qml(root, "setSection", "settings", "")
+    # First Back moves focus from the settings rows to the categories; the
+    # second one leaves the screen.
+    _invoke_qml(root, "handleAction", "Back")
     _invoke_qml(root, "handleAction", "Back")
     _settle(application, 5)
     if str(root.property("section")) != "tasks":

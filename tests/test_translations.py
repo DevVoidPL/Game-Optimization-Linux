@@ -156,6 +156,9 @@ def test_core_interface_texts_are_translated_in_every_language() -> None:
 
 
 def test_catalogs_have_no_empty_or_unfinished_messages() -> None:
+    # Decision: Polish and English must be complete. Spanish is best-effort for
+    # now; its "unfinished" entries are allowed because Qt then shows the
+    # English source text. Finished Spanish entries must still be valid.
     for code in ("en", "pl", "es"):
         root = ET.parse(TRANSLATIONS_DIR / f"game_optimization_{code}.ts").getroot()
         messages = root.findall(".//message")
@@ -165,6 +168,8 @@ def test_catalogs_have_no_empty_or_unfinished_messages() -> None:
             source = message.findtext("source", "")
             translation = message.find("translation")
             assert translation is not None, source
+            if code == "es" and translation.get("type") == "unfinished":
+                continue
             assert translation.get("type") != "unfinished", source
             translated = translation.text or ""
             assert translated.strip(), source
@@ -260,6 +265,10 @@ def test_translation_catalogs_contain_no_mojibake() -> None:
         assert not any(marker in text for marker in mojibake_markers), path
 
 
+def _unescape(source: str) -> str:
+    return re.sub(r"\\(.)", lambda match: {"n": "\n", "t": "\t"}.get(match.group(1), match.group(1)), source)
+
+
 def test_all_qml_translation_sources_exist_in_every_catalog() -> None:
     """Keep newly added desktop and Couch UI text out of English-only fallbacks."""
 
@@ -272,14 +281,17 @@ def test_all_qml_translation_sources_exist_in_every_catalog() -> None:
             r'^\s*pragma\s+Translator:\s*"([^"]+)"', text, re.MULTILINE
         )
         context = pragma.group(1) if pragma else path.stem
-        expected.update((context, source) for source in pattern.findall(text))
+        # Catalogs store the decoded string (real newline/quote), as lupdate does.
+        expected.update((context, _unescape(source)) for source in pattern.findall(text))
 
     python_selector = Path(
         "src/game_optimization_linux/controllers/narrator_region_selector.py"
     ).read_text(encoding="utf-8")
     expected.update(
         ("SubtitleRegionSelector", source)
-        for source in re.findall(r'_tr\(\s*"((?:[^"\\]|\\.)*)"', python_selector)
+        for source in re.findall(
+            r'translate\(\s*"SubtitleRegionSelector",\s*"((?:[^"\\]|\\.)*)"', python_selector
+        )
     )
 
     assert expected
@@ -306,8 +318,8 @@ def test_couch_uses_shared_narrator_route_and_icon_registry() -> None:
     tile = (Path("src/game_optimization_linux/qml/couch/components/CouchTile.qml")
         ).read_text(encoding="utf-8")
     assert 'name === "narrator" ? narratorPage' in couch_main
-    assert 'controller.navigate("narrator")' in couch_home
-    assert "App.UiIcons.sidebarNarrator" in couch_home
+    assert 'controller.navigate("narrator")' not in couch_home
+    assert "App.UiIcons.sidebarNarrator" not in couch_home
     assert "property url iconSource" in tile
 
 

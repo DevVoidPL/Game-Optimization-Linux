@@ -1607,3 +1607,39 @@ def test_descriptor_walk_blocks_directory_swapped_for_external_symlink(
         )
 
     assert calls == []
+
+
+def test_removing_task_history_is_record_only_and_keeps_active_work(
+    tmp_path: Path,
+) -> None:
+    now = datetime.now(UTC)
+    game_file = tmp_path / "Game" / "data.pak"
+    game_file.parent.mkdir()
+    game_file.write_bytes(b"game data")
+
+    def task(task_id: str, status: TaskStatus) -> Task:
+        return Task(id=task_id, game_id="steam-1", game_name="Game", task_type=TaskType.ANALYSIS,
+                    title="Analyze Game", status=status, created_at=now, updated_at=now)
+
+    store = TaskHistoryStore(tmp_path / "task-history.json")
+    store.save([task("done", TaskStatus.COMPLETED), task("failed", TaskStatus.FAILED),
+                task("cancelled", TaskStatus.CANCELLED)])
+    service = BtrfsAnalysisTaskService(history_store=TaskHistoryStore(store.path), max_workers=1)
+    assert service.remove_finished("done") is True
+    reloaded = BtrfsAnalysisTaskService(history_store=TaskHistoryStore(store.path), max_workers=1)
+    assert {item.id for item in reloaded.list_tasks()} == {"failed", "cancelled"}
+
+    with reloaded._lock:                      # simulate live queued/running work
+        reloaded._tasks["queued"] = task("queued", TaskStatus.QUEUED)
+        reloaded._tasks["running"] = task("running", TaskStatus.RUNNING)
+    try:
+        reloaded.remove_finished("running")
+    except Exception:
+        pass
+    assert reloaded.clear_finished() == 2
+    assert {item.id for item in reloaded.list_tasks()} == {"queued", "running"}
+    assert game_file.read_bytes() == b"game data"
+    with reloaded._lock:
+        reloaded._tasks.clear()
+    assert service.shutdown(wait=True, timeout=1.0)
+    assert reloaded.shutdown(wait=True, timeout=1.0)

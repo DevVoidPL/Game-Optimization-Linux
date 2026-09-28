@@ -15,6 +15,7 @@ import pytest
 from game_optimization_linux.services.narrator_pipeline import (
     PhraseDeduplicator,
     _dedup_is_garbage_variant,
+    _dedup_is_split_merge_variant,
 )
 
 _COOLDOWN = 4.5
@@ -167,6 +168,16 @@ def test_short_phrases_never_collapse() -> None:
 
 def test_exact_repeat_is_still_suppressed() -> None:
     assert _spoken_then("Jedź do salonu gier", "Jedź do salonu gier") is None
+
+
+def test_split_word_ocr_variant_is_suppressed_inside_same_episode() -> None:
+    clean = "Dobrze. Spróbujmy znaleźć drogę, nieważne, jak trudno ją dostrzec."
+    split = "Dobrze. spróbujmy znaleźć drogę, nie ważne, jak trudno ją dostrzec."
+
+    assert _dedup_is_split_merge_variant(
+        split.casefold(), clean.casefold()
+    ) is True
+    assert _spoken_then(clean, split) is None
 
 
 def test_cooldown_expiry_alone_does_not_re_arm_the_same_phrase() -> None:

@@ -2026,7 +2026,7 @@ def test_controller_saves_proton_tweaks_and_updates_combined_preview(
     assert "PROTON_USE_WINED3D=1" in preview["protonOverrides"]
 
 
-def test_gamescope_profile_removes_and_rejects_mangohud_fps_limit(
+def test_gamescope_owns_fps_limit_without_erasing_mangohud_preference(
     tmp_path: Path,
 ) -> None:
     game = replace(demo_games()[0], steam_app_id="224760")
@@ -2080,7 +2080,8 @@ def test_gamescope_profile_removes_and_rejects_mangohud_fps_limit(
         assert saved["launchPlan"]["fpsLimitOwner"] == "gamescope"
         assert saved["launchPlan"]["command"].count("-r") == 1
         assert "--framerate-limit" not in saved["launchPlan"]["command"]
-        assert mangohud_repository.load("224760").fps_limit is None
+        # The MangoHud preference is kept, but never applied while Gamescope owns -r.
+        assert mangohud_repository.load("224760").fps_limit == 90
         assert "fps_limit=" not in mangohud_repository.config_path("224760").read_text()
 
         mango_saved = controller.saveMangoHudProfile(game.id, {
@@ -2089,8 +2090,15 @@ def test_gamescope_profile_removes_and_rejects_mangohud_fps_limit(
         })
         assert mango_saved["success"] is True
         assert mango_saved["fpsLimit"] == 0
+        assert mango_saved["fpsLimitPreference"] == 120
         assert mango_saved["fpsLimitOwner"] == "gamescope"
-        assert mangohud_repository.load("224760").fps_limit is None
+        assert "fps_limit=" not in mangohud_repository.config_path("224760").read_text()
+
+        # Removing Gamescope's limit lets the kept MangoHud preference apply again.
+        controller.saveOptimizationProfile(game.id, {"preset": "custom", "targetFpsMode": "unlimited",
+                                                     "gamescopeEnabled": True, "gamescopeMode": "native"})
+        assert "fps_limit=120" in mangohud_repository.config_path("224760").read_text()
+        assert controller.getMangoHudProfile(game.id)["fpsLimitOwner"] == "mangohud"
     finally:
         controller.shutdown()
 

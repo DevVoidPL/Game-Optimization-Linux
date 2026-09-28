@@ -13,6 +13,9 @@ from game_optimization_linux.services.narrator_region import (
     normalized_region_from_preview,
     preview_rect_from_normalized,
 )
+from game_optimization_linux.services.narrator_persistence import (
+    NarratorSettingsRepository,
+)
 
 
 def test_narrator_page_uses_native_selector_instead_of_qml_popup() -> None:
@@ -59,6 +62,31 @@ def test_normalized_coordinate_conversion_without_scaling() -> None:
     )
 
     assert region == NormalizedRect(x=0.1, y=0.6, width=0.7, height=0.2)
+
+
+def test_saved_graphical_roi_is_game_specific_and_survives_restart(
+    tmp_path: Path,
+) -> None:
+    repository = NarratorSettingsRepository(tmp_path / "games")
+    game_key = "123"
+    region_a = NormalizedRect(x=0.12, y=0.58, width=0.74, height=0.24)
+    region_b = NormalizedRect(x=0.20, y=0.66, width=0.62, height=0.18)
+
+    repository.save_overrides(
+        game_key,
+        {
+            "subtitle_region": region_a.to_dict(),
+        },
+    )
+    assert repository.load(game_key).subtitle_region == region_a
+
+    repository.save_overrides(
+        game_key,
+        {"subtitle_region": region_b.to_dict()},
+    )
+    restarted = NarratorSettingsRepository(tmp_path / "games")
+    assert restarted.load(game_key).subtitle_region == region_b
+    assert restarted.load("456").subtitle_region != region_b
 
 
 def test_letterboxed_preview_maps_only_the_painted_game_frame() -> None:
