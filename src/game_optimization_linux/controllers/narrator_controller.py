@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import replace
 from datetime import UTC, datetime
 import hashlib
 import logging
@@ -28,6 +29,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# How long after a launch from GameOpti the Narrator waits for the game.
+AUTOSTART_WAIT_SECONDS = 10 * 60
+
 
 class NarratorController:
     def __init__(self, app: AppController) -> None:
@@ -41,6 +45,100 @@ class NarratorController:
         )
         self._preview_generations: dict[str, int] = {}
         self._preview_jobs: set[Future[object]] = set()
+        # game_key -> deadline (monotonic) while waiting for a launched game.
+        self._awaiting_game: dict[str, float] = {}
+        self._autostarted: set[str] = set()
+        self._clock = time.monotonic
+
+    # -- voice ------------------------------------------------------------------
+    def effective_voice_id(self, settings: NarratorGameSettings | None) -> str:
+        """The voice really used: the saved one if installed, else the first
+        installed voice. A specific voice is never required."""
+
+        tts = self._app._narrator_pipeline.tts
+        available = tuple(str(value) for value in getattr(tts, "available_voice_ids", ()))
+        saved = settings.voice_id if settings is not None else ""
+        if saved and saved in available:
+            return saved
+        if available:
+            return available[0]
+        return saved or str(getattr(tts, "default_voice_id", ""))
+
+    def _voice_name(self, voice_id: str) -> str:
+        for voice in tuple(getattr(self._app._narrator_pipeline.tts, "voices", ())):
+            if isinstance(voice, Mapping):
+                if str(voice.get("id", "")) == voice_id:
+                    return str(voice.get("name", voice_id))
+            elif str(getattr(voice, "voice_id", getattr(voice, "id", ""))) == voice_id:
+                return str(getattr(voice, "name", voice_id))
+        return voice_id
+
+    def _with_effective_voice(self, settings: NarratorGameSettings) -> NarratorGameSettings:
+        voice_id = self.effective_voice_id(settings)
+        return replace(settings, voice_id=voice_id) if voice_id != settings.voice_id else settings
+
+    # -- autostart --------------------------------------------------------------
+    def game_launched(self, game: Game) -> None:
+        """A game was started from GameOpti: wait for it and autostart."""
+
+        game_key = self._game_key(game)
+        try:
+            settings = self._app._narrator_settings_repository.load(game_key)
+        except Exception:
+            return
+        activity = self._app._narrator_pipeline.activity
+        supports = getattr(activity, "supports", None)
+        if not settings.enabled or not (callable(supports) and supports(game)):
+            return
+        invalidate = getattr(activity, "invalidate", None)
+        if callable(invalidate):
+            invalidate(game_key)
+        self._awaiting_game[game_key] = self._clock() + AUTOSTART_WAIT_SECONDS
+        self._app.narratorChanged.emit(game.id)
+
+    def _poll_autostart(self) -> None:
+        pipeline = self._app._narrator_pipeline
+        now = self._clock()
+        for game_key, deadline in tuple(self._awaiting_game.items()):
+            if now > deadline or pipeline.active:
+                if now > deadline:
+                    self._awaiting_game.pop(game_key, None)
+                continue
+            # The detector caches its answer for a few seconds, so this does
+            # not spawn a process on every UI tick.
+            if pipeline.activity.is_active(game_key) is not True:
+                continue
+            self._awaiting_game.pop(game_key, None)
+            game = self._game_for_key(game_key)
+            if game is None:
+                continue
+            try:
+                settings = self._app._narrator_settings_repository.load(game_key)
+            except Exception:
+                continue
+            if not settings.enabled or self._missing_requirements(settings):
+                self._app.narratorChanged.emit(game.id)
+                continue
+            first_grant = not self._has_capture_grant(game_key)
+            if self.start(game.id, automatic=True):
+                self._autostarted.add(game_key)
+                self._app._emit_toast(
+                    "Narrator started with the game. Choose the game window once; the choice is remembered"
+                    if first_grant else "Narrator started with the game",
+                    "info",
+                )
+        snapshot = pipeline.snapshot
+        for game_key in tuple(self._autostarted):
+            if not pipeline.active or snapshot.game_key != game_key:
+                self._autostarted.discard(game_key)
+
+    def _has_capture_grant(self, game_key: str) -> bool:
+        grants = getattr(self._app._narrator_pipeline.capture, "_grants", None)
+        loader = getattr(grants, "load_token", None)
+        try:
+            return bool(loader(game_key)) if callable(loader) else True
+        except Exception:
+            return False
 
     def components(self) -> list[dict[str, Any]]:
         manager = self._app._narrator_component_manager
@@ -214,8 +312,9 @@ class NarratorController:
             select_voice = getattr(
                 self._app._narrator_pipeline.tts, "select_voice", None
             )
-            if callable(select_voice):
-                select_voice(settings.voice_id)
+            effective_voice = self.effective_voice_id(settings)
+            if callable(select_voice) and effective_voice:
+                select_voice(effective_voice)
         except Exception as error:
             logger.warning("Could not save narrator settings for %s: %s", game.id, error)
             self._app._emit_toast("Narrator settings could not be saved", "error")
@@ -317,20 +416,50 @@ class NarratorController:
             )
         missing = list(self._missing_requirements(settings))
         active = self._app._narrator_pipeline.active
-        activity = self._app._narrator_pipeline.activity.is_active(game_key)
-        can_start = not active and not missing and activity is True
+        activity_provider = self._app._narrator_pipeline.activity
+        activity = activity_provider.is_active(game_key)
+        # Unknown (e.g. Flatpak without a host process list) never blocks a
+        # manual start; only a positively "not running" game does.
+        can_start = not active and not missing and activity is not False
         reason_code = ""
         if active and snapshot.game_key != game_key:
             reason_code = "another_session_active"
         elif missing:
             reason_code = "components_missing"
-        elif activity is not True:
+        elif activity is False:
             reason_code = "game_not_running"
+        supports = getattr(activity_provider, "supports", None)
+        autostart_supported = bool(callable(supports) and supports(game))
+        enabled = bool(settings is not None and settings.enabled)
+        running_here = bool(active and snapshot.game_key == game_key)
+        if running_here:
+            card_state = "running"
+        elif snapshot_values.get("status") == "error" and snapshot.game_key == game_key:
+            card_state = "error"
+        elif not enabled:
+            card_state = "disabled"
+        elif missing:
+            card_state = "missing"
+        elif autostart_supported:
+            card_state = "waiting_for_game"
+        else:
+            card_state = "manual"
+        voice_id = self.effective_voice_id(settings)
         snapshot_values.update(
             {
                 "canStart": can_start,
                 "reasonCode": reason_code,
                 "missingRequirements": missing,
+                "cardState": card_state,
+                "gameActivity": (
+                    "running" if activity is True
+                    else "not_running" if activity is False else "unknown"
+                ),
+                "autostartSupported": autostart_supported,
+                "autostartPending": game_key in self._awaiting_game,
+                "captureGrantSaved": self._has_capture_grant(game_key),
+                "voiceId": voice_id,
+                "voiceName": self._voice_name(voice_id) if voice_id else "",
                 "gameId": game.id,
                 "gameKey": game_key,
                 "subtitleRegion": (
@@ -352,13 +481,15 @@ class NarratorController:
         )
         return snapshot_values
 
-    def start(self, game_id: str) -> bool:
-        game = self._app._resolve_game(game_id, show_error=True)
+    def start(self, game_id: str, *, automatic: bool = False) -> bool:
+        game = self._app._resolve_game(game_id, show_error=not automatic)
         if game is None:
             return False
         game_key = self._game_key(game)
         try:
-            settings = self._app._narrator_settings_repository.load(game_key)
+            settings = self._with_effective_voice(
+                self._app._narrator_settings_repository.load(game_key)
+            )
             missing = self._missing_requirements(settings)
             if missing:
                 raise RuntimeError(
@@ -381,17 +512,7 @@ class NarratorController:
             and settings.subtitle_language_mode
             is NarratorSubtitleLanguageMode.POLISH
         )
-        selected_voice = (
-            settings.voice_id
-            if settings is not None and settings.voice_id
-            else str(
-                getattr(
-                    self._app._narrator_pipeline.tts,
-                    "default_voice_id",
-                    "",
-                )
-            )
-        )
+        selected_voice = self.effective_voice_id(settings)
         voice_components = {
             str(getattr(voice, "voice_id", "")): str(
                 getattr(voice, "component_id", "")
@@ -587,6 +708,7 @@ class NarratorController:
     def poll(self) -> None:
         self._poll_component_jobs()
         self._app._narrator_pipeline.poll_game_activity()
+        self._poll_autostart()
         changed: set[str] = set()
         for event in self._app._narrator_pipeline.drain_events():
             game = self._game_for_key(event.game_key)
@@ -812,7 +934,8 @@ class NarratorController:
                 for profile_id in profile_ids
             ],
             "ttsProviderId": settings.tts_provider_id or tts.provider_id,
-            "voiceId": settings.voice_id or default_voice,
+            "voiceId": self.effective_voice_id(settings) or default_voice,
+            "voiceName": self._voice_name(self.effective_voice_id(settings) or default_voice),
             "voices": voices,
             "volume": settings.volume,
             "speechRate": settings.speech_rate,

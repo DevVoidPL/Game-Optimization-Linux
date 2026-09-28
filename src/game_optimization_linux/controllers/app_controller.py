@@ -615,7 +615,12 @@ class AppController(QObject):
                 PiperPolishTtsProvider(),
                 narrator_audio,
                 NarratorGameActivityDetector(
-                    lambda game_key: self._narrator_controller.game_for_key(game_key)
+                    lambda game_key: self._narrator_controller.game_for_key(game_key),
+                    host_processes=(
+                        host_service.host_process_commands
+                        if host_service is not None and host_service.in_flatpak
+                        else None
+                    ),
                 ),
             )
         self._narrator_pipeline = narrator_pipeline
@@ -1522,6 +1527,15 @@ class AppController(QObject):
 
     @Slot(str, result=bool)
     def launchGame(self, game_id: str) -> bool:
+        launched = self._launch_game(game_id)
+        if launched and not self._demo_mode:
+            game = self._resolve_game(game_id, show_error=False)
+            if game is not None:
+                # Lets the Narrator start with the game and stop after it.
+                self._narrator_controller.game_launched(game)
+        return launched
+
+    def _launch_game(self, game_id: str) -> bool:
         game = self._resolve_game(game_id)
         if game is None:
             return False

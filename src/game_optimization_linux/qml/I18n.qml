@@ -20,6 +20,36 @@ QtObject {
         }
     }
 
+    // Honest Narrator state for a game, from session.cardState (backend):
+    // disabled | waiting_for_game | manual | missing | running | error.
+    function narratorMissingLabel(kind) {
+        switch (text(kind)) {
+        case "capture": return qsTr("screen capture")
+        case "ocr": return qsTr("subtitle OCR")
+        case "translation": return qsTr("translation")
+        case "tts": return qsTr("voice")
+        case "audio": return qsTr("audio output")
+        default: return text(kind)
+        }
+    }
+    function narratorState(session) {
+        var data = session || ({})
+        var state = text(data.cardState)
+        if (state === "running")
+            return { "tone": "success", "text": qsTr("Running") }
+        if (state === "error")
+            return { "tone": "danger", "text": qsTr("Error: %1").arg(message(text(data.message)) || qsTr("Unknown")) }
+        if (state === "missing") {
+            var labels = (data.missingRequirements || []).map(function(kind) { return narratorMissingLabel(kind) })
+            return { "tone": "warning", "text": qsTr("On · missing: %1").arg(labels.join(", ")) }
+        }
+        if (state === "waiting_for_game")
+            return { "tone": "success", "text": qsTr("On · starts with the game") }
+        if (state === "manual")
+            return { "tone": "info", "text": qsTr("On · start the Narrator manually") }
+        return { "tone": "neutral", "text": qsTr("Off") }
+    }
+
     function profile(value) {
         switch (text(value)) {
         case "Fast": return qsTr("Fast")
@@ -554,6 +584,10 @@ QtObject {
             return qsTr("game directory is unavailable")
         case "A game file or directory is not accessible":
             return qsTr("A game file or directory is not accessible")
+        case "Narrator started with the game":
+            return qsTr("Narrator started with the game")
+        case "Narrator started with the game. Choose the game window once; the choice is remembered":
+            return qsTr("Narrator started with the game. Choose the game window once; the choice is remembered")
         case "Checking OptiScaler took too long":
             return qsTr("Checking OptiScaler took too long")
         case "The installation can only be relocated when every recorded file matches in the new game directory":

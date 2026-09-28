@@ -119,7 +119,12 @@ def test_feature_cards_show_real_state(details) -> None:
     assert info["gamescope"]["preview"] is False
     assert info["mangohud"]["tone"] == "unavailable"
     assert (info["optiscaler"]["state"], info["optiscaler"]["tone"]) == ("Installed", "success")
-    assert info["narrator"]["state"] == "On for this game"
+    # Without a session state the card never claims the Narrator will start.
+    assert info["narrator"]["state"] == "On · start the Narrator manually"
+    details.setProperty("narratorSession", {"cardState": "missing", "missingRequirements": ["tts"]})
+    _settle()
+    info = {card["id"]: card["info"] for card in _plain(details.property("headerCards"))}
+    assert info["narrator"]["state"] == "On · missing: voice"
     launch = _plain(details.property("headerCards"))[0]["info"]
     assert launch["detail"] == "Profile: Automatic"
 

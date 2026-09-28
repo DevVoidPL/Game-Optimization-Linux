@@ -1438,10 +1438,9 @@ class NarratorPipeline:
         voice_id = settings.voice_id or str(
             getattr(self.tts, "default_voice_id", "")
         )
-        if not voice_id and voices:
-            voice_id = voices[0]
         if voices and voice_id not in voices:
-            raise RuntimeError(f"The selected Polish voice is not available: {voice_id}")
+            # Never require one specific voice: use the first installed one.
+            voice_id = voices[0]
 
         return replace(
             settings,

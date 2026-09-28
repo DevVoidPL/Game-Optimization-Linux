@@ -68,6 +68,8 @@ _HOST_EXECUTABLES = frozenset(
         "xrandr",
         "pkexec",
         "true",
+        # Read-only process list for "is the game running" (Narrator autostart).
+        "ps",
     }
 )
 _TOOL_SPECS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
@@ -421,6 +423,21 @@ class HostServiceClient:
                 or "The optional host component returned an incomplete compsize measurement"
             )
         return measurement
+
+    def host_process_commands(self) -> tuple[str, ...] | None:
+        """Command lines of host processes (read-only ``ps``); None if unknown.
+
+        Used only to recognise a running game from the sandbox: Steam's
+        ``reaper SteamLaunch AppId=<id>`` wrapper, or the game's own path.
+        """
+
+        try:
+            result = self._run_fixed("ps", ("-eo", "args=", "--width", "512"), timeout=3.0)
+        except HostServiceError:
+            return None
+        if result is None or result.returncode != 0:
+            return None
+        return tuple(line.strip() for line in result.stdout.splitlines() if line.strip())
 
     def cancel_all(self) -> None:
         with self._measurement_processes_lock:

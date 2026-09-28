@@ -847,6 +847,25 @@ Item {
                                 }
                             }
 
+                            // Honest state: does the Narrator really start?
+                            StatusBadge {
+                                objectName: "narratorCardState"
+                                visible: page.selectedGameId.length > 0
+                                text: App.I18n.narratorState(page.sessionData).text
+                                status: {
+                                    var tone = App.I18n.narratorState(page.sessionData).tone
+                                    return tone === "success" ? "available" : tone === "danger" ? "failed"
+                                         : tone === "warning" ? "warning" : "paused"
+                                }
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: page.selectedGameId.length > 0 && page.sessionData.captureGrantSaved === false
+                                text: qsTr("The first start asks you to choose the game window once; it is remembered")
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                                wrapMode: Text.WordWrap
+                            }
                             Label {
                                 Layout.fillWidth: true
                                 text: qsTr("The session processes subtitles only while the selected game is running")

@@ -104,6 +104,23 @@ PL_COUCH = {
 
 # (context, source) -> Polish, for the remaining non-Couch desktop texts.
 PL_DESKTOP = {
+    ('CouchGameDetails', 'The first start asks you to choose the game window once; it is remembered'): 'Przy pierwszym uruchomieniu trzeba raz wybrać okno gry; wybór zostanie zapamiętany',
+    ('NarratorPage', 'The first start asks you to choose the game window once; it is remembered'): 'Przy pierwszym uruchomieniu trzeba raz wybrać okno gry; wybór zostanie zapamiętany',
+    ('CouchGameDetails', 'Starts automatically with the game; you can also start it now'): 'Uruchomi się automatycznie z grą; możesz też uruchomić go teraz',
+    ('CouchGameDetails', 'This launcher cannot be detected; start the Narrator manually'): 'Nie można wykryć gry z tego launchera; uruchom Lektora ręcznie',
+    ('CouchGameDetails', 'Voice: %1'): 'Głos: %1',
+    ('I18n', 'screen capture'): 'przechwytywanie ekranu',
+    ('I18n', 'subtitle OCR'): 'OCR napisów',
+    ('I18n', 'translation'): 'tłumaczenie',
+    ('I18n', 'voice'): 'głos',
+    ('I18n', 'audio output'): 'wyjście audio',
+    ('I18n', 'Error: %1'): 'Błąd: %1',
+    ('I18n', 'On · missing: %1'): 'Włączony · brakuje: %1',
+    ('I18n', 'On · starts with the game'): 'Włączony · uruchomi się z grą',
+    ('I18n', 'On · start the Narrator manually'): 'Włączony · uruchom Lektora ręcznie',
+    ('I18n', 'Off'): 'Wyłączony',
+    ('I18n', 'Narrator started with the game'): 'Lektor uruchomił się z grą',
+    ('I18n', 'Narrator started with the game. Choose the game window once; the choice is remembered'): 'Lektor uruchomił się z grą. Wybierz raz okno gry; wybór zostanie zapamiętany',
     ('OptiScalerSection', 'Cancel'): 'Anuluj',
     ('CouchGameDetails', 'Retry: %1'): 'Ponów: %1',
     ('CouchGameDetails', 'Official release from the internet · confirmation required'): 'Oficjalne wydanie z internetu · wymaga potwierdzenia',
