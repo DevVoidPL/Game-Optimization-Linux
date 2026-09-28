@@ -23,9 +23,14 @@ from ..services import (
 )
 from ..services.optiscaler_online import (
     CachedOptiScalerArchive,
+    OptiScalerDownloadError,
+    OptiScalerNetworkError,
     OptiScalerOnlineError,
+    OptiScalerRateLimitError,
     OptiScalerRelease,
+    compare_installed_release,
 )
+from hashlib import sha256 as _sha256
 from ..services.optiscaler_fsr4 import (
     OptiScalerIniCapabilities,
     recommend_fsr4,
@@ -38,6 +43,42 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+class OptiScalerConfirmationRequired(OptiScalerError):
+    """The install plan would replace unmanaged files; the user must confirm."""
+
+    def __init__(self, conflicts: list[dict[str, Any]], digest: str) -> None:
+        super().__init__("Confirm replacing the listed files to continue")
+        self.conflicts = conflicts
+        self.digest = digest
+
+
+def conflict_digest(conflicts: Any) -> str:
+    """Stable identity of the unmanaged files a confirmation applies to.
+
+    A confirmation is bound to this digest, so it never authorises replacing
+    a different set of files than the one the user saw.
+    """
+
+    items = sorted(
+        f"{item.get('relativePath', '')}\0{item.get('sha256', '')}"
+        for item in (conflicts or [])
+        if isinstance(item, Mapping) and not item.get("managedByGameOptimization")
+    )
+    return _sha256("\n".join(items).encode("utf-8")).hexdigest() if items else ""
+
+
+def friendly_online_error(error: BaseException, now: float) -> str:
+    """Short, translatable reason for an online OptiScaler failure."""
+
+    if isinstance(error, OptiScalerRateLimitError):
+        return f"GitHub API rate limit reached; try again in {error.retry_minutes(now)} min"
+    if isinstance(error, OptiScalerNetworkError):
+        return "Could not reach GitHub. Check the internet connection and try again"
+    if isinstance(error, OptiScalerDownloadError):
+        return f"Downloading the official OptiScaler release failed: {error}"
+    return str(error).strip() or type(error).__name__
+
+
 class OptiScalerController:
     def __init__(self, app: AppController) -> None:
         self._app = app
@@ -46,7 +87,9 @@ class OptiScalerController:
         self._status_generation: dict[str, int] = {}
         self._status_app_ids: dict[str, str] = {}
         self._operation_errors: dict[str, str] = {}
-        self._operation_conflicts: dict[str, dict[str, str]] = {}
+        self._operation_conflicts: dict[str, dict[str, Any]] = {}
+        self._operation_contexts: dict[str, dict[str, Any]] = {}
+        self._archive_capabilities: dict[str, OptiScalerIniCapabilities] = {}
 
     @staticmethod
     def _exception_text(error: BaseException, context: str) -> str:
@@ -346,13 +389,18 @@ class OptiScalerController:
                 result.get("installationState", "not_installed")
             )
             installed = bool(result.get("installed"))
-            if installation_state == "corrupt":
+            release_relation = compare_installed_release(
+                installed_version,
+                str(result.get("installedChannel") or result.get("channel") or "stable"),
+                available_version,
+                release.channel if release is not None else channel,
+            )
+            if installation_state in {"corrupt", "inconsistent"}:
                 online_state = "error"
-            elif installed and available_version and (
-                self._app._normalized_release_version(installed_version)
-                != self._app._normalized_release_version(available_version)
-            ):
+            elif installed and release_relation == "older":
                 online_state = "update_available"
+            elif installed and release_relation == "other_channel":
+                online_state = "other_channel"
             elif installed:
                 online_state = "installed"
             elif app_id in self._app._optiscaler_online_errors:
@@ -367,11 +415,16 @@ class OptiScalerController:
                 not installed or online_state == "update_available"
             ):
                 try:
-                    available_capabilities = (
-                        self._app._optiscaler_service.archive_ini_capabilities(
+                    # Extracting the archive is expensive; the result depends
+                    # only on its verified content, so it is computed once.
+                    key = str(cached_archive.sha256 or cached_archive.path)
+                    known = self._archive_capabilities.get(key)
+                    if known is None:
+                        known = self._app._optiscaler_service.archive_ini_capabilities(
                             cached_archive.path
                         )
-                    )
+                        self._archive_capabilities[key] = known
+                    available_capabilities = known
                 except Exception as error:
                     logger.debug(
                         "Could not inspect cached OptiScaler capabilities: %s", error
@@ -407,6 +460,7 @@ class OptiScalerController:
             result.update(
                 {
                     "onlineState": online_state,
+                    "releaseRelation": release_relation,
                     "availableVersion": available_version,
                     "releaseUrl": release.html_url if release is not None else "",
                     "releaseSource": release.source if release is not None else "",
@@ -419,6 +473,7 @@ class OptiScalerController:
                         cached_archive.sha256 if cached_archive is not None else ""
                     ),
                     "onlineError": self._app._optiscaler_online_errors.get(app_id, ""),
+                    "rateLimitRetryMinutes": self._rate_limit_minutes(),
                     "availableChannel": release.channel if release is not None else channel,
                     "availableFidelityFxUpscalerVersion": (
                         release.fidelityfx_upscaler_version
@@ -492,6 +547,194 @@ class OptiScalerController:
         except Exception as error:
             logger.warning("OptiPatcher removal failed for %s: %s", game_id, error)
             return {"success": False, "error": str(error)}
+
+    def _rate_limit_minutes(self) -> int:
+        until = float(getattr(self._app._optiscaler_release_client, "rate_limited_until", 0.0) or 0.0)
+        now = datetime.now(UTC).timestamp()
+        return max(0, int((until - now + 59) // 60)) if until > now else 0
+
+    def startOptiScalerInstall(
+        self,
+        game_id: str,
+        executable: str,
+        injection_dll: str,
+        operation_name: str,
+        confirmed_conflicts: str,
+        allow_anticheat_risk: bool,
+        configuration: Mapping[str, Any] | None = None,
+    ) -> bool:
+        """One button, one background task: official release -> verified install.
+
+        check release -> download (verified SHA-256) -> validate/extract ->
+        plan -> conflicts (stop unless the exact set was confirmed) -> install
+        with backups -> apply settings -> verify. Never falls back to a local
+        archive; every failure ends the task with a real reason.
+        """
+
+        game = self._app._resolve_game(game_id, show_error=False)
+        if game is None:
+            return False
+        try:
+            app_id = self._app._optiscaler_service.game_key(game)
+            channel = self._app._optiscaler_service.profile_repository.load(app_id).channel
+        except OptiScalerError as error:
+            self._app._emit_toast(str(error), "error")
+            return False
+        operation = str(operation_name or "auto").strip().casefold()
+        desired = dict(configuration or {})
+        confirmed = str(confirmed_conflicts or "")
+        client = self._app._optiscaler_release_client
+
+        def job(cancelled: Event, progress: Callable[[str, float], None]) -> OptiScalerProfile:
+            def check() -> None:
+                if cancelled.is_set():
+                    raise OptiScalerCancelled("OptiScaler operation was cancelled")
+
+            try:
+                progress("Checking official release", 0.04)
+                release = client.latest_release(
+                    channel=channel, force_refresh=False, allow_stale_cache=True
+                )
+                check()
+
+                def downloaded(done: int, total: int) -> None:
+                    fraction = (done / total) if total > 0 else 0.0
+                    progress("Downloading official release", 0.06 + 0.44 * min(1.0, fraction))
+
+                progress("Downloading official release", 0.06)
+                try:
+                    archive = client.ensure_archive(release, progress=downloaded)
+                except TypeError:
+                    archive = client.ensure_archive(release)
+                self._app._optiscaler_online_errors.pop(app_id, None)
+            except OptiScalerOnlineError as error:
+                message = friendly_online_error(error, datetime.now(UTC).timestamp())
+                self._app._optiscaler_online_errors[app_id] = message
+                raise OptiScalerError(message) from error
+            check()
+            progress("Verifying and extracting release", 0.55)
+            plan = self._app._optiscaler_service.plan(
+                game,
+                archive.path,
+                executable=str(executable or ""),
+                injection_dll=str(injection_dll or "auto"),
+                requested_fsr4_mode=str(desired.get("fsr4Mode", "")),
+                allow_anticheat_risk=bool(allow_anticheat_risk),
+                version_override=release.version,
+            ).to_dict()
+            if plan.get("blockers"):
+                raise OptiScalerError("; ".join(str(item) for item in plan["blockers"]))
+            digest = conflict_digest(plan.get("conflicts"))
+            if plan.get("requiresConflictConfirmation") and digest != confirmed:
+                unmanaged = [
+                    dict(item) for item in plan.get("conflicts", [])
+                    if not item.get("managedByGameOptimization")
+                ]
+                raise OptiScalerConfirmationRequired(unmanaged, digest)
+            check()
+            progress("Installing with backup", 0.7)
+            profile = self._install_and_configure(
+                game, archive, release, str(executable or ""),
+                str(injection_dll or "auto"), operation, bool(digest) and digest == confirmed,
+                bool(allow_anticheat_risk), desired, cancelled,
+                lambda stage, value: progress(stage, 0.7 + 0.2 * value),
+            )
+            progress("Verifying installation", 0.93)
+            try:
+                self._app._optiscaler_service.verify(game)
+            except OptiScalerError as error:
+                logger.warning("Post-install OptiScaler verification failed: %s", error)
+            return profile
+
+        self._operation_conflicts.pop(str(game_id), None)
+        self._operation_errors.pop(str(game_id), None)
+        return self._app._start_optiscaler_operation(
+            game, "Install", job, context={
+                "operation": operation, "executable": str(executable or ""),
+                "injectionDll": str(injection_dll or "auto"),
+                "configuration": desired,
+            },
+        )
+
+    def confirmOptiScalerRelocation(self, game_id: str) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        if game is None:
+            return {"success": False, "error": "Select an available Steam game first"}
+        try:
+            profile = self._app._optiscaler_service.relocate_installation(game)
+        except OptiScalerError as error:
+            return {"success": False, "error": str(error)}
+        self._invalidate_status(profile.app_id)
+        self._app.optiScalerChanged.emit(profile.app_id)
+        return {"success": True, "installDirectory": profile.install_directory}
+
+    def _install_and_configure(
+        self,
+        game: Game,
+        archive: CachedOptiScalerArchive,
+        release: OptiScalerRelease,
+        executable: str,
+        injection_dll: str,
+        operation: str,
+        allow_replace_conflicts: bool,
+        allow_anticheat_risk: bool,
+        desired: Mapping[str, Any],
+        cancelled: Event,
+        progress: Callable[[str, float], None],
+    ) -> OptiScalerProfile:
+        previous_profile = self._app._optiscaler_service.profile_repository.load(
+            self._app._optiscaler_service.game_key(game)
+        )
+        self._app._optiscaler_service.install(
+            game,
+            archive.path,
+            executable=executable,
+            injection_dll=injection_dll,
+            operation=operation,
+            allow_replace_conflicts=allow_replace_conflicts,
+            allow_anticheat_risk=allow_anticheat_risk,
+            cancel_event=cancelled,
+            progress=progress,
+            expected_archive_sha256=archive.sha256,
+            source_identity="official_optiscaler",
+            channel=release.channel,
+            fidelityfx_upscaler_version=release.fidelityfx_upscaler_version,
+            release_version=release.version,
+            configuration=dict(desired),
+        )
+        requested_mode = str(desired.get("fsr4Mode", previous_profile.fsr4_mode)).casefold()
+        effective_mode = str(
+            desired.get("effectiveFsr4Mode", previous_profile.effective_fsr4_mode)
+        ).casefold()
+        agility = desired.get("fsrAgilitySdkUpgrade", previous_profile.fsr_agility_sdk_upgrade)
+        watermark = desired.get("fsr4Watermark", previous_profile.fsr4_watermark)
+        try:
+            if not isinstance(agility, bool) or not isinstance(watermark, bool):
+                raise OptiScalerError("OptiScaler switch values must be booleans")
+            return self._app._optiscaler_service.configure_upscaling(
+                game,
+                fsr4_mode=requested_mode,
+                effective_fsr4_mode=effective_mode,
+                automatic_reason=str(desired.get("automaticReason", previous_profile.automatic_reason)),
+                fsr_agility_sdk_upgrade=agility,
+                fsr4_watermark=watermark,
+                dx11_upscaler=str(desired.get("dx11Upscaler", previous_profile.dx11_upscaler)),
+                dx12_upscaler=str(desired.get("dx12Upscaler", previous_profile.dx12_upscaler)),
+                vulkan_upscaler=str(desired.get("vulkanUpscaler", previous_profile.vulkan_upscaler)),
+            )
+        except OptiScalerError as error:
+            logger.exception("Installed OptiScaler %s but could not reapply settings", release.version)
+            try:
+                self._app._optiscaler_service.remove(game)
+            except OptiScalerError as rollback_error:
+                raise OptiScalerError(
+                    "OptiScaler configuration failed and rollback also failed: "
+                    f"{error}; {rollback_error}"
+                ) from rollback_error
+            raise OptiScalerError(
+                "OptiScaler configuration failed; the installation was rolled back: "
+                f"{error}"
+            ) from error
 
     def _cached_optiscaler_release(
         self, channel: str = "stable"
@@ -668,8 +911,9 @@ class OptiScalerController:
                 progress("Release ready", 1.0)
                 return self._app._optiscaler_service.profile_repository.load(app_id)
             except OptiScalerOnlineError as error:
-                self._app._optiscaler_online_errors[app_id] = str(error)
-                raise
+                message = friendly_online_error(error, datetime.now(UTC).timestamp())
+                self._app._optiscaler_online_errors[app_id] = message
+                raise OptiScalerError(message) from error
 
         return self._app._start_optiscaler_operation(
             game,
@@ -880,6 +1124,7 @@ class OptiScalerController:
         operation: Callable[
             [Event, Callable[[str, float], None]], Any
         ],
+        context: Mapping[str, Any] | None = None,
     ) -> bool:
         if any(
             stored_game_id == game.id and not future.done()
@@ -908,6 +1153,8 @@ class OptiScalerController:
 
         future = self._app._optiscaler_executor.submit(operation, cancel_event, report)
         self._app._optiscaler_jobs[task_id] = (future, cancel_event, game.id)
+        if context:
+            self._operation_contexts[task_id] = dict(context)
         self._app._reload_tasks()
         self._app._emit_toast(f"OptiScaler {action.casefold()} started", "info")
         return True
@@ -1031,6 +1278,7 @@ class OptiScalerController:
             self._app._optiscaler_jobs.pop(task_id, None)
             task = self._app._operational_tasks.get(task_id)
             if task is None:
+                self._operation_contexts.pop(task_id, None)
                 continue
             status = "completed"
             error_text = ""
@@ -1044,12 +1292,38 @@ class OptiScalerController:
             except OptiScalerCancelled as error:
                 status = "cancelled"
                 error_text = self._exception_text(error, "Operation cancelled")
+            except OptiScalerConfirmationRequired as error:
+                # Not a failure: the user decides. Nothing was written.
+                status = "cancelled"
+                error_text = str(error)
+                context = self._operation_contexts.get(task_id, {})
+                self._operation_errors.pop(game_id, None)
+                self._operation_conflicts[game_id] = {
+                    "kind": "confirmation_required",
+                    "files": error.conflicts[:50],
+                    "fileCount": len(error.conflicts),
+                    "digest": error.digest,
+                    **context,
+                }
             except Exception as error:
                 status = "cancelled" if cancelled.is_set() else "failed"
-                error_text = self._exception_text(
-                    error,
-                    f"OptiScaler {str(task.get('title', 'operation')).split(':', 1)[-1].strip()} failed",
-                )
+                if isinstance(error, OptiScalerError) and not isinstance(
+                    error, OptiScalerConflictError
+                ):
+                    # Already a user-facing reason (translated in QML).
+                    error_text = str(error).strip() or type(error).__name__
+                elif isinstance(error, OSError):
+                    # Never show a raw "[Errno N]" to the user.
+                    error_text = (
+                        f"A game file or directory is not accessible: {error.filename}"
+                        if getattr(error, "filename", None)
+                        else "A game file or directory is not accessible"
+                    )
+                else:
+                    error_text = self._exception_text(
+                        error,
+                        f"OptiScaler {str(task.get('title', 'operation')).split(':', 1)[-1].strip()} failed",
+                    )
                 logger.exception("OptiScaler task %s failed", task_id)
                 self._operation_errors[game_id] = error_text
                 if isinstance(error, OptiScalerConflictError):
@@ -1074,9 +1348,15 @@ class OptiScalerController:
             self.requestOptiScalerStatus(game_id, True)
             if app_id:
                 self._app.optiScalerChanged.emit(app_id)
+            self._operation_contexts.pop(task_id, None)
+            waiting = (
+                self._operation_conflicts.get(game_id, {}).get("kind")
+                == "confirmation_required"
+            )
             task["status"] = status
             task["stage"] = (
                 "Completed" if status == "completed"
+                else "Confirmation required" if waiting and status == "cancelled"
                 else "Cancelled" if status == "cancelled"
                 else "Failed"
             )
@@ -1089,6 +1369,8 @@ class OptiScalerController:
             self._app._emit_toast(
                 str(getattr(profile, "summary", "OptiScaler operation completed"))
                 if status == "completed"
+                else "Confirm replacing the listed files to continue"
+                if waiting and status == "cancelled"
                 else "OptiScaler operation cancelled"
                 if status == "cancelled"
                 else f"OptiScaler operation failed: {error_text}",

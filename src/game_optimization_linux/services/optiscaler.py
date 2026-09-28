@@ -582,6 +582,126 @@ class OptiScalerService:
                         return tuple(found)
         return tuple(found)
 
+    def locate_installation(
+        self, game: Game, manifest: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Find the managed files in the game's *current* library location.
+
+        The manifest stores the absolute directory used at install time; Steam
+        may since have moved the game to another library.  States:
+
+        * ``current``      - the recorded directory exists inside this game;
+        * ``moved``        - it does not exist, but every installed file is in
+                             the current game directory with the recorded
+                             SHA-256 (the game was moved); needs confirmation
+                             before the manifest is rewritten;
+        * ``inconsistent`` - recorded directory missing and the files in the
+                             current directory do not match; nothing is changed;
+        * ``unavailable``  - the current game directory cannot be read.
+        """
+
+        stored_text = str(manifest.get("install_directory", "") or "")
+        stored = Path(stored_text) if stored_text else None
+        result: dict[str, Any] = {
+            "state": "unavailable",
+            "storedDirectory": stored_text,
+            "currentDirectory": "",
+            "mismatchedFiles": [],
+        }
+        try:
+            game_root = self._canonical_game_root(game)
+        except OptiScalerError:
+            return result
+        executable = str(manifest.get("executable", "") or "").replace("\\", "/")
+        relative_dir = PurePosixPath(executable).parent.as_posix() if executable else "."
+        expected = (
+            game_root if relative_dir in {"", "."}
+            else self._target(game_root, relative_dir)
+        )
+        result["currentDirectory"] = str(expected)
+        if stored is not None and stored.is_dir():
+            try:
+                resolved = stored.resolve(strict=True)
+                resolved.relative_to(game_root)
+            except (OSError, ValueError):
+                result["state"] = "inconsistent"
+                result["currentDirectory"] = str(expected)
+                return result
+            result.update({"state": "current", "currentDirectory": str(resolved)})
+            return result
+        if not expected.is_dir():
+            result["state"] = "inconsistent"
+            return result
+        mismatched: list[str] = []
+        for item in manifest.get("installed_files", []):
+            if not isinstance(item, Mapping):
+                continue
+            relative = str(item.get("relative_path", ""))
+            expected_hash = str(item.get("after_sha256", "") or "")
+            if not relative or _is_mutable_configuration(relative):
+                continue
+            target = self._target(expected, relative)
+            try:
+                matches = target.is_file() and (
+                    not expected_hash or self._hash_file(target) == expected_hash
+                )
+            except OSError:
+                matches = False
+            if not matches:
+                mismatched.append(relative)
+        result["mismatchedFiles"] = mismatched[:20]
+        result["state"] = "moved" if not mismatched else "inconsistent"
+        return result
+
+    def _install_root_for_change(self, game: Game, manifest: Mapping[str, Any]) -> Path:
+        """Current install root for a file operation; never a raw OSError."""
+
+        location = self.locate_installation(game, manifest)
+        state = location["state"]
+        if state == "current":
+            root = Path(location["currentDirectory"])
+            if not os.access(root, os.W_OK | os.X_OK):
+                raise OptiScalerError(
+                    "The game directory is not writable. In Flatpak, grant access "
+                    "to this Steam library, then try again"
+                )
+            return root
+        if state == "moved":
+            raise OptiScalerError(
+                "The game was moved to another Steam library. Confirm the new "
+                "location before changing OptiScaler files"
+            )
+        if state == "inconsistent":
+            raise OptiScalerError(
+                "The OptiScaler installation is inconsistent: the recorded files "
+                "were not found in the current game directory. Nothing was changed"
+            )
+        raise OptiScalerError("game directory is unavailable")
+
+    def relocate_installation(self, game: Game) -> OptiScalerProfile:
+        """After confirmation, point the manifest at the game's new location."""
+
+        self._assert_mutation_allowed(game)
+        profile = self.profile_repository.load(self.game_key(game))
+        manifest = self._load_manifest(profile)
+        location = self.locate_installation(game, manifest)
+        if location["state"] != "moved":
+            raise OptiScalerError(
+                "The installation can only be relocated when every recorded file "
+                "matches in the new game directory"
+            )
+        current = str(location["currentDirectory"])
+        manifest["install_directory"] = current
+        manifest["relocated_from"] = location["storedDirectory"]
+        manifest["relocated_at"] = datetime.now(UTC).isoformat()
+        _atomic_write(
+            self.manifest_path(profile.app_id, profile.manifest_id),
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        )
+        updated = replace(profile, install_directory=current, updated_at=datetime.now(UTC))
+        self.profile_repository.save(updated)
+        return updated
+
     def manifest_path(self, app_id: str, manifest_id: str) -> Path:
         return self.data_root / app_id / "optiscaler" / "manifests" / f"{manifest_id}.json"
 
@@ -1503,12 +1623,14 @@ class OptiScalerService:
                 None,
             )
         manifest = self._load_manifest(profile)
-        install_root = Path(str(manifest["install_directory"])).resolve(strict=False)
-        expected_root = self._canonical_game_root(game)
-        try:
-            install_root.relative_to(expected_root)
-        except ValueError as error:
-            raise OptiScalerError("manifest install directory is outside this game") from error
+        location = self.locate_installation(game, manifest)
+        if location["state"] != "current":
+            summary = {
+                "moved": "The game was moved to another Steam library; confirm the new location",
+                "inconsistent": "Inconsistent installation: recorded files are missing in the current game directory",
+            }.get(location["state"], "game directory is unavailable")
+            raise OptiScalerError(summary)
+        install_root = Path(location["currentDirectory"])
         issues: list[dict[str, Any]] = []
         installed_relatives: set[str] = set()
         payload_missing = False
@@ -1804,16 +1926,7 @@ class OptiScalerService:
         if not profile.enabled or profile.installation_state != "installed":
             raise OptiScalerError("OptiScaler is not installed for this game")
         manifest = self._load_manifest(profile)
-        install_root = Path(str(manifest.get("install_directory", ""))).resolve(
-            strict=True
-        )
-        expected_root = self._canonical_game_root(game)
-        try:
-            install_root.relative_to(expected_root)
-        except ValueError as error:
-            raise OptiScalerError(
-                "manifest install directory is outside this game"
-            ) from error
+        install_root = self._install_root_for_change(game, manifest)
         installed_entries = [
             item
             for item in manifest.get("installed_files", [])
@@ -2059,14 +2172,7 @@ class OptiScalerService:
         emit = progress or (lambda _stage, _value: None)
         profile = self.profile_repository.load(self.game_key(game))
         manifest = self._load_manifest(profile)
-        install_root = Path(str(manifest["install_directory"])).resolve(strict=True)
-        game_root = self._canonical_game_root(game)
-        try:
-            install_root.relative_to(game_root)
-        except ValueError as error:
-            raise OptiScalerError(
-                "manifest install directory is outside this game"
-            ) from error
+        install_root = self._install_root_for_change(game, manifest)
         backup_root = self.backup_root(profile.app_id, profile.manifest_id)
         manifest_path = self.manifest_path(profile.app_id, profile.manifest_id)
         try:
@@ -2335,7 +2441,7 @@ class OptiScalerService:
         emit = progress or (lambda _stage, _value: None)
         profile = self.profile_repository.load(self.game_key(game))
         manifest = self._load_manifest(profile)
-        install_root = Path(str(manifest["install_directory"])).resolve(strict=True)
+        install_root = self._install_root_for_change(game, manifest)
         backup_root = self.backup_root(profile.app_id, profile.manifest_id)
         replacements = [
             item for item in manifest.get("replaced_files", []) if isinstance(item, Mapping)
@@ -2408,11 +2514,20 @@ class OptiScalerService:
         capabilities = empty_capabilities
         ini_state = inspect_optiscaler_ini_state("")
         ini_error = ""
-        if profile.enabled and manifest:
+        active_install = bool(
+            profile.enabled
+            and profile.manifest_id
+            and profile.installation_state in {"installed", "partial", "corrupt"}
+        )
+        location = (
+            self.locate_installation(game, manifest)
+            if manifest and active_install
+            else {"state": "not_applicable", "storedDirectory": "",
+                  "currentDirectory": "", "mismatchedFiles": []}
+        )
+        if profile.enabled and manifest and location["state"] == "current":
             try:
-                install_root = Path(
-                    str(manifest.get("install_directory", ""))
-                ).resolve(strict=True)
+                install_root = Path(str(location["currentDirectory"]))
                 ini_entries = [
                     item
                     for item in manifest.get("installed_files", [])
@@ -2531,14 +2646,25 @@ class OptiScalerService:
             {
                 "success": True,
                 "appId": profile.app_id,
-                "installationState": profile.installation_state,
+                "installationState": (
+                    "inconsistent"
+                    if location["state"] in {"inconsistent", "unavailable"}
+                    and active_install
+                    else profile.installation_state
+                ),
+                "installLocation": location,
                 "installed": bool(
                     profile.enabled
                     and profile.manifest_id
                     and profile.installation_state
                     in {"installed", "partial"}
                 ),
-                "installedVersion": profile.installed_version,
+                # A removed installation has no current version; the last one
+                # is kept separately so the UI never shows both states.
+                "installedVersion": (
+                    profile.installed_version if active_install else ""
+                ),
+                "lastInstalledVersion": profile.installed_version,
                 "injectionDll": profile.injection_dll,
                 "protonOverride": profile.proton_override,
                 "manifestId": profile.manifest_id,

@@ -99,7 +99,7 @@ SurfaceCard {
         Label {
             Layout.fillWidth: true
             visible: String(card.statusData.refreshError || card.statusData.operationError || "").length > 0
-            text: String(card.statusData.refreshError || card.statusData.operationError || "")
+            text: App.I18n.message(String(card.statusData.refreshError || card.statusData.operationError || ""))
             color: App.Theme.warning
             wrapMode: Text.WordWrap
         }

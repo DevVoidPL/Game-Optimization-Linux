@@ -54,6 +54,14 @@ FocusScope {
     property var optimizationDisplays: []
     property var optimizationReasons: []
     property var optiScalerData: ({})
+    // Conflict digest the user already declined (the dialog is not reopened
+    // for the same set of files).
+    property string optiScalerDismissedConflict: ""
+    readonly property var optiScalerConflict: optiScalerData.operationConflict || ({})
+    readonly property bool optiScalerBusy: optiScalerData.loading === true || optiScalerData.refreshing === true
+    readonly property string optiScalerErrorText: App.I18n.message(String(
+            optiScalerData.error || optiScalerData.onlineError
+            || optiScalerData.refreshError || optiScalerData.operationError || ""))
     property var protonTweaksData: ({})
     property var narratorData: ({})
     property var narratorSession: ({})
@@ -276,12 +284,11 @@ FocusScope {
         ]
     }
     function optiScalerRefreshSubtitle() {
-        if (optiScalerData.loading || optiScalerData.refreshing)
+        if (optiScalerBusy)
             return qsTr("Checking the official release…")
-        var onlineError = String(optiScalerData.onlineError || "")
-        if (onlineError.length > 0)
-            return onlineError
-        return qsTr("Prepare a verified Couch installation")
+        if (optiScalerErrorText.length > 0)
+            return qsTr("Retry: %1").arg(optiScalerErrorText)
+        return qsTr("Official release from the internet · confirmation required")
     }
     function optiScalerActions() {
         var actions = []
@@ -289,12 +296,14 @@ FocusScope {
         var needsPackage = !installed
                 || String(optiScalerData.onlineState || "") === "update_available"
                 || ["corrupt", "partial"].indexOf(String(optiScalerData.installationState || "")) >= 0
-        if (needsPackage) {
-            if (optiScalerData.archiveReady === true) {
-                actions.push({ "id": "optiscaler-install", "icon": App.UiIcons.couchGlyphInstall, "iconOnLight": App.UiIcons.couchGlyphInstallOnLight, "symbol": "◇", "title": optiScalerOperationLabel(), "subtitle": qsTr("Official verified release · confirmation required"), "enabled": optiScalerExecutable().length > 0 })
-            } else {
-                actions.push({ "id": "optiscaler-refresh", "icon": App.UiIcons.couchGlyphDownload, "iconOnLight": App.UiIcons.couchGlyphDownloadOnLight, "symbol": "↓", "title": qsTr("Download official OptiScaler release"), "subtitle": optiScalerRefreshSubtitle(), "enabled": !(optiScalerData.loading || optiScalerData.refreshing) })
-            }
+        if (optiScalerData.success !== true && !optiScalerBusy) {
+            // Status could not be read: show the reason and a retry.
+            actions.push({ "id": "optiscaler-retry-status", "icon": App.UiIcons.couchGlyphRefresh, "iconOnLight": App.UiIcons.couchGlyphRefreshOnLight, "title": qsTr("Retry"), "subtitle": optiScalerErrorText || qsTr("Status not loaded"), "enabled": true })
+            return actions
+        }
+        if (needsPackage && optiScalerData.success === true) {
+            // One button: download, verify, plan, confirm conflicts, install.
+            actions.push({ "id": "optiscaler-install", "icon": App.UiIcons.couchGlyphInstall, "iconOnLight": App.UiIcons.couchGlyphInstallOnLight, "symbol": "◇", "title": optiScalerOperationLabel(), "subtitle": optiScalerRefreshSubtitle(), "enabled": optiScalerExecutable().length > 0 && !optiScalerBusy })
         }
         if (installed) {
             actions.push({ "id": "optiscaler-configure", "icon": App.UiIcons.couchGlyphTune, "iconOnLight": App.UiIcons.couchGlyphTuneOnLight, "symbol": "◈", "title": qsTr("Upscaling: %1").arg(optiScalerModeLabel()), "subtitle": qsTr("Cycle and apply the FSR mode"), "enabled": (optiScalerData.supportedFsr4Modes || []).length > 0 })
@@ -361,7 +370,9 @@ FocusScope {
             if (optiScalerData.loading || optiScalerData.refreshing)
                 return { "tone": "info", "state": qsTr("Checking…"), "detail": "", "preview": false }
             if (optiScalerData.success !== true)
-                return { "tone": "neutral", "state": qsTr("Unknown"), "detail": qsTr("Status not loaded"), "preview": false }
+                return { "tone": "warning", "state": qsTr("Unknown"), "detail": optiScalerErrorText || qsTr("Status not loaded"), "preview": false }
+            if (String(optiScalerData.installationState || "") === "inconsistent")
+                return { "tone": "warning", "state": qsTr("Inconsistent installation"), "detail": qsTr("Review in Desktop Mode"), "preview": false }
             var installation = String(optiScalerData.installationState || "")
             if (installation === "corrupt" || installation === "partial")
                 return { "tone": "warning", "state": qsTr("Needs repair"), "detail": qsTr("Repair from the OptiScaler tab"), "preview": false }
@@ -610,7 +621,29 @@ FocusScope {
         var result = controller.requestOptiScalerStatus
                 ? controller.requestOptiScalerStatus(String(game.id), false) || ({})
                 : controller.getOptiScalerStatus(String(game.id)) || ({})
-        optiScalerData = result.success ? result : ({})
+        applyOptiScalerStatus(result)
+    }
+    // Accepts success and failure alike, so "Checking…" always ends.
+    function applyOptiScalerStatus(result) {
+        var data = result || ({})
+        if (data.success !== true)
+            data = { "success": false, "loading": false, "refreshing": false,
+                     "error": String(data.error || data.refreshError || "") }
+        optiScalerData = data
+        if (optiScalerBusy)
+            optiScalerStatusTimeout.restart()
+        else
+            optiScalerStatusTimeout.stop()
+        var conflict = data.operationConflict || ({})
+        if (String(conflict.kind || "") === "confirmation_required"
+                && String(conflict.digest || "") !== optiScalerDismissedConflict
+                && !confirmationOpen && visible) {
+            confirmationChoice = 0            // safe default: Cancel
+            confirmationKind = "optiscaler_conflict"
+            confirmationOpen = true
+            if (navigation) navigation.openModal("optiscaler-conflict", "cancel")
+            restoreActiveFocus()
+        }
     }
     function loadProtonTweaks() {
         if (!launcherIntegrationSupported) { protonTweaksData = ({}); return }
@@ -702,22 +735,28 @@ FocusScope {
         restoreActiveFocus()
         return true
     }
-    function beginCouchOptiScalerOperation() {
-        if (!controller || !controller.inspectOnlineOptiScaler
-                || !controller.installOnlineOptiScaler)
+    // Same backend path as Desktop "Install". A conflict stops the task before
+    // any file is written; the conflict dialog then re-runs it with the digest
+    // of exactly the files the user confirmed.
+    function startCouchOptiScalerInstall(operation, confirmedDigest) {
+        if (!controller || !controller.startOptiScalerInstall)
             return false
         var executable = optiScalerExecutable()
-        if (!executable.length || optiScalerData.archiveReady !== true)
+        if (!executable.length)
             return false
-        var operation = String(confirmationKind).replace("optiscaler_", "")
-        var injectionDll = String(optiScalerData.injectionDll || "auto")
-        var plan = controller.inspectOnlineOptiScaler(
-                    String(game.id || ""), executable, injectionDll, true) || ({})
-        if (plan.success !== true || (plan.blockers || []).length > 0)
-            return false
-        return Boolean(controller.installOnlineOptiScaler(
-                    String(game.id || ""), executable, injectionDll, operation,
-                    Boolean(plan.requiresConflictConfirmation), true))
+        return Boolean(controller.startOptiScalerInstall(
+                    String(game.id || ""), executable,
+                    String(optiScalerData.injectionDll || "auto"), String(operation),
+                    String(confirmedDigest || ""), true, ({})))
+    }
+    function beginCouchOptiScalerOperation() {
+        if (confirmationKind === "optiscaler_conflict") {
+            var conflict = optiScalerConflict
+            optiScalerDismissedConflict = String(conflict.digest || "")
+            return startCouchOptiScalerInstall(String(conflict.operation || "auto"),
+                                               String(conflict.digest || ""))
+        }
+        return startCouchOptiScalerInstall(String(confirmationKind).replace("optiscaler_", ""), "")
     }
     function configureCouchOptiScaler() {
         if (!controller || !controller.configureOptiScalerUpscaling)
@@ -1392,6 +1431,8 @@ FocusScope {
     }
     function closeConfirmation() {
         if (!confirmationOpen) return false
+        if (confirmationKind === "optiscaler_conflict")
+            optiScalerDismissedConflict = String(optiScalerConflict.digest || "")
         confirmationOpen = false
         confirmationKind = ""
         pendingPlan = ({})
@@ -1405,11 +1446,23 @@ FocusScope {
         if (confirmationKind === "optiscaler_repair") return qsTr("Repair OptiScaler?")
         if (confirmationKind === "optiscaler_reinstall") return qsTr("Reinstall OptiScaler?")
         if (confirmationKind === "optiscaler_install") return qsTr("Install OptiScaler?")
+        if (confirmationKind === "optiscaler_conflict") return qsTr("Replace existing files?")
         return qsTr("Review compression plan")
     }
     function confirmationDescription() {
         if (confirmationKind === "optiscaler_remove")
             return qsTr("Only files recorded as created by GameOpti will be removed. Replaced files remain available for restoration in Desktop Mode.")
+        if (confirmationKind === "optiscaler_conflict") {
+            var files = (optiScalerConflict.files || []).slice(0, 5).map(function(item) {
+                return "• " + String(item.relativePath || "")
+            })
+            var more = Number(optiScalerConflict.fileCount || 0) - files.length
+            return qsTr("Installing would replace %1 existing file(s) that Game Optimization did not create:")
+                       .arg(Number(optiScalerConflict.fileCount || 0))
+                   + "\n" + files.join("\n")
+                   + (more > 0 ? "\n" + qsTr("…and %1 more").arg(more) : "")
+                   + "\n" + qsTr("Each replaced file is backed up first and can be restored later.")
+        }
         if (confirmationKind.indexOf("optiscaler_") === 0)
             return qsTr("Use the verified official release. Existing target files are backed up before replacement. Do not use injection in online or anti-cheat protected games unless you accept the compatibility and account risk.")
         return qsTr("Profile: %1. Review warnings before starting. No operation starts until explicit confirmation.").arg(selectedProfile)
@@ -1420,6 +1473,7 @@ FocusScope {
         if (confirmationKind === "optiscaler_repair") return qsTr("Repair")
         if (confirmationKind === "optiscaler_reinstall") return qsTr("Reinstall")
         if (confirmationKind === "optiscaler_install") return qsTr("Install")
+        if (confirmationKind === "optiscaler_conflict") return qsTr("Back up and replace")
         return qsTr("Start task")
     }
     function activateAction() {
@@ -1470,6 +1524,11 @@ FocusScope {
         }
         if (id === "optiscaler-refresh")
             return refreshCouchOptiScaler() ? "confirm" : "error"
+        if (id === "optiscaler-retry-status") {
+            if (controller && controller.requestOptiScalerStatus)
+                applyOptiScalerStatus(controller.requestOptiScalerStatus(String(game.id || ""), true) || ({}))
+            return "confirm"
+        }
         if (id === "optiscaler-install")
             return openOptiScalerConfirmation(optiScalerOperation()) ? "open" : "error"
         if (id === "optiscaler-configure")
@@ -1642,9 +1701,8 @@ FocusScope {
                 page.loadOptiScalerStatus()
         }
         function onOptiScalerStatusChanged(changedGameId, result) {
-            if (String(changedGameId) === String(page.game.id || "")
-                    && result && result.success)
-                page.optiScalerData = result
+            if (String(changedGameId) === String(page.game.id || ""))
+                page.applyOptiScalerStatus(result)
         }
         function onNarratorChanged(changedGameId) {
             if (String(changedGameId) === String(page.game.id || ""))
@@ -2437,6 +2495,25 @@ FocusScope {
                 font.pixelSize: 14 * page.couchScale
                 wrapMode: Text.WordWrap
             }
+        }
+    }
+
+    // UI-side guard: never show "Checking…" forever if no result arrives.
+    Timer {
+        id: optiScalerStatusTimeout
+        interval: 20000
+        repeat: false
+        onTriggered: {
+            if (!page.optiScalerBusy)
+                return
+            var data = Object.assign({}, page.optiScalerData)
+            data.loading = false
+            data.refreshing = false
+            if (data.success !== true || !data.installationState)
+                data = { "success": false, "error": "Checking OptiScaler took too long" }
+            else
+                data.refreshError = "Checking OptiScaler took too long"
+            page.optiScalerData = data
         }
     }
 

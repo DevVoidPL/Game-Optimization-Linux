@@ -304,7 +304,8 @@ class AppController(QObject):
     interfaceModeChanged = Signal()
     mangoHudProfileChanged = Signal(str)
     optiScalerChanged = Signal(str)
-    optiScalerStatusChanged = Signal(str, object)
+    # QVariantMap (not ``object``): QML must be able to read the result.
+    optiScalerStatusChanged = Signal(str, "QVariantMap")
     protonTweaksChanged = Signal(str)
     optimizationAnalysisChanged = Signal(str)
     narratorChanged = Signal(str)
@@ -1825,8 +1826,33 @@ class AppController(QObject):
         operation: Callable[
             [Event, Callable[[str, float], None]], OptiScalerProfile
         ],
+        context: Mapping[str, Any] | None = None,
     ) -> bool:
-        return self._optiscaler_controller._start_optiscaler_operation(game, action, operation)
+        return self._optiscaler_controller._start_optiscaler_operation(
+            game, action, operation, context
+        )
+
+    @Slot(str, str, str, str, str, bool, "QVariantMap", result=bool)
+    def startOptiScalerInstall(
+        self,
+        game_id: str,
+        executable: str,
+        injection_dll: str,
+        operation_name: str,
+        confirmed_conflicts: str,
+        allow_anticheat_risk: bool,
+        configuration: Mapping[str, Any],
+    ) -> bool:
+        """The single "Install" path in Desktop and Couch (official release)."""
+
+        return self._optiscaler_controller.startOptiScalerInstall(
+            game_id, executable, injection_dll, operation_name,
+            confirmed_conflicts, allow_anticheat_risk, configuration,
+        )
+
+    @Slot(str, result="QVariantMap")
+    def confirmOptiScalerRelocation(self, game_id: str) -> dict[str, Any]:
+        return self._optiscaler_controller.confirmOptiScalerRelocation(game_id)
 
     @Slot(str, str, str, str, bool, result=bool)
     def installOptiScaler(

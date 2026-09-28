@@ -28,7 +28,7 @@
 <context>
     <name>CouchGameDetails</name>
     <message>
-        <location filename="../qml/couch/CouchGameDetails.qml" line="+70"/>
+        <location filename="../qml/couch/CouchGameDetails.qml" line="+78"/>
         <source>Storage</source>
         <translation>Almacenamiento</translation>
     </message>
@@ -37,41 +37,41 @@
         <translation type="vanished">Remasterización gráfica</translation>
     </message>
     <message>
-        <location line="+263"/>
+        <location line="+264"/>
         <source>Unavailable in this version</source>
         <translation>No disponible en esta versión</translation>
     </message>
     <message>
-        <location line="-262"/>
-        <location line="+2254"/>
+        <location line="-263"/>
+        <location line="+2304"/>
         <source>Optimization</source>
         <translation>Optimización</translation>
     </message>
     <message>
-        <location line="-2291"/>
-        <location line="+545"/>
+        <location line="-2349"/>
+        <location line="+556"/>
         <source>Native</source>
         <translation>Nativa</translation>
     </message>
     <message>
-        <location line="-510"/>
-        <location line="+1986"/>
+        <location line="-513"/>
+        <location line="+2036"/>
         <source>Overview</source>
         <translation>Resumen</translation>
     </message>
     <message>
-        <location line="-1983"/>
+        <location line="-2033"/>
         <source>OptiScaler</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+54"/>
         <location line="+64"/>
-        <location line="+150"/>
+        <location line="+151"/>
         <location line="+15"/>
-        <location line="+232"/>
-        <location line="+334"/>
-        <location line="+1163"/>
+        <location line="+234"/>
+        <location line="+362"/>
+        <location line="+1182"/>
         <location line="+17"/>
         <location line="+2"/>
         <location line="+283"/>
@@ -79,7 +79,7 @@
         <translation>No disponible</translation>
     </message>
     <message>
-        <location line="-2259"/>
+        <location line="-2309"/>
         <source>B</source>
         <translation>B</translation>
     </message>
@@ -150,12 +150,12 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+2056"/>
+        <location line="+2106"/>
         <source>Translating</source>
         <translation type="unfinished">Traduciendo</translation>
     </message>
     <message>
-        <location line="-2055"/>
+        <location line="-2105"/>
         <source>Speaking</source>
         <translation type="unfinished">Hablando</translation>
     </message>
@@ -384,28 +384,13 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+4"/>
-        <source>Prepare a verified Couch installation</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+10"/>
-        <source>Official verified release · confirmation required</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
-        <source>Download official OptiScaler release</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+4"/>
-        <location line="+69"/>
+        <location line="+21"/>
+        <location line="+71"/>
         <source>Upscaling: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-69"/>
+        <location line="-71"/>
         <source>Cycle and apply the FSR mode</source>
         <translation type="unfinished"></translation>
     </message>
@@ -436,12 +421,12 @@
     </message>
     <message>
         <location line="+5"/>
-        <location line="+88"/>
+        <location line="+90"/>
         <source>Launching…</source>
         <translation>Iniciando…</translation>
     </message>
     <message>
-        <location line="-88"/>
+        <location line="-90"/>
         <source>Launch</source>
         <translation>Iniciar</translation>
     </message>
@@ -452,12 +437,12 @@
     </message>
     <message>
         <location line="+0"/>
-        <location line="+81"/>
+        <location line="+83"/>
         <source>Game is unavailable</source>
         <translation>El juego no está disponible</translation>
     </message>
     <message>
-        <location line="-80"/>
+        <location line="-82"/>
         <source>Updates</source>
         <translation>Actualizaciones</translation>
     </message>
@@ -493,14 +478,14 @@
         <translation>Medición de solo lectura</translation>
     </message>
     <message>
-        <location line="-45"/>
-        <location line="+46"/>
-        <location line="+77"/>
+        <location line="-46"/>
+        <location line="+47"/>
+        <location line="+79"/>
         <source>Profile: %1</source>
         <translation>Perfil: %1</translation>
     </message>
     <message>
-        <location line="-77"/>
+        <location line="-79"/>
         <source>Choose a planned profile</source>
         <translation>Elegir un perfil previsto</translation>
     </message>
@@ -525,42 +510,42 @@
         <translation>Se requiere un plan Btrfs verificado</translation>
     </message>
     <message>
-        <location line="-85"/>
+        <location line="-86"/>
         <location line="+39"/>
         <location line="+1"/>
-        <location line="+76"/>
+        <location line="+77"/>
         <location line="+7"/>
-        <location line="+565"/>
+        <location line="+595"/>
         <location line="+19"/>
         <location line="+182"/>
         <location line="+101"/>
         <location line="+72"/>
-        <location line="+842"/>
+        <location line="+861"/>
         <location line="+1"/>
         <location line="+1"/>
         <source>On</source>
         <translation>Activado</translation>
     </message>
     <message>
-        <location line="-1906"/>
+        <location line="-1956"/>
         <location line="+39"/>
         <location line="+1"/>
-        <location line="+76"/>
+        <location line="+77"/>
         <location line="+7"/>
-        <location line="+23"/>
-        <location line="+542"/>
+        <location line="+25"/>
+        <location line="+570"/>
         <location line="+19"/>
         <location line="+182"/>
         <location line="+101"/>
         <location line="+72"/>
-        <location line="+842"/>
+        <location line="+861"/>
         <location line="+1"/>
         <location line="+1"/>
         <source>Off</source>
         <translation>Desactivada</translation>
     </message>
     <message>
-        <location line="-1865"/>
+        <location line="-1915"/>
         <source>MangoHud</source>
         <translation>MangoHud</translation>
     </message>
@@ -569,16 +554,16 @@
         <translation type="vanished">OptiScaler: %1</translation>
     </message>
     <message>
-        <location line="+94"/>
-        <location line="+1794"/>
+        <location line="+97"/>
+        <location line="+1841"/>
         <source>Installed</source>
         <translation>Instalado</translation>
     </message>
     <message>
-        <location line="-1817"/>
-        <location line="+24"/>
-        <location line="+733"/>
-        <location line="+1060"/>
+        <location line="-1866"/>
+        <location line="+26"/>
+        <location line="+761"/>
+        <location line="+1079"/>
         <source>Not installed</source>
         <translation>No instalado</translation>
     </message>
@@ -591,7 +576,7 @@
         <translation type="vanished">La instalación está disponible en el modo Escritorio</translation>
     </message>
     <message>
-        <location line="-1859"/>
+        <location line="-1908"/>
         <source>Remove OptiScaler</source>
         <translation>Eliminar OptiScaler</translation>
     </message>
@@ -613,7 +598,7 @@
         <translation type="vanished">Resolución: %1</translation>
     </message>
     <message>
-        <location line="+247"/>
+        <location line="+249"/>
         <source>FPS only</source>
         <translation>Solo FPS</translation>
     </message>
@@ -635,24 +620,24 @@
         <translation>Personalizado</translation>
     </message>
     <message>
-        <location line="-362"/>
+        <location line="-365"/>
         <location line="+22"/>
         <location line="+33"/>
-        <location line="+288"/>
+        <location line="+291"/>
         <location line="+24"/>
         <source>Disabled</source>
         <translation>Desactivado</translation>
     </message>
     <message>
-        <location line="-425"/>
+        <location line="-428"/>
         <location line="+114"/>
-        <location line="+290"/>
-        <location line="+660"/>
+        <location line="+293"/>
+        <location line="+688"/>
         <source>Automatic</source>
         <translation>Automático</translation>
     </message>
     <message>
-        <location line="-660"/>
+        <location line="-688"/>
         <source>Maximum Performance</source>
         <translation>Máximo rendimiento</translation>
     </message>
@@ -707,15 +692,30 @@
         <translation>Calidad</translation>
     </message>
     <message>
-        <location line="-421"/>
-        <location line="+428"/>
+        <location line="-424"/>
+        <location line="+431"/>
         <location line="+1"/>
-        <location line="+1750"/>
+        <location line="+1797"/>
         <source>Monitor</source>
         <translation>Monitor</translation>
     </message>
     <message>
-        <location line="-2014"/>
+        <location line="-2105"/>
+        <source>Retry: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Official release from the internet · confirmation required</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+10"/>
+        <source>Retry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+31"/>
         <source>Launcher integration unavailable</source>
         <translation type="unfinished"></translation>
     </message>
@@ -725,7 +725,17 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+534"/>
+        <location line="+42"/>
+        <source>Inconsistent installation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Review in Desktop Mode</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+522"/>
         <source>Top left</source>
         <translation>Arriba a la izquierda</translation>
     </message>
@@ -781,7 +791,7 @@
         <translation>Mediano</translation>
     </message>
     <message>
-        <location line="+183"/>
+        <location line="+185"/>
         <source>Update OptiScaler?</source>
         <translation type="unfinished"></translation>
     </message>
@@ -801,12 +811,32 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location line="+1"/>
+        <source>Replace existing files?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location line="+5"/>
         <source>Only files recorded as created by GameOpti will be removed. Replaced files remain available for restoration in Desktop Mode.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+2"/>
+        <location line="+6"/>
+        <source>Installing would replace %1 existing file(s) that Game Optimization did not create:</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>…and %1 more</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Each replaced file is backed up first and can be restored later.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>Use the verified official release. Existing target files are backed up before replacement. Do not use injection in online or anti-cheat protected games unless you accept the compatibility and account risk.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -836,7 +866,12 @@
         <translation type="unfinished">Instalar</translation>
     </message>
     <message>
-        <location line="+272"/>
+        <location line="+1"/>
+        <source>Back up and replace</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+276"/>
         <source>Game</source>
         <translation>Juego</translation>
     </message>
@@ -850,11 +885,11 @@
         <translation type="vanished">%1 · %2 · %3</translation>
     </message>
     <message>
-        <location line="-1375"/>
+        <location line="-1424"/>
         <location line="+20"/>
-        <location line="+10"/>
+        <location line="+12"/>
         <location line="+200"/>
-        <location line="+1488"/>
+        <location line="+1535"/>
         <location line="+1"/>
         <source>Unknown</source>
         <translation>Desconocido</translation>
@@ -915,8 +950,8 @@
         <translation>Clasificación</translation>
     </message>
     <message>
-        <location line="-1554"/>
-        <location line="+1551"/>
+        <location line="-1601"/>
+        <location line="+1598"/>
         <location line="+1"/>
         <source>Measurement unavailable</source>
         <translation>Medición no disponible</translation>
@@ -988,7 +1023,7 @@
         <translation type="vanished">Configura la superposición para este AppID de Steam.</translation>
     </message>
     <message>
-        <location line="-1403"/>
+        <location line="-1422"/>
         <source>MangoHud is unavailable.</source>
         <translation>MangoHud no está disponible.</translation>
     </message>
@@ -1038,7 +1073,7 @@
         <translation>RAM y VRAM</translation>
     </message>
     <message>
-        <location line="+1487"/>
+        <location line="+1506"/>
         <source>Save profile</source>
         <translation>Guardar perfil</translation>
     </message>
@@ -1048,17 +1083,17 @@
         <translation>Hay más ajustes de apariencia, métricas, opciones avanzadas y registro en el modo Escritorio.</translation>
     </message>
     <message>
-        <location line="-1027"/>
+        <location line="-1043"/>
         <source>Review compression plan</source>
         <translation>Revisar plan de compresión</translation>
     </message>
     <message>
-        <location line="-5"/>
+        <location line="-6"/>
         <source>Remove OptiScaler?</source>
         <translation>¿Eliminar OptiScaler?</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+24"/>
         <source>Profile: %1. Review warnings before starting. No operation starts until explicit confirmation.</source>
         <translation>Perfil: %1. Revisa las advertencias antes de empezar. Ninguna operación comienza sin confirmación explícita.</translation>
     </message>
@@ -1067,16 +1102,16 @@
         <translation type="vanished">Solo se eliminarán los archivos registrados como creados por Game Optimization. Los archivos reemplazados seguirán disponibles para restaurarlos en el modo Escritorio.</translation>
     </message>
     <message>
-        <location line="+1040"/>
+        <location line="+1064"/>
         <source>The estimate does not guarantee the same change in free disk space.</source>
         <translation>La estimación no garantiza el mismo cambio de espacio libre en disco.</translation>
     </message>
     <message>
-        <location line="-1508"/>
+        <location line="-1546"/>
         <location line="+181"/>
         <location line="+193"/>
-        <location line="+1018"/>
-        <location line="+120"/>
+        <location line="+1037"/>
+        <location line="+139"/>
         <source>Cancel</source>
         <translation>Cancelar</translation>
     </message>
@@ -1085,22 +1120,22 @@
         <translation type="vanished">MangoHud usa el perfil guardado de cada juego. Los demás asistentes de inicio siguen siendo solo una vista previa y no se escriben opciones de inicio de Steam.</translation>
     </message>
     <message>
-        <location line="-1036"/>
+        <location line="-1059"/>
         <source>Start task</source>
         <translation>Iniciar tarea</translation>
     </message>
     <message>
-        <location line="+662"/>
+        <location line="+666"/>
         <source>Path unavailable</source>
         <translation>Ruta no disponible</translation>
     </message>
     <message>
-        <location line="-1723"/>
+        <location line="-1772"/>
         <source>Checking…</source>
         <translation>Comprobando…</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+18"/>
         <source>Components missing</source>
         <translation>Faltan componentes</translation>
     </message>
@@ -1115,12 +1150,12 @@
         <translation>Iniciar juego</translation>
     </message>
     <message>
-        <location line="+1358"/>
+        <location line="+1405"/>
         <source>Launch unavailable</source>
         <translation>Inicio no disponible</translation>
     </message>
     <message>
-        <location line="-1391"/>
+        <location line="-1438"/>
         <source>Needs repair</source>
         <translation>Necesita reparación</translation>
     </message>
@@ -1129,17 +1164,17 @@
         <translation type="vanished">Aún no se aplica al iniciar</translation>
     </message>
     <message>
-        <location line="-27"/>
+        <location line="-29"/>
         <source>Not supported for this launcher</source>
         <translation>No compatible con este lanzador</translation>
     </message>
     <message>
-        <location line="+40"/>
+        <location line="+42"/>
         <source>On for this game</source>
         <translation>Activado para este juego</translation>
     </message>
     <message>
-        <location line="-36"/>
+        <location line="-38"/>
         <source>Optimization profile not loaded</source>
         <translation>Perfil de optimización no cargado</translation>
     </message>
@@ -1149,7 +1184,7 @@
         <translation>Preajuste: %1</translation>
     </message>
     <message>
-        <location line="+1448"/>
+        <location line="+1497"/>
         <location line="+26"/>
         <source>Preview</source>
         <translation>Vista previa</translation>
@@ -1160,27 +1195,28 @@
         <translation>Listo para jugar</translation>
     </message>
     <message>
-        <location line="-1389"/>
+        <location line="-1436"/>
         <source>Repair from the OptiScaler tab</source>
         <translation>Reparar desde la pestaña OptiScaler</translation>
     </message>
     <message>
-        <location line="+1413"/>
+        <location line="+1460"/>
         <source>Runtime: %1</source>
         <translation>Entorno: %1</translation>
     </message>
     <message>
-        <location line="-1406"/>
+        <location line="-1453"/>
         <source>Settings not loaded</source>
         <translation>Ajustes no cargados</translation>
     </message>
     <message>
-        <location line="-10"/>
+        <location line="-84"/>
+        <location line="+72"/>
         <source>Status not loaded</source>
         <translation>Estado no cargado</translation>
     </message>
     <message>
-        <location line="+569"/>
+        <location line="+599"/>
         <location line="+289"/>
         <location line="+58"/>
         <source>%1 FPS</source>
@@ -1198,18 +1234,18 @@
     </message>
     <message>
         <location line="-72"/>
-        <location line="+1283"/>
+        <location line="+1302"/>
         <source>Available</source>
         <translation>Disponible</translation>
     </message>
     <message>
         <location line="+0"/>
-        <location line="+186"/>
+        <location line="+205"/>
         <source>Available · %1</source>
         <translation>Disponible · %1</translation>
     </message>
     <message>
-        <location line="-1348"/>
+        <location line="-1386"/>
         <source>Borderless</source>
         <translation>Sin bordes</translation>
     </message>
@@ -1244,7 +1280,7 @@
         <translation>Resolución de renderizado del juego</translation>
     </message>
     <message>
-        <location line="+833"/>
+        <location line="+852"/>
         <source>Launch configuration</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1344,17 +1380,17 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+201"/>
+        <location line="+220"/>
         <source>GameMode applies the system gamemode.ini configuration.</source>
         <translation>GameMode aplica la configuración del sistema gamemode.ini.</translation>
     </message>
     <message>
-        <location line="-1375"/>
+        <location line="-1413"/>
         <source>GameMode for this game</source>
         <translation>GameMode para este juego</translation>
     </message>
     <message>
-        <location line="+1376"/>
+        <location line="+1414"/>
         <source>GameOpti does not promise a specific FPS gain.</source>
         <translation>GameOpti no promete una mejora concreta de FPS.</translation>
     </message>
@@ -1364,7 +1400,7 @@
         <translation>GameOpti usa gamemoderun al iniciar este juego.</translation>
     </message>
     <message>
-        <location line="-1277"/>
+        <location line="-1315"/>
         <source>Gamescope default</source>
         <translation>Predeterminado de Gamescope</translation>
     </message>
@@ -1630,12 +1666,12 @@
     </message>
     <message>
         <location line="-35"/>
-        <location line="+1466"/>
+        <location line="+1485"/>
         <source>Unsupported for this launch method</source>
         <translation>No compatible con este método de inicio</translation>
     </message>
     <message>
-        <location line="-1467"/>
+        <location line="-1486"/>
         <source>Use MangoHud</source>
         <translation>Usar MangoHud</translation>
     </message>
@@ -1645,14 +1681,14 @@
         <translation>Tu límite de %1 FPS se conserva para después</translation>
     </message>
     <message>
-        <location line="-862"/>
+        <location line="-893"/>
         <location line="+161"/>
-        <location line="+177"/>
+        <location line="+180"/>
         <source>Lektor</source>
         <translation>Narrador</translation>
     </message>
     <message>
-        <location line="-177"/>
+        <location line="-180"/>
         <source>Enabled</source>
         <translation>Activado</translation>
     </message>
@@ -1668,12 +1704,12 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+1987"/>
+        <location line="+2037"/>
         <source>Capture</source>
         <translation>Captura</translation>
     </message>
     <message>
-        <location line="-1986"/>
+        <location line="-2036"/>
         <source>Voice</source>
         <translation>Voz</translation>
     </message>
@@ -6642,7 +6678,147 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>La captura de pantalla se detuvo</translation>
     </message>
     <message>
-        <location line="+6"/>
+        <location line="+2"/>
+        <source>Could not reach GitHub. Check the internet connection and try again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Confirm replacing the listed files to continue</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The game was moved to another Steam library. Confirm the new location before changing OptiScaler files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The OptiScaler installation is inconsistent: the recorded files were not found in the current game directory. Nothing was changed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The game was moved to another Steam library; confirm the new location</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Inconsistent installation: recorded files are missing in the current game directory</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The game directory is not writable. In Flatpak, grant access to this Steam library, then try again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>game directory is unavailable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>A game file or directory is not accessible</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Checking OptiScaler took too long</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The installation can only be relocated when every recorded file matches in the new game directory</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>conflicting files require confirmation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>select a local OptiScaler archive</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>this 7z archive uses BCJ2 and the bundled extractor is unavailable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Check the official OptiScaler release before creating an installation plan</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Check the official OptiScaler release before installation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Select an available Steam game first</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OptiScaler is not installed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>A Steam update is currently active</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OptiScaler operation cancelled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OptiScaler is not installed for this game</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>OptiScaler operation was cancelled</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>An OptiScaler task for this game is already active</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+7"/>
+        <source>GitHub API rate limit reached; try again in %1 min</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Downloading the official OptiScaler release failed: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>A game file or directory is not accessible: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>OptiScaler operation failed: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
+        <source>Failed to refresh OptiScaler status: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+3"/>
         <source>Narrator components are unavailable: %1</source>
         <translation>Los componentes del narrador no están disponibles: %1</translation>
     </message>
@@ -9472,14 +9648,14 @@ Continúe solo después de revisar este riesgo.</translation>
 <context>
     <name>OptiScalerSection</name>
     <message>
-        <location filename="../qml/pages/details/OptiScalerSection.qml" line="+45"/>
+        <location filename="../qml/pages/details/OptiScalerSection.qml" line="+53"/>
         <location line="+3"/>
-        <location line="+30"/>
+        <location line="+36"/>
         <source>Automatic</source>
         <translation>Automático</translation>
     </message>
     <message>
-        <location line="-13"/>
+        <location line="-15"/>
         <source>Installed</source>
         <translation>Instalado</translation>
     </message>
@@ -9504,8 +9680,8 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Eliminado</translation>
     </message>
     <message>
-        <location line="+1"/>
-        <location line="+686"/>
+        <location line="+3"/>
+        <location line="+713"/>
         <source>Not installed</source>
         <translation>No instalado</translation>
     </message>
@@ -9514,12 +9690,13 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="vanished">El estado de OptiScaler no está disponible</translation>
     </message>
     <message>
-        <location line="-524"/>
+        <location line="-572"/>
         <source>The archive could not be inspected</source>
         <translation>No se pudo inspeccionar el archivo</translation>
     </message>
     <message>
-        <location line="+79"/>
+        <location line="+59"/>
+        <location line="+70"/>
         <source>The OptiScaler installation task could not be started</source>
         <translation>No se pudo iniciar la tarea de instalación de OptiScaler</translation>
     </message>
@@ -9528,12 +9705,12 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="vanished">No se pudo verificar la instalación de OptiScaler</translation>
     </message>
     <message>
-        <location line="-299"/>
+        <location line="-342"/>
         <source>Image scaling</source>
         <translation>Escalado de imagen</translation>
     </message>
     <message>
-        <location line="+620"/>
+        <location line="+661"/>
         <source>Main executable</source>
         <translation>Ejecutable principal</translation>
     </message>
@@ -9543,20 +9720,30 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Confianza de detección: %1</translation>
     </message>
     <message>
-        <location line="-566"/>
-        <location line="+11"/>
-        <location line="+555"/>
+        <location line="-595"/>
+        <location line="+13"/>
+        <location line="+582"/>
         <location line="+71"/>
         <location line="+1"/>
         <location line="+1"/>
         <location line="+49"/>
-        <location line="+63"/>
+        <location line="+172"/>
         <location line="+33"/>
         <source>Unknown</source>
         <translation>Desconocida</translation>
     </message>
     <message>
-        <location line="-198"/>
+        <location line="-919"/>
+        <source>Inconsistent installation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Nightly / other channel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+611"/>
         <source>The executable result is ambiguous. Choose the main game executable before installation.</source>
         <translation>El resultado del ejecutable es ambiguo. Selecciona el ejecutable principal del juego antes de instalar.</translation>
     </message>
@@ -9631,13 +9818,71 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+30"/>
+        <location line="+24"/>
+        <location line="+324"/>
+        <source>Retry</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-308"/>
+        <source>The game was moved to another Steam library. The recorded OptiScaler files were found unchanged in the new location.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Inconsistent installation: the recorded OptiScaler files were not found unchanged in the current game directory. Nothing is removed automatically.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Recorded: %1
+Current: %2</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+9"/>
+        <source>Use the new location</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>Installing would replace %1 existing file(s) that Game Optimization did not create.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+20"/>
+        <source>…and %1 more</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+5"/>
+        <source>Each replaced file is backed up first and can be restored later.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <location line="+179"/>
+        <source>Back up and replace the listed files</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="-172"/>
+        <source>Continue installation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+6"/>
+        <source>Cancel</source>
+        <translation type="unfinished">Cancelar</translation>
+    </message>
+    <message>
+        <location line="+19"/>
         <source>Local OptiScaler archive</source>
         <translation>Archivo local de OptiScaler</translation>
     </message>
     <message>
         <location line="+1"/>
-        <location line="+200"/>
+        <location line="+219"/>
         <source>Choose an OptiScaler archive</source>
         <translation>Elige un archivo de OptiScaler</translation>
     </message>
@@ -9654,7 +9899,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="vanished">Entiendo los conflictos y permito respaldar y reemplazar los archivos de destino</translation>
     </message>
     <message>
-        <location line="-124"/>
+        <location line="-143"/>
         <source>I understand the anti-cheat risk and want to prepare this installation manually</source>
         <translation>Comprendo el riesgo del sistema antitrampas y quiero preparar esta instalación manualmente</translation>
     </message>
@@ -9669,7 +9914,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Archivos que se reemplazarán (%1)</translation>
     </message>
     <message>
-        <location line="+25"/>
+        <location line="+33"/>
         <source>Launch the game and press Insert to check the OptiScaler menu.</source>
         <translation>Inicia el juego y pulsa Insert para comprobar el menú de OptiScaler.</translation>
     </message>
@@ -9679,40 +9924,41 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Manifiesto: %1</translation>
     </message>
     <message>
-        <location line="+28"/>
+        <location line="-618"/>
+        <location line="+646"/>
         <source>GOL-created files will be removed and verified original game files will be restored. Unknown modified binaries are preserved and block removal for review.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+13"/>
+        <location line="+24"/>
         <source>OptiScaler archives (*.7z *.zip)</source>
         <translation>Archivos de OptiScaler (*.7z *.zip)</translation>
     </message>
     <message>
-        <location line="-200"/>
+        <location line="-219"/>
         <source>Choose archive</source>
         <translation>Elegir archivo</translation>
     </message>
     <message>
-        <location line="-742"/>
-        <location line="+30"/>
+        <location line="-884"/>
+        <location line="+36"/>
         <source>FSR 4.1.1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+30"/>
+        <location line="-35"/>
+        <location line="+36"/>
         <source>FSR 4.1.1 INT8 - Experimental</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-29"/>
-        <location line="+30"/>
+        <location line="-35"/>
+        <location line="+36"/>
         <source>Disabled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-15"/>
+        <location line="-17"/>
         <source>Update available</source>
         <translation>Actualización disponible</translation>
     </message>
@@ -9727,19 +9973,19 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+30"/>
-        <location line="+930"/>
+        <location line="+32"/>
+        <location line="+1085"/>
         <source>Status refresh failed: %1. Last known installation information is still shown.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-929"/>
-        <location line="+930"/>
+        <location line="-1084"/>
+        <location line="+1085"/>
         <source>No diagnostic was returned</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-907"/>
+        <location line="-1062"/>
         <source>Refresh error: %1. Last known installation information is shown.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9754,22 +10000,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+27"/>
-        <source>The official release check was started. Apply the recommendation when the download is ready.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+12"/>
-        <source>Review the file conflict beside the install action and confirm replacement before continuing.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+9"/>
-        <source>The OptiScaler install and configuration task could not be started</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+10"/>
+        <location line="+37"/>
         <source>The OptiScaler configuration could not be saved</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9809,12 +10040,17 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>No se pudo inspeccionar la versión oficial</translation>
     </message>
     <message>
-        <location line="+7"/>
+        <location line="+8"/>
         <source>The official release check could not be started</source>
         <translation>No se pudo iniciar la comprobación de la versión oficial</translation>
     </message>
     <message>
-        <location line="+12"/>
+        <location line="+28"/>
+        <source>Choose the main game executable first</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+36"/>
         <source>Update OptiScaler</source>
         <translation>Actualizar OptiScaler</translation>
     </message>
@@ -9834,7 +10070,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>No se pudo guardar el ejecutable seleccionado</translation>
     </message>
     <message>
-        <location line="+42"/>
+        <location line="+39"/>
         <source>The OptiScaler verification task could not be started</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9855,12 +10091,12 @@ Continúe solo después de revisar este riesgo.</translation>
     </message>
     <message>
         <location line="+22"/>
-        <location line="+300"/>
+        <location line="+298"/>
         <source>OptiScaler</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-288"/>
+        <location line="-286"/>
         <source>Status instalacji</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9908,8 +10144,8 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+16"/>
-        <location line="+169"/>
+        <location line="+17"/>
+        <location line="+166"/>
         <source>Usuń</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10071,7 +10307,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Crear plan de instalación</translation>
     </message>
     <message>
-        <location line="+16"/>
+        <location line="+125"/>
         <source>Show local archive fallback</source>
         <translation>Mostrar archivo local alternativo</translation>
     </message>
@@ -10161,7 +10397,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="vanished">Conflictos detectados</translation>
     </message>
     <message>
-        <location line="+144"/>
+        <location line="+163"/>
         <source>Choose the main game executable</source>
         <translation>Elegir el ejecutable principal del juego</translation>
     </message>
@@ -10171,13 +10407,13 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Ejecutables de juegos de Windows (*.exe)</translation>
     </message>
     <message>
-        <location line="-124"/>
+        <location line="-143"/>
         <source>Installed files (%1)</source>
         <translation>Archivos instalados (%1)</translation>
     </message>
     <message>
-        <location line="-610"/>
-        <location line="+695"/>
+        <location line="-714"/>
+        <location line="+807"/>
         <source>Install OptiScaler</source>
         <translation>Instalar OptiScaler</translation>
     </message>
@@ -10206,7 +10442,8 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Eliminar OptiScaler</translation>
     </message>
     <message>
-        <location line="+0"/>
+        <location line="-646"/>
+        <location line="+646"/>
         <source>Remove OptiScaler?</source>
         <translation>¿Eliminar OptiScaler?</translation>
     </message>
@@ -10215,7 +10452,8 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="vanished">Solo se eliminarán los archivos registrados como creados por Game Optimization. Los archivos reemplazados seguirán disponibles para restaurarlos.</translation>
     </message>
     <message>
-        <location line="+0"/>
+        <location line="-646"/>
+        <location line="+646"/>
         <source>Remove</source>
         <translation>Eliminar</translation>
     </message>

@@ -39,6 +39,14 @@ SurfaceCard {
     property string errorMessage: ""
     property bool forceStatusRefresh: false
     property string dismissedOperationConflict: ""
+    // "install" | "refresh" - what "Retry" repeats after a failure.
+    property string lastAction: ""
+    // Set by the backend when installing would replace unmanaged files; the
+    // install stops before writing anything until the user confirms.
+    readonly property var pendingConflict: statusData.operationConflict || ({})
+    readonly property bool conflictPending: String(pendingConflict.kind || "") === "confirmation_required"
+                                            && String(pendingConflict.digest || "") !== dismissedOperationConflict
+    readonly property var installLocation: statusData.installLocation || ({})
     readonly property var archiveNameFilters: archiveDialog.nameFilters
 
     readonly property var injectionValues: ["auto", "dxgi.dll", "d3d12.dll", "winmm.dll", "version.dll", "dbghelp.dll", "wininet.dll", "winhttp.dll"]
@@ -53,10 +61,14 @@ SurfaceCard {
     readonly property var executableCandidates: statusData.executableCandidates || []
     readonly property var executableLabels: executableCandidates.map(function(item) { return String(item.label || item.relativePath || "") })
     readonly property var executableValues: executableCandidates.map(function(item) { return String(item.relativePath || "") })
-    readonly property string displayState: Boolean(planData.requiresConflictConfirmation)
+    readonly property string displayState: Boolean(planData.requiresConflictConfirmation) || conflictPending
                                                    ? "conflict"
+                                                   : String(statusData.installationState || "") === "inconsistent"
+                                                   ? "inconsistent"
                                                    : String(statusData.onlineState || "") === "update_available"
                                                    ? "update_available"
+                                                   : String(statusData.onlineState || "") === "other_channel"
+                                                   ? "other_channel"
                                                    : String(statusData.snapshotState || "unknown")
 
     padding: 18
@@ -71,6 +83,8 @@ SurfaceCard {
         if (state === "unknown") return qsTr("Unknown")
         if (state === "restore_required") return qsTr("Previous files require restoration")
         if (state === "removed") return qsTr("Removed")
+        if (state === "inconsistent") return qsTr("Inconsistent installation")
+        if (state === "other_channel") return qsTr("Nightly / other channel")
         return qsTr("Not installed")
     }
 
@@ -98,7 +112,7 @@ SurfaceCard {
         forceStatusRefresh = false
         if (!result.success) {
             errorMessage = qsTr("Status refresh failed: %1. Last known installation information is still shown.")
-                           .arg(String(result.error || qsTr("No diagnostic was returned")))
+                           .arg(App.I18n.message(String(result.error || "")) || qsTr("No diagnostic was returned"))
             return
         }
         statusData = result
@@ -122,9 +136,9 @@ SurfaceCard {
         vulkanUpscaler = String(result.vulkanUpscaler || "auto")
         if (String(result.refreshError || "").length > 0)
             errorMessage = qsTr("Refresh error: %1. Last known installation information is shown.")
-                           .arg(String(result.refreshError))
+                           .arg(App.I18n.message(String(result.refreshError)))
         else if (String(result.operationError || "").length > 0)
-            errorMessage = String(result.operationError)
+            errorMessage = App.I18n.message(String(result.operationError))
         else
             errorMessage = ""
     }
@@ -139,7 +153,7 @@ SurfaceCard {
             errorMessage = ""
             scheduleStatus(true)
         } else {
-            errorMessage = String(result.error || qsTr("The release channel could not be changed"))
+            errorMessage = result.error ? App.I18n.message(String(result.error)) : qsTr("The release channel could not be changed")
         }
     }
 
@@ -153,7 +167,7 @@ SurfaceCard {
             errorMessage = ""
             scheduleStatus(true)
         } else {
-            errorMessage = String(result.error || qsTr("The backend could not be changed"))
+            errorMessage = result.error ? App.I18n.message(String(result.error)) : qsTr("The backend could not be changed")
         }
     }
 
@@ -178,30 +192,9 @@ SurfaceCard {
             "vulkanUpscaler": vulkanUpscaler
         }
         if (!statusData.installed) {
-            if (!statusData.archiveReady) {
-                refreshOnline()
-                errorMessage = qsTr("The official release check was started. Apply the recommendation when the download is ready.")
-                return
-            }
-            if (!Boolean(planData.success))
-                inspectOnline()
-            if (!Boolean(planData.success))
-                return
-            if ((planData.blockers || []).length > 0) {
-                errorMessage = (planData.blockers || []).join("\n")
-                return
-            }
-            if (Boolean(planData.requiresConflictConfirmation) && !replaceConfirmed) {
-                errorMessage = qsTr("Review the file conflict beside the install action and confirm replacement before continuing.")
-                return
-            }
-            if (!controller.installAndConfigureOnlineOptiScaler)
-                return
-            var accepted = controller.installAndConfigureOnlineOptiScaler(
-                        gameId, selectedExecutable, injectionDll, "install",
-                        replaceConfirmed, antiCheatConfirmed, configuration)
-            if (!accepted)
-                errorMessage = qsTr("The OptiScaler install and configuration task could not be started")
+            // Same one-button flow as "Install": download, verify, plan,
+            // confirm conflicts, install and apply these settings.
+            installFromInternet("")
             return
         }
         if (!controller.configureOptiScalerUpscaling)
@@ -211,7 +204,7 @@ SurfaceCard {
             errorMessage = ""
             scheduleStatus(true)
         } else {
-            errorMessage = String(result.error || qsTr("The OptiScaler configuration could not be saved"))
+            errorMessage = result.error ? App.I18n.message(String(result.error)) : qsTr("The OptiScaler configuration could not be saved")
         }
     }
 
@@ -233,7 +226,7 @@ SurfaceCard {
                     gameId, archiveUrl, selectedExecutable, injectionDll, fsr4Mode) || ({})
         planData = result.success ? result : ({})
         replaceConfirmed = false
-        errorMessage = result.success ? "" : String(result.error || qsTr("The archive could not be inspected"))
+        errorMessage = result.success ? "" : result.error ? App.I18n.message(String(result.error)) : qsTr("The archive could not be inspected")
     }
 
     function inspectOnline() {
@@ -244,14 +237,67 @@ SurfaceCard {
                     antiCheatConfirmed, fsr4Mode) || ({})
         planData = result.success ? result : ({})
         replaceConfirmed = false
-        errorMessage = result.success ? "" : String(result.error || qsTr("The official release could not be inspected"))
+        errorMessage = result.success ? "" : result.error ? App.I18n.message(String(result.error)) : qsTr("The official release could not be inspected")
     }
 
     function refreshOnline() {
         if (!controller || !controller.refreshOptiScalerRelease)
             return
+        lastAction = "refresh"
         if (!controller.refreshOptiScalerRelease(gameId, true))
             errorMessage = qsTr("The official release check could not be started")
+        else
+            errorMessage = ""
+    }
+
+    function currentConfiguration() {
+        var recommendation = statusData.recommendation || ({})
+        return {
+            "fsr4Mode": fsr4Mode,
+            "effectiveFsr4Mode": fsr4Mode === "automatic"
+                               ? String(recommendation.recommendedMode || "disabled")
+                               : fsr4Mode,
+            "automaticReason": fsr4Mode === "automatic"
+                               ? String(recommendation.reason || "") : "",
+            "fsrAgilitySdkUpgrade": fsrAgilitySdkUpgrade,
+            "fsr4Watermark": fsr4Watermark,
+            "dx11Upscaler": dx11Upscaler,
+            "dx12Upscaler": dx12Upscaler,
+            "vulkanUpscaler": vulkanUpscaler
+        }
+    }
+
+    // The single "Install" path: official release from the internet. It never
+    // falls back to a local archive; failures are shown with "Retry".
+    function installFromInternet(confirmedDigest) {
+        if (!controller || !controller.startOptiScalerInstall)
+            return false
+        if (!selectedExecutable) {
+            errorMessage = qsTr("Choose the main game executable first")
+            return false
+        }
+        lastAction = "install"
+        var accepted = controller.startOptiScalerInstall(
+                    gameId, selectedExecutable, injectionDll, onlineOperation(),
+                    String(confirmedDigest || ""), antiCheatConfirmed, currentConfiguration())
+        if (accepted) {
+            errorMessage = ""
+            replaceConfirmed = false
+            dismissedOperationConflict = String(pendingConflict.digest || "")
+        } else {
+            errorMessage = qsTr("The OptiScaler installation task could not be started")
+        }
+        return accepted
+    }
+
+    function retryLastAction() {
+        errorMessage = ""
+        if (lastAction === "install")
+            installFromInternet("")
+        else if (lastAction === "refresh")
+            refreshOnline()
+        else
+            scheduleStatus(true)
     }
 
     function onlineOperation() {
@@ -279,7 +325,7 @@ SurfaceCard {
             errorMessage = ""
             scheduleStatus(true)
         } else {
-            errorMessage = String(result.error || qsTr("The selected executable could not be saved"))
+            errorMessage = result.error ? App.I18n.message(String(result.error)) : qsTr("The selected executable could not be saved")
         }
     }
 
@@ -300,17 +346,14 @@ SurfaceCard {
             "dx12Upscaler": dx12Upscaler,
             "vulkanUpscaler": vulkanUpscaler
         }
-        var accepted = false
-        if (Boolean(planData.officialRelease) && controller.installOnlineOptiScaler) {
-            accepted = controller.installOnlineOptiScaler(
-                        gameId, selectedExecutable, injectionDll,
-                        onlineOperation(), replaceConfirmed, antiCheatConfirmed,
-                        configuration)
-        } else if (controller.installOptiScaler) {
-            accepted = controller.installOptiScaler(
-                        gameId, archiveUrl, selectedExecutable, injectionDll,
-                        replaceConfirmed, configuration)
+        // Local archive only as the explicit advanced option.
+        if (!(showLocalArchive && archiveUrl.length > 0 && controller.installOptiScaler)) {
+            installFromInternet("")
+            return
         }
+        var accepted = controller.installOptiScaler(
+                    gameId, archiveUrl, selectedExecutable, injectionDll,
+                    replaceConfirmed, configuration)
         if (!accepted)
             errorMessage = qsTr("The OptiScaler installation task could not be started")
     }
@@ -430,11 +473,12 @@ SurfaceCard {
                     }
 
                     AppButton {
+                        objectName: "installOptiScalerOnlineButton"
                         text: section.installLabel()
                         iconSource: App.UiIcons.actionInstall
                         kind: "primary"
-                        enabled: Boolean(section.controller && (section.controller.installOnlineOptiScaler || section.controller.installOptiScaler))
-                        onClicked: section.beginInstall()
+                        enabled: Boolean(section.controller && section.controller.startOptiScalerInstall)
+                        onClicked: section.installFromInternet("")
                     }
 
                     AppButton {
@@ -443,10 +487,7 @@ SurfaceCard {
                         kind: "danger"
                         enabled: Boolean(section.controller && section.controller.removeOptiScaler)
                                  && Boolean(section.statusData.manifestId || section.statusData.installed)
-                        onClicked: {
-                            if (section.controller && section.controller.removeOptiScaler)
-                                section.controller.removeOptiScaler(section.gameId)
-                        }
+                        onClicked: removeDialog.ask(qsTr("Remove OptiScaler?"), qsTr("GOL-created files will be removed and verified original game files will be restored. Unknown modified binaries are preserved and block removal for review."), qsTr("Remove"), true, "remove")
                     }
                 }
             }
@@ -768,12 +809,121 @@ SurfaceCard {
             }
         }
 
-        Label {
+        RowLayout {
             Layout.fillWidth: true
             visible: Boolean(section.statusData.onlineError)
-            text: String(section.statusData.onlineError || "")
-            color: App.Theme.danger
-            wrapMode: Text.WordWrap
+            Label {
+                objectName: "optiscalerOnlineError"
+                Layout.fillWidth: true
+                text: App.I18n.message(String(section.statusData.onlineError || ""))
+                color: App.Theme.danger
+                wrapMode: Text.WordWrap
+            }
+            AppButton {
+                text: qsTr("Retry")
+                iconSource: App.UiIcons.actionRefresh
+                kind: "secondary"
+                onClicked: section.retryLastAction()
+            }
+        }
+
+        // Game moved by Steam / inconsistent installation (never auto-removed).
+        ColumnLayout {
+            objectName: "optiscalerLocationNotice"
+            Layout.fillWidth: true
+            visible: ["moved", "inconsistent"].indexOf(String(section.installLocation.state || "")) >= 0
+            spacing: 6
+            Label {
+                Layout.fillWidth: true
+                text: String(section.installLocation.state) === "moved"
+                      ? qsTr("The game was moved to another Steam library. The recorded OptiScaler files were found unchanged in the new location.")
+                      : qsTr("Inconsistent installation: the recorded OptiScaler files were not found unchanged in the current game directory. Nothing is removed automatically.")
+                color: App.Theme.warning
+                wrapMode: Text.WordWrap
+            }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Recorded: %1\nCurrent: %2")
+                      .arg(String(section.installLocation.storedDirectory || ""))
+                      .arg(String(section.installLocation.currentDirectory || ""))
+                color: App.Theme.textMuted
+                font.family: "monospace"
+                wrapMode: Text.WrapAnywhere
+            }
+            AppButton {
+                visible: String(section.installLocation.state) === "moved"
+                text: qsTr("Use the new location")
+                kind: "primary"
+                onClicked: {
+                    var result = section.controller && section.controller.confirmOptiScalerRelocation
+                            ? section.controller.confirmOptiScalerRelocation(section.gameId) || ({}) : ({})
+                    section.errorMessage = result.success ? ""
+                            : App.I18n.message(String(result.error || ""))
+                    section.scheduleStatus(true)
+                }
+            }
+        }
+
+        // Conflicts found by the one-button install: nothing was written yet.
+        ColumnLayout {
+            objectName: "optiscalerConflictConfirmation"
+            Layout.fillWidth: true
+            visible: section.conflictPending
+            spacing: 6
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Installing would replace %1 existing file(s) that Game Optimization did not create.")
+                      .arg(Number(section.pendingConflict.fileCount || 0))
+                color: App.Theme.warning
+                font.weight: Font.DemiBold
+                wrapMode: Text.WordWrap
+            }
+            Repeater {
+                model: (section.pendingConflict.files || []).slice(0, 8)
+                Label {
+                    required property var modelData
+                    Layout.fillWidth: true
+                    text: "• " + String(modelData.relativePath || "")
+                    color: App.Theme.textSecondary
+                    font.family: "monospace"
+                    elide: Text.ElideMiddle
+                }
+            }
+            Label {
+                Layout.fillWidth: true
+                visible: Number(section.pendingConflict.fileCount || 0) > 8
+                text: qsTr("…and %1 more").arg(Number(section.pendingConflict.fileCount || 0) - 8)
+                color: App.Theme.textMuted
+            }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Each replaced file is backed up first and can be restored later.")
+                color: App.Theme.textSecondary
+                wrapMode: Text.WordWrap
+            }
+            AppSwitch {
+                objectName: "optiscalerConfirmReplaceSwitch"
+                text: qsTr("Back up and replace the listed files")
+                checked: section.replaceConfirmed
+                onToggled: section.replaceConfirmed = checked
+            }
+            RowLayout {
+                AppButton {
+                    objectName: "optiscalerConfirmReplaceButton"
+                    text: qsTr("Continue installation")
+                    kind: "primary"
+                    enabled: section.replaceConfirmed
+                    onClicked: section.installFromInternet(String(section.pendingConflict.digest || ""))
+                }
+                AppButton {
+                    text: qsTr("Cancel")
+                    kind: "secondary"
+                    onClicked: {
+                        section.replaceConfirmed = false
+                        section.dismissedOperationConflict = String(section.pendingConflict.digest || "")
+                    }
+                }
+            }
         }
 
         AppSwitch {
@@ -929,6 +1079,14 @@ SurfaceCard {
             }
         }
 
+        AppSwitch {
+            objectName: "optiscalerPlanReplaceSwitch"
+            visible: Boolean(section.planData.requiresConflictConfirmation)
+            text: qsTr("Back up and replace the listed files")
+            checked: section.replaceConfirmed
+            onToggled: section.replaceConfirmed = checked
+        }
+
         Label {
             Layout.fillWidth: true
             visible: (section.planData.blockers || []).length > 0
@@ -980,7 +1138,18 @@ SurfaceCard {
             }
         }
 
-        Label { Layout.fillWidth: true; visible: section.errorMessage.length > 0; text: section.errorMessage; color: App.Theme.danger; wrapMode: Text.WordWrap }
+        RowLayout {
+            Layout.fillWidth: true
+            visible: section.errorMessage.length > 0
+            Label { objectName: "optiscalerErrorMessage"; Layout.fillWidth: true; text: section.errorMessage; color: App.Theme.danger; wrapMode: Text.WordWrap }
+            AppButton {
+                objectName: "optiscalerRetryButton"
+                text: qsTr("Retry")
+                iconSource: App.UiIcons.actionRefresh
+                kind: "secondary"
+                onClicked: section.retryLastAction()
+            }
+        }
     }
 
     FileDialog {
@@ -1028,7 +1197,7 @@ SurfaceCard {
                 return
             if (!result.success) {
                 section.errorMessage = qsTr("Status refresh failed: %1. Last known installation information is still shown.")
-                                       .arg(String(result.error || qsTr("No diagnostic was returned")))
+                                       .arg(App.I18n.message(String(result.error || "")) || qsTr("No diagnostic was returned"))
                 return
             }
             section.statusData = result
