@@ -17,13 +17,17 @@ FocusScope {
     property bool cursorVisible: false
     property bool hideCursor: true
     readonly property bool pageModalOpen: homePage.contextMenuOpen
-                                          || libraryPage.filterBarFocused
+                                          || libraryPage.keyboardOpen
                                           || detailsPage.confirmationOpen
                                           || detailsPage.mangoHudOverlayOpen
                                           || detailsPage.optimizationOverlayOpen
+                                          || detailsPage.gameModeOverlayOpen
+                                          || detailsPage.gamescopeOverlayOpen
                                           || updatesPage.confirmationOpen
-                                          || tasksPage.cancellationOpen
+                                          || updatesPage.actionsOpen
+                                          || tasksPage.overlayOpen
                                           || settingsPage.keyboardOpen
+                                          || settingsPage.confirmationOpen
     readonly property var semanticActions: [
         "NavigateLeft", "NavigateRight", "NavigateUp", "NavigateDown",
         "Confirm", "Back", "SecondaryAction", "MoreActions",
@@ -59,24 +63,28 @@ FocusScope {
     function closePageModal() {
         if (homePage.contextMenuOpen)
             homePage.closeContextMenu()
-        else if (libraryPage.filterBarFocused)
-            libraryPage.closeFilters()
+        else if (libraryPage.keyboardOpen)
+            libraryPage.closeKeyboard()
         else if (detailsPage.confirmationOpen)
             detailsPage.closeConfirmation()
         else if (detailsPage.mangoHudOverlayOpen)
             detailsPage.closeMangoHudOverlay()
         else if (detailsPage.optimizationOverlayOpen)
             detailsPage.closeOptimizationOverlay()
+        else if (detailsPage.gameModeOverlayOpen)
+            detailsPage.closeGameModeOverlay()
+        else if (detailsPage.gamescopeOverlayOpen)
+            detailsPage.closeGamescopeOverlay()
         else if (updatesPage.confirmationOpen)
             updatesPage.closeConfirmation()
+        else if (updatesPage.actionsOpen)
+            updatesPage.closeActions()
         else if (settingsPage.keyboardOpen)
             settingsPage.closeKeyboard()
-        else if (tasksPage.cancellationOpen) {
-            tasksPage.cancellationOpen = false
-            tasksPage.cancellationChoice = 0
-            if (navigation)
-                navigation.closeModal()
-        }
+        else if (settingsPage.confirmationOpen)
+            settingsPage.closeConfirmation(false)
+        else if (tasksPage.overlayOpen)
+            tasksPage.closeOverlays()
     }
 
     function pageForSection(name) {
@@ -124,16 +132,22 @@ FocusScope {
 
     function leaveDetails() {
         var gameId = String(detailsPage.game.id || "")
+        var origin = detailsReturnSection === "library" ? "library" : "home"
         if (navigation) {
-            navigation.rememberFocus("library", gameId, -1)
-            var previous = String(navigation.previousScreen() || "home")
-            if (previous !== "library")
-                navigation.enterScreen("library", gameId)
+            navigation.rememberFocus(origin, gameId, -1)
+            // Details was entered from `origin`; pop it instead of pushing a new
+            // entry so Back keeps a clean history.
+            var previous = String(navigation.previousScreen() || origin)
+            if (previous !== origin)
+                navigation.enterScreen(origin, gameId)
         }
-        section = "library"
+        section = origin
         if (controller) controller.backToGames()
         Qt.callLater(function() {
-            libraryPage.restoreSelection()
+            if (origin === "home")
+                homePage.focusGame(gameId)
+            else
+                libraryPage.focusGame(gameId)
             couch.restoreActivePageFocus()
         })
     }
@@ -241,6 +255,10 @@ FocusScope {
             controller: couch.controller; navigation: couch.navigation; couchScale: couch.couchScale
             onOpenGame: function(gameId) { couch.openGameFrom("library", gameId) }
             onBackRequested: couch.returnToPreviousSection()
+            onSectionRequested: function(name) {
+                if (couch.controller) couch.controller.navigate(name)
+                couch.setSection(name, "")
+            }
         }
         CouchNarratorPage {
             id: narratorPage
@@ -259,54 +277,88 @@ FocusScope {
             controller: couch.controller; navigation: couch.navigation; couchScale: couch.couchScale
             onBackRequested: couch.returnToPreviousSection()
             onToastRequested: function(message, tone) { if (couch.controller && couch.controller.showToast) couch.controller.showToast(message, tone) }
+            onSectionRequested: function(name) {
+                if (couch.controller) couch.controller.navigate(name)
+                couch.setSection(name, "")
+            }
         }
         CouchTasks {
             id: tasksPage
             controller: couch.controller; navigation: couch.navigation; couchScale: couch.couchScale
             onBackRequested: couch.returnToPreviousSection()
+            onSectionRequested: function(name) {
+                if (couch.controller) couch.controller.navigate(name)
+                couch.setSection(name, "")
+            }
         }
         CouchSettings {
             id: settingsPage
             controller: couch.controller; navigation: couch.navigation; couchScale: couch.couchScale
             onBackRequested: couch.returnToPreviousSection()
+            onSectionRequested: function(name) {
+                if (couch.controller) couch.controller.navigate(name)
+                couch.setSection(name, "")
+            }
         }
     }
 
-    Rectangle {
+    // Persisted Couch motion preference (settings key couchMotionMode:
+    // full | reduced | off); anything else keeps the default "full".
+    Binding {
+        target: App.Theme
+        property: "couchMotionMode"
+        value: {
+            var mode = couch.controller && couch.controller.settings
+                    ? String(couch.controller.settings.couchMotionMode || "full") : "full"
+            return ["full", "reduced", "off"].indexOf(mode) >= 0 ? mode : "full"
+        }
+    }
+
+    CouchTopBar {
         id: topBar
         visible: !systemMenu.visible && !homePage.contextMenuOpen
                  && !detailsPage.confirmationOpen && !detailsPage.mangoHudOverlayOpen
                  && !detailsPage.optimizationOverlayOpen
+                 && !detailsPage.gameModeOverlayOpen && !detailsPage.gamescopeOverlayOpen
                  && !updatesPage.confirmationOpen
-                 && !tasksPage.cancellationOpen
+                 && !updatesPage.actionsOpen
+                 && !tasksPage.overlayOpen
                  && !settingsPage.keyboardOpen
+                 && !settingsPage.confirmationOpen
+                 && !libraryPage.keyboardOpen
         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
-        height: 92 * couch.couchScale; color: App.Theme.dark ? "#B80B1018" : "#C9F3F6FA"; z: 30
-        RowLayout {
-            anchors.fill: parent; anchors.leftMargin: 50 * couch.couchScale; anchors.rightMargin: 50 * couch.couchScale; spacing: 14 * couch.couchScale
-            Rectangle {
-                Layout.preferredWidth: 48 * couch.couchScale; Layout.preferredHeight: 48 * couch.couchScale; radius: 13 * couch.couchScale; color: App.Theme.surfaceRaised; clip: true
-                Image { id: logoImage; anchors.fill: parent; anchors.margins: 4 * couch.couchScale; source: couch.controller ? String(couch.controller.appLogoUrl || "") : ""; fillMode: Image.PreserveAspectFit; visible: status === Image.Ready }
-            }
-            ColumnLayout {
-                spacing: 0
-                Label { text: couch.controller ? String(couch.controller.appName || qsTr("Game Optimization Linux")) : qsTr("Game Optimization Linux"); color: App.Theme.text; font.pixelSize: 22 * couch.couchScale; font.weight: Font.Bold }
-                Label { text: couch.section === "home" ? qsTr("Home") : couch.section === "library" ? qsTr("Library") : couch.section === "narrator" ? qsTr("Narrator") : couch.section === "details" ? qsTr("Game details") : couch.section === "updates" ? qsTr("Updates") : couch.section === "tasks" ? qsTr("Tasks") : qsTr("Settings"); color: App.Theme.textSecondary; font.pixelSize: 15 * couch.couchScale }
-            }
-            Item { Layout.fillWidth: true }
-            Label { text: couch.controller && couch.controller.activeController.name ? String(couch.controller.activeController.name) : qsTr("Keyboard"); color: App.Theme.text; font.pixelSize: 16 * couch.couchScale; elide: Text.ElideRight; Layout.maximumWidth: 280 * couch.couchScale }
-            CouchButton { couchScale: couch.couchScale; implicitWidth: 52 * couch.couchScale; implicitHeight: 52 * couch.couchScale; iconSource: App.UiIcons.sidebarTasks; iconSize: App.Theme.couchIconSizeAction; Accessible.name: qsTr("Tasks"); onClicked: { if (couch.controller) couch.controller.navigate("tasks"); couch.setSection("tasks", "") } }
-            CouchButton { couchScale: couch.couchScale; implicitWidth: 52 * couch.couchScale; implicitHeight: 52 * couch.couchScale; iconSource: App.UiIcons.sidebarSettings; iconSize: App.Theme.couchIconSizeAction; Accessible.name: qsTr("Settings"); onClicked: { if (couch.controller) couch.controller.navigate("settings"); couch.setSection("settings", "") } }
-            Label { text: Qt.formatTime(new Date(), "HH:mm"); color: App.Theme.text; font.pixelSize: 20 * couch.couchScale; font.weight: Font.DemiBold; Timer { interval: 30000; running: true; repeat: true; onTriggered: parent.text = Qt.formatTime(new Date(), "HH:mm") } }
-        }
+        height: implicitHeight
+        z: 30
+        couchScale: couch.couchScale
+        appName: couch.controller ? String(couch.controller.appName || qsTr("Game Optimization Linux")) : qsTr("Game Optimization Linux")
+        appLogo: couch.controller ? String(couch.controller.appLogoUrl || "") : ""
+        sectionTitle: couch.section === "home" ? qsTr("Home") : couch.section === "library" ? qsTr("Library") : couch.section === "narrator" ? qsTr("Lektor") : couch.section === "details" ? qsTr("Game details") : couch.section === "updates" ? qsTr("Updates") : couch.section === "tasks" ? qsTr("Tasks") : qsTr("Settings")
+        inputIsController: Boolean(couch.controller && couch.controller.activeController
+                                   && couch.controller.activeController.name)
+        inputLabel: inputIsController ? String(couch.controller.activeController.name) : qsTr("Keyboard")
     }
 
     CouchHints {
         visible: couch.navigation
                  && couch.navigation.inputModality === "controller"
         anchors.right: parent.right; anchors.bottom: parent.bottom
-        anchors.rightMargin: 52 * couch.couchScale; anchors.bottomMargin: 20 * couch.couchScale
+        anchors.rightMargin: couch.section === "home" ? homePage.edgeMargin
+                             : couch.section === "library" ? libraryPage.edgeMargin
+                             : couch.section === "updates" ? updatesPage.edgeMargin
+                             : couch.section === "tasks" ? tasksPage.edgeMargin
+                             : couch.section === "settings" ? settingsPage.edgeMargin : 52 * couch.couchScale
+        anchors.bottomMargin: couch.section === "home" && !couch.pageModalOpen && !systemMenu.visible
+                              ? homePage.hintsBottomMargin
+                              : couch.section === "library" && !couch.pageModalOpen && !systemMenu.visible
+                              ? libraryPage.hintsBottomMargin
+                              : couch.section === "updates" && !couch.pageModalOpen && !systemMenu.visible
+                              ? updatesPage.hintsBottomMargin
+                              : couch.section === "tasks" && !couch.pageModalOpen && !systemMenu.visible
+                              ? tasksPage.hintsBottomMargin
+                              : couch.section === "settings" && !couch.pageModalOpen && !systemMenu.visible
+                              ? settingsPage.hintsBottomMargin : 20 * couch.couchScale
         z: 460; couchScale: couch.couchScale; buttonHints: couch.hints
+        keyboardInput: !topBar.inputIsController
         acceptText: couch.pageModalOpen || systemMenu.visible ? qsTr("Choose")
                     : couch.section === "settings" ? qsTr("Change") : qsTr("Select")
         showBack: couch.section !== "home" || couch.pageModalOpen || systemMenu.visible
@@ -314,16 +366,21 @@ FocusScope {
                      && (couch.section === "library"
                      || (couch.section === "home" && homePage.selectedGameIndex >= 0)
                      || (couch.section === "details" && Boolean(detailsPage.game.id))
-                     || (couch.section === "tasks" && tasksPage.contextAvailable))
+                     || (couch.section === "tasks" && tasksPage.contextAvailable)
+                     || (couch.section === "updates" && updatesPage.selectedIndex >= 0
+                         && updatesPage.focusZone === 0))
         showTabs: !couch.pageModalOpen && !systemMenu.visible
-                  && (couch.section === "details" || couch.section === "settings")
+                  && (couch.section === "details" || couch.section === "settings"
+                      || (couch.section === "library" && libraryPage.sourceCycleAvailable))
         showDirections: couch.pageModalOpen || systemMenu.visible || couch.section === "settings"
         showPages: !couch.pageModalOpen && !systemMenu.visible
                    && ["library", "updates", "tasks", "details", "settings"].indexOf(couch.section) >= 0
         showMenu: !couch.pageModalOpen && !systemMenu.visible
-        contextText: couch.section === "library" ? qsTr("Filters") : qsTr("More")
+        contextText: couch.section === "library" ? qsTr("Search")
+                     : couch.section === "tasks" ? qsTr("Delete all") : qsTr("More")
         sectionText: couch.section === "details" ? qsTr("Tabs")
                      : couch.section === "settings" ? qsTr("Categories")
+                     : couch.section === "library" ? qsTr("Source")
                      : qsTr("Jump")
         directionText: couch.section === "settings" ? qsTr("Adjust") : qsTr("Move")
     }

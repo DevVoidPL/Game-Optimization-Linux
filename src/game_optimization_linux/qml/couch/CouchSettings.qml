@@ -12,6 +12,25 @@ FocusScope {
     property var controller
     property var navigation
     property real couchScale: 1.0
+    readonly property real fitScale: height > 0 ? Math.min(couchScale, height / 1080) : couchScale
+    readonly property real edgeMargin: 48 * fitScale
+    readonly property real bottomNavMargin: 40 * fitScale
+    readonly property real hintsBottomMargin: bottomNavMargin + bottomNav.height + App.Theme.couchSpaceS * fitScale
+    readonly property real contentMargin: 96 * fitScale
+    // 0 categories, 1 settings of the active category, 2 bottom navigation.
+    property int focusZone: 1
+    property int selectedTile: 3
+    // Destructive actions (reset, component removal) need a confirmation
+    // whose default choice (0) is the safe "Cancel".
+    property string confirmRowId: ""
+    property int confirmChoice: 0
+    readonly property bool confirmationOpen: confirmRowId.length > 0
+    readonly property var navTiles: [
+        { "id": "library", "icon": App.UiIcons.couchGlyphLibrary, "iconOnLight": App.UiIcons.couchGlyphLibraryOnLight, "title": qsTr("Library"), "subtitle": qsTr("Your games") },
+        { "id": "tasks", "icon": App.UiIcons.couchGlyphTasks, "iconOnLight": App.UiIcons.couchGlyphTasksOnLight, "title": qsTr("Tasks"), "subtitle": qsTr("Active and recent tasks") },
+        { "id": "updates", "icon": App.UiIcons.couchGlyphUpdates, "iconOnLight": App.UiIcons.couchGlyphUpdatesOnLight, "title": qsTr("Updates"), "subtitle": qsTr("File changes and re-analysis") },
+        { "id": "settings", "icon": App.UiIcons.couchGlyphSettings, "iconOnLight": App.UiIcons.couchGlyphSettingsOnLight, "title": qsTr("Settings"), "subtitle": qsTr("App configuration") }
+    ]
     property int selectedIndex: 0
     property int activeCategoryIndex: 0
     property var settingsData: controller && controller.settings ? controller.settings : ({})
@@ -29,23 +48,24 @@ FocusScope {
             ? controller.narratorComponents : []
 
     readonly property var categories: [
-        { "id": "general", "title": qsTr("General"), "subtitle": qsTr("Language, appearance and startup") },
-        { "id": "libraries", "title": qsTr("Libraries"), "subtitle": qsTr("Game locations and storage") },
-        { "id": "automation", "title": qsTr("Automation"), "subtitle": qsTr("Updates and compression") },
-        { "id": "controller", "title": qsTr("Controller"), "subtitle": qsTr("Input and Couch behaviour") },
-        { "id": "audio", "title": qsTr("Audio"), "subtitle": qsTr("Menu sounds and music") },
-        { "id": "narrator", "title": qsTr("Narrator"), "subtitle": qsTr("Local speech components") },
-        { "id": "advanced", "title": qsTr("Advanced"), "subtitle": qsTr("Resources, diagnostics and mode") }
+        { "id": "general", "title": qsTr("General"), "subtitle": qsTr("Language, appearance and startup"), "icon": App.UiIcons.couchGlyphSettings, "iconOnLight": App.UiIcons.couchGlyphSettingsOnLight },
+        { "id": "libraries", "title": qsTr("Libraries"), "subtitle": qsTr("Game locations and storage"), "icon": App.UiIcons.couchGlyphLibrary, "iconOnLight": App.UiIcons.couchGlyphLibraryOnLight },
+        { "id": "automation", "title": qsTr("Automation"), "subtitle": qsTr("Updates and compression"), "icon": App.UiIcons.couchGlyphUpdates, "iconOnLight": App.UiIcons.couchGlyphUpdatesOnLight },
+        { "id": "controller", "title": qsTr("Controller"), "subtitle": qsTr("Input and Couch behaviour"), "icon": App.UiIcons.couchGlyphController, "iconOnLight": App.UiIcons.couchGlyphControllerOnLight },
+        { "id": "audio", "title": qsTr("Audio"), "subtitle": qsTr("Menu sounds and music"), "icon": App.UiIcons.couchGlyphVolume, "iconOnLight": App.UiIcons.couchGlyphVolumeOnLight },
+        { "id": "narrator", "title": qsTr("Narrator"), "subtitle": qsTr("Local speech components"), "icon": App.UiIcons.couchGlyphNarrator, "iconOnLight": App.UiIcons.couchGlyphNarratorOnLight },
+        { "id": "advanced", "title": qsTr("Advanced"), "subtitle": qsTr("Resources, diagnostics and mode"), "icon": App.UiIcons.couchGlyphTune, "iconOnLight": App.UiIcons.couchGlyphTuneOnLight }
     ]
     readonly property var rows: [
         { "id": "language", "category": "general", "title": qsTr("Language"), "value": languageLabel(setting("language", "English")), "enabled": true, "description": qsTr("Choose the interface language.") },
         { "id": "appearance", "category": "general", "title": qsTr("Appearance"), "value": themeLabel(setting("themeMode", "system")), "enabled": true, "description": qsTr("Follow the system colours or force a light or dark interface.") },
+        { "id": "couch-motion", "category": "general", "title": qsTr("Couch Mode animations"), "value": motionLabel(setting("couchMotionMode", "full")), "enabled": true, "description": qsTr("Full, reduced or no movement in Couch Mode. Saved and applied immediately.") },
         { "id": "automatic-updates", "category": "automation", "title": qsTr("Automatic update checks"), "value": boolLabel(setting("automaticUpdates", true)), "enabled": true, "description": qsTr("Check for new releases without installing automatically.") },
         { "id": "log-level", "category": "advanced", "title": qsTr("Logging level"), "value": String(setting("logLevel", "INFO")), "enabled": true, "description": qsTr("Choose how much diagnostic information is recorded.") },
-        { "id": "default-profile", "category": "automation", "title": qsTr("Default compression profile"), "value": String(setting("defaultCompressionProfile", "Auto")), "enabled": true, "description": qsTr("Preselected mode for storage operations.") },
+        { "id": "default-profile", "category": "automation", "title": qsTr("Default compression profile"), "value": enumLabel(setting("defaultCompressionProfile", "Auto")), "enabled": true, "description": qsTr("Preselected mode for storage operations.") },
 
-        { "id": "auto-compression", "category": "automation", "title": qsTr("Automatic compression"), "value": String(setting("automaticCompressionMode", "Off")), "enabled": true, "description": qsTr("Choose which launcher events may trigger the guarded workflow.") },
-        { "id": "auto-profile", "category": "automation", "title": qsTr("Automatic profile"), "value": String(setting("automaticCompressionProfile", "Auto")), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Auto compares measured levels; fixed profiles remain predictable.") },
+        { "id": "auto-compression", "category": "automation", "title": qsTr("Automatic compression"), "value": enumLabel(setting("automaticCompressionMode", "Off")), "enabled": true, "description": qsTr("Choose which launcher events may trigger the guarded workflow.") },
+        { "id": "auto-profile", "category": "automation", "title": qsTr("Automatic profile"), "value": enumLabel(setting("automaticCompressionProfile", "Auto")), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Auto compares measured levels; fixed profiles remain predictable.") },
         { "id": "auto-delay", "category": "automation", "title": qsTr("Safety delay"), "value": qsTr("%1 s").arg(Number(setting("automaticCompressionDelaySeconds", 300))), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Wait after the launcher becomes stable.") },
         { "id": "auto-jobs", "category": "automation", "title": qsTr("Maximum parallel jobs"), "value": String(Number(setting("automaticCompressionMaxJobs", 1))), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Limit concurrent automatic compression work from one to eight jobs.") },
         { "id": "auto-free", "category": "automation", "title": qsTr("Minimum free space"), "value": qsTr("%1 GiB").arg(Number(setting("automaticCompressionMinFreeGb", 10)).toFixed(1)), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Block automatic work below this free-space limit.") },
@@ -53,14 +73,14 @@ FocusScope {
         { "id": "auto-libraries", "category": "automation", "title": qsTr("Automatic compression libraries"), "value": listLabel("automaticCompressionLibraries"), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Restrict automatic work to these existing library paths; separate paths with semicolons.") },
         { "id": "auto-skipped", "category": "automation", "title": qsTr("Skipped Steam AppIDs"), "value": listLabel("automaticCompressionSkippedAppIds"), "enabled": String(setting("automaticCompressionMode", "Off")) !== "Off", "description": qsTr("Never process these Steam games automatically; separate AppIDs with spaces or semicolons.") },
 
-        { "id": "interface", "category": "general", "title": qsTr("Interface mode"), "value": String(setting("controllerMode", "Automatic")), "enabled": true, "description": qsTr("Choose whether GameOpti starts in the desktop or television-friendly interface.") },
+        { "id": "interface", "category": "general", "title": qsTr("Interface mode"), "value": enumLabel(setting("controllerMode", "Automatic")), "enabled": true, "description": qsTr("Choose whether GameOpti starts in the desktop or television-friendly interface.") },
         { "id": "swap", "category": "controller", "title": qsTr("Swap Confirm and Back"), "value": boolLabel(setting("swapAcceptBack", false)), "enabled": true, "description": qsTr("Reverse the two primary face-button actions.") },
         { "id": "deadzone", "category": "controller", "title": qsTr("Analog dead zone"), "value": qsTr("%1%").arg(Math.round(Number(setting("analogDeadzone", 0.20)) * 100)), "enabled": true, "description": qsTr("Ignore small stick movement around the center.") },
         { "id": "repeat-delay", "category": "controller", "title": qsTr("Navigation repeat delay"), "value": qsTr("%1 ms").arg(Number(setting("navigationRepeatDelayMs", 350))), "enabled": true, "description": qsTr("Delay before a held direction repeats.") },
         { "id": "repeat-rate", "category": "controller", "title": qsTr("Navigation repeat interval"), "value": qsTr("%1 ms").arg(Number(setting("navigationRepeatRateMs", 110))), "enabled": true, "description": qsTr("Time between repeated navigation steps.") },
         { "id": "cursor", "category": "controller", "title": qsTr("Hide cursor in Couch Mode"), "value": boolLabel(setting("hideCursorInCouchMode", true)), "enabled": true, "description": qsTr("The cursor returns after meaningful mouse movement.") },
         { "id": "fullscreen", "category": "controller", "title": qsTr("Start Couch Mode fullscreen"), "value": boolLabel(setting("startCouchModeFullscreen", true)), "enabled": true, "description": qsTr("Use the whole display when Couch Mode opens.") },
-        { "id": "post-launch", "category": "controller", "title": qsTr("After launching a game"), "value": String(setting("postLaunchBehavior", "Minimize")), "enabled": true, "description": qsTr("Choose what the GameOpti window should do.") },
+        { "id": "post-launch", "category": "controller", "title": qsTr("After launching a game"), "value": enumLabel(setting("postLaunchBehavior", "Minimize")), "enabled": true, "description": qsTr("Choose what the GameOpti window should do.") },
 
         { "id": "menu-sounds", "category": "audio", "title": qsTr("Enable menu sounds"), "value": boolLabel(setting("couchMenuSoundsEnabled", true)), "enabled": true, "description": qsTr("Play subtle semantic feedback in Couch Mode.") },
         { "id": "menu-volume", "category": "audio", "title": qsTr("Menu sound volume"), "value": qsTr("%1%").arg(effectiveMenuVolume), "enabled": setting("couchMenuSoundsEnabled", true) === true, "description": qsTr("Adjust short navigation and action effects.") },
@@ -85,6 +105,7 @@ FocusScope {
     readonly property var selectedRow: rows[selectedIndex] || ({})
 
     signal backRequested()
+    signal sectionRequested(string section)
 
     function restoreActiveFocus() {
         if (onScreenKeyboard.opened) {
@@ -94,7 +115,16 @@ FocusScope {
         }
         forceActiveFocus()
         Qt.callLater(function() {
-            if (page.visible && !onScreenKeyboard.opened)
+            if (!page.visible || onScreenKeyboard.opened)
+                return
+            if (page.confirmationOpen)
+                (page.confirmChoice === 0 ? confirmCancelButton : confirmRunButton).forceActiveFocus()
+            else if (page.focusZone === 0)
+                categoryList.forceActiveFocus()
+            else if (page.focusZone === 2) {
+                var entry = bottomNav.itemAt(page.selectedTile)
+                if (entry) entry.forceActiveFocus()
+            } else
                 settingsList.forceActiveFocus()
         })
     }
@@ -130,6 +160,84 @@ FocusScope {
     function themeLabel(value) {
         var code = themeCode(value)
         return code === "dark" ? qsTr("Dark") : code === "light" ? qsTr("Light") : qsTr("System")
+    }
+
+    // Display label for a stored enum value; the stored value is unchanged.
+    function enumLabel(value) {
+        switch (String(value)) {
+        case "Off": return qsTr("Off")
+        case "Automatic": return qsTr("Automatic")
+        case "Desktop only": return qsTr("Desktop only")
+        case "Couch only": return qsTr("Couch only")
+        case "After new game installation": return qsTr("After new game installation")
+        case "After game update": return qsTr("After game update")
+        case "After installation and update": return qsTr("After installation and update")
+        case "Minimize": return qsTr("Minimize")
+        case "Stay open": return qsTr("Stay open")
+        case "Close launcher": return qsTr("Close launcher")
+        case "Fast": case "Balanced": case "Maximum": case "Auto": return App.I18n.profile(value)
+        default: return String(value)
+        }
+    }
+
+    function motionCode(value) {
+        var normalized = String(value || "full")
+        return normalized === "reduced" || normalized === "off" ? normalized : "full"
+    }
+
+    function motionLabel(value) {
+        var code = motionCode(value)
+        return code === "reduced" ? qsTr("Reduced") : code === "off" ? qsTr("Off") : qsTr("Full")
+    }
+
+    // Control type of a row, from its stable id.
+    function rowKind(row) {
+        var id = String(row && row.id || "")
+        if (["automatic-updates", "auto-notify", "swap", "cursor", "fullscreen", "menu-sounds",
+             "music", "steam-tools", "experimental", "narrator-global-enabled"].indexOf(id) >= 0)
+            return "bool"
+        if (["auto-libraries", "auto-skipped", "steam-paths", "game-paths",
+             "backup-path", "quarantine-path"].indexOf(id) >= 0)
+            return "path"
+        if (["auto-delay", "auto-jobs", "auto-free", "deadzone", "repeat-delay", "repeat-rate",
+             "menu-volume", "music-volume", "cpu-limit", "gpu-limit", "narrator-global-volume",
+             "narrator-global-rate", "narrator-global-sampling", "narrator-global-change",
+             "narrator-global-stabilization", "narrator-global-confidence", "narrator-global-cooldown",
+             "narrator-global-noise-w", "narrator-global-noise"].indexOf(id) >= 0)
+            return "number"
+        if (id === "narrator-overview")
+            return "info"
+        if (id === "desktop" || id === "reset" || id === "forgotten-library" || row.componentAction)
+            return "action"
+        return "choice"
+    }
+
+    function destructive(row) {
+        return row && (row.id === "reset" || row.componentAction === "remove")
+    }
+
+    function adjustable(row) {
+        var kind = rowKind(row)
+        return kind === "bool" || kind === "number" || kind === "choice" || row.id === "forgotten-library"
+    }
+
+    // Honest reason shown on a disabled row.
+    function disabledReason(row) {
+        if (!row || row.enabled)
+            return ""
+        var id = String(row.id || "")
+        if (id.indexOf("auto-") === 0)
+            return qsTr("Turn on automatic compression first")
+        if (id === "menu-volume")
+            return qsTr("Turn on menu sounds first")
+        if (id === "music-volume")
+            return qsTr("Turn on Couch Mode music first")
+        if (id === "forgotten-library")
+            return qsTr("No forgotten libraries")
+        if (id.indexOf("narrator-global-") === 0)
+            return narratorGlobalData.success === true ? qsTr("Not available with the current choice")
+                                                       : qsTr("Narrator settings could not be loaded")
+        return qsTr("Unavailable")
     }
 
     function stringList(key) {
@@ -630,8 +738,9 @@ FocusScope {
         var id = row.id
         if (id.indexOf("narrator-global-") === 0)
             return changeNarratorGlobal(id, delta)
+        // Actions run only on Confirm, never on left/right.
         if (row.componentAction)
-            return runNarratorComponentAction(row)
+            return false
         if (id === "narrator-overview") {
             playSemanticSound("confirm")
             return true
@@ -650,6 +759,8 @@ FocusScope {
             playSemanticSound(languageSaved ? "adjust" : "error")
         } else if (id === "appearance")
             saveAdjusted("themeMode", cycle(["system", "dark", "light"], themeCode(setting("themeMode", "system")), delta))
+        else if (id === "couch-motion")
+            saveAdjusted("couchMotionMode", cycle(["full", "reduced", "off"], motionCode(setting("couchMotionMode", "full")), delta))
         else if (id === "automatic-updates")
             saveAdjusted("automaticUpdates", setting("automaticUpdates", true) !== true)
         else if (id === "log-level")
@@ -726,6 +837,41 @@ FocusScope {
             return false
         }
         var row = rows[selectedIndex]
+        if (destructive(row)) {
+            openConfirmation(row.id)
+            return true
+        }
+        return performRow(row)
+    }
+
+    function openConfirmation(rowId) {
+        commitPendingVolumes()
+        confirmRowId = String(rowId)
+        confirmChoice = 0
+        if (navigation)
+            navigation.openModal("settings-confirm", "cancel")
+        playSemanticSound("open")
+        restoreActiveFocus()
+    }
+
+    function closeConfirmation(runAction) {
+        if (!confirmationOpen)
+            return false
+        var rowIndex = globalIndexForId(confirmRowId)
+        confirmRowId = ""
+        confirmChoice = 0
+        if (navigation)
+            navigation.closeModal()
+        var result = true
+        if (runAction && rowIndex >= 0)
+            result = performRow(rows[rowIndex])
+        else
+            playSemanticSound("back")
+        restoreActiveFocus()
+        return result
+    }
+
+    function performRow(row) {
         var id = row.id
         if (row.componentAction)
             return runNarratorComponentAction(row)
@@ -799,6 +945,35 @@ FocusScope {
             reconcileSelection()
     }
 
+    function activateTile() {
+        var tile = navTiles[selectedTile]
+        if (!tile)
+            return false
+        if (tile.id === "settings") {
+            focusZone = 1
+            return true
+        }
+        commitPendingVolumes()
+        sectionRequested(tile.id)
+        return true
+    }
+
+    function isLastActiveRow() {
+        for (var index = activeRows.length - 1; index >= 0; --index) {
+            if (activeRows[index].enabled)
+                return selectedActiveIndex >= index
+        }
+        return true
+    }
+
+    function isFirstActiveRow() {
+        for (var index = 0; index < activeRows.length; ++index) {
+            if (activeRows[index].enabled)
+                return selectedActiveIndex <= index
+        }
+        return true
+    }
+
     function handleAction(action) {
         if (action === "Accept") action = "Confirm"
         else if (action === "PageLeft" || action === "PreviousSection") action = "PreviousTab"
@@ -807,28 +982,89 @@ FocusScope {
             onScreenKeyboard.handleAction(action)
             return
         }
-        if (action === "Back") {
-            commitPendingVolumes()
-            backRequested()
-            playSemanticSound("back")
-        } else if (action === "NavigateUp") {
-            if (move(-1)) playSemanticSound("navigate")
-        } else if (action === "NavigateDown") {
-            if (move(1)) playSemanticSound("navigate")
-        } else if (action === "NavigateLeft")
-            change(-1)
-        else if (action === "NavigateRight")
-            change(1)
-        else if (action === "Confirm")
-            activate()
-        else if (action === "PreviousTab")
+        if (confirmationOpen) {
+            if (action === "Back")
+                closeConfirmation(false)
+            else if (["NavigateLeft", "NavigateRight", "NavigateUp", "NavigateDown"].indexOf(action) >= 0) {
+                var choice = (action === "NavigateLeft" || action === "NavigateUp") ? 0 : 1
+                if (choice !== confirmChoice) {
+                    confirmChoice = choice
+                    playSemanticSound("navigate")
+                    restoreActiveFocus()
+                }
+            } else if (action === "Confirm")
+                closeConfirmation(confirmChoice === 1)
+            return
+        }
+        var previousZone = focusZone
+        if (action === "PreviousTab") {
             changeCategory(-1)
-        else if (action === "NextTab")
+        } else if (action === "NextTab") {
             changeCategory(1)
-        else if (action === "PageUp") {
-            if (move(-5)) playSemanticSound("navigate")
-        } else if (action === "PageDown") {
-            if (move(5)) playSemanticSound("navigate")
+        } else if (focusZone === 0) {
+            if (action === "Back") {
+                commitPendingVolumes()
+                backRequested()
+                playSemanticSound("back")
+            } else if (action === "NavigateUp") {
+                changeCategory(-1)
+            } else if (action === "NavigateDown") {
+                if (activeCategoryIndex >= categories.length - 1)
+                    focusZone = 2
+                else
+                    changeCategory(1)
+            } else if (action === "NavigateRight" || action === "Confirm") {
+                focusZone = 1
+            }
+        } else if (focusZone === 1) {
+            var row = rows[selectedIndex] || ({})
+            if (action === "Back") {
+                commitPendingVolumes()
+                focusZone = 0
+            } else if (action === "NavigateUp") {
+                if (!isFirstActiveRow() && move(-1)) playSemanticSound("navigate")
+            } else if (action === "NavigateDown") {
+                if (isLastActiveRow())
+                    focusZone = 2
+                else if (move(1))
+                    playSemanticSound("navigate")
+            } else if (action === "NavigateLeft") {
+                if (adjustable(row))
+                    change(-1)
+                else
+                    focusZone = 0
+            } else if (action === "NavigateRight") {
+                if (adjustable(row))
+                    change(1)
+            } else if (action === "Confirm") {
+                activate()
+            } else if (action === "PageUp") {
+                if (move(-5)) playSemanticSound("navigate")
+            } else if (action === "PageDown") {
+                if (move(5)) playSemanticSound("navigate")
+            }
+        } else {
+            if (action === "Back") {
+                commitPendingVolumes()
+                backRequested()
+                playSemanticSound("back")
+            } else if (action === "NavigateLeft" || action === "NavigateRight") {
+                var tile = Math.max(0, Math.min(navTiles.length - 1,
+                                                selectedTile + (action === "NavigateLeft" ? -1 : 1)))
+                if (tile !== selectedTile) {
+                    selectedTile = tile
+                    playSemanticSound("navigate")
+                }
+            } else if (action === "NavigateUp") {
+                // Back to the last used setting.
+                focusZone = 1
+            } else if (action === "Confirm") {
+                playSemanticSound(activateTile() ? "confirm" : "error")
+            }
+        }
+        if (focusZone !== previousZone) {
+            playSemanticSound("navigate")
+            restoreActiveFocus()
         }
     }
 
@@ -842,6 +1078,8 @@ FocusScope {
     onActiveRowsChanged: Qt.callLater(reconcileSelection)
     onVisibleChanged: {
         if (visible) {
+            selectedTile = 3
+            focusZone = 1
             loadNarratorGlobal()
             Qt.callLater(restoreFocus)
             restoreActiveFocus()
@@ -857,317 +1095,459 @@ FocusScope {
         onTriggered: page.commitPendingVolumes()
     }
 
-    Rectangle {
+    CouchHeroBackdrop {
         anchors.fill: parent
-        color: App.Theme.background
-        gradient: Gradient {
-            GradientStop { position: 0.0; color: App.Theme.dark ? "#111B28" : "#F8FAFD" }
-            GradientStop { position: 0.65; color: App.Theme.background }
-            GradientStop { position: 1.0; color: App.Theme.dark ? "#080D14" : "#EAF0F7" }
+        sources: []
+    }
+
+    // ---- Header --------------------------------------------------------------
+    ColumnLayout {
+        id: header
+        objectName: "couchSettingsHeader"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        anchors.leftMargin: page.contentMargin
+        anchors.rightMargin: page.contentMargin
+        anchors.topMargin: 92 * page.fitScale
+        spacing: 4 * page.fitScale
+        Label {
+            objectName: "couchSettingsTitle"
+            text: qsTr("Settings")
+            color: App.Theme.text
+            font.pixelSize: App.Theme.couchTitleSize * page.fitScale
+            font.weight: Font.Bold
+        }
+        Label {
+            Layout.fillWidth: true
+            text: qsTr("Choose a category, then change its options with the controller. Changes are saved locally right away.")
+            color: App.Theme.textSecondary
+            font.pixelSize: 18 * page.fitScale
+            elide: Text.ElideRight
         }
     }
 
+    // ---- Categories (focus zone 0) ---------------------------------------------
+    ListView {
+        id: categoryList
+        objectName: "couchSettingsCategories"
+        // Room for the focused cell's scale, ring and glow inside the clip.
+        readonly property real pad: 30 * page.fitScale
+        anchors.left: parent.left
+        anchors.top: header.bottom
+        anchors.bottom: footerRow.top
+        anchors.leftMargin: page.contentMargin - pad
+        anchors.topMargin: App.Theme.couchSpaceL * page.fitScale
+        width: 380 * page.fitScale + 2 * pad
+        model: page.categories
+        currentIndex: page.activeCategoryIndex
+        spacing: App.Theme.couchSpaceS * page.fitScale
+        clip: true
+        topMargin: pad
+        bottomMargin: pad
+        keyNavigationEnabled: false
+        boundsBehavior: Flickable.StopAtBounds
+        highlightMoveDuration: App.Theme.couchMotionDuration(160)
+        highlightMoveVelocity: -1
+        preferredHighlightBegin: pad
+        preferredHighlightEnd: height - pad
+        highlightRangeMode: ListView.ApplyRange
+
+        delegate: Item {
+            id: categoryDelegate
+            objectName: "couchSettingsCategory"
+            required property var modelData
+            required property int index
+            readonly property bool active: page.activeCategoryIndex === index
+            readonly property bool focused: active && page.focusZone === 0
+                                            && !page.keyboardOpen && !page.confirmationOpen
+            // Delegate spans the view; the visual card is inset by `pad` so the
+            // ring and glow stay inside the clip. No x binding on the delegate.
+            width: categoryList.width
+            height: 78 * page.fitScale
+            z: focused ? 2 : 1
+
+            Rectangle {
+                id: categoryCard
+                objectName: "couchSettingsCategoryCard"
+                anchors.fill: parent
+                anchors.leftMargin: categoryList.pad
+                anchors.rightMargin: categoryList.pad
+                radius: App.Theme.couchCardRadius * page.fitScale
+                color: categoryDelegate.focused ? App.Theme.couchFocusSurface
+                       : categoryDelegate.active ? App.Theme.accentSoft
+                       : Qt.rgba(App.Theme.surface.r, App.Theme.surface.g, App.Theme.surface.b,
+                                 App.Theme.dark ? 0.72 : 0.86)
+                border.width: categoryDelegate.active && !categoryDelegate.focused ? 2 * page.fitScale : 1
+                border.color: categoryDelegate.active ? App.Theme.accent : App.Theme.border
+                // Focus is shown by the ring only: no scale in lists.
+                Behavior on color { ColorAnimation { duration: App.Theme.couchFadeDuration(150) } }
+                CouchFocusFrame {
+                    active: categoryDelegate.focused
+                    radius: parent.radius
+                    couchScale: page.fitScale
+                }
+            }
+            RowLayout {
+                anchors.fill: categoryCard
+                anchors.leftMargin: App.Theme.couchSpaceM * page.fitScale
+                anchors.rightMargin: App.Theme.couchSpaceM * page.fitScale
+                spacing: App.Theme.couchSpaceM * page.fitScale
+                Rectangle {
+                    Layout.preferredWidth: 48 * page.fitScale
+                    Layout.preferredHeight: 48 * page.fitScale
+                    radius: App.Theme.couchRadiusSmall * page.fitScale
+                    color: App.Theme.surfaceRaised
+                    CouchIcon {
+                        anchors.centerIn: parent
+                        size: App.Theme.couchIconMedium
+                        couchScale: page.fitScale
+                        source: categoryDelegate.modelData.icon
+                        lightSource: categoryDelegate.modelData.iconOnLight
+                    }
+                }
+                ColumnLayout {
+                    Layout.fillWidth: true
+                    spacing: 1
+                    Label {
+                        Layout.fillWidth: true
+                        text: categoryDelegate.modelData.title
+                        color: categoryDelegate.focused ? App.Theme.couchFocusText : App.Theme.text
+                        font.pixelSize: 21 * page.fitScale
+                        font.weight: Font.Bold
+                        elide: Text.ElideRight
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: categoryDelegate.modelData.subtitle
+                        color: App.Theme.textSecondary
+                        font.pixelSize: App.Theme.couchCaptionSize * page.fitScale
+                        elide: Text.ElideRight
+                    }
+                }
+            }
+            MouseArea {
+                anchors.fill: parent
+                onClicked: {
+                    page.focusZone = 0
+                    page.selectCategory(categoryDelegate.index)
+                    page.restoreActiveFocus()
+                }
+            }
+        }
+    }
+
+    // ---- Settings of the active category (focus zone 1) -------------------------
     ColumnLayout {
-        anchors.fill: parent
-        anchors.leftMargin: 64 * page.couchScale
-        anchors.rightMargin: 64 * page.couchScale
-        anchors.topMargin: 112 * page.couchScale
-        anchors.bottomMargin: 90 * page.couchScale
-        spacing: 22 * page.couchScale
+        id: contentColumn
+        anchors.left: categoryList.right
+        anchors.right: parent.right
+        anchors.top: header.bottom
+        anchors.bottom: footerRow.top
+        // The list clips, so it keeps room for the ring and glow of the focused
+        // row (settingsList.pad); the margins subtract it so rows stay put.
+        anchors.leftMargin: App.Theme.couchSpaceXL * page.fitScale - categoryList.pad
+                            + 12 * page.fitScale - settingsList.pad
+        anchors.rightMargin: page.contentMargin - settingsList.pad
+        anchors.topMargin: App.Theme.couchSpaceL * page.fitScale
+        spacing: App.Theme.couchSpaceS * page.fitScale
 
         ColumnLayout {
             Layout.fillWidth: true
-            spacing: 5 * page.couchScale
-
+            Layout.leftMargin: settingsList.pad
+            spacing: 2 * page.fitScale
             Label {
+                objectName: "couchSettingsCategoryTitle"
                 Layout.fillWidth: true
-                text: qsTr("Couch Mode settings")
+                text: page.categories[page.activeCategoryIndex]
+                      ? page.categories[page.activeCategoryIndex].title : ""
                 color: App.Theme.text
-                font.pixelSize: 42 * page.couchScale
+                font.pixelSize: 28 * page.fitScale
                 font.weight: Font.Bold
             }
             Label {
                 Layout.fillWidth: true
-                text: qsTr("Use the controller to choose a category and adjust its options.")
+                text: page.categories[page.activeCategoryIndex]
+                      && page.categories[page.activeCategoryIndex].id === "narrator"
+                      ? qsTr("Global defaults for new per-game profiles. A game's own Narrator profile can override them.")
+                      : qsTr("Left and right change the selected value. A opens editors and actions.")
                 color: App.Theme.textSecondary
-                font.pixelSize: 18 * page.couchScale
+                font.pixelSize: App.Theme.couchLabelSize * page.fitScale
+                elide: Text.ElideRight
             }
         }
 
-        RowLayout {
+        ListView {
+            id: settingsList
+            objectName: "couchSettingsList"
+            // Ring (4) + glow blur (22) + a little air, all fully inside the clip.
+            readonly property real pad: 30 * page.fitScale
             Layout.fillWidth: true
             Layout.fillHeight: true
-            spacing: 22 * page.couchScale
+            model: page.activeRows
+            currentIndex: page.selectedActiveIndex
+            spacing: App.Theme.couchSpaceS * page.fitScale
+            clip: true
+            topMargin: pad
+            bottomMargin: pad
+            keyNavigationEnabled: false
+            boundsBehavior: Flickable.StopAtBounds
+            highlightMoveDuration: App.Theme.couchMotionDuration(160)
+            highlightMoveVelocity: -1
+            preferredHighlightBegin: pad
+            preferredHighlightEnd: height - pad
+            highlightRangeMode: ListView.ApplyRange
 
-            Rectangle {
-                Layout.preferredWidth: 310 * page.couchScale
-                Layout.fillHeight: true
-                radius: 24 * page.couchScale
-                color: App.Theme.dark ? "#D91A2432" : "#ECFFFFFF"
-                border.width: 1
-                border.color: App.Theme.border
+            delegate: Item {
+                id: settingDelegate
+                objectName: "couchSettingRow"
+                required property var modelData
+                required property int index
+                readonly property int globalIndex: page.globalIndexForId(modelData.id)
+                readonly property string kind: page.rowKind(modelData)
+                readonly property bool selected: page.selectedIndex === globalIndex
+                readonly property bool focused: selected && page.focusZone === 1
+                                                && !page.keyboardOpen && !page.confirmationOpen
+                readonly property string reason: page.disabledReason(modelData)
+                width: settingsList.width
+                height: 92 * page.fitScale
+                z: focused ? 2 : 1
 
-                ColumnLayout {
+                Rectangle {
+                    id: rowCard
+                    objectName: "couchSettingRowCard"
                     anchors.fill: parent
-                    anchors.margins: 18 * page.couchScale
-                    spacing: 12 * page.couchScale
-
-                    Label {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 12 * page.couchScale
-                        text: qsTr("Categories")
-                        color: App.Theme.textSecondary
-                        font.pixelSize: 17 * page.couchScale
-                        font.weight: Font.DemiBold
-                    }
-
-                    Repeater {
-                        model: page.categories
-                        delegate: Rectangle {
-                            id: categoryDelegate
-                            required property var modelData
-                            required property int index
-                            readonly property bool active: page.activeCategoryIndex === index
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 84 * page.couchScale
-                            radius: 16 * page.couchScale
-                            color: active ? App.Theme.surfaceSelected : "transparent"
-                            border.width: active ? 2 * page.couchScale : 0
-                            border.color: active ? App.Theme.accent : "transparent"
-
-                            Rectangle {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 10 * page.couchScale
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 5 * page.couchScale
-                                height: 42 * page.couchScale
-                                radius: width / 2
-                                color: App.Theme.accent
-                                visible: categoryDelegate.active
-                            }
-
-                            ColumnLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 28 * page.couchScale
-                                anchors.rightMargin: 14 * page.couchScale
-                                spacing: 2 * page.couchScale
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: categoryDelegate.modelData.title
-                                    color: categoryDelegate.active ? App.Theme.text : App.Theme.textSecondary
-                                    font.pixelSize: 21 * page.couchScale
-                                    font.weight: categoryDelegate.active ? Font.Bold : Font.DemiBold
-                                    elide: Text.ElideRight
-                                }
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: categoryDelegate.modelData.subtitle
-                                    color: categoryDelegate.active ? App.Theme.textSecondary : App.Theme.textMuted
-                                    font.pixelSize: 15 * page.couchScale
-                                    elide: Text.ElideRight
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: page.selectCategory(categoryDelegate.index)
-                            }
-                        }
-                    }
-
-                    Item { Layout.fillHeight: true }
-
-                    Label {
-                        Layout.fillWidth: true
-                        Layout.leftMargin: 12 * page.couchScale
-                        Layout.rightMargin: 12 * page.couchScale
-                        text: qsTr("Use LB and RB to change category")
-                        color: App.Theme.textMuted
-                        font.pixelSize: 15 * page.couchScale
-                        wrapMode: Text.WordWrap
+                    anchors.leftMargin: settingsList.pad
+                    anchors.rightMargin: settingsList.pad
+                    radius: App.Theme.couchCardRadius * page.fitScale
+                    color: settingDelegate.focused ? App.Theme.couchFocusSurface
+                           : Qt.rgba(App.Theme.surface.r, App.Theme.surface.g, App.Theme.surface.b,
+                                     App.Theme.dark ? 0.86 : 0.94)
+                    border.width: 1
+                    border.color: settingDelegate.selected && !settingDelegate.focused
+                                  ? App.Theme.borderStrong : App.Theme.border
+                    // Focus is shown by the ring only: no scale in lists.
+                    Behavior on color { ColorAnimation { duration: App.Theme.couchFadeDuration(150) } }
+                    CouchFocusFrame {
+                        active: settingDelegate.focused
+                        radius: parent.radius
+                        couchScale: page.fitScale
                     }
                 }
-            }
 
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                radius: 24 * page.couchScale
-                color: App.Theme.dark ? "#E6151D29" : "#F4FFFFFF"
-                border.width: 1
-                border.color: App.Theme.border
-
-                ColumnLayout {
-                    anchors.fill: parent
-                    anchors.margins: 22 * page.couchScale
-                    spacing: 14 * page.couchScale
+                // The category icon lives in the category column only.
+                RowLayout {
+                    anchors.fill: rowCard
+                    anchors.leftMargin: App.Theme.couchSpaceL * page.fitScale
+                    anchors.rightMargin: App.Theme.couchSpaceL * page.fitScale
+                    spacing: App.Theme.couchSpaceM * page.fitScale
+                    opacity: settingDelegate.modelData.enabled ? 1 : 0.62
 
                     ColumnLayout {
                         Layout.fillWidth: true
-                        spacing: 2 * page.couchScale
-                        Label {
-                            Layout.fillWidth: true
-                            text: page.categories[page.activeCategoryIndex]
-                                  ? page.categories[page.activeCategoryIndex].title : ""
-                            color: App.Theme.text
-                            font.pixelSize: 30 * page.couchScale
-                            font.weight: Font.Bold
-                        }
-                        Label {
-                            Layout.fillWidth: true
-                            text: qsTr("Use left and right to change the selected value.")
-                            color: App.Theme.textSecondary
-                            font.pixelSize: 16 * page.couchScale
-                        }
-                    }
-
-                    ListView {
-                        id: settingsList
-                        objectName: "couchSettingsList"
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        model: page.activeRows
-                        spacing: 11 * page.couchScale
-                        clip: true
-                        interactive: contentHeight > height
-                        boundsBehavior: Flickable.StopAtBounds
-
-                        delegate: Rectangle {
-                            id: settingDelegate
-                            required property var modelData
-                            required property int index
-                            readonly property int globalIndex: page.globalIndexForId(modelData.id)
-                            readonly property bool selected: page.selectedIndex === globalIndex
-                            width: settingsList.width
-                            height: 82 * page.couchScale
-                            radius: 17 * page.couchScale
-                            color: selected ? App.Theme.surfaceSelected : App.Theme.surfaceRaised
-                            border.width: selected ? 4 * page.couchScale : 1
-                            border.color: selected ? App.Theme.accent : App.Theme.border
-                            opacity: modelData.enabled ? 1 : 0.58
-                            scale: selected ? 1.015 : 1.0
-                            transformOrigin: Item.Center
-
-                            Behavior on scale {
-                                NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
-                            }
-                            Behavior on color {
-                                ColorAnimation { duration: 140 }
-                            }
-
-                            Rectangle {
-                                anchors.fill: parent
-                                anchors.margins: 5 * page.couchScale
-                                radius: 13 * page.couchScale
-                                color: "transparent"
-                                border.width: settingDelegate.selected ? 1 : 0
-                                border.color: settingDelegate.selected ? App.Theme.accentGlow : "transparent"
-                            }
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 22 * page.couchScale
-                                anchors.rightMargin: 18 * page.couchScale
-                                spacing: 18 * page.couchScale
-
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: settingDelegate.modelData.title
-                                    color: App.Theme.text
-                                    font.pixelSize: 21 * page.couchScale
-                                    font.weight: settingDelegate.selected ? Font.Bold : Font.DemiBold
-                                    elide: Text.ElideRight
-                                }
-
-                                Rectangle {
-                                    Layout.preferredWidth: Math.max(150 * page.couchScale,
-                                                                    valueLabel.implicitWidth + 34 * page.couchScale)
-                                    Layout.maximumWidth: 410 * page.couchScale
-                                    Layout.preferredHeight: 46 * page.couchScale
-                                    radius: height / 2
-                                    color: settingDelegate.modelData.enabled
-                                           ? (settingDelegate.selected ? App.Theme.accentSoft : App.Theme.surface)
-                                           : App.Theme.backgroundElevated
-                                    border.width: 1
-                                    border.color: settingDelegate.selected ? App.Theme.accent : App.Theme.border
-
-                                    Label {
-                                        id: valueLabel
-                                        anchors.centerIn: parent
-                                        width: Math.min(implicitWidth, parent.width - 24 * page.couchScale)
-                                        text: settingDelegate.modelData.value
-                                        color: settingDelegate.modelData.enabled
-                                               ? (settingDelegate.selected ? App.Theme.accent : App.Theme.textSecondary)
-                                               : App.Theme.textMuted
-                                        font.pixelSize: 18 * page.couchScale
-                                        font.weight: Font.Bold
-                                        horizontalAlignment: Text.AlignHCenter
-                                        elide: Text.ElideRight
-                                    }
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                enabled: settingDelegate.modelData.enabled
-                                onClicked: {
-                                    page.selectIndex(settingDelegate.globalIndex, true)
-                                    page.activate()
-                                }
-                            }
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 126 * page.couchScale
-                        radius: 17 * page.couchScale
-                        color: App.Theme.dark ? "#C7101722" : "#EAF3F7FB"
-                        border.width: 1
-                        border.color: page.selectedRow.enabled ? App.Theme.borderStrong : App.Theme.warning
-
+                        Layout.minimumWidth: 0
+                        spacing: 3 * page.fitScale
                         RowLayout {
-                            anchors.fill: parent
-                            anchors.margins: 20 * page.couchScale
-                            spacing: 16 * page.couchScale
-
-                            Rectangle {
-                                Layout.preferredWidth: 46 * page.couchScale
-                                Layout.preferredHeight: 46 * page.couchScale
-                                radius: width / 2
-                                color: page.selectedRow.enabled ? App.Theme.accentSoft : App.Theme.warningSoft
-                                Label {
-                                    anchors.centerIn: parent
-                                    text: page.selectedRow.enabled ? "i" : "!"
-                                    color: page.selectedRow.enabled ? App.Theme.accent : App.Theme.warning
-                                    font.pixelSize: 23 * page.couchScale
-                                    font.weight: Font.Bold
-                                }
-                            }
-
-                            ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: App.Theme.couchSpaceS * page.fitScale
+                            // Takes all free width; elides only when it really
+                            // does not fit (no maximumWidth: implicitWidth, whose
+                            // integer rounding made every title elide).
+                            Label {
+                                objectName: "couchSettingTitle"
                                 Layout.fillWidth: true
-                                spacing: 4 * page.couchScale
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: page.selectedRow.title || ""
-                                    color: App.Theme.text
-                                    font.pixelSize: 19 * page.couchScale
-                                    font.weight: Font.Bold
-                                    elide: Text.ElideRight
-                                }
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: page.selectedRow.description || ""
-                                    color: App.Theme.textSecondary
-                                    font.pixelSize: 16 * page.couchScale
-                                    wrapMode: Text.WordWrap
-                                    maximumLineCount: 2
-                                    elide: Text.ElideRight
-                                }
+                                text: settingDelegate.modelData.title
+                                color: settingDelegate.focused ? App.Theme.couchFocusText : App.Theme.text
+                                font.pixelSize: 21 * page.fitScale
+                                font.weight: Font.Bold
+                                elide: Text.ElideRight
+                            }
+                            CouchStatePill {
+                                objectName: "couchSettingExperimental"
+                                visible: settingDelegate.modelData.id === "experimental"
+                                couchScale: page.fitScale * 0.85
+                                tone: "warning"
+                                text: qsTr("Experimental")
                             }
                         }
+                        Label {
+                            Layout.fillWidth: true
+                            text: settingDelegate.reason.length ? settingDelegate.reason
+                                                                : String(settingDelegate.modelData.description || "")
+                            color: settingDelegate.focused ? App.Theme.couchFocusSubtext : App.Theme.textSecondary
+                            font.pixelSize: 15 * page.fitScale
+                            elide: Text.ElideRight
+                        }
                     }
+
+                    // Control matching the real data type.
+                    Row {
+                        objectName: "couchSettingControl"
+                        property string kind: settingDelegate.kind
+                        Layout.alignment: Qt.AlignVCenter
+                        Layout.maximumWidth: 460 * page.fitScale
+                        spacing: App.Theme.couchSpaceS * page.fitScale
+                        CouchIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: settingDelegate.modelData.enabled
+                                     && (settingDelegate.kind === "choice" || settingDelegate.kind === "number"
+                                         || settingDelegate.modelData.id === "forgotten-library")
+                            size: App.Theme.couchIconSmall
+                            couchScale: page.fitScale
+                            source: App.UiIcons.couchGlyphPrevious
+                            lightSource: App.UiIcons.couchGlyphPreviousOnLight
+                        }
+                        CouchIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: settingDelegate.kind === "bool"
+                            size: App.Theme.couchIconMedium
+                            couchScale: page.fitScale
+                            muted: !settingDelegate.modelData.enabled
+                            source: settingDelegate.modelData.value === page.boolLabel(true)
+                                    ? App.UiIcons.couchGlyphToggleOn : App.UiIcons.couchGlyphToggleOff
+                            lightSource: settingDelegate.modelData.value === page.boolLabel(true)
+                                         ? App.UiIcons.couchGlyphToggleOnOnLight : App.UiIcons.couchGlyphToggleOffOnLight
+                        }
+                        Label {
+                            objectName: "couchSettingValue"
+                            anchors.verticalCenter: parent.verticalCenter
+                            width: Math.min(implicitWidth, 340 * page.fitScale)
+                            text: settingDelegate.modelData.enabled || settingDelegate.kind !== "action"
+                                  ? String(settingDelegate.modelData.value) : qsTr("Unavailable")
+                            color: settingDelegate.focused ? App.Theme.couchFocusText
+                                   : page.destructive(settingDelegate.modelData) ? App.Theme.couchToneText("danger")
+                                   : App.Theme.text
+                            font.pixelSize: 19 * page.fitScale
+                            font.weight: Font.DemiBold
+                            horizontalAlignment: Text.AlignRight
+                            elide: settingDelegate.kind === "path" ? Text.ElideMiddle : Text.ElideRight
+                        }
+                        CouchIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: settingDelegate.modelData.enabled
+                                     && (settingDelegate.kind === "choice" || settingDelegate.kind === "number"
+                                         || settingDelegate.modelData.id === "forgotten-library")
+                            size: App.Theme.couchIconSmall
+                            couchScale: page.fitScale
+                            source: App.UiIcons.couchGlyphNext
+                            lightSource: App.UiIcons.couchGlyphNextOnLight
+                        }
+                        CouchIcon {
+                            anchors.verticalCenter: parent.verticalCenter
+                            visible: settingDelegate.modelData.enabled
+                                     && (settingDelegate.kind === "path"
+                                         || (settingDelegate.kind === "action"
+                                             && settingDelegate.modelData.id !== "forgotten-library"))
+                            size: App.Theme.couchIconSmall
+                            couchScale: page.fitScale
+                            source: settingDelegate.kind === "path" ? App.UiIcons.couchGlyphKeyboard : App.UiIcons.couchGlyphNext
+                            lightSource: settingDelegate.kind === "path" ? App.UiIcons.couchGlyphKeyboardOnLight
+                                                                          : App.UiIcons.couchGlyphNextOnLight
+                        }
+                    }
+                }
+
+                MouseArea {
+                    anchors.fill: parent
+                    enabled: settingDelegate.modelData.enabled
+                    onClicked: {
+                        page.focusZone = 1
+                        page.selectIndex(settingDelegate.globalIndex, true)
+                        page.activate()
+                        page.restoreActiveFocus()
+                    }
+                }
+            }
+        }
+    }
+
+    Item {
+        id: footerRow
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: bottomNav.top
+        anchors.bottomMargin: App.Theme.couchSpaceS * page.fitScale
+        height: 52 * page.fitScale
+    }
+
+    // ---- Global section navigation (focus zone 2) ----------------------------------
+    CouchBottomNav {
+        id: bottomNav
+        objectName: "couchSettingsNavigation"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: page.edgeMargin
+        anchors.rightMargin: page.edgeMargin
+        anchors.bottomMargin: page.bottomNavMargin
+        height: implicitHeight
+        couchScale: page.fitScale
+        model: page.navTiles
+        activeIndex: 3
+        currentIndex: page.selectedTile
+        navFocused: page.focusZone === 2 && !page.keyboardOpen && !page.confirmationOpen
+        onActivated: function(index) {
+            page.focusZone = 2
+            page.selectedTile = index
+            page.playSemanticSound(page.activateTile() ? "confirm" : "error")
+        }
+    }
+
+    // ---- Confirmation for destructive actions (safe default: Cancel) ---------------
+    CouchOverlayFrame {
+        objectName: "couchSettingsConfirmation"
+        anchors.fill: parent
+        z: 120
+        visible: page.confirmationOpen
+        couchScale: page.couchScale
+        maximumWidth: 760 * page.couchScale
+        preferredHeight: 330 * page.couchScale
+
+        ColumnLayout {
+            anchors.fill: parent
+            spacing: 18 * page.couchScale
+            Label {
+                Layout.fillWidth: true
+                text: page.confirmRowId.length && page.rows[page.globalIndexForId(page.confirmRowId)]
+                      ? page.rows[page.globalIndexForId(page.confirmRowId)].title : ""
+                color: App.Theme.text
+                font.pixelSize: 32 * page.couchScale
+                font.weight: Font.Bold
+                elide: Text.ElideRight
+            }
+            Label {
+                Layout.fillWidth: true
+                text: page.confirmRowId.length && page.rows[page.globalIndexForId(page.confirmRowId)]
+                      ? page.rows[page.globalIndexForId(page.confirmRowId)].description : ""
+                color: App.Theme.textSecondary
+                font.pixelSize: 18 * page.couchScale
+                wrapMode: Text.WordWrap
+            }
+            Item { Layout.fillHeight: true }
+            RowLayout {
+                Layout.fillWidth: true
+                spacing: 16 * page.couchScale
+                CouchButton {
+                    id: confirmCancelButton
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 66 * page.couchScale
+                    couchScale: page.couchScale
+                    iconSource: App.UiIcons.couchGlyphPrevious
+                    iconLightSource: App.UiIcons.couchGlyphPreviousOnLight
+                    text: qsTr("Cancel")
+                    focus: page.confirmationOpen && page.confirmChoice === 0
+                    onClicked: page.closeConfirmation(false)
+                }
+                CouchButton {
+                    id: confirmRunButton
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 66 * page.couchScale
+                    couchScale: page.couchScale
+                    iconSource: App.UiIcons.couchGlyphRemove
+                    iconLightSource: App.UiIcons.couchGlyphRemoveOnLight
+                    text: qsTr("Continue")
+                    focus: page.confirmationOpen && page.confirmChoice === 1
+                    onClicked: page.closeConfirmation(true)
                 }
             }
         }
@@ -1179,6 +1559,8 @@ FocusScope {
         couchScale: page.couchScale
         buttonHints: page.controller && page.controller.gamepadButtonHints
                      ? page.controller.gamepadButtonHints : ({})
+        keyboardInput: !(page.controller && page.controller.activeController
+                         && page.controller.activeController.name)
         onSemanticSound: function(kind) {
             if (page.controller && page.controller.playCouchSound)
                 page.controller.playCouchSound(kind)

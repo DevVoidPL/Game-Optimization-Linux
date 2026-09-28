@@ -6,6 +6,20 @@ QtObject {
         return String(value === undefined || value === null ? "" : value)
     }
 
+    // Presentation name for a stable launcher id / backend launcher value.
+    // Ids stay "steam" | "heroic" | "lutris" | "custom" (backend "Manual").
+    function launcherName(value) {
+        switch (text(value).trim().toLowerCase()) {
+        case "steam": return "Steam"
+        case "heroic": return "Heroic Games Launcher"
+        case "lutris": return "Lutris"
+        case "manual":
+        // Distinct text from the profile "Custom": shown as "Własne" in Polish.
+        case "custom": return qsTr("Custom games", "launcher source")
+        default: return text(value)
+        }
+    }
+
     function profile(value) {
         switch (text(value)) {
         case "Fast": return qsTr("Fast")
