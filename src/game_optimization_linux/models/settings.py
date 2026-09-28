@@ -33,6 +33,9 @@ _SUPPORTED_LANGUAGES = {
 }
 
 
+COUCH_MOTION_MODES = ("full", "reduced", "off")
+
+
 def _is_supported_language(value: str) -> bool:
     return value.strip().casefold().replace("-", "_") in _SUPPORTED_LANGUAGES
 
@@ -129,6 +132,8 @@ class AppSettings:
     couch_menu_sounds_volume: int = 40
     couch_music_enabled: bool = True
     couch_music_volume: int = 20
+    # Stable ids only: "full" | "reduced" | "off".
+    couch_motion_mode: str = "full"
 
     def __post_init__(self) -> None:
         if not isinstance(self.language, str) or not self.language.strip():
@@ -255,6 +260,8 @@ class AppSettings:
                 raise ValueError(f"{field_name} must be an integer between 0 and 100")
         if not isinstance(self.post_launch_behavior, PostLaunchBehavior):
             raise ValueError("post_launch_behavior must be a PostLaunchBehavior value")
+        if self.couch_motion_mode not in COUCH_MOTION_MODES:
+            raise ValueError("couch_motion_mode must be full, reduced or off")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -303,6 +310,7 @@ class AppSettings:
             "couch_menu_sounds_volume": self.couch_menu_sounds_volume,
             "couch_music_enabled": self.couch_music_enabled,
             "couch_music_volume": self.couch_music_volume,
+            "couch_motion_mode": self.couch_motion_mode,
         }
 
     @classmethod
@@ -517,5 +525,11 @@ class AppSettings:
             ),
             couch_music_volume=_read_clamped_volume(
                 data, "couch_music_volume", defaults.couch_music_volume
+            ),
+            # Older files have no value; unknown values fall back to "full".
+            couch_motion_mode=(
+                data["couch_motion_mode"]
+                if data.get("couch_motion_mode") in COUCH_MOTION_MODES
+                else defaults.couch_motion_mode
             ),
         )

@@ -176,6 +176,7 @@ class SettingsController:
             "couchMenuSoundsVolume": "couch_menu_sounds_volume",
             "couchMusicEnabled": "couch_music_enabled",
             "couchMusicVolume": "couch_music_volume",
+            "couchMotionMode": "couch_motion_mode",
         }
         requested = aliases.get(key, key)
         if not is_dataclass(self._app._settings_model):
