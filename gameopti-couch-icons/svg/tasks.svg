@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Zadania">
+  <title>Zadania</title>
+  <path d="M7 12.5L11.5 17L19 8" stroke="#45D0B5"/>
+  <path d="M27 12H42" stroke="#E6ECEF"/>
+  <path d="M13 24h.01" stroke="#E6ECEF"/>
+  <path d="M27 24H42" stroke="#E6ECEF"/>
+  <path d="M13 36h.01" stroke="#E6ECEF"/>
+  <path d="M27 36H42" stroke="#E6ECEF"/>
+</svg>

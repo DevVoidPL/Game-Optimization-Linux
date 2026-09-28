@@ -23,9 +23,17 @@ Rectangle {
     property bool showDirections: false
     property bool showPages: false
     property bool showMenu: true
+    // True when no controller is active (top bar shows "Keyboard"): show the
+    // keys CouchMain really maps instead of controller button names.
+    property bool keyboardInput: false
+    readonly property var keyboardKeys: ({
+        "confirm": "Enter", "back": "Esc", "more": "Y", "previousTab": "Q", "nextTab": "E",
+        "pageUp": "PgUp", "pageDown": "PgDn", "systemMenu": "Menu"
+    })
     readonly property var visibleHints: buildHints()
 
     function buildHints() {
+        var buttonHints = keyboardInput ? keyboardKeys : hints.buttonHints
         var result = []
         if (showConfirm)
             result.push({ "button": String(buttonHints.confirm || buttonHints.accept || "A"), "label": acceptText })
@@ -36,7 +44,7 @@ Rectangle {
         if (showTabs)
             result.push({ "button": String(buttonHints.previousTab || buttonHints.pageLeft || buttonHints.previous || "L1") + "/" + String(buttonHints.nextTab || buttonHints.pageRight || buttonHints.next || "R1"), "label": sectionText })
         if (showDirections)
-            result.push({ "button": "D-pad", "label": directionText })
+            result.push({ "button": keyboardInput ? qsTr("Arrows") : "D-pad", "label": directionText })
         if (showPages)
             result.push({ "button": String(buttonHints.pageUp || "L2") + "/" + String(buttonHints.pageDown || "R2"), "label": pageText })
         if (showMenu)

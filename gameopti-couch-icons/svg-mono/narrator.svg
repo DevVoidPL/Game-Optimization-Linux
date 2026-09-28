@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Lektor">
+  <title>Lektor</title>
+  <path d="M14 8H34A8 8 0 0 1 42 16V26A8 8 0 0 1 34 34H26L17 41V34H14A8 8 0 0 1 6 26V16A8 8 0 0 1 14 8Z" stroke="currentColor"/>
+  <path d="M16 19V25" stroke="currentColor"/>
+  <path d="M24 15V29" stroke="currentColor"/>
+  <path d="M32 18V26" stroke="currentColor"/>
+</svg>

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Przegląd">
+  <title>Przegląd</title>
+  <path d="M8 8V40H42" stroke="#E6ECEF"/>
+  <path d="M18 33V26" stroke="#E6ECEF"/>
+  <path d="M27 33V15" stroke="#45D0B5"/>
+  <path d="M36 33V22" stroke="#E6ECEF"/>
+</svg>

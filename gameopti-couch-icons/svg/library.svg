@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Biblioteka">
+  <title>Biblioteka</title>
+  <rect x="8" y="8" width="12" height="12" rx="3.5" stroke="#45D0B5"/>
+  <rect x="28" y="8" width="12" height="12" rx="3.5" stroke="#E6ECEF"/>
+  <rect x="8" y="28" width="12" height="12" rx="3.5" stroke="#E6ECEF"/>
+  <rect x="28" y="28" width="12" height="12" rx="3.5" stroke="#E6ECEF"/>
+</svg>
