@@ -283,7 +283,6 @@ class SubtitleTextGate:
         if self._accepted_identity and self._strict_identities_match(
             identity,
             self._accepted_identity,
-            similarity=accepted_similarity,
         ):
             self._reset_candidate()
             return OcrGateObservation(
@@ -297,7 +296,7 @@ class SubtitleTextGate:
                 candidate_match_kind=(
                     "normalized_exact"
                     if identity == self._accepted_identity
-                    else "similarity"
+                    else "ocr_variant"
                 ),
                 decision="duplicate_accepted_phrase",
             )
@@ -472,16 +471,16 @@ class SubtitleTextGate:
             return "single_edit"
         return ""
 
-    def _strict_identities_match(
-        self,
-        first: str,
-        second: str,
-        *,
-        similarity: float,
-    ) -> bool:
+    def _strict_identities_match(self, first: str, second: str) -> bool:
+        # Similarity is useful for candidate consensus, not for deciding that
+        # an already spoken sentence with a changed word is the same dialogue.
         return (
             self._numbers_match(first, second)
-            and similarity >= self.similarity_threshold
+            and (
+                first == second
+                or _dedup_is_split_merge_variant(first, second)
+                or _dedup_is_garbage_variant(first, second)
+            )
         )
 
     @staticmethod
@@ -628,19 +627,21 @@ def _dedup_looks_like_garbage(token: str) -> bool:
     return not any(character in _DEDUP_VOWELS for character in letters)
 
 
-def _dedup_words_match(first: str, second: str) -> bool:
+def _dedup_words_match(first: str, second: str, *, at_edge: bool = False) -> bool:
     """Equal words, or one truncated by OCR at a phrase edge.
 
     ``gent``/``agent`` and ``kojnie``/``spokojnie`` are the same word with its
-    start eaten by the ROI; ``ib``/``fib`` is the same inside a sentence. A
-    truncation may lose at most three characters, so ``wróć`` can never match
-    ``jedź``.
+    start eaten by the ROI. Interior truncation is accepted only when the same
+    observation also proves that the subtitle edge was clipped. A truncation
+    may lose at most three characters, so ``wróć`` can never match ``jedź``.
     """
 
     if first == second:
         return True
     short, long = sorted((first, second), key=len)
     if len(short) < 2 or len(long) - len(short) > 3:
+        return False
+    if not at_edge and not _dedup_looks_like_garbage(long):
         return False
     return long.startswith(short) or long.endswith(short)
 
@@ -657,15 +658,29 @@ def _dedup_absorbed(word: str, garbage_tokens: list[str]) -> bool:
     )
 
 
+def _dedup_has_edge_truncation(first: list[str], second: list[str]) -> bool:
+    return any(
+        left != right and _dedup_words_match(left, right, at_edge=True)
+        for left, right in ((first[0], second[0]), (first[-1], second[-1]))
+    )
+
+
 def _dedup_core_matches(first: list[str], second: list[str]) -> int:
     """Length of the longest in-order run of matching words."""
 
+    edge_truncated = _dedup_has_edge_truncation(first, second)
     rows = len(first)
     columns = len(second)
     table = [[0] * (columns + 1) for _ in range(rows + 1)]
     for row in range(rows - 1, -1, -1):
         for column in range(columns - 1, -1, -1):
-            if _dedup_words_match(first[row], second[column]):
+            if _dedup_words_match(
+                first[row], second[column],
+                at_edge=(
+                    edge_truncated or row == column == 0
+                    or (row == rows - 1 and column == columns - 1)
+                ),
+            ):
                 table[row][column] = 1 + table[row + 1][column + 1]
             else:
                 table[row][column] = max(
@@ -682,6 +697,8 @@ def _dedup_is_garbage_variant(candidate: str, spoken: str) -> bool:
     extra or changed word inside the sentence keeps the phrases distinct.
     """
 
+    if re.findall(r"\d+", candidate) != re.findall(r"\d+", spoken):
+        return False
     candidate_words = [word for word in _dedup_words(candidate) if _dedup_is_word(word)]
     spoken_words = [word for word in _dedup_words(spoken) if _dedup_is_word(word)]
     if not candidate_words or not spoken_words:
@@ -693,15 +710,26 @@ def _dedup_is_garbage_variant(candidate: str, spoken: str) -> bool:
 
     candidate_unmatched: list[str] = []
     spoken_unmatched: list[str] = []
-    remaining = list(spoken_words)
-    for word in candidate_words:
-        for index, other in enumerate(remaining):
-            if _dedup_words_match(word, other):
+    # Multiple subtitle rows can be clipped at the same ROI boundary; retain
+    # internal truncation tolerance only with a matching outer-edge truncation.
+    edge_truncated = _dedup_has_edge_truncation(candidate_words, spoken_words)
+    remaining = list(enumerate(spoken_words))
+    for candidate_index, word in enumerate(candidate_words):
+        for index, (spoken_index, other) in enumerate(remaining):
+            at_edge = (
+                edge_truncated
+                or candidate_index == spoken_index == 0
+                or (
+                    candidate_index == len(candidate_words) - 1
+                    and spoken_index == len(spoken_words) - 1
+                )
+            )
+            if _dedup_words_match(word, other, at_edge=at_edge):
                 del remaining[index]
                 break
         else:
             candidate_unmatched.append(word)
-    spoken_unmatched = remaining
+    spoken_unmatched = [word for _, word in remaining]
 
     candidate_garbage = [
         word for word in candidate_unmatched if _dedup_looks_like_garbage(word)
@@ -720,6 +748,19 @@ def _dedup_is_garbage_variant(candidate: str, spoken: str) -> bool:
         if not _dedup_absorbed(word, candidate_garbage):
             return False
     return True
+
+
+def _dedup_is_split_merge_variant(candidate: str, spoken: str) -> bool:
+    """Match token-boundary OCR changes without forgiving changed characters.
+
+    Multiple splits and merges can occur together with no token-count change.
+    Number boundaries remain significant (``1 23`` is not ``12 3``).
+    """
+
+    return (
+        re.findall(r"\d+", candidate) == re.findall(r"\d+", spoken)
+        and candidate.replace(" ", "") == spoken.replace(" ", "")
+    )
 
 
 class PhraseDeduplicator:
@@ -750,7 +791,7 @@ class PhraseDeduplicator:
         frame_had_text: bool | None = None,
     ) -> str | None:
         normalized = normalize_subtitle(text)
-        identity = normalized.casefold()
+        identity = subtitle_identity(normalized)
         if not identity:
             self._visible_phrase = ""
             # A rejected frame that still contained text means the subtitle is
@@ -774,6 +815,7 @@ class PhraseDeduplicator:
         if self._episode_identity and (
             identity == self._episode_identity
             or _dedup_is_garbage_variant(identity, self._episode_identity)
+            or _dedup_is_split_merge_variant(identity, self._episode_identity)
         ):
             return None
         if identity == self._visible_phrase:
@@ -789,7 +831,10 @@ class PhraseDeduplicator:
         for spoken_identity, spoken_at in self._spoken_at.items():
             if now - spoken_at >= cooldown_seconds:
                 continue
-            if _dedup_is_garbage_variant(identity, spoken_identity):
+            if (
+                _dedup_is_garbage_variant(identity, spoken_identity)
+                or _dedup_is_split_merge_variant(identity, spoken_identity)
+            ):
                 return None
         # Latch here, at the moment the phrase is handed onwards for synthesis, so
         # a second variant cannot reach the queue before the first is marked. A
@@ -798,7 +843,7 @@ class PhraseDeduplicator:
         return normalized
 
     def mark_spoken(self, text: str, *, now: float) -> None:
-        identity = normalize_subtitle(text).casefold()
+        identity = subtitle_identity(text)
         if identity:
             self._spoken_at[identity] = now
 
@@ -1866,20 +1911,17 @@ class NarratorPipeline:
                 result.debug_capture_path or "none",
             )
 
-            if (
-                rejection_reason not in {"unstable", "duplicate"}
-                and not observation.needs_confirmation
-            ):
-                self._deduplicator.accept(
-                    "",
-                    now=now,
-                    cooldown_seconds=settings.duplicate_cooldown_ms / 1000.0,
-                    # A frame that still carried text does not end the episode,
-                    # so a low-confidence misread cannot re-arm the same phrase.
-                    frame_had_text=bool(
-                        (result.filtered_text or result.text).strip()
-                    ),
-                )
+            # Visibility belongs to every observation, including unconfirmed
+            # candidates and duplicates. Otherwise separated blanks accumulate
+            # as a false consecutive disappearance and release the TTS latch.
+            self._deduplicator.accept(
+                "",
+                now=now,
+                cooldown_seconds=settings.duplicate_cooldown_ms / 1000.0,
+                frame_had_text=bool(
+                    (result.raw_text or result.filtered_text or result.text).strip()
+                ),
+            )
             phrase = self._deduplicator.accept(
                 observation.accepted_text,
                 now=self._clock(),

@@ -138,10 +138,25 @@ class NarratorController:
         game_key = self._game_key(game)
         try:
             settings = self._app._narrator_settings_repository.load(game_key)
+            raw = self._app._narrator_settings_repository.load_overrides(game_key)
         except Exception as error:
             logger.warning("Could not load narrator settings for %s: %s", game.id, error)
             return self._settings_error(str(error), game_id=game.id, game_key=game_key)
-        return self._settings_to_qml(game, settings)
+        result = self._settings_to_qml(game, settings)
+        result["overrideFields"] = [
+            field for field in (
+                "enabled", "source_mode", "capture_source",
+                "subtitle_language_mode", "subtitle_adapter_id",
+                "ocr_provider_id", "translation_provider_id",
+                "translation_profile_id", "tts_provider_id", "voice_id",
+                "volume", "speech_rate", "noise_scale", "noise_w_scale",
+                "capture_sampling_hz", "visual_change_threshold",
+                "stabilization_ms", "ocr_min_confidence",
+                "duplicate_cooldown_ms",
+            ) if field in raw
+        ]
+        result["subtitleRegionInherited"] = False
+        return result
 
     def save_settings(self, game_id: str, values: Mapping[str, Any]) -> bool:
         game = self._app._resolve_game(game_id, show_error=True)
@@ -149,7 +164,6 @@ class NarratorController:
             return False
         game_key = self._game_key(game)
         try:
-            current = self._app._narrator_settings_repository.load(game_key).to_dict()
             aliases = {
                 "enabled": "enabled",
                 "sourceMode": "source_mode",
@@ -173,15 +187,30 @@ class NarratorController:
             }
             for source, target in aliases.items():
                 if source in values:
-                    current[target] = values[source]
+                    values = dict(values)
+                    values[target] = values[source]
             crop = values.get("subtitleRegion")
             if isinstance(crop, Mapping):
-                current["subtitle_region"] = dict(crop)
-            current["updated_at"] = datetime.now(UTC).isoformat()
-            settings = NarratorGameSettings.from_dict(
-                current, expected_game_key=game_key
-            )
-            self._app._narrator_settings_repository.save(settings)
+                values = dict(values)
+                values["subtitle_region"] = dict(crop)
+            raw_values = {
+                key: value for key, value in dict(values).items()
+                if key in set(aliases.values()) or key == "subtitle_region"
+            }
+            raw_values["updated_at"] = datetime.now(UTC).isoformat()
+            repository = self._app._narrator_settings_repository
+            previous_region = repository.load(game_key).subtitle_region
+            repository.save_overrides(game_key, raw_values)
+            settings = repository.load(game_key)
+            pipeline = self._app._narrator_pipeline
+            if (
+                settings.subtitle_region != previous_region
+                and pipeline.active
+                and pipeline.snapshot.game_key == game_key
+            ):
+                # Running sessions hold their startup settings. Stop rather than
+                # show a saved ROI while OCR continues cropping the old region.
+                pipeline.stop()
             select_voice = getattr(
                 self._app._narrator_pipeline.tts, "select_voice", None
             )
@@ -193,6 +222,30 @@ class NarratorController:
             return False
         self._app.narratorChanged.emit(game.id)
         self._app._emit_toast("Narrator settings saved", "success")
+        return True
+
+    def clear_overrides(self, game_id: str) -> bool:
+        game = self._app._resolve_game(game_id, show_error=True)
+        if game is None:
+            return False
+        try:
+            self._app._narrator_settings_repository.clear_overrides(
+                self._game_key(game),
+                (
+                    "enabled", "source_mode", "capture_source",
+                    "subtitle_language_mode", "subtitle_adapter_id",
+                    "ocr_provider_id", "translation_provider_id",
+                    "translation_profile_id", "tts_provider_id", "voice_id",
+                    "volume", "speech_rate", "noise_scale", "noise_w_scale",
+                    "capture_sampling_hz", "visual_change_threshold",
+                    "stabilization_ms", "ocr_min_confidence",
+                    "duplicate_cooldown_ms",
+                ),
+            )
+        except Exception as error:
+            logger.warning("Could not clear narrator overrides for %s: %s", game.id, error)
+            return False
+        self._app.narratorChanged.emit(game.id)
         return True
 
     def session_state(self, game_id: str) -> dict[str, Any]:
@@ -489,6 +542,9 @@ class NarratorController:
         )
         if callable(cancel):
             cancel()
+        self._emit_region_preview(
+            normalized, {"success": True, "state": "cancelled", "message": ""}
+        )
         return True
 
     def finish_region_preview_capture(self, game_id: str, generation: int) -> None:

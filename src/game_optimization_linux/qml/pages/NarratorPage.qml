@@ -208,9 +208,8 @@ Item {
         if (!selectedGameId.length || !controller
                 || typeof controller.saveNarratorGameSettings !== "function")
             return false
-        var saved = Boolean(controller.saveNarratorGameSettings(
-                                selectedGameId, settingsPayload()))
-        return saved
+        return Boolean(controller.saveNarratorGameSettings(
+                            selectedGameId, settingsPayload()))
     }
 
     function refreshSession() {
@@ -278,6 +277,8 @@ Item {
             regionPreviewSourceHeight = Number(value(values, ["sourceHeight"], 0))
             return
         }
+        if (state === "cancelled" || state === "stopped")
+            regionPreviewLoading = false
         if (!Boolean(value(values, ["success"], true))) {
             regionPreviewLoading = false
             regionPreviewError = String(value(
@@ -295,6 +296,7 @@ Item {
         cropY = Number(value(region, ["y"], cropY))
         cropWidth = Number(value(region, ["width"], cropWidth))
         cropHeight = Number(value(region, ["height"], cropHeight))
+        regionPreviewLoading = false
         regionPreviewError = ""
         refreshSession()
     }
@@ -764,7 +766,7 @@ Item {
 
                     Label {
                         Layout.fillWidth: true
-                        text: qsTr("Narrator settings are stored separately for each game. Models and voices are shared between games.")
+                        text: qsTr("These are global Narrator defaults. Subtitle capture regions remain specific to each game.")
                         color: App.Theme.textSecondary
                         font.pixelSize: App.Theme.fontCaption
                         wrapMode: Text.WordWrap

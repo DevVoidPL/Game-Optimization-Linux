@@ -262,7 +262,6 @@ Item {
                     qsTr("Storage"),
                     qsTr("Optimization"),
                     qsTr("OptiScaler"),
-                    qsTr("Narrator"),
                     qsTr("MangoHud")
                 ]
 
@@ -270,7 +269,7 @@ Item {
                     id: tabButton
                     required property int index
                     required property string modelData
-                    width: Math.max(92, (tabBar.width - tabBar.spacing * 5) / 6)
+                    width: Math.max(92, (tabBar.width - tabBar.spacing * 4) / 5)
                     height: tabBar.height
                     implicitWidth: 96
                     implicitHeight: height
@@ -314,8 +313,7 @@ Item {
                 if (tabBar.currentIndex === 1) return storageComponent
                 if (tabBar.currentIndex === 2) return optimizationComponent
                 if (tabBar.currentIndex === 3) return optiScalerComponent
-                if (tabBar.currentIndex === 4) return narratorComponent
-                if (tabBar.currentIndex === 5) return mangoHudComponent
+                if (tabBar.currentIndex === 4) return mangoHudComponent
                 return overviewComponent
             }
         }
@@ -378,15 +376,6 @@ Item {
     Component {
         id: optiScalerComponent
         OptiScalerTab {
-            controller: page.controller
-            gameData: page.gameData
-            onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
-        }
-    }
-
-    Component {
-        id: narratorComponent
-        NarratorTab {
             controller: page.controller
             gameData: page.gameData
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }

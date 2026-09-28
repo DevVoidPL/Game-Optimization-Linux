@@ -42,8 +42,8 @@ from game_optimization_linux.models.narrator import NormalizedRect
 from game_optimization_linux.services.narrator_region import fitted_preview_content
 
 
-def _tr(text: str) -> str:
-    return QCoreApplication.translate("SubtitleRegionSelector", text)
+# Translations use literal QCoreApplication.translate("SubtitleRegionSelector", ...)
+# calls (not a wrapper) so pyside6-lupdate can extract them into the catalogs.
 
 
 class RegionInteractionMode(StrEnum):
@@ -442,7 +442,7 @@ class SubtitleRegionSelectorWindow(QWidget):
         )
         super().__init__(parent, flags)
         self.setObjectName("nativeSubtitleRegionSelector")
-        self.setWindowTitle(_tr("Select subtitle area"))
+        self.setWindowTitle(QCoreApplication.translate("SubtitleRegionSelector", "Select subtitle area"))
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self.setStyleSheet(
@@ -467,11 +467,12 @@ class SubtitleRegionSelectorWindow(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 14, 18, 14)
         layout.setSpacing(10)
-        instruction = QLabel(_tr("Select subtitle area"), self)
+        instruction = QLabel(QCoreApplication.translate("SubtitleRegionSelector", "Select subtitle area"), self)
         instruction.setObjectName("selectorInstruction")
         instruction.setStyleSheet("font-size: 18px; font-weight: 600;")
         hint = QLabel(
-            _tr(
+            QCoreApplication.translate(
+                "SubtitleRegionSelector",
                 "Drag over subtitles. Drag the selection to move it or use its edges and corners to resize it."
             ),
             self,
@@ -486,11 +487,11 @@ class SubtitleRegionSelectorWindow(QWidget):
         self._dimensions_label = QLabel(self)
         self._dimensions_label.setObjectName("selectorDimensions")
         footer.addWidget(self._dimensions_label, 1)
-        self.reset_button = QPushButton(_tr("Reset"), self)
+        self.reset_button = QPushButton(QCoreApplication.translate("SubtitleRegionSelector", "Reset"), self)
         self.reset_button.setObjectName("resetRegionButton")
-        self.cancel_button = QPushButton(_tr("Cancel"), self)
+        self.cancel_button = QPushButton(QCoreApplication.translate("SubtitleRegionSelector", "Cancel"), self)
         self.cancel_button.setObjectName("cancelRegionButton")
-        self.save_button = QPushButton(_tr("Save region"), self)
+        self.save_button = QPushButton(QCoreApplication.translate("SubtitleRegionSelector", "Save region"), self)
         self.save_button.setObjectName("saveRegionButton")
         footer.addWidget(self.reset_button)
         footer.addWidget(self.cancel_button)
@@ -550,7 +551,7 @@ class SubtitleRegionSelectorWindow(QWidget):
         self._dimensions_label.setStyleSheet("")
         if valid:
             self._dimensions_label.setText(
-                _tr("Source: %1x%2    OCR region: %3x%4")
+                QCoreApplication.translate("SubtitleRegionSelector", "Source: %1x%2    OCR region: %3x%4")
                 .replace("%1", str(self.canvas.source_width))
                 .replace("%2", str(self.canvas.source_height))
                 .replace("%3", str(width))
@@ -558,7 +559,7 @@ class SubtitleRegionSelectorWindow(QWidget):
             )
         else:
             self._dimensions_label.setText(
-                _tr("Source: %1x%2    OCR region: %3x%4")
+                QCoreApplication.translate("SubtitleRegionSelector", "Source: %1x%2    OCR region: %3x%4")
                 .replace("%1", str(self.canvas.source_width))
                 .replace("%2", str(self.canvas.source_height))
                 .replace("%3", "0")

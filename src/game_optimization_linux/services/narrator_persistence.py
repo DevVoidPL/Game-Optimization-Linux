@@ -81,14 +81,62 @@ class NarratorSettingsRepository:
     def load(self, game_key: object) -> NarratorGameSettings:
         normalized = validate_game_key(game_key)
         path = self.path(normalized)
+        defaults = self.load_defaults()
         if not path.is_file():
-            return replace(self.load_defaults(), game_key=normalized)
-        return self._read(path, normalized)
+            return replace(defaults, game_key=normalized,
+                          subtitle_region=NarratorGameSettings.default(normalized).subtitle_region)
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, Mapping):
+            raise ValueError("narrator settings must contain a JSON object")
+        merged = defaults.to_dict()
+        merged.update(raw)
+        merged["game_key"] = normalized
+        # Subtitle regions are always local to a game.
+        merged["subtitle_region"] = raw.get(
+            "subtitle_region",
+            NarratorGameSettings.default(normalized).to_dict()["subtitle_region"],
+        )
+        return NarratorGameSettings.from_dict(merged, expected_game_key=normalized)
+
+    def load_overrides(self, game_key: object) -> dict[str, Any]:
+        normalized = validate_game_key(game_key)
+        path = self.path(normalized)
+        if not path.is_file():
+            return {}
+        values = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(values, Mapping):
+            raise ValueError("narrator settings must contain a JSON object")
+        return dict(values)
+
+    def save_overrides(self, game_key: object, values: Mapping[str, Any]) -> Path:
+        normalized = validate_game_key(game_key)
+        current = self.load_overrides(normalized)
+        current.update(values)
+        current["schema_version"] = NarratorGameSettings.default(normalized).schema_version
+        current["game_key"] = normalized
+        return self._save_raw(normalized, current)
+
+    def clear_overrides(self, game_key: object, fields: tuple[str, ...]) -> Path | None:
+        normalized = validate_game_key(game_key)
+        current = self.load_overrides(normalized)
+        for field in fields:
+            current.pop(field, None)
+        current.pop("updated_at", None)
+        if not current or set(current) <= {"schema_version", "game_key"}:
+            path = self.path(normalized)
+            path.unlink(missing_ok=True)
+            return None
+        current["schema_version"] = NarratorGameSettings.default(normalized).schema_version
+        current["game_key"] = normalized
+        return self._save_raw(normalized, current)
+
+    def _save_raw(self, game_key: str, values: Mapping[str, Any]) -> Path:
+        path = self.path(game_key)
+        _atomic_json_write(path, values)
+        return path
 
     def save(self, settings: NarratorGameSettings) -> Path:
-        path = self.path(settings.game_key)
-        _atomic_json_write(path, settings.to_dict())
-        return path
+        return self._save_raw(settings.game_key, settings.to_dict())
 
 
 class CaptureGrantRepository:
