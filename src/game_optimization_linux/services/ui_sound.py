@@ -178,6 +178,13 @@ class UiSoundService(QObject):
             return False
         return self._play_effect(kind, rate_limited=True)
 
+    def play_feedback(self, kind: str) -> bool:
+        """Confirmation for global shortcuts, also while a game has focus."""
+
+        if self._shutdown or not self._menu_sounds_enabled or not self.initialize():
+            return False
+        return self._play_effect(kind, rate_limited=False)
+
     @staticmethod
     def _status_name(status: object) -> str:
         name = getattr(status, "name", "")

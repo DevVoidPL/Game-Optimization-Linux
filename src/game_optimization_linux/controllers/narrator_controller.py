@@ -30,7 +30,12 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # How long after a launch from GameOpti the Narrator waits for the game.
-AUTOSTART_WAIT_SECONDS = 10 * 60
+# The game's own executable must run this long before autostart and the
+# portal prompt (process settles, launcher hands over, the window appears).
+GAME_STABLE_SECONDS = 8.0
+WINDOW_DELAY_SECONDS = 6.0
+AUTOSTART_DELAY_SECONDS = GAME_STABLE_SECONDS + WINDOW_DELAY_SECONDS
+WATCH_REFRESH_SECONDS = 15.0
 
 
 class NarratorController:
@@ -46,8 +51,11 @@ class NarratorController:
         self._preview_generations: dict[str, int] = {}
         self._preview_jobs: set[Future[object]] = set()
         # game_key -> deadline (monotonic) while waiting for a launched game.
-        self._awaiting_game: dict[str, float] = {}
-        self._autostarted: set[str] = set()
+        self._watched: dict[str, Game] = {}
+        self._watch_refresh_at = 0.0
+        self._seen_since: dict[str, float] = {}
+        self._autostart_done: set[str] = set()
+        self._last_decision: dict[str, str] = {}
         self._clock = time.monotonic
 
     # -- voice ------------------------------------------------------------------
@@ -79,58 +87,137 @@ class NarratorController:
 
     # -- autostart --------------------------------------------------------------
     def game_launched(self, game: Game) -> None:
-        """A game was started from GameOpti: wait for it and autostart."""
+        """A game was started from GameOpti: look for it right away."""
 
         game_key = self._game_key(game)
-        try:
-            settings = self._app._narrator_settings_repository.load(game_key)
-        except Exception:
-            return
-        activity = self._app._narrator_pipeline.activity
-        supports = getattr(activity, "supports", None)
-        if not settings.enabled or not (callable(supports) and supports(game)):
-            return
-        invalidate = getattr(activity, "invalidate", None)
+        invalidate = getattr(self._app._narrator_pipeline.activity, "invalidate", None)
         if callable(invalidate):
             invalidate(game_key)
-        self._awaiting_game[game_key] = self._clock() + AUTOSTART_WAIT_SECONDS
+        self._watch_refresh_at = 0.0
+        logger.info("Narrator autostart: %s launched from GameOpti", game_key)
         self._app.narratorChanged.emit(game.id)
+
+    def _log_decision(self, game_key: str, message: str) -> None:
+        """Log each autostart decision once per change (not on every tick)."""
+
+        if self._last_decision.get(game_key) != message:
+            self._last_decision[game_key] = message
+            logger.info("Narrator autostart: %s: %s", game_key, message)
+
+    def _refresh_watch(self, now: float) -> None:
+        """Games with the Narrator enabled, watched wherever they are started."""
+
+        if now < self._watch_refresh_at:
+            return
+        self._watch_refresh_at = now + WATCH_REFRESH_SECONDS
+        supports = getattr(self._app._narrator_pipeline.activity, "supports", None)
+        watched: dict[str, Game] = {}
+        for game in tuple(self._app._domain_games.values()):
+            game_key = self._game_key(game)
+            try:
+                enabled = self._app._narrator_settings_repository.load(game_key).enabled
+            except Exception:
+                continue
+            if not enabled:
+                continue
+            if callable(supports) and supports(game):
+                watched[game_key] = game
+            else:
+                self._log_decision(game_key, "skipped, the game process cannot be observed; start manually")
+        self._watched = watched
 
     def _poll_autostart(self) -> None:
         pipeline = self._app._narrator_pipeline
         now = self._clock()
-        for game_key, deadline in tuple(self._awaiting_game.items()):
-            if now > deadline or pipeline.active:
-                if now > deadline:
-                    self._awaiting_game.pop(game_key, None)
+        self._refresh_watch(now)
+        if pipeline.active:
+            # A running session (manual or automatic) is not restarted after
+            # the user stops it while the game still runs.
+            self._autostart_done.add(pipeline.snapshot.game_key)
+            return
+        strict = getattr(pipeline.activity, "game_process_running", None)
+        if not callable(strict):
+            return
+        for game_key, game in tuple(self._watched.items()):
+            running = strict(game_key)
+            if running is not True:
+                if game_key in self._seen_since:
+                    self._log_decision(game_key, "game process ended")
+                self._seen_since.pop(game_key, None)
+                self._autostart_done.discard(game_key)
+                if running is None:
+                    self._log_decision(game_key, "skipped, the process list is unavailable")
                 continue
-            # The detector caches its answer for a few seconds, so this does
-            # not spawn a process on every UI tick.
-            if pipeline.activity.is_active(game_key) is not True:
+            since = self._seen_since.setdefault(game_key, now)
+            if since == now:
+                self._log_decision(game_key, "game process detected, waiting for it to settle and open its window")
+            if game_key in self._autostart_done or now - since < AUTOSTART_DELAY_SECONDS:
                 continue
-            self._awaiting_game.pop(game_key, None)
-            game = self._game_for_key(game_key)
-            if game is None:
-                continue
+            self._autostart_done.add(game_key)
             try:
                 settings = self._app._narrator_settings_repository.load(game_key)
-            except Exception:
+            except Exception as error:
+                self._log_decision(game_key, f"error, settings could not be read: {error}")
                 continue
-            if not settings.enabled or self._missing_requirements(settings):
+            missing = self._missing_requirements(settings) if settings.enabled else ()
+            if not settings.enabled or missing:
+                self._log_decision(game_key, "skipped, " + (
+                    "missing: " + ", ".join(missing) if missing else "disabled"))
                 self._app.narratorChanged.emit(game.id)
                 continue
             first_grant = not self._has_capture_grant(game_key)
+            self._log_decision(game_key, "start" + (" (first window choice)" if first_grant else ""))
             if self.start(game.id, automatic=True):
-                self._autostarted.add(game_key)
                 self._app._emit_toast(
                     "Narrator started with the game. Choose the game window once; the choice is remembered"
                     if first_grant else "Narrator started with the game",
                     "info",
                 )
-        snapshot = pipeline.snapshot
-        for game_key in tuple(self._autostarted):
-            if not pipeline.active or snapshot.game_key != game_key:
-                self._autostarted.discard(game_key)
+            else:
+                self._log_decision(game_key, "error, the start was rejected")
+
+    def toggle_for_running_game(self) -> bool:
+        """Gamepad shortcut: stop the session, or start it for the running game."""
+
+        pipeline = self._app._narrator_pipeline
+        sounds = self._app._ui_sound_service
+        if pipeline.active:
+            logger.info("Narrator shortcut: stop")
+            self.stop()
+            sounds.play_feedback("close")
+            return True
+        self._refresh_watch(self._clock())
+        for game_key, game in tuple(self._watched.items()):
+            if pipeline.activity.is_active(game_key) is True:
+                logger.info("Narrator shortcut: start for %s", game_key)
+                started = self.start(game.id, automatic=True)
+                sounds.play_feedback("open" if started else "error")
+                return started
+        logger.info("Narrator shortcut: skipped, no running game with the Narrator enabled")
+        sounds.play_feedback("error")
+        return False
+
+    def choose_window_again(self, game_id: str) -> bool:
+        """Forget the saved portal choice for this game only."""
+
+        game = self._app._resolve_game(game_id, show_error=True)
+        if game is None:
+            return False
+        game_key = self._game_key(game)
+        capture = self._app._narrator_pipeline.capture
+        grants = getattr(capture, "_grants", None)
+        try:
+            if grants is not None:
+                grants.save_token(game_key, "")
+        except Exception as error:
+            logger.warning("Could not clear the narrator capture choice for %s: %s", game_key, error)
+            return False
+        getattr(capture, "stale_grants", set()).discard(game_key)
+        logger.info("Narrator capture: saved window choice cleared for %s", game_key)
+        if self._app._narrator_pipeline.active and self._app._narrator_pipeline.snapshot.game_key == game_key:
+            self.stop()
+        self._app.narratorChanged.emit(game.id)
+        return True
 
     def _has_capture_grant(self, game_key: str) -> bool:
         grants = getattr(self._app._narrator_pipeline.capture, "_grants", None)
@@ -456,8 +543,13 @@ class NarratorController:
                     else "not_running" if activity is False else "unknown"
                 ),
                 "autostartSupported": autostart_supported,
-                "autostartPending": game_key in self._awaiting_game,
+                "autostartPending": (
+                    game_key in self._seen_since and game_key not in self._autostart_done
+                ),
                 "captureGrantSaved": self._has_capture_grant(game_key),
+                "captureGrantStale": game_key in getattr(
+                    self._app._narrator_pipeline.capture, "stale_grants", ()
+                ),
                 "voiceId": voice_id,
                 "voiceName": self._voice_name(voice_id) if voice_id else "",
                 "gameId": game.id,
@@ -710,6 +802,12 @@ class NarratorController:
         self._app._narrator_pipeline.poll_game_activity()
         self._poll_autostart()
         changed: set[str] = set()
+        fresh = getattr(getattr(self._app._narrator_pipeline, "capture", None), "fresh_selections", None)
+        if fresh:
+            fresh.clear()
+            # The portal does not say which window was chosen, so ask the
+            # user to confirm that it is the game and not GameOpti itself.
+            self._app._emit_toast("Check the preview - it should show the game", "info")
         for event in self._app._narrator_pipeline.drain_events():
             game = self._game_for_key(event.game_key)
             if game is not None:

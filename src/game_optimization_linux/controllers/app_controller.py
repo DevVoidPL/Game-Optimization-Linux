@@ -751,6 +751,7 @@ class AppController(QObject):
         )
         self._gamepad_service.actionTriggered.connect(self._on_gamepad_action)
         self._gamepad_service.inputActivity.connect(self._on_gamepad_activity)
+        self._gamepad_service.shortcutTriggered.connect(self._on_gamepad_shortcut)
         self._configure_gamepad_service()
 
         self._games: list[dict[str, Any]] = []
@@ -2104,6 +2105,10 @@ class AppController(QObject):
         return self._narrator_controller.stop()
 
     @Slot(str, result=bool)
+    def chooseNarratorWindowAgain(self, game_id: str) -> bool:
+        return self._narrator_controller.choose_window_again(game_id)
+
+    @Slot(str, result=bool)
     def requestNarratorRegionPreview(self, game_id: str) -> bool:
         return self._narrator_controller.request_region_preview(game_id)
 
@@ -2442,6 +2447,10 @@ class AppController(QObject):
             self._consume_gamepad_action = str(action)
 
     @Slot(str)
+    def _on_gamepad_shortcut(self, shortcut: str) -> None:
+        if shortcut == "narrator_toggle":
+            self._narrator_controller.toggle_for_running_game()
+
     def _on_gamepad_action(self, action: str) -> None:
         if self._consume_gamepad_action and action == self._consume_gamepad_action:
             self._consume_gamepad_action = ""

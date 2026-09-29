@@ -232,8 +232,12 @@ FocusScope {
         if (reason === "game_not_running") return qsTr("Launch the game before starting Narrator")
         if (reason === "another_session_active") return qsTr("Narrator is active for another game")
         if (narratorData.enabled !== true) return qsTr("Enable Narrator for this game first")
+        if (narratorSession.cardState === "error")
+            return qsTr("Retry, or choose the game window again")
+        if (narratorSession.captureGrantStale === true)
+            return qsTr("Requires choosing the window again")
         if (narratorSession.captureGrantSaved === false)
-            return qsTr("The first start asks you to choose the game window once; it is remembered")
+            return qsTr("The first start requires a one-time window choice with the mouse (preferably in Desktop, while the game is running)")
         if (narratorSession.cardState === "waiting_for_game")
             return qsTr("Starts automatically with the game; you can also start it now")
         if (narratorSession.cardState === "manual")
@@ -255,7 +259,8 @@ FocusScope {
             { "id": "narrator-volume", "icon": App.UiIcons.couchGlyphVolume, "iconOnLight": App.UiIcons.couchGlyphVolumeOnLight, "symbol": "◖", "title": qsTr("Volume: %1%").arg(Math.round(Number(narratorData.volume || 0) * 100)), "label": qsTr("Volume"), "value": qsTr("%1%").arg(Math.round(Number(narratorData.volume || 0) * 100)), "description": qsTr("Press repeatedly to adjust"), "subtitle": qsTr("Press repeatedly to adjust"), "enabled": true },
             { "id": "narrator-rate", "icon": App.UiIcons.couchGlyphSpeechRate, "iconOnLight": App.UiIcons.couchGlyphSpeechRateOnLight, "symbol": "››", "title": qsTr("Speech rate: %1×").arg(Number(narratorData.speechRate || 1).toFixed(1)), "label": qsTr("Speech rate"), "value": qsTr("%1×").arg(Number(narratorData.speechRate || 1).toFixed(1)), "description": qsTr("Press repeatedly to adjust"), "subtitle": qsTr("Press repeatedly to adjust"), "enabled": true },
             { "id": "narrator-region", "icon": App.UiIcons.couchGlyphRegion, "iconOnLight": App.UiIcons.couchGlyphRegionOnLight, "symbol": "⌗", "title": qsTr("Select subtitle region"), "label": qsTr("Subtitle region"), "value": qsTr("Select"), "description": qsTr("Open the native capture selector"), "subtitle": qsTr("Open the native capture selector"), "enabled": Boolean(controller && controller.selectNarratorSubtitleRegion) },
-            { "id": active ? "narrator-stop" : "narrator-start", "icon": active ? App.UiIcons.couchGlyphStop : App.UiIcons.couchGlyphStart, "iconOnLight": active ? App.UiIcons.couchGlyphStopOnLight : App.UiIcons.couchGlyphStartOnLight, "symbol": active ? "■" : "▶", "title": active ? qsTr("Stop Narrator") : qsTr("Start Narrator"), "label": active ? qsTr("Stop Narrator") : qsTr("Start Narrator"), "value": active ? qsTr("Active") : App.I18n.narratorState(narratorSession).text, "description": narratorStartMessage(), "subtitle": narratorStartMessage(), "enabled": active || (narratorData.enabled === true && narratorSession.canStart === true) }
+            { "id": "narrator-reselect", "icon": App.UiIcons.couchGlyphCapture, "iconOnLight": App.UiIcons.couchGlyphCaptureOnLight, "symbol": "▣", "title": qsTr("Choose window again"), "label": qsTr("Game window"), "value": narratorSession.captureGrantSaved === true ? qsTr("Saved") : qsTr("Not chosen"), "description": qsTr("Forget the saved window for this game only"), "subtitle": qsTr("Forget the saved window for this game only"), "enabled": true },
+            { "id": active ? "narrator-stop" : "narrator-start", "icon": active ? App.UiIcons.couchGlyphStop : App.UiIcons.couchGlyphStart, "iconOnLight": active ? App.UiIcons.couchGlyphStopOnLight : App.UiIcons.couchGlyphStartOnLight, "symbol": active ? "■" : "▶", "title": active ? qsTr("Stop Narrator") : narratorSession.cardState === "error" ? qsTr("Retry") : qsTr("Start Narrator"), "label": active ? qsTr("Stop Narrator") : narratorSession.cardState === "error" ? qsTr("Retry") : qsTr("Start Narrator"), "value": active ? qsTr("Active") : App.I18n.narratorState(narratorSession).text, "description": narratorStartMessage(), "subtitle": narratorStartMessage(), "enabled": active || (narratorData.enabled === true && narratorSession.canStart === true) }
         ]
     }
     function optiScalerExecutable() {
@@ -725,6 +730,9 @@ FocusScope {
             return Boolean(controller.selectNarratorSubtitleRegion
                     && controller.selectNarratorSubtitleRegion(
                         String(game.id), narratorData.subtitleRegion || ({})))
+        if (id === "narrator-reselect")
+            return Boolean(controller.chooseNarratorWindowAgain
+                    && controller.chooseNarratorWindowAgain(String(game.id)))
         if (id === "narrator-start")
             return Boolean(controller.startNarrator
                     && controller.startNarrator(String(game.id)))

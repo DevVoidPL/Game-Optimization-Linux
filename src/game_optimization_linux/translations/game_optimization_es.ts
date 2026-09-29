@@ -37,40 +37,40 @@
         <translation type="vanished">Remasterización gráfica</translation>
     </message>
     <message>
-        <location line="+272"/>
+        <location line="+277"/>
         <source>Unavailable in this version</source>
         <translation>No disponible en esta versión</translation>
     </message>
     <message>
-        <location line="-271"/>
-        <location line="+2311"/>
+        <location line="-276"/>
+        <location line="+2321"/>
         <source>Optimization</source>
         <translation>Optimización</translation>
     </message>
     <message>
-        <location line="-2356"/>
-        <location line="+563"/>
+        <location line="-2366"/>
+        <location line="+570"/>
         <source>Native</source>
         <translation>Nativa</translation>
     </message>
     <message>
-        <location line="-520"/>
-        <location line="+2043"/>
+        <location line="-527"/>
+        <location line="+2053"/>
         <source>Overview</source>
         <translation>Resumen</translation>
     </message>
     <message>
-        <location line="-2040"/>
+        <location line="-2050"/>
         <source>OptiScaler</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+54"/>
         <location line="+66"/>
-        <location line="+157"/>
+        <location line="+162"/>
         <location line="+15"/>
-        <location line="+233"/>
-        <location line="+362"/>
+        <location line="+235"/>
+        <location line="+365"/>
         <location line="+1182"/>
         <location line="+17"/>
         <location line="+2"/>
@@ -79,7 +79,7 @@
         <translation>No disponible</translation>
     </message>
     <message>
-        <location line="-2316"/>
+        <location line="-2326"/>
         <source>B</source>
         <translation>B</translation>
     </message>
@@ -125,11 +125,12 @@
     </message>
     <message>
         <location line="+4"/>
+        <location line="+94"/>
         <source>Game window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+8"/>
+        <location line="-86"/>
         <source>Starting</source>
         <translation type="unfinished">Iniciando</translation>
     </message>
@@ -150,12 +151,12 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+2111"/>
+        <location line="+2121"/>
         <source>Translating</source>
         <translation type="unfinished">Traduciendo</translation>
     </message>
     <message>
-        <location line="-2110"/>
+        <location line="-2120"/>
         <source>Speaking</source>
         <translation type="unfinished">Hablando</translation>
     </message>
@@ -248,12 +249,7 @@
         <translation type="unfinished">Primero activa el Narrador para este juego</translation>
     </message>
     <message>
-        <location line="+2"/>
-        <source>The first start asks you to choose the game window once; it is remembered</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+2"/>
+        <location line="+8"/>
         <source>Starts automatically with the game; you can also start it now</source>
         <translation type="unfinished"></translation>
     </message>
@@ -353,6 +349,27 @@
     </message>
     <message>
         <location line="+1"/>
+        <source>Choose window again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Saved</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Not chosen</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <location line="+0"/>
+        <source>Forget the saved window for this game only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <location line="+0"/>
         <source>Stop Narrator</source>
         <translation type="unfinished">Detener Narrador</translation>
@@ -436,12 +453,12 @@
     </message>
     <message>
         <location line="+5"/>
-        <location line="+89"/>
+        <location line="+91"/>
         <source>Launching…</source>
         <translation>Iniciando…</translation>
     </message>
     <message>
-        <location line="-89"/>
+        <location line="-91"/>
         <source>Launch</source>
         <translation>Iniciar</translation>
     </message>
@@ -452,12 +469,12 @@
     </message>
     <message>
         <location line="+0"/>
-        <location line="+82"/>
+        <location line="+84"/>
         <source>Game is unavailable</source>
         <translation>El juego no está disponible</translation>
     </message>
     <message>
-        <location line="-81"/>
+        <location line="-83"/>
         <source>Updates</source>
         <translation>Actualizaciones</translation>
     </message>
@@ -495,12 +512,12 @@
     <message>
         <location line="-46"/>
         <location line="+47"/>
-        <location line="+78"/>
+        <location line="+80"/>
         <source>Profile: %1</source>
         <translation>Perfil: %1</translation>
     </message>
     <message>
-        <location line="-78"/>
+        <location line="-80"/>
         <source>Choose a planned profile</source>
         <translation>Elegir un perfil previsto</translation>
     </message>
@@ -525,12 +542,12 @@
         <translation>Se requiere un plan Btrfs verificado</translation>
     </message>
     <message>
-        <location line="-86"/>
-        <location line="+39"/>
+        <location line="-87"/>
+        <location line="+40"/>
         <location line="+1"/>
         <location line="+77"/>
         <location line="+7"/>
-        <location line="+594"/>
+        <location line="+599"/>
         <location line="+19"/>
         <location line="+182"/>
         <location line="+101"/>
@@ -542,12 +559,12 @@
         <translation>Activado</translation>
     </message>
     <message>
-        <location line="-1955"/>
-        <location line="+39"/>
+        <location line="-1961"/>
+        <location line="+40"/>
         <location line="+1"/>
         <location line="+77"/>
         <location line="+7"/>
-        <location line="+594"/>
+        <location line="+599"/>
         <location line="+19"/>
         <location line="+182"/>
         <location line="+101"/>
@@ -559,7 +576,7 @@
         <translation>Desactivada</translation>
     </message>
     <message>
-        <location line="-1914"/>
+        <location line="-1919"/>
         <source>MangoHud</source>
         <translation>MangoHud</translation>
     </message>
@@ -569,14 +586,14 @@
     </message>
     <message>
         <location line="+97"/>
-        <location line="+1840"/>
+        <location line="+1845"/>
         <source>Installed</source>
         <translation>Instalado</translation>
     </message>
     <message>
-        <location line="-1865"/>
+        <location line="-1870"/>
         <location line="+26"/>
-        <location line="+760"/>
+        <location line="+765"/>
         <location line="+1079"/>
         <source>Not installed</source>
         <translation>No instalado</translation>
@@ -590,7 +607,7 @@
         <translation type="vanished">La instalación está disponible en el modo Escritorio</translation>
     </message>
     <message>
-        <location line="-1907"/>
+        <location line="-1912"/>
         <source>Remove OptiScaler</source>
         <translation>Eliminar OptiScaler</translation>
     </message>
@@ -612,7 +629,7 @@
         <translation type="vanished">Resolución: %1</translation>
     </message>
     <message>
-        <location line="+248"/>
+        <location line="+250"/>
         <source>FPS only</source>
         <translation>Solo FPS</translation>
     </message>
@@ -634,24 +651,24 @@
         <translation>Personalizado</translation>
     </message>
     <message>
-        <location line="-370"/>
-        <location line="+28"/>
-        <location line="+33"/>
-        <location line="+290"/>
+        <location line="-377"/>
+        <location line="+32"/>
+        <location line="+34"/>
+        <location line="+292"/>
         <location line="+24"/>
         <source>Disabled</source>
         <translation>Desactivado</translation>
     </message>
     <message>
-        <location line="-433"/>
-        <location line="+120"/>
-        <location line="+292"/>
-        <location line="+688"/>
+        <location line="-440"/>
+        <location line="+125"/>
+        <location line="+294"/>
+        <location line="+691"/>
         <source>Automatic</source>
         <translation>Automático</translation>
     </message>
     <message>
-        <location line="-688"/>
+        <location line="-691"/>
         <source>Maximum Performance</source>
         <translation>Máximo rendimiento</translation>
     </message>
@@ -706,15 +723,15 @@
         <translation>Calidad</translation>
     </message>
     <message>
-        <location line="-429"/>
-        <location line="+436"/>
+        <location line="-436"/>
+        <location line="+443"/>
         <location line="+1"/>
-        <location line="+1797"/>
+        <location line="+1800"/>
         <source>Monitor</source>
         <translation>Monitor</translation>
     </message>
     <message>
-        <location line="-2104"/>
+        <location line="-2109"/>
         <source>Retry: %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -724,12 +741,29 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+10"/>
+        <location line="-41"/>
+        <location line="+0"/>
+        <location line="+51"/>
         <source>Retry</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+31"/>
+        <location line="-78"/>
+        <source>Retry, or choose the game window again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Requires choosing the window again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>The first start requires a one-time window choice with the mouse (preferably in Desktop, while the game is running)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+105"/>
         <source>Launcher integration unavailable</source>
         <translation type="unfinished"></translation>
     </message>
@@ -749,12 +783,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+15"/>
+        <location line="+17"/>
         <source>Voice: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+506"/>
+        <location line="+509"/>
         <source>Top left</source>
         <translation>Arriba a la izquierda</translation>
     </message>
@@ -904,11 +938,11 @@
         <translation type="vanished">%1 · %2 · %3</translation>
     </message>
     <message>
-        <location line="-1423"/>
+        <location line="-1428"/>
         <location line="+20"/>
         <location line="+12"/>
-        <location line="+199"/>
-        <location line="+1535"/>
+        <location line="+201"/>
+        <location line="+1538"/>
         <location line="+1"/>
         <source>Unknown</source>
         <translation>Desconocido</translation>
@@ -969,8 +1003,8 @@
         <translation>Clasificación</translation>
     </message>
     <message>
-        <location line="-1601"/>
-        <location line="+1598"/>
+        <location line="-1604"/>
+        <location line="+1601"/>
         <location line="+1"/>
         <source>Measurement unavailable</source>
         <translation>Medición no disponible</translation>
@@ -1149,7 +1183,7 @@
         <translation>Ruta no disponible</translation>
     </message>
     <message>
-        <location line="-1771"/>
+        <location line="-1776"/>
         <source>Checking…</source>
         <translation>Comprobando…</translation>
     </message>
@@ -1163,17 +1197,17 @@
         <translation>Instalar desde la pestaña OptiScaler</translation>
     </message>
     <message>
-        <location line="+29"/>
+        <location line="+31"/>
         <source>Launch game</source>
         <translation>Iniciar juego</translation>
     </message>
     <message>
-        <location line="+1405"/>
+        <location line="+1408"/>
         <source>Launch unavailable</source>
         <translation>Inicio no disponible</translation>
     </message>
     <message>
-        <location line="-1437"/>
+        <location line="-1442"/>
         <source>Needs repair</source>
         <translation>Necesita reparación</translation>
     </message>
@@ -1201,7 +1235,7 @@
         <translation>Preajuste: %1</translation>
     </message>
     <message>
-        <location line="+1496"/>
+        <location line="+1501"/>
         <location line="+26"/>
         <source>Preview</source>
         <translation>Vista previa</translation>
@@ -1212,17 +1246,17 @@
         <translation>Listo para jugar</translation>
     </message>
     <message>
-        <location line="-1435"/>
+        <location line="-1440"/>
         <source>Repair from the OptiScaler tab</source>
         <translation>Reparar desde la pestaña OptiScaler</translation>
     </message>
     <message>
-        <location line="+1459"/>
+        <location line="+1464"/>
         <source>Runtime: %1</source>
         <translation>Entorno: %1</translation>
     </message>
     <message>
-        <location line="-1452"/>
+        <location line="-1457"/>
         <source>Settings not loaded</source>
         <translation>Ajustes no cargados</translation>
     </message>
@@ -1233,7 +1267,7 @@
         <translation>Estado no cargado</translation>
     </message>
     <message>
-        <location line="+598"/>
+        <location line="+603"/>
         <location line="+289"/>
         <location line="+58"/>
         <source>%1 FPS</source>
@@ -1698,14 +1732,14 @@
         <translation>Tu límite de %1 FPS se conserva para después</translation>
     </message>
     <message>
-        <location line="-900"/>
-        <location line="+169"/>
-        <location line="+179"/>
+        <location line="-910"/>
+        <location line="+173"/>
+        <location line="+182"/>
         <source>Lektor</source>
         <translation>Narrador</translation>
     </message>
     <message>
-        <location line="-179"/>
+        <location line="-182"/>
         <source>Enabled</source>
         <translation>Activado</translation>
     </message>
@@ -1721,12 +1755,12 @@
     </message>
     <message>
         <location line="+1"/>
-        <location line="+2036"/>
+        <location line="+2042"/>
         <source>Capture</source>
         <translation>Captura</translation>
     </message>
     <message>
-        <location line="-2035"/>
+        <location line="-2041"/>
         <source>Voice</source>
         <translation>Voz</translation>
     </message>
@@ -1761,13 +1795,13 @@
         <translation>%1×</translation>
     </message>
     <message>
-        <location line="-64"/>
-        <location line="+66"/>
+        <location line="-68"/>
+        <location line="+71"/>
         <source>Active</source>
         <translation>Activo</translation>
     </message>
     <message>
-        <location line="-49"/>
+        <location line="-54"/>
         <location line="+11"/>
         <source>Ready</source>
         <translation>Listo</translation>
@@ -6792,6 +6826,16 @@ Continúe solo después de revisar este riesgo.</translation>
     </message>
     <message>
         <location line="+2"/>
+        <source>The capture session was closed (the chosen window disappeared or the choice was cancelled)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
+        <source>Check the preview - it should show the game</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>Narrator started with the game</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8536,12 +8580,12 @@ Continúe solo después de revisar este riesgo.</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+601"/>
+        <location line="+605"/>
         <source>Not installed</source>
         <translation>No instalado</translation>
     </message>
     <message>
-        <location line="-599"/>
+        <location line="-603"/>
         <source>Installing</source>
         <translation>Instalando</translation>
     </message>
@@ -8552,12 +8596,12 @@ Continúe solo después de revisar este riesgo.</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+594"/>
+        <location line="+598"/>
         <source>Unavailable in this build</source>
         <translation>No disponible en esta compilación</translation>
     </message>
     <message>
-        <location line="-592"/>
+        <location line="-596"/>
         <location line="+34"/>
         <source>Error</source>
         <translation>Error</translation>
@@ -8565,14 +8609,14 @@ Continúe solo después de revisar este riesgo.</translation>
     <message>
         <location line="-33"/>
         <location line="+34"/>
-        <location line="+1311"/>
+        <location line="+1315"/>
         <location line="+132"/>
         <location line="+19"/>
         <source>Unknown</source>
         <translation>Desconocido</translation>
     </message>
     <message>
-        <location line="-1481"/>
+        <location line="-1485"/>
         <location line="+16"/>
         <location line="+29"/>
         <location line="+39"/>
@@ -8600,12 +8644,12 @@ Continúe solo después de revisar este riesgo.</translation>
     </message>
     <message>
         <location line="+2"/>
-        <location line="+1216"/>
+        <location line="+1220"/>
         <source>Translating</source>
         <translation>Traduciendo</translation>
     </message>
     <message>
-        <location line="-1214"/>
+        <location line="-1218"/>
         <location line="+66"/>
         <source>Speaking</source>
         <translation>Hablando</translation>
@@ -8718,7 +8762,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <location line="+24"/>
         <location line="+11"/>
         <location line="+2"/>
-        <location line="+1128"/>
+        <location line="+1132"/>
         <location line="+30"/>
         <location line="+65"/>
         <location line="+50"/>
@@ -8726,7 +8770,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>No medido</translation>
     </message>
     <message>
-        <location line="-1332"/>
+        <location line="-1336"/>
         <source>%1 (played %2 of %3)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8795,7 +8839,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Activado para este juego</translation>
     </message>
     <message>
-        <location line="+36"/>
+        <location line="+40"/>
         <source>The session processes subtitles only while the selected game is running</source>
         <translation>La sesión procesa subtítulos solo mientras se ejecuta el juego seleccionado</translation>
     </message>
@@ -8874,7 +8918,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Ventana</translation>
     </message>
     <message>
-        <location line="-544"/>
+        <location line="-548"/>
         <source>Balanced</source>
         <translation>Equilibrado</translation>
     </message>
@@ -8894,7 +8938,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+158"/>
+        <location line="+162"/>
         <source>Monitor</source>
         <translation>Monitor</translation>
     </message>
@@ -9263,14 +9307,29 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Guardar ajustes</translation>
     </message>
     <message>
-        <location line="+5"/>
+        <location line="+6"/>
+        <source>Choose window again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
+        <source>Forget the saved window for this game only</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+11"/>
         <source>Stop narrator</source>
         <translation>Detener narrador</translation>
     </message>
     <message>
-        <location line="+0"/>
+        <location line="+1"/>
         <source>Start narrator</source>
         <translation>Iniciar narrador</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Retry</source>
+        <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+7"/>
@@ -9282,7 +9341,7 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation type="vanished">Activa el narrador e instala primero todos los componentes necesarios</translation>
     </message>
     <message>
-        <location line="-755"/>
+        <location line="-769"/>
         <source>Cancel capture</source>
         <translation>Cancelar captura</translation>
     </message>
@@ -9322,12 +9381,12 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Ajuste preciso avanzado</translation>
     </message>
     <message>
-        <location line="-772"/>
+        <location line="-776"/>
         <source>Disabled</source>
         <translation>Desactivada</translation>
     </message>
     <message>
-        <location line="+1254"/>
+        <location line="+1258"/>
         <source>OCR diagnostics</source>
         <translation>Diagnóstico de OCR</translation>
     </message>
@@ -9337,7 +9396,12 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Imagen OCR + PNG: %1</translation>
     </message>
     <message>
-        <location line="-886"/>
+        <location line="-887"/>
+        <source>Requires choosing the window again</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>The first start asks you to choose the game window once; it is remembered</source>
         <translation type="unfinished"></translation>
     </message>
@@ -9492,17 +9556,17 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Último subtítulo aceptado</translation>
     </message>
     <message>
-        <location line="-1244"/>
+        <location line="-1248"/>
         <source>Local Polish subtitle OCR</source>
         <translation>OCR local de subtítulos en polaco</translation>
     </message>
     <message>
-        <location line="+1352"/>
+        <location line="+1356"/>
         <source>OCR worker wait: %1</source>
         <translation>Espera del proceso OCR: %1</translation>
     </message>
     <message>
-        <location line="-1313"/>
+        <location line="-1317"/>
         <source>A verified local Polish OCR runtime and model are required.</source>
         <translation>Se requieren un entorno OCR local y un modelo de polaco verificados.</translation>
     </message>

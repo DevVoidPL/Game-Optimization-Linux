@@ -108,6 +108,10 @@ class PortalScreenCaptureProvider:
         self._state_callback: StateCallback | None = None
         self._restore_retry_used = False
         self._attempt = 0
+        # Games whose saved window choice could not be restored, and games
+        # whose window was just chosen (the UI asks to check the preview).
+        self.stale_grants: set[str] = set()
+        self.fresh_selections: set[str] = set()
 
     def capabilities(self) -> CaptureCapabilities:
         if self._backend is None:
@@ -250,6 +254,9 @@ class PortalScreenCaptureProvider:
             or info.session_id != request.session_id
         ):
             return
+        self.stale_grants.discard(request.game_key)
+        if not request.restore_token:
+            self.fresh_selections.add(request.game_key)
         if info.restore_token:
             try:
                 self._grants.save_token(request.game_key, info.restore_token)
@@ -268,6 +275,7 @@ class PortalScreenCaptureProvider:
             and not self._restore_retry_used
         ):
             self._restore_retry_used = True
+            self.stale_grants.add(request.game_key)
             try:
                 self._grants.save_token(request.game_key, "")
             except Exception as error:

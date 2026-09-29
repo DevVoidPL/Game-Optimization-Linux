@@ -198,6 +198,12 @@ class SDL3GamepadProvider:
     def start(self) -> Sequence[GamepadDevice]:
         if self._started:
             return self.list_devices()
+        set_hint = getattr(self._library, "SDL_SetHint", None)
+        if set_hint is not None:
+            # Keep receiving pad events while a game window has focus (the
+            # Narrator shortcut); Couch navigation itself is unchanged.
+            set_hint.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
+            set_hint(b"SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", b"1")
         if not self._library.SDL_InitSubSystem(SDL_INIT_GAMEPAD):
             raise SDL3Unavailable(f"SDL3 gamepad initialization failed: {self._error()}")
         self._started = True

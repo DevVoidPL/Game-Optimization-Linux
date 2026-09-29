@@ -244,17 +244,17 @@ def test_narrator_action_grid_is_balanced_readable_and_navigable() -> None:
         QTest.qWait(250)
         ids = [action["id"] for action in _plain(root.property("actionModel"))]
         assert ids == ["narrator-enabled", "narrator-language", "narrator-source", "narrator-capture",
-                       "narrator-voice", "narrator-volume", "narrator-rate", "narrator-region", "narrator-start"]
+                       "narrator-voice", "narrator-volume", "narrator-rate", "narrator-region", "narrator-reselect", "narrator-start"]
         viewport = root.findChild(QObject, "couchDetailsActionsViewport")
-        assert (viewport.property("columns"), viewport.property("rows")) == (3, 3)
+        assert (viewport.property("columns"), viewport.property("rows")) == (4, 3)
         titles = [item for item in _probe(root) if item["name"] == "couchTileTitle"]
         assert titles and not [item["text"] for item in titles if item["truncated"]]
         _act(root, "NavigateDown")                                   # same column, next row
-        assert root.property("selectedAction") == 3
+        assert root.property("selectedAction") == 4
         _act(root, "NavigateDown")                                   # third row, an enabled tile
         actions = _plain(root.property("actionModel"))
         selected = root.property("selectedAction")
-        assert 6 <= selected <= 8 and actions[selected]["enabled"] is True
+        assert 8 <= selected <= 9 and actions[selected]["enabled"] is True
         _act(root, "NavigateDown")                                   # past the last row -> content
         assert root.property("focusArea") == 3
     finally:

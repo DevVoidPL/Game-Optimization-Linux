@@ -584,6 +584,10 @@ QtObject {
             return qsTr("game directory is unavailable")
         case "A game file or directory is not accessible":
             return qsTr("A game file or directory is not accessible")
+        case "The portal capture session closed":
+            return qsTr("The capture session was closed (the chosen window disappeared or the choice was cancelled)")
+        case "Check the preview - it should show the game":
+            return qsTr("Check the preview - it should show the game")
         case "Narrator started with the game":
             return qsTr("Narrator started with the game")
         case "Narrator started with the game. Choose the game window once; the choice is remembered":

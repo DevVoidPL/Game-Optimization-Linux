@@ -100,6 +100,13 @@ class GamepadInputMapper:
         }
         self._view_holds.pop(instance_id, None)
 
+    def suppress_view_release(self, instance_id: int) -> None:
+        """The View/Select button was part of a shortcut: no action on release."""
+
+        hold = self._view_holds.get(instance_id)
+        if hold is not None:
+            self._view_holds[instance_id] = (hold[0], True)
+
     @staticmethod
     def _button_action(control: str) -> GamepadAction | None:
         return {
@@ -290,6 +297,10 @@ class GamepadService(QObject):
     controllerDisconnected = Signal(str)
     mappingChanged = Signal(object)
     inputActivity = Signal(str)
+    # Global shortcut (also while a game has focus): hold Select/View + Y.
+    shortcutTriggered = Signal(str)
+    SHORTCUT_BUTTONS = frozenset({"back", "north"})
+    SHORTCUT_HOLD_SECONDS = 1.0
 
     def __init__(
         self,
@@ -305,6 +316,9 @@ class GamepadService(QObject):
         self._devices: list[GamepadDevice] = []
         self._active_id: int | None = None
         self._mapper = GamepadInputMapper()
+        self._held_buttons: dict[int, set[str]] = {}
+        self._shortcut_since: dict[int, float] = {}
+        self._shortcut_fired: set[int] = set()
         self._started = False
         self._stopped = False
         self._timer = QTimer(self)
@@ -419,6 +433,9 @@ class GamepadService(QObject):
                         self.activeControllerChanged.emit()
                 elif event.kind == "remapped" and current:
                     self.mappingChanged.emit(current.to_dict())
+            if event.kind == "button":
+                held = self._held_buttons.setdefault(event.instance_id, set())
+                (held.add if event.pressed else held.discard)(event.control)
             meaningful = self._mapper.is_meaningful(event)
             actions = self._mapper.process(event)
             if meaningful:
@@ -434,8 +451,22 @@ class GamepadService(QObject):
                 continue
             emitted_actions.add(action.value)
             self.actionTriggered.emit(action.value)
+        self._poll_shortcut(time.monotonic())
         if devices_changed:
             self.controllersChanged.emit()
+
+    def _poll_shortcut(self, now: float) -> None:
+        for instance_id, held in tuple(self._held_buttons.items()):
+            if not self.SHORTCUT_BUTTONS <= held:
+                self._shortcut_since.pop(instance_id, None)
+                self._shortcut_fired.discard(instance_id)
+                continue
+            since = self._shortcut_since.setdefault(instance_id, now)
+            if instance_id in self._shortcut_fired or now - since < self.SHORTCUT_HOLD_SECONDS:
+                continue
+            self._shortcut_fired.add(instance_id)
+            self._mapper.suppress_view_release(instance_id)
+            self.shortcutTriggered.emit("narrator_toggle")
 
     def _device(self, identifier: int | None) -> GamepadDevice | None:
         if identifier is None:

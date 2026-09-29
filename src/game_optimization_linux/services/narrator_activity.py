@@ -12,8 +12,14 @@ Inside Flatpak the sandbox cannot see host processes, so the host process
 list comes from the host service (``ps`` via ``flatpak-spawn --host``). If no
 process list is available the answer is ``None`` (unknown), never a guess.
 
-Results are cached per game for ``min_interval`` seconds, so callers polling
+Results are cached per game for ``min_interval`` seconds, and the host
+process list is shared by all games for the same time, so callers polling
 every frame do not spawn a process each time.
+
+``game_process_running`` is the stricter check used before autostart and the
+portal prompt: the process' own executable (argv[0]) must be inside the game
+directory and must not be a known launcher stub. Wrappers such as Steam's
+reaper, Proton or launchers only mention the path in their arguments.
 """
 
 from __future__ import annotations
@@ -26,6 +32,8 @@ import time
 from game_optimization_linux.models import Game, Launcher
 
 DEFAULT_MIN_INTERVAL_SECONDS = 4.0
+# Executables inside a game folder that only start another launcher.
+_LAUNCHER_STUBS = re.compile(r"launcher|^playgtav$|^playrdr2$|^unins\d*$|crashreport|redist")
 
 
 def _in_flatpak() -> bool:
@@ -50,6 +58,8 @@ class NarratorGameActivityDetector:
         self._clock = clock
         self._min_interval = max(0.0, float(min_interval))
         self._cache: dict[str, tuple[float, bool | None]] = {}
+        self._strict_cache: dict[str, tuple[float, bool | None]] = {}
+        self._commands_cache: tuple[float, tuple[str, ...] | None] | None = None
         self.probe_count = 0
 
     @property
@@ -68,10 +78,13 @@ class NarratorGameActivityDetector:
         return bool(str(game.install_path or "").strip())
 
     def invalidate(self, game_key: str = "") -> None:
+        self._commands_cache = None
         if game_key:
             self._cache.pop(game_key, None)
+            self._strict_cache.pop(game_key, None)
         else:
             self._cache.clear()
+            self._strict_cache.clear()
 
     def is_active(self, game_key: str) -> bool | None:
         now = self._clock()
@@ -82,20 +95,82 @@ class NarratorGameActivityDetector:
         self._cache[game_key] = (now, result)
         return result
 
+    def game_process_running(self, game_key: str) -> bool | None:
+        """Whether the game's own executable runs (not only a launcher)."""
+
+        now = self._clock()
+        cached = self._strict_cache.get(game_key)
+        if cached is not None and now - cached[0] < self._min_interval:
+            return cached[1]
+        game = self._game_loader(game_key)
+        commands = self._commands() if game is not None else None
+        result = (
+            None if commands is None
+            else any(self._is_game_executable(game, line) for line in commands)
+        )
+        self._strict_cache[game_key] = (now, result)
+        return result
+
     # -- probing ---------------------------------------------------------------
+    def _commands(self) -> tuple[str, ...] | None:
+        """One process list (host ``ps`` or /proc) shared by all games."""
+
+        now = self._clock()
+        cached = self._commands_cache
+        if cached is not None and now - cached[0] < self._min_interval:
+            return cached[1]
+        self.probe_count += 1
+        if self._sandboxed:
+            listed = self._host_processes() if self._host_processes is not None else None
+            commands = None if listed is None else tuple(str(line) for line in listed)
+        else:
+            commands = self._native_commands()
+        self._commands_cache = (now, commands)
+        return commands
+
     def _probe(self, game_key: str) -> bool | None:
         game = self._game_loader(game_key)
         if game is None:
             return None
-        self.probe_count += 1
         if self._sandboxed:
-            if self._host_processes is None:
-                return None
-            commands = self._host_processes()
+            commands = self._commands()
             if commands is None:
                 return None
             return any(self._command_matches(game, line) for line in commands)
+        self.probe_count += 1
         return self._native_probe(game)
+
+    @classmethod
+    def _is_game_executable(cls, game: Game, command: str) -> bool:
+        folded = str(command).strip().casefold()
+        for marker in cls._path_markers(game):
+            if not folded.startswith(marker):
+                continue
+            rest = folded[len(marker):]
+            if rest and rest[0] not in "/\\":
+                continue
+            exe_end = rest.find(".exe")
+            path = rest[: exe_end] if exe_end >= 0 else rest.split(" ", 1)[0]
+            name = path.replace("\\", "/").rsplit("/", 1)[-1]
+            if name and not _LAUNCHER_STUBS.search(name):
+                return True
+        return False
+
+    def _native_commands(self) -> tuple[str, ...] | None:
+        try:
+            processes = tuple(self._proc_root.iterdir())
+        except OSError:
+            return None
+        commands: list[str] = []
+        for process in processes:
+            if not process.name.isdecimal():
+                continue
+            try:
+                raw = (process / "cmdline").read_bytes()
+            except OSError:
+                continue
+            commands.append(raw.replace(b"\0", b" ").decode("utf-8", errors="replace"))
+        return tuple(commands)
 
     @staticmethod
     def _path_markers(game: Game) -> tuple[str, ...]:

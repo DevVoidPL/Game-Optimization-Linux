@@ -104,6 +104,19 @@ PL_COUCH = {
 
 # (context, source) -> Polish, for the remaining non-Couch desktop texts.
 PL_DESKTOP = {
+    ('CouchGameDetails', 'Retry, or choose the game window again'): 'Ponów albo wybierz okno gry ponownie',
+    ('CouchGameDetails', 'Requires choosing the window again'): 'Wymaga ponownego wyboru okna',
+    ('NarratorPage', 'Requires choosing the window again'): 'Wymaga ponownego wyboru okna',
+    ('CouchGameDetails', 'The first start requires a one-time window choice with the mouse (preferably in Desktop, while the game is running)'): 'Pierwsze uruchomienie wymaga jednorazowego wyboru okna myszką (najlepiej w Desktop, gdy gra już działa)',
+    ('CouchGameDetails', 'Choose window again'): 'Wybierz okno ponownie',
+    ('NarratorPage', 'Choose window again'): 'Wybierz okno ponownie',
+    ('CouchGameDetails', 'Saved'): 'Zapisane',
+    ('CouchGameDetails', 'Not chosen'): 'Nie wybrano',
+    ('CouchGameDetails', 'Forget the saved window for this game only'): 'Zapomnij zapisane okno tylko dla tej gry',
+    ('NarratorPage', 'Forget the saved window for this game only'): 'Zapomnij zapisane okno tylko dla tej gry',
+    ('NarratorPage', 'Retry'): 'Ponów',
+    ('I18n', 'The capture session was closed (the chosen window disappeared or the choice was cancelled)'): 'Sesja przechwytywania została zamknięta (wybrane okno zniknęło albo wybór anulowano)',
+    ('I18n', 'Check the preview - it should show the game'): 'Sprawdź podgląd - powinien pokazywać grę',
     ('CouchGameDetails', 'The first start asks you to choose the game window once; it is remembered'): 'Przy pierwszym uruchomieniu trzeba raz wybrać okno gry; wybór zostanie zapamiętany',
     ('NarratorPage', 'The first start asks you to choose the game window once; it is remembered'): 'Przy pierwszym uruchomieniu trzeba raz wybrać okno gry; wybór zostanie zapamiętany',
     ('CouchGameDetails', 'Starts automatically with the game; you can also start it now'): 'Uruchomi się automatycznie z grą; możesz też uruchomić go teraz',

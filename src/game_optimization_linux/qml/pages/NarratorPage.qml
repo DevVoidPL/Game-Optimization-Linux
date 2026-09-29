@@ -860,8 +860,12 @@ Item {
                             }
                             Label {
                                 Layout.fillWidth: true
-                                visible: page.selectedGameId.length > 0 && page.sessionData.captureGrantSaved === false
-                                text: qsTr("The first start asks you to choose the game window once; it is remembered")
+                                visible: page.selectedGameId.length > 0
+                                         && (page.sessionData.captureGrantSaved === false
+                                             || page.sessionData.captureGrantStale === true)
+                                text: page.sessionData.captureGrantStale === true
+                                      ? qsTr("Requires choosing the window again")
+                                      : qsTr("The first start asks you to choose the game window once; it is remembered")
                                 color: App.Theme.textSecondary
                                 font.pixelSize: App.Theme.fontCaption
                                 wrapMode: Text.WordWrap
@@ -1976,7 +1980,21 @@ Item {
                             onClicked: page.saveSettings()
                         }
                         AppButton {
-                            text: page.sessionActive ? qsTr("Stop narrator") : qsTr("Start narrator")
+                            objectName: "narratorChooseWindowAgain"
+                            text: qsTr("Choose window again")
+                            toolTip: qsTr("Forget the saved window for this game only")
+                            enabled: page.selectedGameId.length > 0
+                                     && (page.sessionData.captureGrantSaved === true
+                                         || page.sessionData.captureGrantStale === true)
+                            onClicked: {
+                                if (controller && typeof controller.chooseNarratorWindowAgain === "function")
+                                    controller.chooseNarratorWindowAgain(page.selectedGameId)
+                                page.refreshSession()
+                            }
+                        }
+                        AppButton {
+                            text: page.sessionActive ? qsTr("Stop narrator")
+                                  : page.sessionData.cardState === "error" ? qsTr("Retry") : qsTr("Start narrator")
                             kind: page.sessionActive ? "danger" : "primary"
                             enabled: page.sessionActive
                                      || (page.selectedGameId.length > 0
