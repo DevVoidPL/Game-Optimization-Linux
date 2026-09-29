@@ -19,6 +19,46 @@
   </categories>
   <content_rating type="oars-1.1" />
   <releases>
+    <release version="2.0.0-beta" date="2026-09-29">
+      <description>
+        <p>Couch Mode redesign:</p>
+        <ul>
+          <li>Redesigned Home, Library, game details, Updates, Tasks and Settings built on a shared design system with new icon glyphs.</li>
+          <li>Launcher logos for Steam, Heroic and Lutris, and a persistent motion setting (full, reduced or off).</li>
+        </ul>
+        <p>Narrator:</p>
+        <ul>
+          <li>Starts with the game, including Steam and Proton titles, after a fixed 15 second delay; an automatic session stops only after the game exit is confirmed twice, and a manually started session is never stopped automatically.</li>
+          <li>The saved capture window choice is reused; a cancelled or failed start no longer erases it.</li>
+          <li>One silent retry when the captured window changes (for example a splash window replaced by the main window), a silent stop on game exit, and one restart when no frames arrive.</li>
+          <li>Uses the first installed voice when the saved voice is missing and shows honest session states.</li>
+          <li>The subtitle region selector is fully usable with a controller: presets, moving and resizing.</li>
+          <li>Select+Y controller shortcut to start or stop the Narrator; delivery while a game has focus is still being investigated.</li>
+        </ul>
+        <p>OptiScaler:</p>
+        <ul>
+          <li>One-button online install with a confirmation before replacing existing files, backups, and handling of moved games; updated Desktop section.</li>
+        </ul>
+        <p>Compression:</p>
+        <ul>
+          <li>Compression started from Couch Mode and automatic compression never ask for a password; the exact compsize measurement is a separate, confirmed action, and unmeasured values are shown as not measured.</li>
+        </ul>
+        <p>System usage:</p>
+        <ul>
+          <li>Optional CPU, GPU and RAM usage next to the clock in Couch Mode, from real system sources only.</li>
+        </ul>
+        <p>Controller:</p>
+        <ul>
+          <li>Controller input steers GameOpti only while its window is active, and connection diagnostics are written to the log.</li>
+        </ul>
+        <p>Other changes and fixes:</p>
+        <ul>
+          <li>Gamescope window mode, sharpness and FPS limit handling in game optimization.</li>
+          <li>Lutris game configurations are read from the data directory.</li>
+          <li>Donate page in Desktop Mode, synchronized translation catalogs and a system menu sound fix.</li>
+        </ul>
+      </description>
+    </release>
     <release version="1.6.0-alpha" date="2026-08-17">
       <description>
         <p>Major alpha update with experimental Polish narration, real-game performance analysis and automatic optimization improvements.</p>

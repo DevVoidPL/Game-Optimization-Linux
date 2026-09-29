@@ -11,7 +11,7 @@ Game Optimization Linux is an open-source desktop utility for organizing Linux
 game libraries and managing per-game optimization, compatibility, graphics,
 monitoring, storage, and accessibility tools from one interface.
 
-> **Alpha:** the project is under active development. Back up important game
+> **Beta:** the project is under active development. Back up important game
 > files and review every proposed change, especially for modded or online games.
 
 ## Highlights
@@ -109,7 +109,7 @@ No `sudo` is used. The runner is installed under
 
 ## Current limitations
 
-- Alpha releases still require wider testing across distributions, desktop
+- Beta releases still require wider testing across distributions, desktop
   environments, GPUs, Wine/Proton versions, and game engines.
 - Launcher-native Heroic/Lutris and manual launching do not yet use the full
   Steam optimization wrapper pipeline.
