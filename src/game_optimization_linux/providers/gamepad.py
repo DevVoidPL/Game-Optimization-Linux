@@ -203,7 +203,14 @@ class SDL3GamepadProvider:
             # Keep receiving pad events while a game window has focus (the
             # Narrator shortcut); Couch navigation itself is unchanged.
             set_hint.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
-            set_hint(b"SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", b"1")
+            set_hint.restype = ctypes.c_bool
+            applied = set_hint(b"SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS", b"1")
+            logger.info(
+                "Gamepad: SDL background joystick events hint applied=%s",
+                bool(applied),
+            )
+        else:
+            logger.info("Gamepad: SDL_SetHint unavailable; background events not requested")
         if not self._library.SDL_InitSubSystem(SDL_INIT_GAMEPAD):
             raise SDL3Unavailable(f"SDL3 gamepad initialization failed: {self._error()}")
         self._started = True
@@ -309,7 +316,18 @@ class SDL3GamepadProvider:
                 results.append(GamepadEvent("remapped", identifier))
             elif event_type in {SDL_EVENT_GAMEPAD_BUTTON_DOWN, SDL_EVENT_GAMEPAD_BUTTON_UP}:
                 value = event.gbutton
-                results.append(GamepadEvent("button", int(value.which), _BUTTON_NAMES.get(int(value.button), f"button_{int(value.button)}"), event_type == SDL_EVENT_GAMEPAD_BUTTON_DOWN, 1.0 if event_type == SDL_EVENT_GAMEPAD_BUTTON_DOWN else 0.0, float(value.timestamp) / 1_000_000_000.0))
+                control = _BUTTON_NAMES.get(int(value.button), f"button_{int(value.button)}")
+                pressed = event_type == SDL_EVENT_GAMEPAD_BUTTON_DOWN
+                if control in ("back", "north"):
+                    # Select (back) and Y (north) form the Narrator shortcut;
+                    # log the raw event so the whole chain is traceable.
+                    logger.info(
+                        "Gamepad raw shortcut button: device=%s control=%s pressed=%s",
+                        int(value.which),
+                        control,
+                        pressed,
+                    )
+                results.append(GamepadEvent("button", int(value.which), control, pressed, 1.0 if pressed else 0.0, float(value.timestamp) / 1_000_000_000.0))
             elif event_type == SDL_EVENT_GAMEPAD_AXIS_MOTION:
                 value = event.gaxis
                 normalized = max(-1.0, min(1.0, float(value.value) / 32767.0))

@@ -864,7 +864,9 @@ def test_portal_capture_falls_back_to_monitor_and_retries_invalid_restore_token(
     backend.state_callbacks[0](CaptureState.RESTORE_FAILED, "expired")
     assert len(backend.requests) == 2
     assert backend.requests[1].restore_token == ""
-    assert grants.load_token("292030") == ""
+    # A failed restore must not delete the saved consent; it is kept until a
+    # later successful start returns a replacement token.
+    assert grants.load_token("292030") == "old-single-use-token"
     assert states[-2][0] is CaptureState.SELECTING_SOURCE
     backend.started_callbacks[0](
         CaptureSessionInfo(
@@ -874,7 +876,9 @@ def test_portal_capture_falls_back_to_monitor_and_retries_invalid_restore_token(
             restore_token="stale-token",
         )
     )
-    assert grants.load_token("292030") == ""
+    # The first session's started callback is stale (superseded by the retry),
+    # so it neither activates nor overwrites the preserved consent.
+    assert grants.load_token("292030") == "old-single-use-token"
     backend.started_callbacks[-1](
         CaptureSessionInfo(
             session_id="session-a",

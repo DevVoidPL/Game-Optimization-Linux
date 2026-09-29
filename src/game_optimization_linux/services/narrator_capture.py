@@ -189,6 +189,11 @@ class PortalScreenCaptureProvider:
                 else ""
             )
         )
+        logger.info(
+            "Narrator capture: start for %s, saved window token=%s",
+            request.game_key,
+            "yes" if restore_token else "no",
+        )
         self._request = CaptureRequest(
             session_id=request.session_id,
             game_key=request.game_key,
@@ -257,11 +262,26 @@ class PortalScreenCaptureProvider:
         self.stale_grants.discard(request.game_key)
         if not request.restore_token:
             self.fresh_selections.add(request.game_key)
+        logger.info(
+            "Narrator capture: session active for %s, restored saved window=%s",
+            request.game_key,
+            "yes" if request.restore_token else "no (fresh selection)",
+        )
         if info.restore_token:
             try:
                 self._grants.save_token(request.game_key, info.restore_token)
+                logger.info(
+                    "Narrator capture: saved new window token for %s",
+                    request.game_key,
+                )
             except Exception as error:
                 logger.warning("Could not save narrator portal restore token: %s", error)
+        else:
+            logger.info(
+                "Narrator capture: portal returned no new token for %s; "
+                "keeping the previously saved window choice",
+                request.game_key,
+            )
         callback(CaptureState.ACTIVE, "")
 
     def _on_state(self, state: CaptureState, message: str, attempt: int) -> None:
@@ -276,10 +296,13 @@ class PortalScreenCaptureProvider:
         ):
             self._restore_retry_used = True
             self.stale_grants.add(request.game_key)
-            try:
-                self._grants.save_token(request.game_key, "")
-            except Exception as error:
-                logger.warning("Could not clear narrator portal restore token: %s", error)
+            # Keep the saved consent: a failed restore must not erase or
+            # overwrite it. Only a later *successful* start writes a new token.
+            logger.info(
+                "Narrator capture: saved window could not be restored for %s; "
+                "keeping the saved choice and asking for a source once",
+                request.game_key,
+            )
             if self._backend is not None:
                 self._backend.stop()
             retry = CaptureRequest(

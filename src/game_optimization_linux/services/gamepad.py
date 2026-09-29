@@ -458,14 +458,31 @@ class GamepadService(QObject):
     def _poll_shortcut(self, now: float) -> None:
         for instance_id, held in tuple(self._held_buttons.items()):
             if not self.SHORTCUT_BUTTONS <= held:
+                if instance_id in self._shortcut_since:
+                    logger.info(
+                        "Gamepad shortcut: Select+Y released on device %s before firing",
+                        instance_id,
+                    )
                 self._shortcut_since.pop(instance_id, None)
                 self._shortcut_fired.discard(instance_id)
                 continue
-            since = self._shortcut_since.setdefault(instance_id, now)
+            since = self._shortcut_since.get(instance_id)
+            if since is None:
+                since = self._shortcut_since.setdefault(instance_id, now)
+                logger.info(
+                    "Gamepad shortcut: Select+Y combination detected on device %s; "
+                    "holding for %.1fs",
+                    instance_id,
+                    self.SHORTCUT_HOLD_SECONDS,
+                )
             if instance_id in self._shortcut_fired or now - since < self.SHORTCUT_HOLD_SECONDS:
                 continue
             self._shortcut_fired.add(instance_id)
             self._mapper.suppress_view_release(instance_id)
+            logger.info(
+                "Gamepad shortcut: Select+Y held on device %s; emitting narrator_toggle",
+                instance_id,
+            )
             self.shortcutTriggered.emit("narrator_toggle")
 
     def _device(self, identifier: int | None) -> GamepadDevice | None:

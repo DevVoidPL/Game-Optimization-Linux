@@ -168,13 +168,17 @@ class NarratorController:
             return
         for game_key, game in tuple(self._watched.items()):
             running = strict(game_key)
+            if running is None:
+                # Unknown, not ended: a transient ps failure/timeout must not
+                # reset a game we already saw running. Keep the watch state so
+                # the session survives a momentary blind spot in the host list.
+                self._log_decision(game_key, "skipped, the process list is unavailable")
+                continue
             if running is not True:
                 if game_key in self._seen_since:
                     self._log_decision(game_key, "game process ended")
                 self._seen_since.pop(game_key, None)
                 self._autostart_done.discard(game_key)
-                if running is None:
-                    self._log_decision(game_key, "skipped, the process list is unavailable")
                 continue
             since = self._seen_since.setdefault(game_key, now)
             if since == now:
@@ -880,9 +884,26 @@ class NarratorController:
         game_key = str(getattr(event, "game_key", ""))
         if not game_key or game_key in self._capture_retry_session:
             return False
+        # Retry only while the game's own process is still running. If it has
+        # ended (or the process list says so), stop the Narrator silently: no
+        # portal prompt, no error toast, no retry.
+        running = None
+        strict = getattr(self._app._narrator_pipeline.activity, "game_process_running", None)
+        if callable(strict):
+            running = strict(game_key)
+        if running is False:
+            logger.info(
+                "Narrator capture: session closed for %s and the game has ended; "
+                "stopping silently",
+                game_key,
+            )
+            self._capture_retry_session.add(game_key)
+            self.stop()
+            return True
         self._capture_retry_session.add(game_key)
         logger.info(
-            "Narrator capture: session closed for %s; retrying once", game_key
+            "Narrator capture: session closed for %s (game still running); retrying once",
+            game_key,
         )
         if self.start(game.id, automatic=True):
             self._app._emit_toast("Capture session closed; retrying once", "info")

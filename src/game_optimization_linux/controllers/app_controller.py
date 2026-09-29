@@ -2454,6 +2454,7 @@ class AppController(QObject):
 
     @Slot(str)
     def _on_gamepad_shortcut(self, shortcut: str) -> None:
+        logger.info("Gamepad shortcut handler invoked: %s", shortcut)
         if shortcut == "narrator_toggle":
             self._narrator_controller.toggle_for_running_game()
 

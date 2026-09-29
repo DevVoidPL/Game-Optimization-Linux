@@ -194,7 +194,7 @@ def test_host_process_detection_is_throttled_and_matches_steam_reaper(tmp_path: 
     assert sandbox_without_host.supports(game) is False
 
 
-def test_gamepad_select_y_hold_emits_shortcut_once(monkeypatch) -> None:
+def test_gamepad_select_y_hold_emits_shortcut_once(monkeypatch, caplog) -> None:
     from game_optimization_linux.models import GamepadEvent
     from game_optimization_linux.providers import FakeGamepadProvider
     from game_optimization_linux.services import GamepadService
@@ -208,14 +208,18 @@ def test_gamepad_select_y_hold_emits_shortcut_once(monkeypatch) -> None:
     monkeypatch.setattr(gamepad_module.time, "monotonic", lambda: now[0])
     for control in ("back", "north"):
         provider.emit(GamepadEvent("button", 1, control, True, 1.0))
-    service.pollNow()
-    now[0] += 0.5
-    service.pollNow()
-    assert shortcuts == []
-    now[0] += 0.6
-    service.pollNow()
-    service.pollNow()
+    with caplog.at_level("INFO", logger="game_optimization_linux.services.gamepad"):
+        service.pollNow()
+        now[0] += 0.5
+        service.pollNow()
+        assert shortcuts == []
+        now[0] += 0.6
+        service.pollNow()
+        service.pollNow()
     assert shortcuts == ["narrator_toggle"]
+    messages = " ".join(record.getMessage() for record in caplog.records)
+    assert "combination detected" in messages          # detection stage logged
+    assert "emitting narrator_toggle" in messages       # firing stage logged
     provider.emit(GamepadEvent("button", 1, "back", False, 0.0))
     service.pollNow()
     assert "ContextAction1" not in actions and "context_action_1" not in actions
@@ -251,10 +255,12 @@ def test_strict_detection_matches_proton_wrapper_launched_game_exe(tmp_path: Pat
 
 
 def test_capture_closed_triggers_one_automatic_retry(narrator) -> None:
-    _controller, controller_narrator, _p, _c, _activity, game, _save = narrator
+    _controller, controller_narrator, _p, _c, activity, game, _save = narrator
     key = controller_narrator._game_key(game)
     starts: list[str] = []
+    stops: list[int] = []
     controller_narrator.start = lambda game_id, automatic=False: (starts.append(game_id) or True)
+    controller_narrator.stop = lambda: (stops.append(1) or True)
 
     class _Event:
         def __init__(self, status: str, message: str) -> None:
@@ -263,17 +269,40 @@ def test_capture_closed_triggers_one_automatic_retry(narrator) -> None:
             self.game_key = key
 
     closed = _Event("error", "The portal capture session closed")
-    # First closure retries once; a second identical closure does not.
+    # Game still running: retry once; a second identical closure does not.
+    activity.active = True
     assert controller_narrator._retry_after_capture_closed(closed, game) is True
     assert controller_narrator._retry_after_capture_closed(closed, game) is False
-    assert starts == [game.id]
+    assert starts == [game.id] and stops == []
     # A healthy session clears the guard, so a later closure can retry again.
     controller_narrator._capture_retry_session.discard(key)
     assert controller_narrator._retry_after_capture_closed(closed, game) is True
+    assert starts == [game.id, game.id]
+    # Game has ended: stop silently, no portal/start, no toast.
+    controller_narrator._capture_retry_session.discard(key)
+    activity.active = False
+    assert controller_narrator._retry_after_capture_closed(closed, game) is True
+    assert stops == [1] and starts == [game.id, game.id]
     # Unrelated errors are never retried.
+    controller_narrator._capture_retry_session.discard(key)
     other = _Event("error", "Screen capture stopped")
     assert controller_narrator._retry_after_capture_closed(other, game) is False
-    assert starts == [game.id, game.id]
+
+
+def test_unknown_process_list_does_not_end_a_watched_game(narrator) -> None:
+    controller, controller_narrator, _p, _c, activity, game, save = narrator
+    save()
+    clock = [100.0]
+    controller_narrator._clock = lambda: clock[0]
+    activity.active = True
+    controller_narrator.poll()                     # game seen running
+    key = controller_narrator._game_key(game)
+    assert key in controller_narrator._seen_since
+    activity.active = None                          # transient ps failure/timeout
+    clock[0] += 1.0
+    controller_narrator.poll()
+    # Unknown must not be treated as "ended": the watch state survives.
+    assert key in controller_narrator._seen_since
 
 
 def test_gamepad_navigation_is_gated_by_window_active_but_shortcut_is_not(narrator) -> None:
