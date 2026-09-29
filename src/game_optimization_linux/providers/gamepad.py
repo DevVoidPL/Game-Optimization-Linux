@@ -111,6 +111,19 @@ def _classify_gamepad(sdl_type: int, name: str) -> GamepadType:
     return GamepadType.UNKNOWN
 
 
+_STEAM_VENDOR_ID = 0x28DE
+_STEAM_VIRTUAL_PRODUCT_ID = 0x11FF
+
+
+def _is_steam_virtual_gamepad(name: str, vendor: int, product: int) -> bool:
+    """Steam Input's virtual controller (the pad games see while it runs)."""
+
+    return bool(
+        (vendor == _STEAM_VENDOR_ID and product == _STEAM_VIRTUAL_PRODUCT_ID)
+        or "steam virtual" in str(name).casefold()
+    )
+
+
 class SDL3GamepadProvider:
     """Bounded, non-blocking SDL event polling on the Qt main thread."""
 
@@ -122,6 +135,9 @@ class SDL3GamepadProvider:
         self._joystick_count = 0
         self._started = False
         self._closed = False
+        # Diagnostics only: devices whose Select/View (back) is held, so Y is
+        # logged at INFO only as part of a possible Select+Y shortcut.
+        self._back_held: set[int] = set()
         self._configure_abi()
 
     @staticmethod
@@ -228,13 +244,13 @@ class SDL3GamepadProvider:
         identifiers = self._library.SDL_GetGamepads(ctypes.byref(count))
         try:
             for index in range(max(0, count.value)):
-                self._open(int(identifiers[index]))
+                self._open(int(identifiers[index]), reason="present at start")
         finally:
             if identifiers:
                 self._library.SDL_free(ctypes.cast(identifiers, ctypes.c_void_p))
         return self.list_devices()
 
-    def _open(self, instance_id: int) -> GamepadDevice | None:
+    def _open(self, instance_id: int, *, reason: str = "connected") -> GamepadDevice | None:
         if instance_id in self._handles:
             return self._devices.get(instance_id)
         handle = self._library.SDL_OpenGamepad(instance_id)
@@ -284,13 +300,28 @@ class SDL3GamepadProvider:
             product or None,
         )
         self._devices[instance_id] = device
+        logger.info(
+            "Gamepad %s: name=%r vid:pid=%04x:%04x instance=%s steam_virtual=%s",
+            reason, name, vendor, product, instance_id,
+            _is_steam_virtual_gamepad(name, vendor, product),
+        )
         return device
 
-    def _remove(self, instance_id: int) -> None:
+    def _remove(self, instance_id: int, *, log: bool = True) -> None:
         handle = self._handles.pop(instance_id, None)
         if handle:
             self._library.SDL_CloseGamepad(handle)
-        self._devices.pop(instance_id, None)
+        device = self._devices.pop(instance_id, None)
+        self._back_held.discard(instance_id)
+        if log:
+            name = device.name if device else ""
+            vendor = (device.vendor_id or 0) if device else 0
+            product = (device.product_id or 0) if device else 0
+            logger.info(
+                "Gamepad disconnected: name=%r vid:pid=%04x:%04x instance=%s steam_virtual=%s",
+                name, vendor, product, instance_id,
+                _is_steam_virtual_gamepad(name, vendor, product),
+            )
 
     def poll_events(self, limit: int = 256) -> Sequence[GamepadEvent]:
         if not self._started or self._closed:
@@ -311,21 +342,28 @@ class SDL3GamepadProvider:
                 results.append(GamepadEvent("disconnected", identifier))
             elif event_type == SDL_EVENT_GAMEPAD_REMAPPED:
                 identifier = int(event.gdevice.which)
-                self._remove(identifier)
-                self._open(identifier)
+                self._remove(identifier, log=False)
+                self._open(identifier, reason="remapped")
                 results.append(GamepadEvent("remapped", identifier))
             elif event_type in {SDL_EVENT_GAMEPAD_BUTTON_DOWN, SDL_EVENT_GAMEPAD_BUTTON_UP}:
                 value = event.gbutton
                 control = _BUTTON_NAMES.get(int(value.button), f"button_{int(value.button)}")
                 pressed = event_type == SDL_EVENT_GAMEPAD_BUTTON_DOWN
-                if control in ("back", "north"):
-                    # Select (back) and Y (north) form the Narrator shortcut;
-                    # log the raw event so the whole chain is traceable.
+                instance = int(value.which)
+                if control == "back":
+                    # Select/View is the shortcut modifier: always log it.
+                    (self._back_held.add if pressed else self._back_held.discard)(instance)
+                    logger.info(
+                        "Gamepad raw button: device=%s control=back pressed=%s", instance, pressed
+                    )
+                elif control == "north" and instance in self._back_held:
+                    logger.info(
+                        "Gamepad raw button: device=%s control=north pressed=%s (Select held)",
+                        instance, pressed,
+                    )
+                elif control == "north":
                     logger.debug(
-                        "Gamepad raw shortcut button: device=%s control=%s pressed=%s",
-                        int(value.which),
-                        control,
-                        pressed,
+                        "Gamepad raw button: device=%s control=north pressed=%s", instance, pressed
                     )
                 results.append(GamepadEvent("button", int(value.which), control, pressed, 1.0 if pressed else 0.0, float(value.timestamp) / 1_000_000_000.0))
             elif event_type == SDL_EVENT_GAMEPAD_AXIS_MOTION:

@@ -1270,6 +1270,10 @@ def test_automatic_queue_starts_confirmed_service_plan_after_analysis(
         assert queued["confirmed"] is False
         assert queued["automatic_authorized"] is True
         assert queued["plan"].profile is CompressionProfile.AUTO
+        # No user is present for automatic compression: never a password
+        # prompt, also in Desktop Mode.
+        assert controller.interfaceMode == "desktop"
+        assert queued["interactive_measurement"] is False
     finally:
         controller.shutdown()
 

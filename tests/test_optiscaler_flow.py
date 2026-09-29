@@ -107,15 +107,17 @@ def test_conflict_needs_exact_confirmation_then_backs_up(setup_service, tmp_path
 
 
 @pytest.mark.parametrize(
-    ("error", "expected"),
+    ("make_error", "expected"),
     [
-        (OptiScalerRateLimitError("x", retry_at=time.time() + 600), "GitHub API rate limit reached; try again in 10 min"),
-        (OptiScalerNetworkError("down"), "Could not reach GitHub. Check the internet connection and try again"),
+        # A factory: retry_at must be computed when the test runs, not when
+        # pytest collects it (a long suite would otherwise see "2 min").
+        (lambda: OptiScalerRateLimitError("x", retry_at=time.time() + 600), "GitHub API rate limit reached; try again in 10 min"),
+        (lambda: OptiScalerNetworkError("down"), "Could not reach GitHub. Check the internet connection and try again"),
     ],
 )
-def test_online_failure_is_reported_and_never_uses_a_local_archive(setup_service, tmp_path, error, expected) -> None:
+def test_online_failure_is_reported_and_never_uses_a_local_archive(setup_service, tmp_path, make_error, expected) -> None:
     service, game, archive, _root = setup_service
-    controller = _controller(service, game, tmp_path, FakeClient(archive, error))
+    controller = _controller(service, game, tmp_path, FakeClient(archive, make_error()))
     controller._local_file_argument = lambda _value: pytest.fail("fell back to a local archive")
     try:
         status = _run(controller, game)

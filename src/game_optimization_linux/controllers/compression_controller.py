@@ -252,9 +252,12 @@ class CompressionController:
             )
             return False
         try:
-            # Couch Mode never pops up the Polkit password prompt on its own;
-            # the exact measurement is a separate, explicit action there.
-            interactive = self._app._interface_mode != "couch"
+            # Never pop up the Polkit password prompt on its own: not in Couch
+            # Mode and never for automatic compression (no user present), in
+            # any mode. The exact measurement is a separate, explicit action.
+            interactive = (
+                not automatic_authorized and self._app._interface_mode != "couch"
+            )
             task = self._app._task_service.enqueue_compression_plan(
                 game,
                 plan,

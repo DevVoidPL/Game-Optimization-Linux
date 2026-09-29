@@ -216,8 +216,13 @@ def test_narrator_ducking_is_reversible_and_idempotent() -> None:
     )
     narrator = NarratorController.__new__(NarratorController)
     narrator._app = app
+    narrator._clock = lambda: 0.0
     narrator._poll_component_jobs = lambda: None  # type: ignore[method-assign]
     narrator._poll_autostart = lambda: None  # type: ignore[method-assign]
+    # This test covers music ducking only; the capture retry and frame
+    # watchdog stages of poll() are exercised in test_narrator_autostart.
+    narrator._poll_capture_closed = lambda _now: None  # type: ignore[method-assign]
+    narrator._poll_frame_watchdog = lambda _now: None  # type: ignore[method-assign]
 
     NarratorController.poll(narrator)
     duck_event_count = len(music)
