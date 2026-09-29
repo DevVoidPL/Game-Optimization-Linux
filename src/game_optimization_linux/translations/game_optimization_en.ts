@@ -14375,6 +14375,30 @@ Current: %2</translation>
         <source>Save region</source>
         <translation>Save region</translation>
     </message>
+    <message>
+        <source>LB/RB: preset    D-pad/left stick: move    Right stick or L2/R2: size    A: save    B: cancel</source>
+        <translation>LB/RB: preset    D-pad/left stick: move    Right stick or L2/R2: size    A: save    B: cancel</translation>
+    </message>
+    <message>
+        <source>Bottom 20%</source>
+        <translation>Bottom 20%</translation>
+    </message>
+    <message>
+        <source>Bottom 30%</source>
+        <translation>Bottom 30%</translation>
+    </message>
+    <message>
+        <source>Center bottom</source>
+        <translation>Center bottom</translation>
+    </message>
+    <message>
+        <source>Full screen</source>
+        <translation>Full screen</translation>
+    </message>
+    <message>
+        <source>Preset: %1</source>
+        <translation>Preset: %1</translation>
+    </message>
 </context>
 <context>
     <name>SystemPage</name>

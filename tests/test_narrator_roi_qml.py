@@ -232,3 +232,52 @@ def test_capture_error_and_other_game_signals_do_not_change_roi(roi_runtime):
         "another-game", {"x": 0.2, "y": 0.4, "width": 0.5, "height": 0.25}
     )
     assert _page_region(page) == original
+
+
+def test_gamepad_drives_native_selector_even_when_main_window_inactive(roi_runtime):
+    """LB/RB presets, D-pad move, L2/R2 size and A save reach the selector
+    although the main window is hidden (inactive) behind it."""
+
+    controller, page, repository, _pipeline, capture, _executor, _ocr = roi_runtime
+    game_id = page.property("selectedGameId")
+    game_key = controller.getNarratorGameSettings(game_id)["gameKey"]
+    page.requestRegionPreview()
+    capture.frame_callback(_pixels(capture.requests[-1]))
+    coordinator = controller._narrator_region_selector
+    _wait_for(lambda: coordinator.active_window is not None)
+    window = coordinator.active_window
+    controller.setCouchWindowActive(False)          # main window hidden
+    navigated: list[str] = []
+    controller.gamepadAction.connect(navigated.append)
+    emit = controller._gamepad_service.actionTriggered.emit
+
+    emit("NextTab")                                  # first preset (no preset yet)
+    assert window.canvas.preset_id == "bottom_20"
+    emit("NextTab")
+    assert window.canvas.normalized_region().to_dict() == pytest.approx(
+        {"x": 0.0, "y": 0.70, "width": 1.0, "height": 0.30})
+    emit("NavigateUp")
+    assert window.canvas.normalized_region().y == pytest.approx(0.68)
+    emit("PageUp")                                   # L2 / right stick up: smaller
+    shrunk = window.canvas.normalized_region()
+    assert shrunk.height == pytest.approx(0.30 / 1.1)
+    assert window.canvas.preset_id == "" and window.gamepad_hint.text()
+    emit("Confirm")                                  # A saves
+    assert coordinator.active_window is None
+    assert repository.load(game_key).subtitle_region == shrunk
+    assert navigated == []                           # nothing leaked into the Couch UI
+
+
+def test_gamepad_b_cancels_native_selector(roi_runtime):
+    controller, page, repository, _pipeline, capture, _executor, _ocr = roi_runtime
+    game_id = page.property("selectedGameId")
+    game_key = controller.getNarratorGameSettings(game_id)["gameKey"]
+    before = repository.load(game_key).subtitle_region
+    page.requestRegionPreview()
+    capture.frame_callback(_pixels(capture.requests[-1]))
+    coordinator = controller._narrator_region_selector
+    _wait_for(lambda: coordinator.active_window is not None)
+    controller._gamepad_service.actionTriggered.emit("NavigateDown")
+    controller._gamepad_service.actionTriggered.emit("Back")
+    assert coordinator.active_window is None
+    assert repository.load(game_key).subtitle_region == before

@@ -14403,6 +14403,30 @@ Obecnie: %2</translation>
         <source>Save region</source>
         <translation>Zapisz obszar</translation>
     </message>
+    <message>
+        <source>LB/RB: preset    D-pad/left stick: move    Right stick or L2/R2: size    A: save    B: cancel</source>
+        <translation>LB/RB: preset    D-pad/lewa gałka: przesuń    Prawa gałka lub L2/R2: rozmiar    A: zapisz    B: anuluj</translation>
+    </message>
+    <message>
+        <source>Bottom 20%</source>
+        <translation>Dół 20%</translation>
+    </message>
+    <message>
+        <source>Bottom 30%</source>
+        <translation>Dół 30%</translation>
+    </message>
+    <message>
+        <source>Center bottom</source>
+        <translation>Środek-dół</translation>
+    </message>
+    <message>
+        <source>Full screen</source>
+        <translation>Cały ekran</translation>
+    </message>
+    <message>
+        <source>Preset: %1</source>
+        <translation>Preset: %1</translation>
+    </message>
 </context>
 <context>
     <name>SystemPage</name>

@@ -14342,6 +14342,30 @@ Current: %2</source>
         <source>Save region</source>
         <translation>Guardar región</translation>
     </message>
+    <message>
+        <source>LB/RB: preset    D-pad/left stick: move    Right stick or L2/R2: size    A: save    B: cancel</source>
+        <translation>LB/RB: preajuste    Cruceta/stick izquierdo: mover    Stick derecho o L2/R2: tamaño    A: guardar    B: cancelar</translation>
+    </message>
+    <message>
+        <source>Bottom 20%</source>
+        <translation>Inferior 20 %</translation>
+    </message>
+    <message>
+        <source>Bottom 30%</source>
+        <translation>Inferior 30 %</translation>
+    </message>
+    <message>
+        <source>Center bottom</source>
+        <translation>Centro inferior</translation>
+    </message>
+    <message>
+        <source>Full screen</source>
+        <translation>Pantalla completa</translation>
+    </message>
+    <message>
+        <source>Preset: %1</source>
+        <translation>Preajuste: %1</translation>
+    </message>
 </context>
 <context>
     <name>SystemPage</name>

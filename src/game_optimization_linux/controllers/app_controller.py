@@ -2448,6 +2448,7 @@ class AppController(QObject):
         if (
             self._settings_model.controller_mode is ControllerMode.AUTOMATIC
             and self._interface_mode == "desktop"
+            and self._narrator_region_selector.active_window is None
         ):
             self._set_interface_mode("couch")
             self._consume_gamepad_action = str(action)
@@ -2459,6 +2460,14 @@ class AppController(QObject):
             logger.info("Gamepad shortcut %s handled: result=%s", shortcut, bool(result))
 
     def _on_gamepad_action(self, action: str) -> None:
+        # While the native subtitle-region selector is open it owns the pad,
+        # whatever the interface mode or main-window focus (the main window is
+        # hidden behind the selector, so _window_active is False then).
+        if self._narrator_region_selector.active_window is not None:
+            normalized = normalize_gamepad_action(action)
+            if normalized is not None:
+                self._narrator_region_selector.handle_gamepad_action(normalized.value)
+            return
         if self._consume_gamepad_action and action == self._consume_gamepad_action:
             self._consume_gamepad_action = ""
             return
