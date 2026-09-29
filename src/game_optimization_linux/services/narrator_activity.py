@@ -61,6 +61,12 @@ class NarratorGameActivityDetector:
         self._strict_cache: dict[str, tuple[float, bool | None]] = {}
         self._commands_cache: tuple[float, tuple[str, ...] | None] | None = None
         self.probe_count = 0
+        # Bumped once per freshly read process list (not on cache hits).
+        self.commands_generation = 0
+        # Diagnostics for "ended": why the last strict read was negative and
+        # the last command line that matched the game.
+        self.last_reason: dict[str, str] = {}
+        self.last_match: dict[str, str] = {}
 
     @property
     def can_observe_processes(self) -> bool:
@@ -104,10 +110,25 @@ class NarratorGameActivityDetector:
             return cached[1]
         game = self._game_loader(game_key)
         commands = self._commands() if game is not None else None
-        result = (
-            None if commands is None
-            else any(self._is_game_executable(game, line) for line in commands)
-        )
+        result: bool | None
+        if commands is None:
+            result = None
+            self.last_reason[game_key] = (
+                "game not in the library" if game is None
+                else "process list unavailable (None)"
+            )
+        elif not commands:
+            result = False
+            self.last_reason[game_key] = "empty process list"
+        else:
+            matched = next(
+                (line for line in commands if self._is_game_executable(game, line)), None
+            )
+            result = matched is not None
+            if matched is not None:
+                self.last_match[game_key] = matched
+            else:
+                self.last_reason[game_key] = f"no matching process in {len(commands)} lines"
         self._strict_cache[game_key] = (now, result)
         return result
 
@@ -126,6 +147,7 @@ class NarratorGameActivityDetector:
         else:
             commands = self._native_commands()
         self._commands_cache = (now, commands)
+        self.commands_generation += 1
         return commands
 
     def _probe(self, game_key: str) -> bool | None:

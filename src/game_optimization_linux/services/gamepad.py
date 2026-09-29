@@ -445,6 +445,11 @@ class GamepadService(QObject):
                     held.add(event.control)
                     self._fire_shortcut(event.instance_id, time.monotonic())
                     continue
+                if event.pressed and event.control == self.SHORTCUT_MODIFIER:
+                    logger.info(
+                        "Gamepad shortcut: Select held on device %s (press Y for the Narrator)",
+                        event.instance_id,
+                    )
                 (held.add if event.pressed else held.discard)(event.control)
             meaningful = self._mapper.is_meaningful(event)
             actions = self._mapper.process(event)

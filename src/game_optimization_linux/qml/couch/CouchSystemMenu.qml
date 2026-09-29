@@ -131,8 +131,8 @@ CouchOverlayFrame {
                     focusSelected()
                     playSemanticSound("confirm")
                 } else if (controller) {
-                    controller.requestWindowAction("close")
                     playSemanticSound("confirm")
+                    controller.requestWindowAction("close")
                 } else {
                     playSemanticSound("error")
                 }
@@ -160,8 +160,12 @@ CouchOverlayFrame {
             if (!selectedEntry) {
                 playSemanticSound("error")
             } else {
-                activate()
+                // Sound first: activate() may switch to Desktop Mode, which
+                // destroys this Couch item before a later call could run.
                 playSemanticSound(selectedEntry.id === "quit" ? "open" : "confirm")
+                activate()
+                if (selectedEntry.id === "desktop")
+                    return
             }
         }
         if (navigation && visible && !quitConfirmationOpen)

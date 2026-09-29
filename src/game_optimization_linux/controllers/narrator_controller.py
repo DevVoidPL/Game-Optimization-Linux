@@ -29,21 +29,19 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Autostart delay after the game's own process is detected. Games may show a
-# small launcher/splash window first; the delay is learned per game from the
-# last session that lasted (detection -> start of a session > 90 s) plus a
-# margin. Unknown games use the default; the value is always capped.
-AUTOSTART_DEFAULT_DELAY_SECONDS = 30.0
-AUTOSTART_LEARNED_MARGIN_SECONDS = 5.0
-AUTOSTART_MAX_DELAY_SECONDS = 90.0
+# Autostart waits this long after the game's own process is detected.
+AUTOSTART_DELAY_SECONDS = 15.0
 # A session that lasts this long counts as "on the real game window".
 LASTING_SESSION_SECONDS = 90.0
 # After "capture session closed": wait, re-check the process, then decide.
 CAPTURE_CLOSED_RECHECK_SECONDS = 8.0
+# No capture frame this long after the session became active: restart once.
+FRAME_WATCHDOG_SECONDS = 10.0
+# Consecutive negative process reads (each on a fresh list) before "ended".
+ENDED_CONFIRMATIONS = 2
 WATCH_REFRESH_SECONDS = 15.0
 # How often the autostart watcher logs a liveness heartbeat.
 HEARTBEAT_SECONDS = 30.0
-_AUTOSTART_DELAYS_FILE_NAME = "narrator-autostart-delays-v1.json"
 
 
 class NarratorController:
@@ -74,11 +72,15 @@ class NarratorController:
         # game_key -> monotonic time when "capture session closed" must be
         # re-checked (the game may be switching from a splash window).
         self._capture_closed_pending: dict[str, float] = {}
-        # game_key -> (session start time, seconds since process detection or
-        # None for a start without a detected process).
-        self._session_started: dict[str, tuple[float, float | None]] = {}
-        self._delay_learned: set[str] = set()
-        self._autostart_delays: Any = None
+        # game_key -> (session start time, started automatically).
+        self._session_started: dict[str, tuple[float, bool]] = {}
+        # Frame watchdog for the current session: (game_key, deadline, frames
+        # at arming) once capture is active; one silent restart per game.
+        self._frame_watchdog: tuple[str, float, int] | None = None
+        self._watchdog_restarted: set[str] = set()
+        # "Ended" needs consecutive negative reads on distinct process lists.
+        self._negative_reads: dict[str, int] = {}
+        self._last_probe: dict[str, object] = {}
         self._clock = time.monotonic
 
     # -- voice ------------------------------------------------------------------
@@ -167,61 +169,34 @@ class NarratorController:
             ", ".join(sorted(self._watched)) or "none",
         )
 
-    def _delay_repository(self) -> Any:
-        """Learned delays live next to the per-game settings directory."""
+    def _read_game_process(self, game_key: str, strict: Any) -> bool | None:
+        """True running, False ended (confirmed), None not decided yet.
 
-        if self._autostart_delays is None:
-            from game_optimization_linux.services.narrator_persistence import (
-                AutostartDelayRepository,
-            )
+        A negative read (no match, empty list or unavailable list) counts only
+        when it comes from a fresh process list; ENDED_CONFIRMATIONS of them in
+        a row are needed before the game counts as ended.
+        """
 
-            root = getattr(self._app._narrator_settings_repository, "root", None)
-            self._autostart_delays = (
-                AutostartDelayRepository(root.parent / _AUTOSTART_DELAYS_FILE_NAME)
-                if root is not None
-                else False
-            )
-        return self._autostart_delays or None
+        activity = self._app._narrator_pipeline.activity
+        running = strict(game_key)
+        if running is True:
+            self._negative_reads.pop(game_key, None)
+            return True
+        probe = getattr(activity, "commands_generation", None)
+        fresh = probe is None or self._last_probe.get(game_key) != probe
+        self._last_probe[game_key] = probe
+        count = self._negative_reads.get(game_key, 0) + (1 if fresh else 0)
+        self._negative_reads[game_key] = count
+        return False if count >= ENDED_CONFIRMATIONS else None
 
-    def _autostart_delay(self, game_key: str) -> tuple[float, str]:
-        repository = self._delay_repository()
-        learned = None
-        if repository is not None:
-            try:
-                learned = repository.load(game_key)
-            except Exception as error:
-                logger.warning("Could not read the learned autostart delay: %s", error)
-        if learned is None:
-            return AUTOSTART_DEFAULT_DELAY_SECONDS, "default"
-        delay = min(AUTOSTART_MAX_DELAY_SECONDS, learned + AUTOSTART_LEARNED_MARGIN_SECONDS)
-        return delay, f"learned {learned:.0f} s + {AUTOSTART_LEARNED_MARGIN_SECONDS:.0f} s"
-
-    def _track_lasting_session(self, now: float) -> None:
-        """Learn the detection->start delay once a session lasts > 90 s."""
-
-        pipeline = self._app._narrator_pipeline
-        if not pipeline.active:
-            return
-        game_key = pipeline.snapshot.game_key
-        started = self._session_started.get(game_key)
-        if started is None or game_key in self._delay_learned:
-            return
-        started_at, since_detection = started
-        if now - started_at < LASTING_SESSION_SECONDS or since_detection is None:
-            return
-        self._delay_learned.add(game_key)
-        repository = self._delay_repository()
-        if repository is None:
-            return
-        try:
-            repository.save(game_key, since_detection)
-        except Exception as error:
-            logger.warning("Could not save the learned autostart delay: %s", error)
-            return
-        logger.info(
-            "Narrator autostart: %s: session lasted > %.0f s; learned delay %.0f s "
-            "from process detection",
-            game_key, LASTING_SESSION_SECONDS, since_detection,
+    def _log_ended(self, game_key: str) -> None:
+        activity = self._app._narrator_pipeline.activity
+        reason = getattr(activity, "last_reason", {}).get(game_key, "unknown")
+        matched = getattr(activity, "last_match", {}).get(game_key, "")
+        self._log_decision(
+            game_key,
+            f"game process ended after {ENDED_CONFIRMATIONS} negative reads "
+            f"(reason: {reason}; last matched line: {matched[:200] or 'none'})",
         )
 
     def _poll_autostart(self) -> None:
@@ -229,36 +204,48 @@ class NarratorController:
         now = self._clock()
         self._refresh_watch(now)
         self._log_heartbeat(now, pipeline)
-        if pipeline.active:
-            # A running session (manual or automatic) is not restarted after
-            # the user stops it while the game still runs.
-            self._autostart_done.add(pipeline.snapshot.game_key)
-            return
         strict = getattr(pipeline.activity, "game_process_running", None)
         if not callable(strict):
             return
+        active_key = pipeline.snapshot.game_key if pipeline.active else ""
+        if active_key:
+            # A running session (manual or automatic) is not restarted after
+            # the user stops it while the game still runs.
+            self._autostart_done.add(active_key)
         for game_key, game in tuple(self._watched.items()):
-            running = strict(game_key)
-            if running is None:
-                # Unknown, not ended: a transient ps failure/timeout must not
-                # reset a game we already saw running. Keep the watch state so
-                # the session survives a momentary blind spot in the host list.
-                self._log_decision(game_key, "skipped, the process list is unavailable")
+            if active_key and game_key != active_key:
                 continue
-            if running is not True:
+            running = self._read_game_process(game_key, strict)
+            if running is None:
+                continue          # not confirmed either way; keep the state
+            if running is False:
                 if game_key in self._seen_since:
-                    self._log_decision(game_key, "game process ended")
+                    self._log_ended(game_key)
                 self._seen_since.pop(game_key, None)
                 self._autostart_done.discard(game_key)
+                if game_key == active_key:
+                    if self._session_started.get(game_key, (0.0, False))[1]:
+                        logger.info(
+                            "Narrator autostart: %s: stopping the automatic session, the game ended",
+                            game_key,
+                        )
+                        self.stop()
+                    else:
+                        logger.info(
+                            "Narrator autostart: %s: session was started manually; keeping it",
+                            game_key,
+                        )
+                continue
+            if game_key == active_key:
+                self._seen_since.setdefault(game_key, now)
                 continue
             since = self._seen_since.setdefault(game_key, now)
-            delay, source = self._autostart_delay(game_key)
             if since == now:
                 self._log_decision(
                     game_key,
-                    f"game process detected, waiting {delay:.0f} s ({source}) for its window",
+                    f"game process detected, waiting {AUTOSTART_DELAY_SECONDS:.0f} s for its window",
                 )
-            if game_key in self._autostart_done or now - since < delay:
+            if game_key in self._autostart_done or now - since < AUTOSTART_DELAY_SECONDS:
                 continue
             self._autostart_done.add(game_key)
             try:
@@ -701,9 +688,8 @@ class NarratorController:
             self._app.narratorChanged.emit(game.id)
             return False
         now = self._clock()
-        seen = self._seen_since.get(game_key)
-        self._session_started[game_key] = (now, None if seen is None else now - seen)
-        self._delay_learned.discard(game_key)
+        self._session_started[game_key] = (now, bool(automatic))
+        self._frame_watchdog = None
         self._app.narratorChanged.emit(game.id)
         return True
 
@@ -910,7 +896,8 @@ class NarratorController:
 
     def poll(self) -> None:
         self._poll_component_jobs()
-        self._app._narrator_pipeline.poll_game_activity()
+        # Game-exit autostop is decided in _poll_autostart (confirmed "ended",
+        # automatic sessions only), not by the pipeline's single probe.
         self._poll_autostart()
         changed: set[str] = set()
         fresh = getattr(getattr(self._app._narrator_pipeline, "capture", None), "fresh_selections", None)
@@ -935,7 +922,7 @@ class NarratorController:
             self._app.narratorChanged.emit(game_id)
         now = self._clock()
         self._poll_capture_closed(now)
-        self._track_lasting_session(now)
+        self._poll_frame_watchdog(now)
         snapshot = self._app._narrator_pipeline.snapshot
         self._app._ui_sound_service.set_music_ducked(
             snapshot.status.value == "speaking"
@@ -1002,7 +989,8 @@ class NarratorController:
                     "(< %.0f s, window change); retrying once with the saved window",
                     game_key, duration, LASTING_SESSION_SECONDS,
                 )
-                if self.start(game.id, automatic=True):
+                automatic = self._session_started.get(game_key, (0.0, True))[1]
+                if self.start(game.id, automatic=automatic):
                     self._app._emit_toast("Capture session closed; retrying once", "info")
                 continue
             reason = (
@@ -1015,6 +1003,51 @@ class NarratorController:
                 "Narrator capture: %s: no retry, %s; stopping silently", game_key, reason
             )
             self.stop()
+
+    def _poll_frame_watchdog(self, now: float) -> None:
+        """No frame FRAME_WATCHDOG_SECONDS after capture became active: restart
+        once, silently, with the saved window token."""
+
+        pipeline = self._app._narrator_pipeline
+        snapshot = pipeline.snapshot
+        capture = getattr(pipeline, "capture", None)
+        frames = getattr(capture, "frames_received", None)
+        if (
+            not pipeline.active
+            or getattr(snapshot, "capture_state", "") != "active"
+            or not isinstance(frames, int)
+        ):
+            self._frame_watchdog = None
+            return
+        game_key = snapshot.game_key
+        watchdog = self._frame_watchdog
+        if watchdog is None or watchdog[0] != game_key:
+            self._frame_watchdog = (game_key, now + FRAME_WATCHDOG_SECONDS, frames)
+            return
+        _key, deadline, baseline = watchdog
+        if frames > baseline:
+            self._watchdog_restarted.discard(game_key)   # frames flow: healthy
+            self._frame_watchdog = (game_key, float("inf"), frames)
+            return
+        if now < deadline:
+            return
+        self._frame_watchdog = (game_key, float("inf"), frames)
+        game = self._game_for_key(game_key)
+        if game is None or game_key in self._watchdog_restarted:
+            logger.info(
+                "Narrator capture: %s: no frames %.0f s after start; already restarted once",
+                game_key, FRAME_WATCHDOG_SECONDS,
+            )
+            return
+        self._watchdog_restarted.add(game_key)
+        automatic = self._session_started.get(game_key, (0.0, True))[1]
+        logger.info(
+            "Narrator capture: %s: no frames %.0f s after start; restarting once "
+            "silently with the saved window",
+            game_key, FRAME_WATCHDOG_SECONDS,
+        )
+        pipeline.stop()
+        self.start(game.id, automatic=automatic)
 
     def _component_action(self, action: str, component_id: str) -> bool:
         if component_id in self._component_jobs:

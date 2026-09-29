@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import json
 from pathlib import Path
 
 import pytest
@@ -117,18 +116,19 @@ def test_autostart_waits_for_stable_game_process_then_autostops(narrator) -> Non
     controller_narrator.poll()                     # game started outside GameOpti
     activity.active = True
     controller_narrator.poll()
-    clock[0] += 25.0
+    clock[0] += 10.0
     controller_narrator.poll()
-    assert not pipeline.active                     # default 30 s delay not reached
+    assert not pipeline.active                     # fixed 15 s delay not reached
     clock[0] += 6.0
     controller_narrator.poll()
     assert pipeline.active and capture.requests    # started with the game
     assert controller.getNarratorSessionState(game.id)["cardState"] == "running"
     activity.active = False
     controller_narrator.poll()
+    assert pipeline.active                         # one negative read is not "ended"
     clock[0] += 3.0
     controller_narrator.poll()
-    assert not pipeline.active                     # stopped after the game exited
+    assert not pipeline.active                     # automatic session stopped after 2 reads
 
 
 def test_manual_stop_is_not_undone_and_gamepad_shortcut_toggles(narrator) -> None:
@@ -284,7 +284,7 @@ def test_capture_closed_rechecks_after_8s_and_retries_only_short_sessions(narrat
     closed = _Event("The portal capture session closed")
 
     def close_after(session_seconds: float) -> None:
-        controller_narrator._session_started[key] = (clock[0] - session_seconds, None)
+        controller_narrator._session_started[key] = (clock[0] - session_seconds, True)
         assert controller_narrator._retry_after_capture_closed(closed, game) is True
 
     # Splash -> main window: short session, game still running after 8 s.
@@ -319,27 +319,91 @@ def test_capture_closed_rechecks_after_8s_and_retries_only_short_sessions(narrat
     assert controller_narrator._retry_after_capture_closed(_Event("Screen capture stopped"), game) is False
 
 
-def test_autostart_delay_is_learned_from_a_lasting_session(narrator, tmp_path: Path) -> None:
+def test_ended_needs_two_fresh_reads_and_never_stops_a_manual_session(narrator) -> None:
     _controller, controller_narrator, pipeline, _c, activity, game, save = narrator
     save()
     key = controller_narrator._game_key(game)
     clock = [100.0]
     controller_narrator._clock = pipeline._clock = lambda: clock[0]
-    assert controller_narrator._autostart_delay(key) == (30.0, "default")
     activity.active = True
-    controller_narrator.poll()                      # process detected at t=100
-    clock[0] += 31.0
-    controller_narrator.poll()                      # autostart at +31 s
-    assert pipeline.active
-    clock[0] += 91.0
-    controller_narrator.poll()                      # the session lasted > 90 s
-    stored = json.loads((tmp_path / "narrator-autostart-delays-v1.json").read_text())
-    assert stored["delays"][key] == 31.0
-    delay, source = controller_narrator._autostart_delay(key)
-    assert delay == 36.0 and source.startswith("learned")
-    # The learned value is always capped.
-    controller_narrator._delay_repository().save(key, 200.0)
-    assert controller_narrator._autostart_delay(key)[0] == 90.0
+    activity.commands_generation = 1
+    controller_narrator.poll()
+    assert controller_narrator.start(game.id) and pipeline.active   # manual start
+    activity.active = False
+    for _ in range(3):                             # same process list: one read
+        clock[0] += 1.0
+        controller_narrator.poll()
+    assert key in controller_narrator._seen_since and pipeline.active
+    activity.commands_generation = 2               # second fresh negative list
+    clock[0] += 4.0
+    controller_narrator.poll()
+    assert key not in controller_narrator._seen_since   # confirmed "ended"
+    assert pipeline.active                         # the manual session keeps running
+
+
+def test_frame_watchdog_restarts_once_silently(narrator) -> None:
+    controller, controller_narrator, pipeline, capture, activity, game, save = narrator
+    save()
+    clock = [100.0]
+    controller_narrator._clock = pipeline._clock = lambda: clock[0]
+    activity.active = True
+    starts: list[bool] = []
+    real_start = controller_narrator.start
+
+    def start(game_id, automatic=False):
+        starts.append(automatic)
+        return real_start(game_id, automatic=automatic)
+
+    controller_narrator.start = start
+    toasts: list[str] = []
+    controller._emit_toast = lambda message, kind: toasts.append(kind)
+    capture.frames_received = 0
+    assert controller_narrator.start(game.id, automatic=True)
+    pipeline._snapshot = replace(pipeline._snapshot, capture_state="active")
+    controller_narrator.poll()                     # armed
+    clock[0] += 9.0
+    controller_narrator.poll()
+    assert starts == [True]                        # not before 10 s
+    clock[0] += 2.0
+    controller_narrator.poll()
+    assert starts == [True, True] and pipeline.active   # one silent restart
+    pipeline._snapshot = replace(pipeline._snapshot, capture_state="active")
+    controller_narrator.poll()
+    clock[0] += 11.0
+    controller_narrator.poll()
+    assert starts == [True, True]                  # never a second restart
+    assert "error" not in toasts
+
+
+def test_gamepad_real_select_y_sequence_fires_shortcut(monkeypatch) -> None:
+    """back down, ~0.5 s, north down, north up < 100 ms, back up."""
+
+    from game_optimization_linux.models import GamepadDevice, GamepadEvent, GamepadType
+    from game_optimization_linux.providers import FakeGamepadProvider
+    from game_optimization_linux.services import GamepadService
+    import game_optimization_linux.services.gamepad as gamepad_module
+
+    provider = FakeGamepadProvider((GamepadDevice(0, "Pad", GamepadType.XBOX),))
+    service = GamepadService(provider)
+    service.start()
+    now = [200.0]
+    monkeypatch.setattr(gamepad_module.time, "monotonic", lambda: now[0])
+    shortcuts, actions = [], []
+    service.shortcutTriggered.connect(shortcuts.append)
+    service.actionTriggered.connect(actions.append)
+
+    def step(control: str, pressed: bool, dt: float) -> None:
+        now[0] += dt
+        provider.emit(GamepadEvent("button", 0, control, pressed, 1.0 if pressed else 0.0, now[0]))
+        service.pollNow()
+
+    step("back", True, 0.0)
+    step("north", True, 0.5)
+    step("north", False, 0.08)
+    step("back", False, 0.3)
+    service.stop()
+    assert shortcuts == ["narrator_toggle"]
+    assert not {"MoreActions", "ContextAction1"} & set(actions)
 
 
 def test_unknown_process_list_does_not_end_a_watched_game(narrator) -> None:
