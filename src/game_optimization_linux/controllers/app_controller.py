@@ -140,6 +140,7 @@ from ..services import (
     uses_flatpak_steam,
 )
 from ..services.library_cache import LibraryCache
+from ..services.system_usage import SystemUsageMonitor, format_memory
 from ..services.optiscaler_online import (
     CachedOptiScalerArchive,
     OptiScalerRelease,
@@ -302,6 +303,7 @@ class AppController(QObject):
     controllersChanged = Signal()
     activeControllerChanged = Signal()
     interfaceModeChanged = Signal()
+    systemUsageChanged = Signal()
     mangoHudProfileChanged = Signal(str)
     optiScalerChanged = Signal(str)
     # QVariantMap (not ``object``): QML must be able to read the result.
@@ -733,6 +735,10 @@ class AppController(QObject):
         self._ui_sound_service.set_enabled(self._settings_model.interface_sounds)
         self._configure_couch_audio()
         self._gamepad_service = gamepad_service or GamepadService(parent=self)
+        # Couch header CPU/GPU/RAM: samples only while enabled and visible.
+        self._system_usage = SystemUsageMonitor(parent=self)
+        self._system_usage.set_enabled(self._settings_model.couch_show_system_usage)
+        self._system_usage.changed.connect(self.systemUsageChanged)
         self._couch_navigation = CouchNavigationController(self)
         self._gamepad_service.availabilityChanged.connect(
             self._on_gamepad_availability_changed
@@ -1157,6 +1163,31 @@ class AppController(QObject):
     @Property(str, notify=interfaceModeChanged)
     def interfaceMode(self) -> str:
         return self._interface_mode
+
+    @Property("QVariantMap", notify=systemUsageChanged)
+    def systemUsage(self) -> dict[str, Any]:
+        """Only metrics that were really read; missing ones are absent."""
+
+        usage = self._system_usage.usage
+        values: dict[str, Any] = {}
+        if usage.cpu_percent is not None:
+            values["cpuPercent"] = usage.cpu_percent
+        if usage.gpu_percent is not None:
+            values["gpuPercent"] = usage.gpu_percent
+        if usage.memory_used_bytes is not None and usage.memory_total_bytes:
+            language = str(self._settings_model.language).casefold()
+            values["memoryText"] = format_memory(
+                usage.memory_used_bytes,
+                usage.memory_total_bytes,
+                decimal_comma=language.startswith(("pl", "pol", "es", "spa")),
+            )
+        return values
+
+    @Slot(bool)
+    def setCouchVisible(self, visible: bool) -> None:
+        """Couch UI shown on screen (not minimised); drives usage sampling."""
+
+        self._system_usage.set_visible(bool(visible))
 
     @Slot(result=bool)
     def toggleInterfaceMode(self) -> bool:
@@ -2248,6 +2279,7 @@ class AppController(QObject):
         if self._shutdown_requested:
             return
         self._shutdown_requested = True
+        self._system_usage.stop()
         if hasattr(self, "_task_timer") and self._task_timer.isActive():
             self._task_timer.stop()
         for timer_name in ("_scan_debounce_timer", "_ignored_scan_event_timer"):

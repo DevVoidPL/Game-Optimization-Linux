@@ -79,6 +79,12 @@ ApplicationWindow {
                                             && visible
                                             && visibility !== Window.Minimized
                                             && active)
+        // System-usage sampling follows visibility, not keyboard focus.
+        if (controller && controller.setCouchVisible)
+            controller.setCouchVisible(interfaceMode === "couch"
+                                       && visible
+                                       && visibility !== Window.Minimized
+                                       && visibility !== Window.Hidden)
     }
 
     onInterfaceModeChanged: Qt.callLater(synchronizeWindowMode)

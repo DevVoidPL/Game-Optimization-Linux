@@ -126,6 +126,8 @@ class AppSettings:
     navigation_repeat_rate_ms: int = 110
     hide_cursor_in_couch_mode: bool = True
     start_couch_mode_fullscreen: bool = True
+    # Couch header CPU/GPU/RAM indicator.
+    couch_show_system_usage: bool = True
     post_launch_behavior: PostLaunchBehavior = PostLaunchBehavior.MINIMIZE
     interface_sounds: bool = False
     couch_menu_sounds_enabled: bool = True
@@ -246,6 +248,7 @@ class AppSettings:
         for value, field_name in (
             (self.hide_cursor_in_couch_mode, "hide_cursor_in_couch_mode"),
             (self.start_couch_mode_fullscreen, "start_couch_mode_fullscreen"),
+            (self.couch_show_system_usage, "couch_show_system_usage"),
             (self.interface_sounds, "interface_sounds"),
             (self.couch_menu_sounds_enabled, "couch_menu_sounds_enabled"),
             (self.couch_music_enabled, "couch_music_enabled"),
@@ -304,6 +307,7 @@ class AppSettings:
             "navigation_repeat_rate_ms": self.navigation_repeat_rate_ms,
             "hide_cursor_in_couch_mode": self.hide_cursor_in_couch_mode,
             "start_couch_mode_fullscreen": self.start_couch_mode_fullscreen,
+            "couch_show_system_usage": self.couch_show_system_usage,
             "post_launch_behavior": self.post_launch_behavior.value,
             "interface_sounds": self.interface_sounds,
             "couch_menu_sounds_enabled": self.couch_menu_sounds_enabled,
@@ -509,6 +513,11 @@ class AppSettings:
                 data,
                 "start_couch_mode_fullscreen",
                 defaults.start_couch_mode_fullscreen,
+            ),
+            couch_show_system_usage=_read_bool(
+                data,
+                "couch_show_system_usage",
+                defaults.couch_show_system_usage,
             ),
             post_launch_behavior=post_launch_behavior,
             interface_sounds=_read_bool(

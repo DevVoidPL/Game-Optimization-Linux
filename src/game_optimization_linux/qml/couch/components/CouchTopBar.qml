@@ -6,8 +6,8 @@ import "../.." as App
 // Compact Couch Mode header. All user-visible strings are supplied by the
 // owner (CouchMain) so they stay in its translation context.
 //
-// Right side, in order: active input device, a reserved slot for real system
-// telemetry (empty and invisible until a provider exists), and the clock.
+// Right side, in order: active input device, real system telemetry chips
+// (hidden when disabled or unreadable), and the clock.
 // Settings live in the bottom navigation, so there is no duplicate here.
 Rectangle {
     id: bar
@@ -19,11 +19,14 @@ Rectangle {
     property string sectionTitle: ""
     property string inputLabel: ""
     property bool inputIsController: false
-    // Future CPU/GPU/RAM chips are placed into this slot by the owner.
+    // CPU/GPU/RAM chips are placed into this slot by the owner, which also
+    // says whether any of them is shown. (A visibleChildren check cannot work:
+    // children of an invisible slot report visible=false themselves.)
     default property alias telemetry: telemetrySlot.data
+    property bool telemetryShown: false
     property date now: new Date()
     readonly property string clockText: Qt.formatTime(now, "HH:mm")
-    readonly property bool telemetryVisible: telemetrySlot.visibleChildren.length > 0
+    readonly property bool telemetryVisible: telemetryShown
 
     implicitHeight: 84 * couchScale
     color: "transparent"

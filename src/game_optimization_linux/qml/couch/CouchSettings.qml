@@ -80,6 +80,7 @@ FocusScope {
         { "id": "repeat-rate", "category": "controller", "title": qsTr("Navigation repeat interval"), "value": qsTr("%1 ms").arg(Number(setting("navigationRepeatRateMs", 110))), "enabled": true, "description": qsTr("Time between repeated navigation steps.") },
         { "id": "cursor", "category": "controller", "title": qsTr("Hide cursor in Couch Mode"), "value": boolLabel(setting("hideCursorInCouchMode", true)), "enabled": true, "description": qsTr("The cursor returns after meaningful mouse movement.") },
         { "id": "fullscreen", "category": "controller", "title": qsTr("Start Couch Mode fullscreen"), "value": boolLabel(setting("startCouchModeFullscreen", true)), "enabled": true, "description": qsTr("Use the whole display when Couch Mode opens.") },
+        { "id": "system-usage", "category": "controller", "title": qsTr("Show CPU/GPU/RAM usage"), "value": boolLabel(setting("couchShowSystemUsage", true)), "enabled": true, "description": qsTr("Show real processor, graphics and memory usage next to the clock. Values that cannot be read stay hidden.") },
         { "id": "post-launch", "category": "controller", "title": qsTr("After launching a game"), "value": enumLabel(setting("postLaunchBehavior", "Minimize")), "enabled": true, "description": qsTr("Choose what the GameOpti window should do.") },
 
         { "id": "menu-sounds", "category": "audio", "title": qsTr("Enable menu sounds"), "value": boolLabel(setting("couchMenuSoundsEnabled", true)), "enabled": true, "description": qsTr("Play subtle semantic feedback in Couch Mode.") },
@@ -193,7 +194,7 @@ FocusScope {
     // Control type of a row, from its stable id.
     function rowKind(row) {
         var id = String(row && row.id || "")
-        if (["automatic-updates", "auto-notify", "swap", "cursor", "fullscreen", "menu-sounds",
+        if (["automatic-updates", "auto-notify", "swap", "cursor", "fullscreen", "system-usage", "menu-sounds",
              "music", "steam-tools", "experimental", "narrator-global-enabled"].indexOf(id) >= 0)
             return "bool"
         if (["auto-libraries", "auto-skipped", "steam-paths", "game-paths",
@@ -797,6 +798,8 @@ FocusScope {
             saveAdjusted("hideCursorInCouchMode", setting("hideCursorInCouchMode", true) !== true)
         else if (id === "fullscreen")
             saveAdjusted("startCouchModeFullscreen", setting("startCouchModeFullscreen", true) !== true)
+        else if (id === "system-usage")
+            saveAdjusted("couchShowSystemUsage", setting("couchShowSystemUsage", true) !== true)
         else if (id === "post-launch")
             saveAdjusted("postLaunchBehavior", cycle(["Minimize", "Stay open", "Close launcher"], setting("postLaunchBehavior", "Minimize"), delta))
         else if (id === "menu-sounds")
@@ -907,6 +910,7 @@ FocusScope {
             saved = Boolean(controller.saveSetting("navigationRepeatRateMs", 110)) && saved
             saved = Boolean(controller.saveSetting("hideCursorInCouchMode", true)) && saved
             saved = Boolean(controller.saveSetting("startCouchModeFullscreen", true)) && saved
+            saved = Boolean(controller.saveSetting("couchShowSystemUsage", true)) && saved
             saved = Boolean(controller.saveSetting("postLaunchBehavior", "Minimize")) && saved
             saved = Boolean(controller.saveSetting("couchMenuSoundsEnabled", true)) && saved
             saved = Boolean(controller.saveSetting("couchMenuSoundsVolume", 40)) && saved

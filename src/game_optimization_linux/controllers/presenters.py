@@ -691,6 +691,7 @@ def settings_to_qml(settings: AppSettings) -> dict[str, Any]:
         "navigation_repeat_rate_ms": "navigationRepeatRateMs",
         "hide_cursor_in_couch_mode": "hideCursorInCouchMode",
         "start_couch_mode_fullscreen": "startCouchModeFullscreen",
+        "couch_show_system_usage": "couchShowSystemUsage",
         "post_launch_behavior": "postLaunchBehavior",
         "interface_sounds": "interfaceSounds",
         "couch_menu_sounds_enabled": "couchMenuSoundsEnabled",

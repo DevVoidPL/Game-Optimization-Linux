@@ -2407,6 +2407,22 @@
         <source>Delete all</source>
         <translation>Usuń wszystkie</translation>
     </message>
+    <message>
+        <source>CPU</source>
+        <translation>CPU</translation>
+    </message>
+    <message>
+        <source>GPU</source>
+        <translation>GPU</translation>
+    </message>
+    <message>
+        <source>RAM</source>
+        <translation>RAM</translation>
+    </message>
+    <message>
+        <source>%1%</source>
+        <translation>%1%</translation>
+    </message>
 </context>
 <context>
     <name>CouchNarratorPage</name>
@@ -3703,6 +3719,14 @@
         <location line="+1" />
         <source>Close launcher</source>
         <translation>Zamknij launcher</translation>
+    </message>
+    <message>
+        <source>Show CPU/GPU/RAM usage</source>
+        <translation>Pokaż użycie CPU/GPU/RAM</translation>
+    </message>
+    <message>
+        <source>Show real processor, graphics and memory usage next to the clock. Values that cannot be read stay hidden.</source>
+        <translation>Pokazuj rzeczywiste użycie procesora, grafiki i pamięci obok zegara. Wartości, których nie da się odczytać, są ukryte.</translation>
     </message>
 </context>
 <context>

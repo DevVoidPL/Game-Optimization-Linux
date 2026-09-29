@@ -336,6 +336,37 @@ FocusScope {
         inputIsController: Boolean(couch.controller && couch.controller.activeController
                                    && couch.controller.activeController.name)
         inputLabel: inputIsController ? String(couch.controller.activeController.name) : qsTr("Keyboard")
+
+        // Real CPU/GPU/RAM usage from the controller; a metric that could not
+        // be read is absent from the map and its chip stays hidden.
+        readonly property bool usageEnabled: Boolean(couch.controller && couch.controller.settings
+                                                     && couch.controller.settings.couchShowSystemUsage !== false)
+        readonly property var usage: couch.controller && couch.controller.systemUsage
+                                     ? couch.controller.systemUsage : ({})
+        telemetryShown: usageEnabled && (usage.cpuPercent !== undefined
+                                         || usage.gpuPercent !== undefined
+                                         || usage.memoryText !== undefined)
+        CouchUsageChip {
+            objectName: "couchUsageCpu"
+            visible: topBar.usageEnabled && topBar.usage.cpuPercent !== undefined
+            couchScale: couch.couchScale
+            label: qsTr("CPU")
+            value: qsTr("%1%").arg(topBar.usage.cpuPercent)
+        }
+        CouchUsageChip {
+            objectName: "couchUsageGpu"
+            visible: topBar.usageEnabled && topBar.usage.gpuPercent !== undefined
+            couchScale: couch.couchScale
+            label: qsTr("GPU")
+            value: qsTr("%1%").arg(topBar.usage.gpuPercent)
+        }
+        CouchUsageChip {
+            objectName: "couchUsageRam"
+            visible: topBar.usageEnabled && topBar.usage.memoryText !== undefined
+            couchScale: couch.couchScale
+            label: qsTr("RAM")
+            value: String(topBar.usage.memoryText || "")
+        }
     }
 
     CouchHints {

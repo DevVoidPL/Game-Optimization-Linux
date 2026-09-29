@@ -2395,6 +2395,22 @@
         <source>Delete all</source>
         <translation>Delete all</translation>
     </message>
+    <message>
+        <source>CPU</source>
+        <translation>CPU</translation>
+    </message>
+    <message>
+        <source>GPU</source>
+        <translation>GPU</translation>
+    </message>
+    <message>
+        <source>RAM</source>
+        <translation>RAM</translation>
+    </message>
+    <message>
+        <source>%1%</source>
+        <translation>%1%</translation>
+    </message>
 </context>
 <context>
     <name>CouchNarratorPage</name>
@@ -3687,6 +3703,14 @@
         <location line="+1" />
         <source>Close launcher</source>
         <translation>Close launcher</translation>
+    </message>
+    <message>
+        <source>Show CPU/GPU/RAM usage</source>
+        <translation>Show CPU/GPU/RAM usage</translation>
+    </message>
+    <message>
+        <source>Show real processor, graphics and memory usage next to the clock. Values that cannot be read stay hidden.</source>
+        <translation>Show real processor, graphics and memory usage next to the clock. Values that cannot be read stay hidden.</translation>
     </message>
 </context>
 <context>
