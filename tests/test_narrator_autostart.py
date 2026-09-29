@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from pathlib import Path
 
 import pytest
@@ -116,10 +117,10 @@ def test_autostart_waits_for_stable_game_process_then_autostops(narrator) -> Non
     controller_narrator.poll()                     # game started outside GameOpti
     activity.active = True
     controller_narrator.poll()
-    clock[0] += 10.0
+    clock[0] += 25.0
     controller_narrator.poll()
-    assert not pipeline.active                     # process not stable long enough
-    clock[0] += 5.0
+    assert not pipeline.active                     # default 30 s delay not reached
+    clock[0] += 6.0
     controller_narrator.poll()
     assert pipeline.active and capture.requests    # started with the game
     assert controller.getNarratorSessionState(game.id)["cardState"] == "running"
@@ -194,7 +195,7 @@ def test_host_process_detection_is_throttled_and_matches_steam_reaper(tmp_path: 
     assert sandbox_without_host.supports(game) is False
 
 
-def test_gamepad_select_y_hold_emits_shortcut_once(monkeypatch, caplog) -> None:
+def test_gamepad_select_y_press_fires_shortcut_with_cooldown(monkeypatch, caplog) -> None:
     from game_optimization_linux.models import GamepadEvent
     from game_optimization_linux.providers import FakeGamepadProvider
     from game_optimization_linux.services import GamepadService
@@ -206,23 +207,31 @@ def test_gamepad_select_y_hold_emits_shortcut_once(monkeypatch, caplog) -> None:
     service.shortcutTriggered.connect(shortcuts.append)
     service.actionTriggered.connect(actions.append)
     monkeypatch.setattr(gamepad_module.time, "monotonic", lambda: now[0])
-    for control in ("back", "north"):
-        provider.emit(GamepadEvent("button", 1, control, True, 1.0))
+
+    def tap_y() -> None:
+        provider.emit(GamepadEvent("button", 1, "north", True, 1.0))
+        provider.emit(GamepadEvent("button", 1, "north", False, 0.0))
+        service.pollNow()
+
+    provider.emit(GamepadEvent("button", 1, "back", True, 1.0))
     with caplog.at_level("INFO", logger="game_optimization_linux.services.gamepad"):
-        service.pollNow()
-        now[0] += 0.5
-        service.pollNow()
-        assert shortcuts == []
-        now[0] += 0.6
-        service.pollNow()
-        service.pollNow()
+        tap_y()                                     # Select held + Y tap: fires now
     assert shortcuts == ["narrator_toggle"]
-    messages = " ".join(record.getMessage() for record in caplog.records)
-    assert "combination detected" in messages          # detection stage logged
-    assert "emitting narrator_toggle" in messages       # firing stage logged
+    assert "Select+Y fired" in " ".join(r.getMessage() for r in caplog.records)
+    now[0] += 1.0
+    tap_y()                                         # within 1.5 s cooldown
+    assert shortcuts == ["narrator_toggle"]
+    now[0] += 0.6
+    tap_y()                                         # cooldown over
+    assert shortcuts == ["narrator_toggle", "narrator_toggle"]
     provider.emit(GamepadEvent("button", 1, "back", False, 0.0))
     service.pollNow()
-    assert "ContextAction1" not in actions and "context_action_1" not in actions
+    # Neither Y ("More actions") nor the Select release reached the UI.
+    assert not {"MoreActions", "ContextAction1"} & set(actions)
+    # Y alone (Select not held) stays a normal button.
+    now[0] += 5.0
+    tap_y()
+    assert shortcuts == ["narrator_toggle", "narrator_toggle"] and "MoreActions" in actions
 
 
 def test_strict_detection_matches_proton_wrapper_launched_game_exe(tmp_path: Path) -> None:
@@ -254,39 +263,83 @@ def test_strict_detection_matches_proton_wrapper_launched_game_exe(tmp_path: Pat
     assert detector.game_process_running("208650") is False
 
 
-def test_capture_closed_triggers_one_automatic_retry(narrator) -> None:
+def test_capture_closed_rechecks_after_8s_and_retries_only_short_sessions(narrator) -> None:
     _controller, controller_narrator, _p, _c, activity, game, _save = narrator
     key = controller_narrator._game_key(game)
+    clock = [1000.0]
+    controller_narrator._clock = lambda: clock[0]
     starts: list[str] = []
     stops: list[int] = []
+    toasts: list[tuple[str, str]] = []
     controller_narrator.start = lambda game_id, automatic=False: (starts.append(game_id) or True)
     controller_narrator.stop = lambda: (stops.append(1) or True)
+    _controller._emit_toast = lambda message, kind: toasts.append((message, kind))
 
     class _Event:
-        def __init__(self, status: str, message: str) -> None:
-            self.status = type("S", (), {"value": status})()
+        def __init__(self, message: str) -> None:
+            self.status = type("S", (), {"value": "error"})()
             self.message = message
             self.game_key = key
 
-    closed = _Event("error", "The portal capture session closed")
-    # Game still running: retry once; a second identical closure does not.
+    closed = _Event("The portal capture session closed")
+
+    def close_after(session_seconds: float) -> None:
+        controller_narrator._session_started[key] = (clock[0] - session_seconds, None)
+        assert controller_narrator._retry_after_capture_closed(closed, game) is True
+
+    # Splash -> main window: short session, game still running after 8 s.
     activity.active = True
-    assert controller_narrator._retry_after_capture_closed(closed, game) is True
-    assert controller_narrator._retry_after_capture_closed(closed, game) is False
-    assert starts == [game.id] and stops == []
-    # A healthy session clears the guard, so a later closure can retry again.
-    controller_narrator._capture_retry_session.discard(key)
-    assert controller_narrator._retry_after_capture_closed(closed, game) is True
-    assert starts == [game.id, game.id]
-    # Game has ended: stop silently, no portal/start, no toast.
-    controller_narrator._capture_retry_session.discard(key)
+    close_after(20.0)
+    clock[0] += 7.0
+    controller_narrator._poll_capture_closed(clock[0])
+    assert starts == [] and stops == []            # nothing before 8 s
+    clock[0] += 1.5
+    controller_narrator._poll_capture_closed(clock[0])
+    assert starts == [game.id] and stops == []     # one retry
+    # A second quick closure is not retried again: silent stop.
+    close_after(10.0)
+    clock[0] += 9.0
+    controller_narrator._poll_capture_closed(clock[0])
+    assert starts == [game.id] and stops == [1]
+    # Game exit: the window closes after a long session -> silent stop even if
+    # the process is still visible a moment later.
+    controller_narrator._capture_retry_session.clear()
+    close_after(600.0)
+    clock[0] += 9.0
+    controller_narrator._poll_capture_closed(clock[0])
+    assert starts == [game.id] and stops == [1, 1]
+    # Short session but the game ended within the 8 s: silent stop.
     activity.active = False
-    assert controller_narrator._retry_after_capture_closed(closed, game) is True
-    assert stops == [1] and starts == [game.id, game.id]
-    # Unrelated errors are never retried.
-    controller_narrator._capture_retry_session.discard(key)
-    other = _Event("error", "Screen capture stopped")
-    assert controller_narrator._retry_after_capture_closed(other, game) is False
+    close_after(20.0)
+    clock[0] += 9.0
+    controller_narrator._poll_capture_closed(clock[0])
+    assert starts == [game.id] and stops == [1, 1, 1]
+    assert all(kind != "error" for _message, kind in toasts)
+    # Unrelated errors are not taken over.
+    assert controller_narrator._retry_after_capture_closed(_Event("Screen capture stopped"), game) is False
+
+
+def test_autostart_delay_is_learned_from_a_lasting_session(narrator, tmp_path: Path) -> None:
+    _controller, controller_narrator, pipeline, _c, activity, game, save = narrator
+    save()
+    key = controller_narrator._game_key(game)
+    clock = [100.0]
+    controller_narrator._clock = pipeline._clock = lambda: clock[0]
+    assert controller_narrator._autostart_delay(key) == (30.0, "default")
+    activity.active = True
+    controller_narrator.poll()                      # process detected at t=100
+    clock[0] += 31.0
+    controller_narrator.poll()                      # autostart at +31 s
+    assert pipeline.active
+    clock[0] += 91.0
+    controller_narrator.poll()                      # the session lasted > 90 s
+    stored = json.loads((tmp_path / "narrator-autostart-delays-v1.json").read_text())
+    assert stored["delays"][key] == 31.0
+    delay, source = controller_narrator._autostart_delay(key)
+    assert delay == 36.0 and source.startswith("learned")
+    # The learned value is always capped.
+    controller_narrator._delay_repository().save(key, 200.0)
+    assert controller_narrator._autostart_delay(key)[0] == 90.0
 
 
 def test_unknown_process_list_does_not_end_a_watched_game(narrator) -> None:

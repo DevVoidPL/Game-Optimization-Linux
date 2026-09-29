@@ -198,6 +198,40 @@ class CaptureGrantRepository:
         }
 
 
+class AutostartDelayRepository:
+    """Learned seconds from game-process detection to a lasting session."""
+
+    SCHEMA_VERSION = 1
+
+    def __init__(self, path: Path) -> None:
+        self.path = Path(path)
+
+    def load(self, game_key: object) -> float | None:
+        value = self._load().get(validate_game_key(game_key))
+        return float(value) if isinstance(value, (int, float)) and value >= 0 else None
+
+    def save(self, game_key: object, seconds: float) -> None:
+        delays = self._load()
+        delays[validate_game_key(game_key)] = round(max(0.0, float(seconds)), 1)
+        _atomic_json_write(
+            self.path, {"schema_version": self.SCHEMA_VERSION, "delays": delays}
+        )
+
+    def _load(self) -> dict[str, float]:
+        try:
+            values = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return {}
+        delays = values.get("delays", {}) if isinstance(values, Mapping) else {}
+        if not isinstance(delays, Mapping):
+            return {}
+        return {
+            str(key): float(value)
+            for key, value in delays.items()
+            if isinstance(key, str) and isinstance(value, (int, float))
+        }
+
+
 def normalize_cache_phrase(text: str) -> str:
     return " ".join(unicodedata.normalize("NFKC", str(text)).split()).casefold()
 
@@ -329,6 +363,7 @@ class TranslationCache:
 
 
 __all__ = [
+    "AutostartDelayRepository",
     "CAPTURE_GRANTS_SCHEMA_VERSION",
     "CaptureGrantRepository",
     "NARRATOR_SETTINGS_FILE_NAME",

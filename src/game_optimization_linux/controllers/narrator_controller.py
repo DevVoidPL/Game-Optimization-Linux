@@ -29,15 +29,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# How long after a launch from GameOpti the Narrator waits for the game.
-# The game's own executable must run this long before autostart and the
-# portal prompt (process settles, launcher hands over, the window appears).
-GAME_STABLE_SECONDS = 8.0
-WINDOW_DELAY_SECONDS = 6.0
-AUTOSTART_DELAY_SECONDS = GAME_STABLE_SECONDS + WINDOW_DELAY_SECONDS
+# Autostart delay after the game's own process is detected. Games may show a
+# small launcher/splash window first; the delay is learned per game from the
+# last session that lasted (detection -> start of a session > 90 s) plus a
+# margin. Unknown games use the default; the value is always capped.
+AUTOSTART_DEFAULT_DELAY_SECONDS = 30.0
+AUTOSTART_LEARNED_MARGIN_SECONDS = 5.0
+AUTOSTART_MAX_DELAY_SECONDS = 90.0
+# A session that lasts this long counts as "on the real game window".
+LASTING_SESSION_SECONDS = 90.0
+# After "capture session closed": wait, re-check the process, then decide.
+CAPTURE_CLOSED_RECHECK_SECONDS = 8.0
 WATCH_REFRESH_SECONDS = 15.0
 # How often the autostart watcher logs a liveness heartbeat.
 HEARTBEAT_SECONDS = 30.0
+_AUTOSTART_DELAYS_FILE_NAME = "narrator-autostart-delays-v1.json"
 
 
 class NarratorController:
@@ -65,6 +71,14 @@ class NarratorController:
         # (SOURCE_LOST), tracked per game so it fires at most once until the
         # session recovers to a healthy state.
         self._capture_retry_session: set[str] = set()
+        # game_key -> monotonic time when "capture session closed" must be
+        # re-checked (the game may be switching from a splash window).
+        self._capture_closed_pending: dict[str, float] = {}
+        # game_key -> (session start time, seconds since process detection or
+        # None for a start without a detected process).
+        self._session_started: dict[str, tuple[float, float | None]] = {}
+        self._delay_learned: set[str] = set()
+        self._autostart_delays: Any = None
         self._clock = time.monotonic
 
     # -- voice ------------------------------------------------------------------
@@ -153,6 +167,63 @@ class NarratorController:
             ", ".join(sorted(self._watched)) or "none",
         )
 
+    def _delay_repository(self) -> Any:
+        """Learned delays live next to the per-game settings directory."""
+
+        if self._autostart_delays is None:
+            from game_optimization_linux.services.narrator_persistence import (
+                AutostartDelayRepository,
+            )
+
+            root = getattr(self._app._narrator_settings_repository, "root", None)
+            self._autostart_delays = (
+                AutostartDelayRepository(root.parent / _AUTOSTART_DELAYS_FILE_NAME)
+                if root is not None
+                else False
+            )
+        return self._autostart_delays or None
+
+    def _autostart_delay(self, game_key: str) -> tuple[float, str]:
+        repository = self._delay_repository()
+        learned = None
+        if repository is not None:
+            try:
+                learned = repository.load(game_key)
+            except Exception as error:
+                logger.warning("Could not read the learned autostart delay: %s", error)
+        if learned is None:
+            return AUTOSTART_DEFAULT_DELAY_SECONDS, "default"
+        delay = min(AUTOSTART_MAX_DELAY_SECONDS, learned + AUTOSTART_LEARNED_MARGIN_SECONDS)
+        return delay, f"learned {learned:.0f} s + {AUTOSTART_LEARNED_MARGIN_SECONDS:.0f} s"
+
+    def _track_lasting_session(self, now: float) -> None:
+        """Learn the detection->start delay once a session lasts > 90 s."""
+
+        pipeline = self._app._narrator_pipeline
+        if not pipeline.active:
+            return
+        game_key = pipeline.snapshot.game_key
+        started = self._session_started.get(game_key)
+        if started is None or game_key in self._delay_learned:
+            return
+        started_at, since_detection = started
+        if now - started_at < LASTING_SESSION_SECONDS or since_detection is None:
+            return
+        self._delay_learned.add(game_key)
+        repository = self._delay_repository()
+        if repository is None:
+            return
+        try:
+            repository.save(game_key, since_detection)
+        except Exception as error:
+            logger.warning("Could not save the learned autostart delay: %s", error)
+            return
+        logger.info(
+            "Narrator autostart: %s: session lasted > %.0f s; learned delay %.0f s "
+            "from process detection",
+            game_key, LASTING_SESSION_SECONDS, since_detection,
+        )
+
     def _poll_autostart(self) -> None:
         pipeline = self._app._narrator_pipeline
         now = self._clock()
@@ -181,9 +252,13 @@ class NarratorController:
                 self._autostart_done.discard(game_key)
                 continue
             since = self._seen_since.setdefault(game_key, now)
+            delay, source = self._autostart_delay(game_key)
             if since == now:
-                self._log_decision(game_key, "game process detected, waiting for it to settle and open its window")
-            if game_key in self._autostart_done or now - since < AUTOSTART_DELAY_SECONDS:
+                self._log_decision(
+                    game_key,
+                    f"game process detected, waiting {delay:.0f} s ({source}) for its window",
+                )
+            if game_key in self._autostart_done or now - since < delay:
                 continue
             self._autostart_done.add(game_key)
             try:
@@ -625,6 +700,10 @@ class NarratorController:
             self._app._emit_toast(str(error), "warning")
             self._app.narratorChanged.emit(game.id)
             return False
+        now = self._clock()
+        seen = self._seen_since.get(game_key)
+        self._session_started[game_key] = (now, None if seen is None else now - seen)
+        self._delay_learned.discard(game_key)
         self._app.narratorChanged.emit(game.id)
         return True
 
@@ -854,6 +933,9 @@ class NarratorController:
                 self._capture_retry_session.discard(event.game_key)
         for game_id in changed:
             self._app.narratorChanged.emit(game_id)
+        now = self._clock()
+        self._poll_capture_closed(now)
+        self._track_lasting_session(now)
         snapshot = self._app._narrator_pipeline.snapshot
         self._app._ui_sound_service.set_music_ducked(
             snapshot.status.value == "speaking"
@@ -869,11 +951,14 @@ class NarratorController:
     _CAPTURE_CLOSED_MARKER = "capture session closed"
 
     def _retry_after_capture_closed(self, event: object, game: Game | None) -> bool:
-        """One automatic restart after the portal capture session closes.
+        """Schedule the decision after the portal capture session closes.
 
-        Returns True when a retry was triggered (so the error toast is
-        suppressed for this event). The retry fires at most once per session;
-        a second closure surfaces the error to the user as before.
+        The window may close because the game switches from a splash window to
+        its main window, or because the game is exiting (its window disappears
+        a few seconds before the process ends). Nothing is decided right away:
+        after CAPTURE_CLOSED_RECHECK_SECONDS the process is checked again in
+        _poll_capture_closed. Returns True when the closure was taken over (the
+        error toast is suppressed).
         """
 
         message = str(getattr(event, "message", ""))
@@ -882,33 +967,54 @@ class NarratorController:
         if game is None:
             return False
         game_key = str(getattr(event, "game_key", ""))
-        if not game_key or game_key in self._capture_retry_session:
+        if not game_key:
             return False
-        # Retry only while the game's own process is still running. If it has
-        # ended (or the process list says so), stop the Narrator silently: no
-        # portal prompt, no error toast, no retry.
-        running = None
-        strict = getattr(self._app._narrator_pipeline.activity, "game_process_running", None)
-        if callable(strict):
-            running = strict(game_key)
-        if running is False:
-            logger.info(
-                "Narrator capture: session closed for %s and the game has ended; "
-                "stopping silently",
-                game_key,
-            )
-            self._capture_retry_session.add(game_key)
-            self.stop()
-            return True
-        self._capture_retry_session.add(game_key)
+        now = self._clock()
+        started = self._session_started.get(game_key)
+        duration = now - started[0] if started is not None else float("inf")
+        self._capture_closed_pending[game_key] = (now + CAPTURE_CLOSED_RECHECK_SECONDS, duration)
         logger.info(
-            "Narrator capture: session closed for %s (game still running); retrying once",
-            game_key,
+            "Narrator capture: session closed for %s after %.0f s; re-checking the "
+            "game process in %.0f s",
+            game_key, duration, CAPTURE_CLOSED_RECHECK_SECONDS,
         )
-        if self.start(game.id, automatic=True):
-            self._app._emit_toast("Capture session closed; retrying once", "info")
-            return True
-        return False
+        return True
+
+    def _poll_capture_closed(self, now: float) -> None:
+        pipeline = self._app._narrator_pipeline
+        for game_key, (due, duration) in tuple(self._capture_closed_pending.items()):
+            if now < due:
+                continue
+            del self._capture_closed_pending[game_key]
+            game = self._game_for_key(game_key)
+            if game is None or (pipeline.active and pipeline.snapshot.game_key == game_key):
+                continue          # gone, or the user already restarted it
+            strict = getattr(pipeline.activity, "game_process_running", None)
+            running = strict(game_key) if callable(strict) else None
+            if (
+                running is True
+                and duration < LASTING_SESSION_SECONDS
+                and game_key not in self._capture_retry_session
+            ):
+                self._capture_retry_session.add(game_key)
+                logger.info(
+                    "Narrator capture: %s still running and the session lasted %.0f s "
+                    "(< %.0f s, window change); retrying once with the saved window",
+                    game_key, duration, LASTING_SESSION_SECONDS,
+                )
+                if self.start(game.id, automatic=True):
+                    self._app._emit_toast("Capture session closed; retrying once", "info")
+                continue
+            reason = (
+                "the game has ended" if running is False
+                else "the process list is unavailable" if running is None
+                else "already retried once" if game_key in self._capture_retry_session
+                else f"the session lasted {duration:.0f} s (game exit)"
+            )
+            logger.info(
+                "Narrator capture: %s: no retry, %s; stopping silently", game_key, reason
+            )
+            self.stop()
 
     def _component_action(self, action: str, component_id: str) -> bool:
         if component_id in self._component_jobs:

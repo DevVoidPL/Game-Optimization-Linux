@@ -297,10 +297,12 @@ class GamepadService(QObject):
     controllerDisconnected = Signal(str)
     mappingChanged = Signal(object)
     inputActivity = Signal(str)
-    # Global shortcut (also while a game has focus): hold Select/View + Y.
+    # Global shortcut (also while a game has focus): with Select/View held,
+    # press Y. Fires on the Y press; no hold needed.
     shortcutTriggered = Signal(str)
-    SHORTCUT_BUTTONS = frozenset({"back", "north"})
-    SHORTCUT_HOLD_SECONDS = 1.0
+    SHORTCUT_MODIFIER = "back"
+    SHORTCUT_TRIGGER = "north"
+    SHORTCUT_COOLDOWN_SECONDS = 1.5
 
     def __init__(
         self,
@@ -317,8 +319,7 @@ class GamepadService(QObject):
         self._active_id: int | None = None
         self._mapper = GamepadInputMapper()
         self._held_buttons: dict[int, set[str]] = {}
-        self._shortcut_since: dict[int, float] = {}
-        self._shortcut_fired: set[int] = set()
+        self._shortcut_last = float("-inf")
         self._started = False
         self._stopped = False
         self._timer = QTimer(self)
@@ -435,6 +436,15 @@ class GamepadService(QObject):
                     self.mappingChanged.emit(current.to_dict())
             if event.kind == "button":
                 held = self._held_buttons.setdefault(event.instance_id, set())
+                if (
+                    event.pressed
+                    and event.control == self.SHORTCUT_TRIGGER
+                    and self.SHORTCUT_MODIFIER in held
+                ):
+                    # Select + Y: the Y press is the shortcut, not "More actions".
+                    held.add(event.control)
+                    self._fire_shortcut(event.instance_id, time.monotonic())
+                    continue
                 (held.add if event.pressed else held.discard)(event.control)
             meaningful = self._mapper.is_meaningful(event)
             actions = self._mapper.process(event)
@@ -451,39 +461,21 @@ class GamepadService(QObject):
                 continue
             emitted_actions.add(action.value)
             self.actionTriggered.emit(action.value)
-        self._poll_shortcut(time.monotonic())
         if devices_changed:
             self.controllersChanged.emit()
 
-    def _poll_shortcut(self, now: float) -> None:
-        for instance_id, held in tuple(self._held_buttons.items()):
-            if not self.SHORTCUT_BUTTONS <= held:
-                if instance_id in self._shortcut_since:
-                    logger.info(
-                        "Gamepad shortcut: Select+Y released on device %s before firing",
-                        instance_id,
-                    )
-                self._shortcut_since.pop(instance_id, None)
-                self._shortcut_fired.discard(instance_id)
-                continue
-            since = self._shortcut_since.get(instance_id)
-            if since is None:
-                since = self._shortcut_since.setdefault(instance_id, now)
-                logger.info(
-                    "Gamepad shortcut: Select+Y combination detected on device %s; "
-                    "holding for %.1fs",
-                    instance_id,
-                    self.SHORTCUT_HOLD_SECONDS,
-                )
-            if instance_id in self._shortcut_fired or now - since < self.SHORTCUT_HOLD_SECONDS:
-                continue
-            self._shortcut_fired.add(instance_id)
-            self._mapper.suppress_view_release(instance_id)
-            logger.info(
-                "Gamepad shortcut: Select+Y held on device %s; emitting narrator_toggle",
-                instance_id,
+    def _fire_shortcut(self, instance_id: int, now: float) -> None:
+        # Select stays pressed through the combination; its release must not
+        # trigger its own short-press action.
+        self._mapper.suppress_view_release(instance_id)
+        if now - self._shortcut_last < self.SHORTCUT_COOLDOWN_SECONDS:
+            logger.debug(
+                "Gamepad shortcut: Select+Y on device %s ignored (cooldown)", instance_id
             )
-            self.shortcutTriggered.emit("narrator_toggle")
+            return
+        self._shortcut_last = now
+        logger.info("Gamepad shortcut: Select+Y fired on device %s (narrator_toggle)", instance_id)
+        self.shortcutTriggered.emit("narrator_toggle")
 
     def _device(self, identifier: int | None) -> GamepadDevice | None:
         if identifier is None:

@@ -321,7 +321,7 @@ class SDL3GamepadProvider:
                 if control in ("back", "north"):
                     # Select (back) and Y (north) form the Narrator shortcut;
                     # log the raw event so the whole chain is traceable.
-                    logger.info(
+                    logger.debug(
                         "Gamepad raw shortcut button: device=%s control=%s pressed=%s",
                         int(value.which),
                         control,
