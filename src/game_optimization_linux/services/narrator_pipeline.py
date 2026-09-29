@@ -42,6 +42,11 @@ OCR_STABLE_OBSERVATIONS = 2
 OCR_SIMILARITY_THRESHOLD = 0.88
 OCR_STABILITY_WINDOW_SECONDS = 1.25
 OCR_DECISION_HISTORY_LIMIT = 20
+# The last line read, re-read with an OCR slip: keys (identity without spaces)
+# of at least OCR_DUPLICATE_MIN_KEY_LENGTH characters that differ by at most
+# OCR_DUPLICATE_MAX_EDITS added, removed or changed characters.
+OCR_DUPLICATE_MAX_EDITS = 1
+OCR_DUPLICATE_MIN_KEY_LENGTH = 10
 
 
 class SubtitleSource(Protocol):
@@ -146,6 +151,53 @@ def subtitle_identity(text: str) -> str:
     )
 
 
+def _drop_mixed_tokens(text: str) -> str:
+    """Remove OCR tokens that mix digits with letters (``2959sj``, ``(@9s``)."""
+
+    return " ".join(
+        token
+        for token in text.split()
+        if not (
+            any(character.isdigit() for character in token)
+            and any(character.isalpha() for character in token)
+        )
+    )
+
+
+def _within_edits(first: str, second: str, limit: int) -> bool:
+    """Whether at most ``limit`` added, removed or changed characters separate them."""
+
+    if abs(len(first) - len(second)) > limit:
+        return False
+    previous = list(range(len(second) + 1))
+    for row, left in enumerate(first, start=1):
+        current = [row]
+        for column, right in enumerate(second, start=1):
+            current.append(
+                min(
+                    previous[column] + 1,
+                    current[column - 1] + 1,
+                    previous[column - 1] + (left != right),
+                )
+            )
+        if min(current) > limit:
+            return False
+        previous = current
+    return previous[-1] <= limit
+
+
+def _is_ocr_slip_variant(first: str, second: str) -> bool:
+    """One long enough line re-read with a single slip (``tu adam``/``tuadamx``)."""
+
+    first_key = first.replace(" ", "")
+    second_key = second.replace(" ", "")
+    return min(
+        len(first_key), len(second_key)
+    ) >= OCR_DUPLICATE_MIN_KEY_LENGTH and _within_edits(
+        first_key, second_key, OCR_DUPLICATE_MAX_EDITS
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class OcrGateObservation:
     raw_text: str
@@ -217,6 +269,9 @@ class SubtitleTextGate:
         # Diagnostics only: monotonic counter, one value per created candidate,
         # so all observations of one subtitle attempt share an identity.
         self._candidate_id = 0
+        # Diagnostics only: difflib similarity of the latest cleaned line to the
+        # last line read. Logged, never used for a decision.
+        self.last_line_similarity: float | None = None
 
     @property
     def needs_confirmation(self) -> bool:
@@ -236,7 +291,15 @@ class SubtitleTextGate:
         previous_candidate = self._candidate_text
         previous_identity = self._candidate_identity
         previous_since = self._candidate_since
+        self.last_line_similarity = None
         reason = self._validate(filtered, confidence)
+        if not reason:
+            # A line that passed the filters can still carry noise tokens mixing
+            # digits and letters. Drop them before comparison, translation and
+            # speech; a line left without a word is rejected.
+            filtered = _drop_mixed_tokens(filtered)
+            if sum(character.isalpha() for character in filtered) < 2:
+                reason = "min_alphabetic"
         if reason:
             if (
                 previous_candidate
@@ -261,7 +324,10 @@ class SubtitleTextGate:
             # The candidate is abandoned here. Reported before _clear, so the
             # terminal record still names it and its text.
             abandoned_id = self._candidate_id if previous_candidate else 0
-            self._clear(no_subtitle=True)
+            # Only an empty reading means the subtitle is gone. Garbage or a
+            # low-confidence reading keeps the last line read, otherwise that
+            # line is read again once OCR recovers.
+            self._clear(no_subtitle=reason == "empty")
             return OcrGateObservation(
                 raw,
                 filtered,
@@ -280,6 +346,11 @@ class SubtitleTextGate:
 
         identity = subtitle_identity(filtered)
         accepted_similarity = self._similarity(identity, self._accepted_identity)
+        if self._accepted_identity:
+            self.last_line_similarity = self._similarity(
+                identity.replace(" ", ""),
+                self._accepted_identity.replace(" ", ""),
+            )
         if self._accepted_identity and self._strict_identities_match(
             identity,
             self._accepted_identity,
@@ -474,12 +545,14 @@ class SubtitleTextGate:
     def _strict_identities_match(self, first: str, second: str) -> bool:
         # Similarity is useful for candidate consensus, not for deciding that
         # an already spoken sentence with a changed word is the same dialogue.
+        # Only a single OCR character slip in a long enough line is forgiven.
         return (
             self._numbers_match(first, second)
             and (
                 first == second
                 or _dedup_is_split_merge_variant(first, second)
                 or _dedup_is_garbage_variant(first, second)
+                or _is_ocr_slip_variant(first, second)
             )
         )
 
@@ -1935,6 +2008,14 @@ class NarratorPipeline:
                 )
             elif phrase:
                 final_decision = "accepted"
+            line_similarity = self._text_gate.last_line_similarity
+            logger.info(
+                "Narrator OCR: raw=%r cleaned=%r similarity=%s decision=%s",
+                observation.raw_text,
+                observation.filtered_text,
+                f"{line_similarity:.3f}" if line_similarity is not None else "none",
+                final_decision,
+            )
             # Loss funnel. Every observation is counted exactly once under the
             # decision the pipeline already assigned it, so no new vocabulary is
             # invented and the rows stay traceable to the decision history.

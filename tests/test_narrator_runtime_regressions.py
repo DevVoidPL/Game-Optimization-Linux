@@ -1,5 +1,6 @@
 """Replay OCR observations through the real crop/gate/translation/TTS pipeline."""
 from dataclasses import replace
+import logging
 from pathlib import Path
 
 import pytest
@@ -201,3 +202,38 @@ def test_split_merge_does_not_hide_changed_numbers():
     first, second = "Idź do pokoju 1 23", "Idź do pokoju 12 3"
     assert dedup.accept(first, now=1, cooldown_seconds=4.5) == first
     assert dedup.accept(second, now=2, cooldown_seconds=4.5) == second
+
+
+def test_ocr_variants_of_one_line_are_read_once(tmp_path: Path, caplog):
+    """Facts from a game: one line read by OCR in three ways is spoken once."""
+    caplog.set_level(
+        logging.INFO, logger="game_optimization_linux.services.narrator_pipeline"
+    )
+    replay = Replay(tmp_path, polish=True)
+    try:
+        replay.observe("Siema, Tu adam")
+        replay.observe("Siema, Tu adam")
+        replay.audio.completed_callbacks[-1]()
+        replay.now += 6  # Past the cooldown: time alone must not re-arm the line.
+        for variant in ("Siema, TuAdamx", "2959sj Siema tu (@9s Adamo"):
+            replay.observe(variant)
+            decision = replay.observe(variant)
+            assert decision.rejection_reason == "duplicate"
+        # Tokens mixing digits and letters never reach comparison or speech.
+        assert decision.normalized_text == "Siema tu Adamo"
+        assert replay.tts.values == ["Siema, Tu adam"]
+        assert len(replay.audio.played) == 1
+        lines = [
+            record.getMessage()
+            for record in caplog.records
+            if record.getMessage().startswith("Narrator OCR:")
+        ]
+        assert len(lines) == 6
+        assert "decision=accepted" in lines[1]
+        assert lines[-1] == (
+            "Narrator OCR: raw='2959sj Siema tu (@9s Adamo' "
+            "cleaned='Siema tu Adamo' similarity=0.957 "
+            "decision=duplicate_accepted_phrase"
+        )
+    finally:
+        replay.pipeline.shutdown()
