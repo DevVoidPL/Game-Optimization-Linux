@@ -1822,6 +1822,42 @@
         <source>Ready</source>
         <translation>Ready</translation>
     </message>
+    <message>
+        <source>Not measured</source>
+        <translation>Not measured</translation>
+    </message>
+    <message>
+        <source>Exact measurement (requires password and keyboard)</source>
+        <translation>Exact measurement (requires password and keyboard)</translation>
+    </message>
+    <message>
+        <source>The optional measurement component is not installed</source>
+        <translation>The optional measurement component is not installed</translation>
+    </message>
+    <message>
+        <source>Runs compsize only after you confirm; the system asks for your password</source>
+        <translation>Runs compsize only after you confirm; the system asks for your password</translation>
+    </message>
+    <message>
+        <source>Start the exact measurement?</source>
+        <translation>Start the exact measurement?</translation>
+    </message>
+    <message>
+        <source>compsize reads the real on-disk usage. The system will ask for your administrator password, so a keyboard is needed. Nothing is changed on disk.</source>
+        <translation>compsize reads the real on-disk usage. The system will ask for your administrator password, so a keyboard is needed. Nothing is changed on disk.</translation>
+    </message>
+    <message>
+        <source>Measure</source>
+        <translation>Measure</translation>
+    </message>
+    <message>
+        <source>Additional potential (estimate)</source>
+        <translation>Additional potential (estimate)</translation>
+    </message>
+    <message>
+        <source>≈ %1</source>
+        <translation>≈ %1</translation>
+    </message>
 </context>
 <context>
     <name>CouchHints</name>
@@ -7693,6 +7729,10 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <location line="+2" />
         <source>Existing %1 setting</source>
         <translation>Existing %1 setting</translation>
+    </message>
+    <message>
+        <source>Exact compsize measurement was not requested; savings are not measured</source>
+        <translation>Exact compsize measurement was not requested; savings are not measured</translation>
     </message>
 </context>
 <context>

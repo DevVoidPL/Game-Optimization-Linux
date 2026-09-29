@@ -207,8 +207,13 @@ class BtrfsAnalysisTaskService:
         *,
         confirmed: bool,
         automatic_authorized: bool = False,
+        interactive_measurement: bool = True,
     ) -> Task:
-        """Run one already reviewed plan through the same queue as analysis."""
+        """Run one already reviewed plan through the same queue as analysis.
+
+        ``interactive_measurement=False`` (Couch Mode) never starts the
+        password-protected compsize measurement; savings stay "not measured".
+        """
 
         service = self._compression_service
         if service is None:
@@ -258,6 +263,7 @@ class BtrfsAnalysisTaskService:
                     "full_compression": plan.full_compression,
                     "after_update": plan.after_update,
                     "automatic": bool(automatic_authorized),
+                    "interactive_measurement": bool(interactive_measurement),
                     "confirmation_recorded": bool(
                         confirmed or automatic_authorized
                     ),
@@ -275,6 +281,7 @@ class BtrfsAnalysisTaskService:
                 bool(confirmed),
                 bool(automatic_authorized),
                 cancel_event,
+                bool(interactive_measurement),
             )
             self._futures[task.id] = future
             self._persist_locked()
@@ -438,6 +445,7 @@ class BtrfsAnalysisTaskService:
         confirmed: bool,
         automatic_authorized: bool,
         cancelled: Event,
+        interactive_measurement: bool = True,
     ) -> None:
         service = self._compression_service
         if service is None:
@@ -461,6 +469,7 @@ class BtrfsAnalysisTaskService:
                 confirmed=confirmed,
                 automatic_authorized=automatic_authorized,
                 cancel_event=cancelled,
+                interactive_measurement=interactive_measurement,
                 progress_callback=lambda values: self._update_compression_progress(
                     task_id, values
                 ),

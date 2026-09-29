@@ -189,6 +189,7 @@ class _TaskService:
         *,
         confirmed: bool,
         automatic_authorized: bool = False,
+        interactive_measurement: bool = True,
     ) -> Task:
         self.compression_calls.append(
             {
@@ -196,6 +197,7 @@ class _TaskService:
                 "plan": plan,
                 "confirmed": confirmed,
                 "automatic_authorized": automatic_authorized,
+                "interactive_measurement": interactive_measurement,
             }
         )
         task = Task(
@@ -1308,3 +1310,47 @@ def test_shutdown_cancels_update_worker_and_closes_task_and_compression_services
     controller.shutdown()
     assert tasks.shutdown_calls == [(True, 2.0)]
     assert compression.shutdown_calls == 1
+
+
+def test_couch_start_disables_the_automatic_password_measurement(
+    tmp_path: Path,
+) -> None:
+    harness = _harness(tmp_path)
+    try:
+        controller = harness.controller
+        controller._analysis_reports[harness.game.id] = _analysis_report(harness.game)
+        for mode, expected in (("couch", False), ("desktop", True)):
+            controller._interface_mode = mode
+            presented = controller.prepareCompression(harness.game.id, "Maximum", True)
+            assert controller.startCompression(presented["planId"]) is True
+            call = harness.tasks.compression_calls[-1]
+            assert call["interactive_measurement"] is expected
+            harness.tasks.tasks.clear()      # allow the next start for the same game
+    finally:
+        harness.controller.shutdown()
+
+
+def test_task_service_forwards_the_no_prompt_flag_to_compression(
+    tmp_path: Path,
+) -> None:
+    received: list[dict[str, object]] = []
+
+    class _RecordingService:
+        def execute(self, _plan_id: str, _game: Game, **kwargs: object) -> object:
+            received.append(dict(kwargs))
+            raise RuntimeError("stop after recording")
+
+    game = _game(tmp_path, "42")
+    tasks = BtrfsAnalysisTaskService(
+        compression_service=_RecordingService(),  # type: ignore[arg-type]
+        max_workers=1,
+    )
+    try:
+        task = tasks.enqueue_compression_plan(
+            game, _compression_plan(game), confirmed=True, interactive_measurement=False
+        )
+        tasks.wait_for(task.id, timeout=2.0)
+        assert received and received[0]["interactive_measurement"] is False
+        assert tasks.get_task(task.id).metadata["interactive_measurement"] is False
+    finally:
+        tasks.shutdown()

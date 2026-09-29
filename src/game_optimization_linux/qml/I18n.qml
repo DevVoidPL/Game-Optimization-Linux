@@ -388,6 +388,8 @@ QtObject {
             return qsTr("The demo task queue could not be updated")
         case "The task list could not be updated":
             return qsTr("The task list could not be updated")
+        case "Exact compsize measurement was not requested; savings are not measured":
+            return qsTr("Exact compsize measurement was not requested; savings are not measured")
         case "Waiting for authorization to measure compression":
             return qsTr("Waiting for authorization to measure compression")
         case "unknown provider error":

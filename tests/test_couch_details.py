@@ -7,7 +7,9 @@ from pathlib import Path
 import re
 
 import pytest
-from PySide6.QtCore import Q_ARG, Q_RETURN_ARG, QCoreApplication, QMetaObject, QObject, Qt, QUrl
+from PySide6.QtCore import (
+    Q_ARG, Q_RETURN_ARG, Property, QCoreApplication, QMetaObject, QObject, Qt, QUrl, Slot,
+)
 from PySide6.QtQml import QQmlComponent, QQmlEngine
 
 from game_optimization_linux import config
@@ -90,7 +92,7 @@ def test_tab_and_action_ids_are_preserved(details) -> None:
     assert tabs == ["overview", "storage", "optimization", "optiscaler", "narrator"]
     expected = {
         0: ["launch", "updates"],
-        1: ["analyze", "verify", "profile", "compress"],
+        1: ["analyze", "verify", "exact-measure", "profile", "compress"],
         2: ["optimization-profile", "gamemode", "gamescope", "mangohud-profile"],
     }
     for tab, ids in expected.items():
@@ -260,3 +262,61 @@ def test_narrator_action_grid_is_balanced_readable_and_navigable() -> None:
     finally:
         view.close()
         manager.set_language("en")
+
+
+class _MeasureController(QObject):
+    """Minimal controller: records exact measurements, never starts pkexec."""
+
+    def __init__(self, installed: bool) -> None:
+        super().__init__()
+        self.calls: list[str] = []
+        self._installed = installed
+
+    @Property("QVariantMap", constant=True)
+    def selectedGame(self):  # noqa: N802
+        return dict(GAME, filesystem="Btrfs", physicalSize="12.0 GB",
+                    physicalSizeMeasuredByCompsize=False, savingsMeasured=False)
+
+    @Property("QVariantMap", constant=True)
+    def systemInfo(self):  # noqa: N802
+        source = "optional_host_component" if self._installed else "unavailable"
+        return {"compressionCapabilities": {"measurementSource": source}}
+
+    @Slot(str, result=bool)
+    def exactCompressionMeasurement(self, game_id: str) -> bool:  # noqa: N802
+        self.calls.append(game_id)
+        return True
+
+
+@pytest.mark.parametrize("installed", [True, False])
+def test_exact_measurement_is_an_explicit_confirmed_pad_action(installed: bool) -> None:
+    controller = _MeasureController(installed)
+    engine, page = _load(COUCH / "CouchGameDetails.qml",
+                         {"controller": controller, "width": 1920, "height": 1080})
+    try:
+        page.setProperty("selectedTab", 1)
+        _settle()
+        actions = _plain(page.property("actionModel"))
+        index = [a["id"] for a in actions].index("exact-measure")
+        action = actions[index]
+        assert "password" in action["title"] and "keyboard" in action["title"]
+        assert action["enabled"] is installed
+        # Unmeasured Btrfs values are shown honestly, the estimate is marked.
+        assert _call(page, "physicalUsageText") == "Not measured"
+        assert _call(page, "measuredValue", "savedSpace", "savingsMeasured") == "Not measured"
+        if not installed:
+            return
+        page.setProperty("focusArea", 2)
+        page.setProperty("selectedAction", index)
+        _call(page, "handleAction", "Confirm")          # A: opens a confirmation only
+        assert page.property("confirmationOpen") is True and controller.calls == []
+        _call(page, "handleAction", "Back")             # B: cancel, nothing measured
+        assert page.property("confirmationOpen") is False and controller.calls == []
+        _call(page, "handleAction", "Confirm")
+        _call(page, "handleAction", "NavigateRight")    # choose "Measure"
+        _call(page, "handleAction", "Confirm")
+        assert controller.calls == ["g1"] and page.property("confirmationOpen") is False
+    finally:
+        page.deleteLater()
+        _settle()
+        del engine

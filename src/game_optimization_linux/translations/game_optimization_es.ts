@@ -1806,6 +1806,42 @@
         <source>Ready</source>
         <translation>Listo</translation>
     </message>
+    <message>
+        <source>Not measured</source>
+        <translation>Sin medir</translation>
+    </message>
+    <message>
+        <source>Exact measurement (requires password and keyboard)</source>
+        <translation>Medición exacta (requiere contraseña y teclado)</translation>
+    </message>
+    <message>
+        <source>The optional measurement component is not installed</source>
+        <translation>El componente opcional de medición no está instalado</translation>
+    </message>
+    <message>
+        <source>Runs compsize only after you confirm; the system asks for your password</source>
+        <translation>Ejecuta compsize solo tras confirmar; el sistema pedirá tu contraseña</translation>
+    </message>
+    <message>
+        <source>Start the exact measurement?</source>
+        <translation>¿Iniciar la medición exacta?</translation>
+    </message>
+    <message>
+        <source>compsize reads the real on-disk usage. The system will ask for your administrator password, so a keyboard is needed. Nothing is changed on disk.</source>
+        <translation>compsize lee el uso real en disco. El sistema pedirá la contraseña de administrador, por lo que se necesita un teclado. No se modifica nada en el disco.</translation>
+    </message>
+    <message>
+        <source>Measure</source>
+        <translation>Medir</translation>
+    </message>
+    <message>
+        <source>Additional potential (estimate)</source>
+        <translation>Potencial adicional (estimación)</translation>
+    </message>
+    <message>
+        <source>≈ %1</source>
+        <translation>≈ %1</translation>
+    </message>
 </context>
 <context>
     <name>CouchHints</name>
@@ -7677,6 +7713,10 @@ Continúe solo después de revisar este riesgo.</translation>
         <location line="+2"/>
         <source>Existing %1 setting</source>
         <translation>Ajuste existente: %1</translation>
+    </message>
+    <message>
+        <source>Exact compsize measurement was not requested; savings are not measured</source>
+        <translation>No se solicitó la medición exacta con compsize; el ahorro no se ha medido</translation>
     </message>
 </context>
 <context>

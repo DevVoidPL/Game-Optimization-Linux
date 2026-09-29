@@ -36,6 +36,22 @@ FocusScope {
     property bool confirmationOpen: false
     property string confirmationKind: ""
     property int confirmationChoice: 0
+    // Exact compsize measurement asks for a password (Polkit) and needs a
+    // keyboard. Couch never starts it on its own: only this explicit action.
+    readonly property var compressionCapabilities: controller && controller.systemInfo
+                                                   ? (controller.systemInfo.compressionCapabilities || ({})) : ({})
+    readonly property bool exactMeasurementInstalled: compressionCapabilities.measurementSource === "optional_host_component"
+    readonly property bool gameOnBtrfs: String(game.filesystem || "").toLowerCase() === "btrfs"
+    function measuredValue(key, measuredKey) {
+        return Boolean(game[measuredKey]) ? String(value([key], qsTr("Not measured"))) : qsTr("Not measured")
+    }
+    // On Btrfs the on-disk size is known only from compsize; elsewhere the
+    // directory size is the real physical usage.
+    function physicalUsageText() {
+        var known = gameOnBtrfs ? Boolean(game.physicalSizeMeasuredByCompsize)
+                                : game.physicalSizeBytes !== undefined && game.physicalSizeBytes !== null
+        return known ? String(value(["physicalSize"], qsTr("Not measured"))) : qsTr("Not measured")
+    }
     property bool mangoHudOverlayOpen: false
     property int mangoHudRow: 0
     property var mangoHudProfile: ({})
@@ -337,6 +353,7 @@ FocusScope {
         if (selectedTab === 1) return [
             { "id": "analyze", "icon": App.UiIcons.couchGlyphAnalyze, "iconOnLight": App.UiIcons.couchGlyphAnalyzeOnLight, "symbol": "⌕", "title": qsTr("Analyze"), "subtitle": boolValue(["analysisAllowed"], false) ? qsTr("Inspect the current game") : qsTr("Unavailable for this game"), "enabled": boolValue(["analysisAllowed"], false) },
             { "id": "verify", "icon": App.UiIcons.couchGlyphVerifyCompression, "iconOnLight": App.UiIcons.couchGlyphVerifyCompressionOnLight, "symbol": "✓", "title": qsTr("Verify compression"), "subtitle": boolValue(["analysisAllowed"], false) ? qsTr("Read-only measurement") : qsTr("Unavailable for this game"), "enabled": boolValue(["analysisAllowed"], false) },
+            { "id": "exact-measure", "icon": App.UiIcons.couchGlyphVerifyCompression, "iconOnLight": App.UiIcons.couchGlyphVerifyCompressionOnLight, "symbol": "⚿", "title": qsTr("Exact measurement (requires password and keyboard)"), "subtitle": !page.exactMeasurementInstalled ? qsTr("The optional measurement component is not installed") : !page.gameOnBtrfs || !boolValue(["analysisAllowed"], false) ? qsTr("Unavailable for this game") : qsTr("Runs compsize only after you confirm; the system asks for your password"), "enabled": page.exactMeasurementInstalled && page.gameOnBtrfs && boolValue(["analysisAllowed"], false) },
             { "id": "profile", "icon": App.UiIcons.couchGlyphCompressionProfile, "iconOnLight": App.UiIcons.couchGlyphCompressionProfileOnLight, "symbol": "◈", "title": qsTr("Profile: %1").arg(selectedProfile), "subtitle": boolValue(["analysisProfilesUnlocked"], false) ? qsTr("Choose a planned profile") : qsTr("Analyze the game first"), "enabled": boolValue(["analysisProfilesUnlocked"], false) },
             { "id": "compress", "icon": App.UiIcons.couchGlyphCompress, "iconOnLight": App.UiIcons.couchGlyphCompressOnLight, "symbol": "↓", "title": qsTr("Start compression"), "subtitle": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) ? qsTr("Review the verified plan") : qsTr("A verified Btrfs plan is required"), "enabled": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) }
         ]
@@ -1464,9 +1481,12 @@ FocusScope {
         if (confirmationKind === "optiscaler_reinstall") return qsTr("Reinstall OptiScaler?")
         if (confirmationKind === "optiscaler_install") return qsTr("Install OptiScaler?")
         if (confirmationKind === "optiscaler_conflict") return qsTr("Replace existing files?")
+        if (confirmationKind === "exact_measurement") return qsTr("Start the exact measurement?")
         return qsTr("Review compression plan")
     }
     function confirmationDescription() {
+        if (confirmationKind === "exact_measurement")
+            return qsTr("compsize reads the real on-disk usage. The system will ask for your administrator password, so a keyboard is needed. Nothing is changed on disk.")
         if (confirmationKind === "optiscaler_remove")
             return qsTr("Only files recorded as created by GameOpti will be removed. Replaced files remain available for restoration in Desktop Mode.")
         if (confirmationKind === "optiscaler_conflict") {
@@ -1491,6 +1511,7 @@ FocusScope {
         if (confirmationKind === "optiscaler_reinstall") return qsTr("Reinstall")
         if (confirmationKind === "optiscaler_install") return qsTr("Install")
         if (confirmationKind === "optiscaler_conflict") return qsTr("Back up and replace")
+        if (confirmationKind === "exact_measurement") return qsTr("Measure")
         return qsTr("Start task")
     }
     function activateAction() {
@@ -1512,6 +1533,13 @@ FocusScope {
             return controller.analyzeGame(String(game.id || "")) ? "confirm" : "error"
         if (id === "verify")
             return controller.verifyCompression(String(game.id || "")) ? "confirm" : "error"
+        if (id === "exact-measure") {
+            confirmationChoice = 0
+            confirmationKind = "exact_measurement"
+            confirmationOpen = true
+            if (navigation) navigation.openModal("exact-measurement-confirmation", "cancel")
+            return "open"
+        }
         if (id === "profile") {
             var index = profileNames.indexOf(selectedProfile)
             selectedProfile = profileNames[(index + 1) % profileNames.length]
@@ -1598,7 +1626,9 @@ FocusScope {
             } else if (action === "Confirm") {
                 var completed = true
                 if (confirmationChoice === 1 && controller) {
-                    if (confirmationKind === "optiscaler_remove")
+                    if (confirmationKind === "exact_measurement")
+                        completed = Boolean(controller.exactCompressionMeasurement(String(game.id || "")))
+                    else if (confirmationKind === "optiscaler_remove")
                         completed = Boolean(controller.removeOptiScaler(String(game.id || "")))
                     else if (confirmationKind.indexOf("optiscaler_") === 0)
                         completed = beginCouchOptiScalerOperation()
@@ -2171,11 +2201,11 @@ FocusScope {
             Repeater {
                 model: [
                     { "label": qsTr("Logical size"), "value": String(page.value(["logicalSize"], page.formatBytes(page.value(["scannerLogicalBytes"], -1)))) },
-                    { "label": qsTr("Current physical usage"), "value": String(page.value(["physicalSize"], qsTr("Measurement unavailable"))) },
-                    { "label": qsTr("Current saving"), "value": String(page.value(["savedSpace"], qsTr("Measurement unavailable"))) },
+                    { "label": qsTr("Current physical usage"), "value": page.physicalUsageText() },
+                    { "label": qsTr("Current saving"), "value": page.measuredValue("savedSpace", "savingsMeasured") },
                     { "label": qsTr("Compression effect"), "value": page.value(["compressionEffectPercent"], null) === null ? qsTr("Unavailable") : Number(page.value(["compressionEffectPercent"], 0)).toFixed(2) + "%" },
                     { "label": qsTr("Classification"), "value": page.classificationLabel() },
-                    { "label": qsTr("Additional potential"), "value": page.selectedProjection().available === true ? page.formatBytes(page.selectedProjection().estimatedAdditionalSavingBytes) : qsTr("Unavailable") }
+                    { "label": qsTr("Additional potential (estimate)"), "value": page.selectedProjection().available === true ? qsTr("≈ %1").arg(page.formatBytes(page.selectedProjection().estimatedAdditionalSavingBytes)) : qsTr("Unavailable") }
                 ]
                 delegate: Rectangle {
                     id: storageMetric

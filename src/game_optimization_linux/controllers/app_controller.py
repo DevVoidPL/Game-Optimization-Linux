@@ -232,6 +232,7 @@ class TaskServiceLike(Protocol):
         *,
         confirmed: bool,
         automatic_authorized: bool = False,
+        interactive_measurement: bool = True,
     ) -> Task: ...
 
     def list_tasks(self) -> Sequence[Task]: ...

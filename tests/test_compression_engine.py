@@ -1643,3 +1643,38 @@ def test_removing_task_history_is_record_only_and_keeps_active_work(
         reloaded._tasks.clear()
     assert service.shutdown(wait=True, timeout=1.0)
     assert reloaded.shutdown(wait=True, timeout=1.0)
+
+
+def test_non_interactive_compression_never_calls_the_password_measurement(
+    tmp_path: Path,
+) -> None:
+    """Couch Mode: compression runs without root and never starts pkexec;
+    savings are reported as not measured instead of invented numbers."""
+
+    game = _steam_game(tmp_path)
+    (game.install_path / "payload.bin").write_bytes(b"A" * 8192)
+    report = _report(game)
+    measurements = _PrivilegedMeasurements(logical_bytes=16_384)
+
+    def runner(command: list[str], **_kwargs: object) -> subprocess.CompletedProcess[str]:
+        output = f"8192 8192 0 {command[-1]}" if command[1:3] == ["filesystem", "du"] else ""
+        return subprocess.CompletedProcess(command, 0, output, "")
+
+    provider = _provider(
+        analyzer=_StaticAnalyzer(report),
+        runner=runner,
+        measurement_provider=measurements,
+    )
+    plan = provider.create_plan(game, report, CompressionProfile.BALANCED)
+
+    result = provider.execute_plan(
+        game, plan, confirmed=True, interactive_measurement=False
+    )
+
+    assert measurements.calls == 0                       # no password prompt
+    assert result.actual_saved_bytes is None             # not measured, not 0
+    assert result.verification_state in {"measurement_unavailable", "failed"}
+    assert any("not requested" in warning for warning in result.warnings)
+    # The explicit exact measurement action still uses the provider.
+    provider.measure_current(game, exact=True)
+    assert measurements.calls == 1
