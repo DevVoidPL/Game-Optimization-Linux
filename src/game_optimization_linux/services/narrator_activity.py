@@ -144,16 +144,36 @@ class NarratorGameActivityDetector:
     def _is_game_executable(cls, game: Game, command: str) -> bool:
         folded = str(command).strip().casefold()
         for marker in cls._path_markers(game):
-            if not folded.startswith(marker):
-                continue
-            rest = folded[len(marker):]
-            if rest and rest[0] not in "/\\":
-                continue
-            exe_end = rest.find(".exe")
-            path = rest[: exe_end] if exe_end >= 0 else rest.split(" ", 1)[0]
-            name = path.replace("\\", "/").rsplit("/", 1)[-1]
-            if name and not _LAUNCHER_STUBS.search(name):
-                return True
+            # 1) The process' own executable (argv[0]) is inside the game dir:
+            #    a native binary launched directly (e.g. "<root>/bin/game").
+            if folded.startswith(marker):
+                rest = folded[len(marker):]
+                if not rest or rest[0] in "/\\":
+                    exe_end = rest.find(".exe")
+                    path = rest[:exe_end] if exe_end >= 0 else rest.split(" ", 1)[0]
+                    name = path.replace("\\", "/").rsplit("/", 1)[-1]
+                    if name and not _LAUNCHER_STUBS.search(name):
+                        return True
+            # 2) A game ".exe" under the game dir appears anywhere in the
+            #    command line. Steam/Proton launch the title through a wrapper
+            #    (reaper, proton, wine loader) whose argv[0] is not the game,
+            #    so the real executable is only a later argument. Requiring
+            #    ".exe" keeps launcher scripts and stubs (Play.sh, PlayGTAV)
+            #    from counting as the running game.
+            index = folded.find(marker)
+            while index >= 0:
+                end = index + len(marker)
+                if end < len(folded) and folded[end] in "/\\":
+                    exe_end = folded.find(".exe", end)
+                    if exe_end >= 0:
+                        segment = folded[end:exe_end]
+                        # ".exe" must belong to this path component, not a
+                        # later unrelated argument further down the line.
+                        if " " not in segment and '"' not in segment and "'" not in segment:
+                            name = segment.replace("\\", "/").rsplit("/", 1)[-1]
+                            if name and not _LAUNCHER_STUBS.search(name):
+                                return True
+                index = folded.find(marker, index + 1)
         return False
 
     def _native_commands(self) -> tuple[str, ...] | None:

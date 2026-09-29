@@ -219,3 +219,80 @@ def test_gamepad_select_y_hold_emits_shortcut_once(monkeypatch) -> None:
     provider.emit(GamepadEvent("button", 1, "back", False, 0.0))
     service.pollNow()
     assert "ContextAction1" not in actions and "context_action_1" not in actions
+
+
+def test_strict_detection_matches_proton_wrapper_launched_game_exe(tmp_path: Path) -> None:
+    """Steam/Proton launch the title through a wrapper (reaper/proton/wine),
+    so the game's own .exe is only a later argv token. Autostart must still
+    recognise it, while bare wrappers and launcher stubs must not count."""
+
+    root = tmp_path / "steamapps" / "common" / "Batman Arkham Knight"
+    game = _game(root, "208650")
+    lines: list[str] = []
+    detector = NarratorGameActivityDetector(
+        lambda _key: game, host_processes=lambda: list(lines), sandboxed=True, clock=lambda: 0.0
+    )
+    wine = "Z:" + str(root).replace("/", chr(92))
+    # Reaper wrapper as argv[0], game .exe as a later argument (unix path form).
+    lines[:] = [f"reaper SteamLaunch AppId=208650 -- {root}/Binaries/Win64/BatmanAK.exe -nomovies"]
+    assert detector.game_process_running("208650") is True
+    detector.invalidate("208650")
+    # Wine loader as argv[0], game .exe in Z: wine-path form as a later argument.
+    lines[:] = [f".../proton/dist/bin/wine64 {wine}\\Binaries\\Win64\\BatmanAK.exe"]
+    assert detector.game_process_running("208650") is True
+    detector.invalidate("208650")
+    # Bare wrapper and launcher stubs never count as the running game.
+    lines[:] = [
+        "reaper SteamLaunch AppId=208650 -- proton waitforexitandrun",
+        f"{wine}\\PlayGTAV.exe",
+        f"reaper SteamLaunch AppId=208650 -- {root}/Play.sh",
+    ]
+    assert detector.game_process_running("208650") is False
+
+
+def test_capture_closed_triggers_one_automatic_retry(narrator) -> None:
+    _controller, controller_narrator, _p, _c, _activity, game, _save = narrator
+    key = controller_narrator._game_key(game)
+    starts: list[str] = []
+    controller_narrator.start = lambda game_id, automatic=False: (starts.append(game_id) or True)
+
+    class _Event:
+        def __init__(self, status: str, message: str) -> None:
+            self.status = type("S", (), {"value": status})()
+            self.message = message
+            self.game_key = key
+
+    closed = _Event("error", "The portal capture session closed")
+    # First closure retries once; a second identical closure does not.
+    assert controller_narrator._retry_after_capture_closed(closed, game) is True
+    assert controller_narrator._retry_after_capture_closed(closed, game) is False
+    assert starts == [game.id]
+    # A healthy session clears the guard, so a later closure can retry again.
+    controller_narrator._capture_retry_session.discard(key)
+    assert controller_narrator._retry_after_capture_closed(closed, game) is True
+    # Unrelated errors are never retried.
+    other = _Event("error", "Screen capture stopped")
+    assert controller_narrator._retry_after_capture_closed(other, game) is False
+    assert starts == [game.id, game.id]
+
+
+def test_gamepad_navigation_is_gated_by_window_active_but_shortcut_is_not(narrator) -> None:
+    controller, controller_narrator, _p, _c, _a, _game, _save = narrator
+    controller._interface_mode = "couch"
+    dispatched: list[str] = []
+    controller._couch_navigation.dispatch = lambda value: (dispatched.append(value) or True)
+    toggles: list[int] = []
+    controller_narrator.toggle_for_running_game = lambda: toggles.append(1)
+
+    # Window inactive (a game holds focus): navigation is ignored...
+    controller.setCouchWindowActive(False)
+    controller._on_gamepad_action("NavigateDown")
+    assert dispatched == []
+    # ...but the Select+Y narrator shortcut still works.
+    controller._on_gamepad_shortcut("narrator_toggle")
+    assert toggles == [1]
+
+    # Window active again: navigation is processed.
+    controller.setCouchWindowActive(True)
+    controller._on_gamepad_action("NavigateDown")
+    assert dispatched == ["NavigateDown"]

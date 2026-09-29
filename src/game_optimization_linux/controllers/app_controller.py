@@ -787,6 +787,11 @@ class AppController(QObject):
         self._manual_launch_jobs: dict[str, Future[Any]] = {}
         self._shutdown_requested = False
         self._consume_gamepad_action = ""
+        # Gamepad input reaches the UI only while GameOpti's own window is
+        # active; the Select+Y narrator shortcut is handled separately so it
+        # keeps working while a game holds focus. Default active until QML
+        # reports otherwise, so headless/desktop startup is unchanged.
+        self._window_active = True
         self._last_launch_request: dict[str, float] = {}
         requested_interface_mode = str(initial_interface_mode or "").strip().casefold()
         self._interface_mode = (
@@ -1945,6 +1950,7 @@ class AppController(QObject):
 
     @Slot(bool)
     def setCouchWindowActive(self, active: bool) -> None:
+        self._window_active = bool(active)
         self._ui_sound_service.set_window_active(bool(active))
 
     @Slot(bool)
@@ -2459,6 +2465,12 @@ class AppController(QObject):
             self.toggleInterfaceMode()
             return
         if self._interface_mode == "desktop":
+            return
+        # Only steer GameOpti while its own window is active. When a game holds
+        # focus the window is inactive; gamepad navigation must go to the game,
+        # not to GameOpti. The Select+Y narrator shortcut is handled in
+        # _on_gamepad_shortcut and stays available regardless of focus.
+        if not self._window_active:
             return
         normalized = normalize_gamepad_action(action)
         if normalized is None:

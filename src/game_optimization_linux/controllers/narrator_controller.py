@@ -36,6 +36,8 @@ GAME_STABLE_SECONDS = 8.0
 WINDOW_DELAY_SECONDS = 6.0
 AUTOSTART_DELAY_SECONDS = GAME_STABLE_SECONDS + WINDOW_DELAY_SECONDS
 WATCH_REFRESH_SECONDS = 15.0
+# How often the autostart watcher logs a liveness heartbeat.
+HEARTBEAT_SECONDS = 30.0
 
 
 class NarratorController:
@@ -56,6 +58,13 @@ class NarratorController:
         self._seen_since: dict[str, float] = {}
         self._autostart_done: set[str] = set()
         self._last_decision: dict[str, str] = {}
+        # Autostart watcher heartbeat: an INFO line roughly every 30 s so the
+        # log shows the watcher is alive even when nothing changes.
+        self._heartbeat_at = 0.0
+        # One automatic capture retry after the portal session is closed
+        # (SOURCE_LOST), tracked per game so it fires at most once until the
+        # session recovers to a healthy state.
+        self._capture_retry_session: set[str] = set()
         self._clock = time.monotonic
 
     # -- voice ------------------------------------------------------------------
@@ -126,10 +135,29 @@ class NarratorController:
                 self._log_decision(game_key, "skipped, the game process cannot be observed; start manually")
         self._watched = watched
 
+    def _log_heartbeat(self, now: float, pipeline: object) -> None:
+        """INFO liveness line every ~30 s with the current watcher state."""
+
+        if now < self._heartbeat_at:
+            return
+        self._heartbeat_at = now + HEARTBEAT_SECONDS
+        if getattr(pipeline, "active", False):
+            logger.info(
+                "Narrator autostart heartbeat: session active for %s",
+                getattr(pipeline.snapshot, "game_key", "") or "?",
+            )
+            return
+        logger.info(
+            "Narrator autostart heartbeat: watching %d game(s): %s",
+            len(self._watched),
+            ", ".join(sorted(self._watched)) or "none",
+        )
+
     def _poll_autostart(self) -> None:
         pipeline = self._app._narrator_pipeline
         now = self._clock()
         self._refresh_watch(now)
+        self._log_heartbeat(now, pipeline)
         if pipeline.active:
             # A running session (manual or automatic) is not restarted after
             # the user stops it while the game still runs.
@@ -813,7 +841,13 @@ class NarratorController:
             if game is not None:
                 changed.add(game.id)
             if event.status.value == "error" and event.message:
+                if self._retry_after_capture_closed(event, game):
+                    continue
                 self._app._emit_toast(event.message, "error")
+            elif event.status.value in {"listening", "speaking"} and event.game_key:
+                # A healthy session clears the one-shot retry guard so a later,
+                # independent closure can retry once again.
+                self._capture_retry_session.discard(event.game_key)
         for game_id in changed:
             self._app.narratorChanged.emit(game_id)
         snapshot = self._app._narrator_pipeline.snapshot
@@ -824,6 +858,36 @@ class NarratorController:
 
     def game_for_key(self, game_key: str) -> Game | None:
         return self._game_for_key(game_key)
+
+    # Portal message emitted when the capture session is closed (the chosen
+    # window disappeared or the choice was cancelled). This is the trigger for
+    # a single automatic retry, matched before any translation.
+    _CAPTURE_CLOSED_MARKER = "capture session closed"
+
+    def _retry_after_capture_closed(self, event: object, game: Game | None) -> bool:
+        """One automatic restart after the portal capture session closes.
+
+        Returns True when a retry was triggered (so the error toast is
+        suppressed for this event). The retry fires at most once per session;
+        a second closure surfaces the error to the user as before.
+        """
+
+        message = str(getattr(event, "message", ""))
+        if self._CAPTURE_CLOSED_MARKER not in message.casefold():
+            return False
+        if game is None:
+            return False
+        game_key = str(getattr(event, "game_key", ""))
+        if not game_key or game_key in self._capture_retry_session:
+            return False
+        self._capture_retry_session.add(game_key)
+        logger.info(
+            "Narrator capture: session closed for %s; retrying once", game_key
+        )
+        if self.start(game.id, automatic=True):
+            self._app._emit_toast("Capture session closed; retrying once", "info")
+            return True
+        return False
 
     def _component_action(self, action: str, component_id: str) -> bool:
         if component_id in self._component_jobs:
