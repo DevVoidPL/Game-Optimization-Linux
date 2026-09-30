@@ -2286,6 +2286,34 @@ class AppController(QObject):
     def removeNarratorComponent(self, component_id: str) -> bool:
         return self._narrator_controller.remove_component(component_id)
 
+    @Slot(str, bool, result="QVariantMap")
+    def importNarratorCustomVoice(
+        self, model_file: str, allow_other_language: bool = False
+    ) -> dict[str, Any]:
+        text = str(model_file or "").strip()
+        url = QUrl(text)
+        if url.scheme():
+            if not url.isLocalFile():
+                return {
+                    "success": False,
+                    "errorCode": "not_local",
+                    "error": "Only local voice files are supported",
+                }
+            text = url.toLocalFile()
+        if not text:
+            return {
+                "success": False,
+                "errorCode": "not_onnx",
+                "error": "Choose a Piper voice model file (.onnx)",
+            }
+        return self._narrator_controller.import_custom_voice(
+            Path(text).expanduser(), bool(allow_other_language)
+        )
+
+    @Slot(str, result=bool)
+    def removeNarratorCustomVoice(self, voice_id: str) -> bool:
+        return self._narrator_controller.remove_custom_voice(voice_id)
+
     @Slot(str)
     @Slot(str, str)
     def showToast(self, message: str, level: str = "info") -> None:

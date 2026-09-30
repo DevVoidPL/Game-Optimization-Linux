@@ -7,6 +7,7 @@ from dataclasses import replace
 from datetime import UTC, datetime
 import hashlib
 import logging
+from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Any, Mapping
 
@@ -16,6 +17,10 @@ from game_optimization_linux.models.narrator import (
     CaptureState,
     NarratorGameSettings,
     NarratorSubtitleLanguageMode,
+)
+from game_optimization_linux.services.narrator_tts import (
+    CustomVoiceError,
+    CustomVoiceLanguageError,
 )
 from game_optimization_linux.services.narrator_region import (
     EncodedRegionPreview,
@@ -713,6 +718,13 @@ class NarratorController:
                 getattr(self._app._narrator_pipeline.tts, "voices", ())
             )
         }
+        custom_voices = {
+            str(getattr(voice, "voice_id", ""))
+            for voice in tuple(
+                getattr(self._app._narrator_pipeline.tts, "voices", ())
+            )
+            if bool(getattr(voice, "custom", False))
+        }
         required_components = {
             "capture": "capture.portal-pipewire",
             "ocr": "ocr.polish-local" if polish_mode else "ocr.english-local",
@@ -721,6 +733,10 @@ class NarratorController:
         }
         if not polish_mode:
             required_components["translation"] = "translation.opus-en-pl"
+        if selected_voice in custom_voices:
+            # A user-imported voice has no managed component; its availability
+            # is checked against the installed voice files below.
+            del required_components["tts"]
         component_states = {
             component.component_id: component.state.value
             for component in self._app._narrator_component_manager.list_components()
@@ -1052,6 +1068,61 @@ class NarratorController:
         pipeline.stop()
         self.start(game.id, automatic=automatic)
 
+    def import_custom_voice(
+        self, model_path: Path, allow_other_language: bool = False
+    ) -> dict[str, Any]:
+        """Import a user Piper voice; no checksum, the user owns its license."""
+
+        tts = self._app._narrator_pipeline.tts
+        importer = getattr(tts, "import_custom_voice", None)
+        if not callable(importer):
+            return {
+                "success": False,
+                "errorCode": "unsupported",
+                "error": "Custom voices are not supported",
+            }
+        if self._app._narrator_pipeline.active:
+            return {
+                "success": False,
+                "errorCode": "session_active",
+                "error": "Stop the narrator before adding a voice",
+            }
+        try:
+            voice = importer(model_path, allow_other_language=allow_other_language)
+        except CustomVoiceLanguageError as error:
+            return {
+                "success": False,
+                "needsLanguageConfirmation": True,
+                "language": error.language,
+                "errorCode": error.code,
+                "error": str(error),
+            }
+        except CustomVoiceError as error:
+            logger.info("Narrator custom voice import rejected: %s", error.code)
+            return {
+                "success": False,
+                "errorCode": error.code,
+                "errorDetail": error.detail,
+                "error": str(error),
+            }
+        logger.info("Narrator custom voice imported: %s", voice.voice_id)
+        self._app.narratorComponentsChanged.emit()
+        return {"success": True, "voiceId": voice.voice_id, "name": voice.name}
+
+    def remove_custom_voice(self, voice_id: str) -> bool:
+        tts = self._app._narrator_pipeline.tts
+        remover = getattr(tts, "remove_custom_voice", None)
+        if not callable(remover) or self._app._narrator_pipeline.active:
+            return False
+        try:
+            remover(str(voice_id))
+        except (CustomVoiceError, ValueError, OSError) as error:
+            logger.info("Narrator custom voice removal rejected: %s", error)
+            return False
+        logger.info("Narrator custom voice removed: %s", voice_id)
+        self._app.narratorComponentsChanged.emit()
+        return True
+
     def _component_action(self, action: str, component_id: str) -> bool:
         if component_id in self._component_jobs:
             self._app._emit_toast("This narrator component operation is already running", "warning")
@@ -1218,6 +1289,11 @@ class NarratorController:
                 )
                 name = str(getattr(voice, "name", voice_id))
                 component_id = str(getattr(voice, "component_id", ""))
+            custom = bool(
+                voice.get("custom", False)
+                if isinstance(voice, Mapping)
+                else getattr(voice, "custom", False)
+            )
             if voice_id:
                 installed = bool(
                     getattr(tts, "voice_installed", lambda _voice_id: False)(
@@ -1239,6 +1315,7 @@ class NarratorController:
                         "id": voice_id,
                         "name": name or voice_id,
                         "componentId": component_id,
+                        "custom": custom,
                         "installed": installed,
                         "available": available,
                         "quality": quality if quality in {"low", "medium", "high"} else "",

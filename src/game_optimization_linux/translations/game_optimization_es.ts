@@ -9707,6 +9707,91 @@ Continúe solo después de revisar este riesgo.</translation>
         <source>Speak the character name label before a subtitle line.</source>
         <translation>Leer el nombre del personaje antes de la línea de subtítulos.</translation>
     </message>
+    <message>
+        <location line="+0"/>
+        <source>A custom voice named %1 already exists.</source>
+        <translation>Ya existe una voz propia llamada %1.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Add custom voice...</source>
+        <translation>Añadir voz propia...</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Choose a Piper voice model</source>
+        <translation>Elige un modelo de voz Piper</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Choose a Piper voice model file (.onnx).</source>
+        <translation>Elige un archivo de modelo de voz Piper (.onnx).</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Custom: %1</source>
+        <translation>Propia: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Custom voice added. You are responsible for its license.</source>
+        <translation>Voz propia añadida. Eres responsable de su licencia.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Custom voice imported by you. It is not verified; you are responsible for its license.</source>
+        <translation>Voz propia importada por ti. No está verificada; eres responsable de su licencia.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Import</source>
+        <translation>Importar</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Piper voice models (*.onnx)</source>
+        <translation>Modelos de voz Piper (*.onnx)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Stop the narrator before adding a voice.</source>
+        <translation>Detén el narrador antes de añadir una voz.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The configuration file %1 was not found next to the model. Place the .onnx.json file with the same name next to the .onnx file.</source>
+        <translation>No se encontró el archivo de configuración %1 junto al modelo. Coloca el archivo .onnx.json con el mismo nombre junto al archivo .onnx.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The voice configuration file could not be read.</source>
+        <translation>No se pudo leer el archivo de configuración de la voz.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The voice configuration file is not valid JSON.</source>
+        <translation>El archivo de configuración de la voz no es un JSON válido.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The voice configuration is not a Piper voice.</source>
+        <translation>La configuración no corresponde a una voz Piper.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The voice files could not be copied.</source>
+        <translation>No se pudieron copiar los archivos de la voz.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>This voice is for language &quot;%1&quot;, not Polish. Import it anyway?</source>
+        <translation>Esta voz es para el idioma &quot;%1&quot;, no polaco. ¿Importarla de todos modos?</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Voice is not Polish</source>
+        <translation>La voz no es polaca</translation>
+    </message>
 </context>
 <context>
     <name>NarratorSection</name>

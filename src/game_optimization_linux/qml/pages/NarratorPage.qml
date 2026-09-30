@@ -2,8 +2,10 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import "../components"
+import "../dialogs"
 import ".." as App
 
 Item {
@@ -30,6 +32,7 @@ Item {
     // Shared global setting, also edited in Couch mode settings.
     property bool readSpeakerNames: false
     property string expandedVoiceLicenseId: ""
+    property string customVoiceError: ""
     property real narratorVolume: 0.85
     property real speechRate: 1.0
     // Advanced articulation overrides. When articulationOverridden is false the
@@ -418,14 +421,70 @@ Item {
     }
 
     function removeVoice(voice) {
-        if (sessionActive || !controller
-                || typeof controller.removeNarratorComponent !== "function")
+        if (sessionActive || !controller)
             return
         var voiceIdentifier = String(value(voice, ["id"], ""))
         if (voiceIdentifier === voiceId)
             return
-        controller.removeNarratorComponent(
-                    String(value(voice, ["componentId", "component_id"], "")))
+        if (Boolean(value(voice, ["custom"], false))) {
+            if (typeof controller.removeNarratorCustomVoice === "function")
+                controller.removeNarratorCustomVoice(voiceIdentifier)
+            return
+        }
+        if (typeof controller.removeNarratorComponent === "function")
+            controller.removeNarratorComponent(
+                        String(value(voice, ["componentId", "component_id"], "")))
+    }
+
+    function customVoiceErrorText(code, detail) {
+        if (code === "missing_config")
+            return qsTr("The configuration file %1 was not found next to the model. Place the .onnx.json file with the same name next to the .onnx file.").arg(detail)
+        if (code === "config_invalid_json")
+            return qsTr("The voice configuration file is not valid JSON.")
+        if (code === "config_unreadable")
+            return qsTr("The voice configuration file could not be read.")
+        if (code === "config_not_piper")
+            return qsTr("The voice configuration is not a Piper voice.")
+        if (code === "already_exists")
+            return qsTr("A custom voice named %1 already exists.").arg(detail)
+        if (code === "copy_failed")
+            return qsTr("The voice files could not be copied.")
+        if (code === "session_active")
+            return qsTr("Stop the narrator before adding a voice.")
+        return qsTr("Choose a Piper voice model file (.onnx).")
+    }
+
+    function voiceLabel(voice) {
+        var name = String(value(voice, ["name", "id"], ""))
+        return Boolean(value(voice, ["custom"], false))
+                ? qsTr("Custom: %1").arg(name) : name
+    }
+
+    // Copies a user .onnx + .onnx.json pair; a non-Polish voice needs an
+    // explicit confirmation before it is imported.
+    function importCustomVoice(fileUrl, allowOtherLanguage) {
+        customVoiceError = ""
+        if (sessionActive || !controller
+                || typeof controller.importNarratorCustomVoice !== "function")
+            return
+        var result = controller.importNarratorCustomVoice(String(fileUrl), Boolean(allowOtherLanguage)) || {}
+        if (Boolean(value(result, ["needsLanguageConfirmation"], false))) {
+            customVoiceLanguageDialog.ask(
+                        qsTr("Voice is not Polish"),
+                        qsTr("This voice is for language \"%1\", not Polish. Import it anyway?")
+                            .arg(String(value(result, ["language"], "?"))),
+                        qsTr("Import"), false, String(fileUrl))
+            return
+        }
+        if (!Boolean(value(result, ["success"], false))) {
+            customVoiceError = customVoiceErrorText(
+                        String(value(result, ["errorCode"], "")),
+                        String(value(result, ["errorDetail"], "")))
+            return
+        }
+        voiceId = String(value(result, ["voiceId"], voiceId))
+        if (typeof controller.showToast === "function")
+            controller.showToast(qsTr("Custom voice added. You are responsible for its license."), "warning")
     }
 
     function setReadSpeakerNames(enabled) {
@@ -1179,7 +1238,7 @@ Item {
                                             RadioButton {
                                                 checked: voiceRow.selected
                                                 enabled: !page.sessionActive
-                                                text: String(page.value(voiceRow.modelData, ["name", "id"], ""))
+                                                text: page.voiceLabel(voiceRow.modelData)
                                                 onClicked: page.selectVoice(voiceRow.modelData)
                                             }
 
@@ -1210,7 +1269,8 @@ Item {
 
                                             AppButton {
                                                 visible: !voiceRow.selected && voiceRow.installed
-                                                         && Boolean(page.value(voiceRow.modelData, ["managed"], false))
+                                                         && (Boolean(page.value(voiceRow.modelData, ["managed"], false))
+                                                             || Boolean(page.value(voiceRow.modelData, ["custom"], false)))
                                                 compact: true
                                                 kind: "danger"
                                                 text: qsTr("Remove")
@@ -1232,6 +1292,16 @@ Item {
                                             visible: voiceRow.installing
                                             Layout.fillWidth: true
                                             indeterminateMode: true
+                                        }
+
+                                        Label {
+                                            visible: voiceRow.licenseExpanded
+                                                     && Boolean(page.value(voiceRow.modelData, ["custom"], false))
+                                            Layout.fillWidth: true
+                                            text: qsTr("Custom voice imported by you. It is not verified; you are responsible for its license.")
+                                            color: App.Theme.warning
+                                            font.pixelSize: App.Theme.fontCaption
+                                            wrapMode: Text.WordWrap
                                         }
 
                                         Flow {
@@ -1272,6 +1342,25 @@ Item {
                                     }
                                 }
                             }
+                        }
+
+                        AppButton {
+                            objectName: "narratorAddCustomVoice"
+                            compact: true
+                            kind: "secondary"
+                            text: qsTr("Add custom voice...")
+                            iconSource: App.UiIcons.actionInstall
+                            enabled: !page.sessionActive
+                            onClicked: customVoiceDialog.open()
+                        }
+
+                        Label {
+                            visible: page.customVoiceError.length > 0
+                            Layout.fillWidth: true
+                            text: page.customVoiceError
+                            color: App.Theme.danger
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
                         }
 
                         Label {
@@ -2240,4 +2329,19 @@ Item {
         }
     }
 
+    FileDialog {
+        id: customVoiceDialog
+        objectName: "narratorCustomVoiceDialog"
+        title: qsTr("Choose a Piper voice model")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [qsTr("Piper voice models (*.onnx)")]
+        onAccepted: page.importCustomVoice(selectedFile.toString(), false)
+    }
+
+    ConfirmDialog {
+        id: customVoiceLanguageDialog
+        onConfirmed: function(fileUrl) {
+            page.importCustomVoice(String(fileUrl), true)
+        }
+    }
 }
