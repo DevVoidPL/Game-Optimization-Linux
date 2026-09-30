@@ -113,6 +113,7 @@ from ..services import (
     MangoHudDetector,
     MangoHudLaunchIntegration,
     MangoHudProfileRepository,
+    MangoHudLivePreview,
     ManualGameStore,
     NarratorComponentManager,
     NarratorGameActivityDetector,
@@ -307,6 +308,7 @@ class AppController(QObject):
     interfaceModeChanged = Signal()
     systemUsageChanged = Signal()
     mangoHudProfileChanged = Signal(str)
+    mangoHudLivePreviewChanged = Signal("QVariantMap")
     optiScalerChanged = Signal(str)
     # QVariantMap (not ``object``): QML must be able to read the result.
     optiScalerStatusChanged = Signal(str, "QVariantMap")
@@ -350,6 +352,7 @@ class AppController(QObject):
         mangohud_repository: MangoHudProfileRepository | None = None,
         mangohud_detector: MangoHudDetector | None = None,
         mangohud_launch_integration: MangoHudLaunchIntegration | None = None,
+        mangohud_live_preview: MangoHudLivePreview | None = None,
         optimization_profile_repository: GameOptimizationProfileRepository | None = None,
         optimization_analysis_repository: OptimizationAnalysisRepository | None = None,
         automatic_optimization_repository: AutomaticOptimizationRepository | None = None,
@@ -550,6 +553,15 @@ class AppController(QObject):
             mangohud_launch_integration
             or MangoHudLaunchIntegration(
                 self._mangohud_repository, self._mangohud_detector
+            )
+        )
+        self._mangohud_live_preview = mangohud_live_preview or MangoHudLivePreview(
+            host_service=host_service
+        )
+        # Called from the preview watcher thread; the signal is queued to QML.
+        self._mangohud_live_preview.on_finished = (
+            lambda result: self.mangoHudLivePreviewChanged.emit(
+                {**result.to_dict(), "running": False}
             )
         )
         self._optimization_profile_repository = (
@@ -1754,6 +1766,16 @@ class AppController(QObject):
     def resetMangoHudProfile(self, game_id: str) -> dict[str, Any]:
         return self._mangohud_controller.resetMangoHudProfile(game_id)
 
+    @Slot(str, "QVariantMap", result="QVariantMap")
+    def startMangoHudLivePreview(
+        self, game_id: str, values: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._mangohud_controller.startMangoHudLivePreview(game_id, values)
+
+    @Slot(result=bool)
+    def stopMangoHudLivePreview(self) -> bool:
+        return self._mangohud_controller.stopMangoHudLivePreview()
+
     @Slot(str, result=bool)
     def openMangoHudDirectory(self, game_id: str) -> bool:
         return self._mangohud_controller.openMangoHudDirectory(game_id)
@@ -2335,6 +2357,12 @@ class AppController(QObject):
             self._gamepad_service.stop()
         if hasattr(self, "_ui_sound_service"):
             self._ui_sound_service.shutdown()
+        live_preview = getattr(self, "_mangohud_live_preview", None)
+        if live_preview is not None:
+            try:
+                live_preview.shutdown()
+            except Exception:
+                logger.exception("Could not stop the MangoHud live preview")
         narrator_controller = getattr(self, "_narrator_controller", None)
         narrator_region_selector = getattr(
             self, "_narrator_region_selector", None

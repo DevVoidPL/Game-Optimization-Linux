@@ -52,6 +52,21 @@ Item {
     property string outputFolder: ""
     property string toggleLoggingKey: "Shift_L+F2"
     property var supportedMetrics: []
+    property bool frameTimingGraph: false
+    property string textColor: "FFFFFF"
+    property string gpuColor: "2E9762"
+    property string cpuColor: "2E97CB"
+    property string vramColor: "AD64C1"
+    property string ramColor: "C26693"
+    property string frametimeColor: "00FF00"
+    property string backgroundColor: "020202"
+    // Preset metric sets and the HUD layout both come from the backend model
+    // that also generates MangoHud.conf.
+    property var presetMetricSets: ({})
+    property var previewLayout: ({})
+    property bool configExpanded: false
+    property bool livePreviewRunning: false
+    property string livePreviewMessage: ""
     property int categoryIndex: 0
 
     signal toastRequested(string message, string tone)
@@ -119,8 +134,25 @@ Item {
         "logInterval": logInterval,
         "outputFolder": outputFolder,
         "toggleLoggingKey": toggleLoggingKey,
-        "executablePath": selectedExecutable
+        "executablePath": selectedExecutable,
+        "frameTimingGraph": frameTimingGraph,
+        "textColor": textColor,
+        "gpuColor": gpuColor,
+        "cpuColor": cpuColor,
+        "vramColor": vramColor,
+        "ramColor": ramColor,
+        "frametimeColor": frametimeColor,
+        "backgroundColor": backgroundColor
     })
+    readonly property var colorModel: [
+        { "id": "textColor", "label": qsTr("Text color") },
+        { "id": "gpuColor", "label": qsTr("GPU color") },
+        { "id": "cpuColor", "label": qsTr("CPU color") },
+        { "id": "vramColor", "label": qsTr("VRAM color") },
+        { "id": "ramColor", "label": qsTr("RAM color") },
+        { "id": "frametimeColor", "label": qsTr("Frametime graph color") },
+        { "id": "backgroundColor", "label": qsTr("Background color") }
+    ]
 
     readonly property var executableValues: executableCandidates.map(function(item) {
         return String(item.relativePath || "")
@@ -161,22 +193,84 @@ Item {
         return supportedMetrics.length === 0 || supportedMetrics.indexOf(metric) >= 0
     }
 
+    function sameMetricSet(left, right) {
+        if (left.length !== right.length) return false
+        for (var index = 0; index < left.length; ++index)
+            if (right.indexOf(left[index]) < 0) return false
+        return true
+    }
+
+    // A manual metric change makes the profile "custom" unless the resulting
+    // set is exactly one of the presets (never "disabled").
+    function presetForMetrics(values) {
+        var candidates = ["fps_only", "basic", "extended"]
+        for (var index = 0; index < candidates.length; ++index) {
+            var known = presetMetricSets[candidates[index]]
+            if (known && sameMetricSet(values, known)) return candidates[index]
+        }
+        return "custom"
+    }
+
     function setMetric(metric, selected) {
         var next = metrics.slice()
         var index = next.indexOf(metric)
         if (selected && index < 0) next.push(metric)
         else if (!selected && index >= 0) next.splice(index, 1)
         metrics = next
-        preset = "custom"
+        preset = presetForMetrics(next)
         profileEnabled = true
         changed()
     }
 
     function presetMetrics(value) {
-        if (value === "fps_only") return ["fps", "frametime"]
-        if (value === "basic") return ["fps", "frametime", "gpu_usage", "cpu_usage", "gpu_temperature", "cpu_temperature", "vram", "ram"]
-        if (value === "extended") return ["fps", "frametime", "gpu_usage", "cpu_usage", "gpu_temperature", "cpu_temperature", "gpu_clock", "cpu_clock", "gpu_power", "cpu_power", "vram", "ram", "process_memory", "process_vram", "wine_proton", "resolution", "gamemode"]
-        return value === "disabled" ? [] : metrics
+        if (value === "disabled") return []
+        if (value === "custom") return metrics
+        var known = presetMetricSets[value]
+        return known ? Array.from(known) : metrics
+    }
+
+    function hudBackground(hex, alpha) {
+        var base = Qt.lighter(hex, 1.0)
+        return Qt.rgba(base.r, base.g, base.b, alpha)
+    }
+
+    function colorValue(name) { return String(tab[name] || "") }
+    function validColor(value) { return /^[0-9A-Fa-f]{6}$/.test(String(value)) }
+    function setColor(name, value) {
+        var normalized = String(value || "").replace("#", "").toUpperCase()
+        if (!validColor(normalized) || tab[name] === normalized) return
+        tab[name] = normalized
+        changed()
+    }
+
+    function startLivePreview() {
+        livePreviewMessage = ""
+        if (!controller || !controller.startMangoHudLivePreview || gameId.length === 0) return
+        var result = controller.startMangoHudLivePreview(gameId, draftMap) || ({})
+        livePreviewRunning = Boolean(result.running)
+        if (!result.success) livePreviewMessage = livePreviewErrorText(result)
+    }
+
+    function stopLivePreview() {
+        if (controller && controller.stopMangoHudLivePreview) controller.stopMangoHudLivePreview()
+    }
+
+    function livePreviewErrorText(result) {
+        var code = String(result && result.code || "")
+        if (code === "vkcube_missing") return qsTr("Live preview requires the vulkan-tools package")
+        if (code === "mangohud_missing") return App.I18n.message(String(result.message || ""))
+        if (code === "already_running") return qsTr("A live preview is already running")
+        if (code === "disabled") return qsTr("Select a preset with metrics first")
+        if (code === "process_failed")
+            return qsTr("The live preview ended with an error: %1").arg(String(result.message || ""))
+        return qsTr("Could not start the live preview: %1").arg(String(result && result.message || ""))
+    }
+
+    function copyConfig() {
+        configTextEdit.selectAll()
+        configTextEdit.copy()
+        configTextEdit.deselect()
+        toastRequested(qsTr("Configuration copied"), "success")
     }
 
     function choosePreset(value) {
@@ -221,6 +315,17 @@ Item {
         outputFolder = String(result && result.outputFolder || "")
         toggleLoggingKey = String(result && result.toggleLoggingKey || "Shift_L+F2")
         supportedMetrics = result && result.supportedMetrics ? Array.from(result.supportedMetrics) : []
+        frameTimingGraph = Boolean(result && result.frameTimingGraph)
+        textColor = String(result && result.textColor || "FFFFFF")
+        gpuColor = String(result && result.gpuColor || "2E9762")
+        cpuColor = String(result && result.cpuColor || "2E97CB")
+        vramColor = String(result && result.vramColor || "AD64C1")
+        ramColor = String(result && result.ramColor || "C26693")
+        frametimeColor = String(result && result.frametimeColor || "00FF00")
+        backgroundColor = String(result && result.backgroundColor || "020202")
+        presetMetricSets = result && result.presetMetrics ? result.presetMetrics : ({})
+        previewLayout = result && result.previewLayout ? result.previewLayout : ({})
+        livePreviewRunning = Boolean(result && result.livePreviewRunning)
         profilePath = String(result && result.profilePath || "")
         configPath = String(result && result.configPath || "")
         configPreview = String(result && result.configPreview || "")
@@ -248,7 +353,9 @@ Item {
         var result = controller.previewMangoHudProfile(gameId, draftMap)
         if (result && result.success)
         {
+            errorMessage = ""
             configPreview = String(result.configPreview || "")
+            previewLayout = result.previewLayout || ({})
             fpsLimit = Number(result.fpsLimit || 0)
             fpsLimitOwner = String(result.fpsLimitOwner || "none")
             activationStrategy = String(result.activationStrategy || activationStrategy)
@@ -269,7 +376,17 @@ Item {
         else errorMessage = String(result && result.error || qsTr("Could not save MangoHud profile"))
     }
 
+    // Short debounce: slider drags and typing rebuild only the preview model.
     Timer { id: previewTimer; interval: 180; repeat: false; onTriggered: tab.refreshPreview() }
+
+    Connections {
+        target: tab.controller ? tab.controller : null
+        ignoreUnknownSignals: true
+        function onMangoHudLivePreviewChanged(result) {
+            tab.livePreviewRunning = Boolean(result && result.running)
+            tab.livePreviewMessage = result && !result.success ? tab.livePreviewErrorText(result) : ""
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent
@@ -406,9 +523,38 @@ Item {
                                 AppSlider { from: 0; to: 64; stepSize: 1; value: tab.roundCorners; onMoved: { tab.roundCorners = Math.round(value); tab.changed() } }
                             }
                             SettingRow { Layout.fillWidth: true; title: qsTr("Compact layout"); AppSwitch { checked: tab.compact; onToggled: { tab.compact = checked; tab.changed() } } }
-                            SettingRow { Layout.fillWidth: true; title: qsTr("Horizontal layout"); AppSwitch { checked: tab.horizontal; onToggled: { tab.horizontal = checked; tab.changed() } } }
+                            SettingRow { Layout.fillWidth: true; title: qsTr("Horizontal layout"); AppSwitch { objectName: "mangoHudHorizontal"; checked: tab.horizontal; onToggled: { tab.horizontal = checked; tab.changed() } } }
+                            Repeater {
+                                model: tab.colorModel
+                                delegate: SettingRow {
+                                    id: colorRow
+                                    required property var modelData
+                                    Layout.fillWidth: true
+                                    title: modelData.label
+                                    description: "#" + tab.colorValue(modelData.id)
+                                    RowLayout {
+                                        spacing: 8
+                                        Rectangle {
+                                            Layout.preferredWidth: 26
+                                            Layout.preferredHeight: 26
+                                            radius: 6
+                                            color: "#" + tab.colorValue(colorRow.modelData.id)
+                                            border.width: 1
+                                            border.color: App.Theme.borderStrong
+                                        }
+                                        AppTextField {
+                                            objectName: "mangoHudColor_" + colorRow.modelData.id
+                                            Layout.preferredWidth: 100
+                                            text: tab.colorValue(colorRow.modelData.id)
+                                            maximumLength: 7
+                                            validator: RegularExpressionValidator { regularExpression: /#?[0-9A-Fa-f]{0,6}/ }
+                                            onTextEdited: tab.setColor(colorRow.modelData.id, text)
+                                        }
+                                    }
+                                }
+                            }
                             SettingRow {
-                                Layout.fillWidth: true; title: qsTr("Table columns"); description: qsTr("Supported by MangoHud %1").arg(tab.appId ? "" : "")
+                                Layout.fillWidth: true; title: qsTr("Table columns"); description: qsTr("Cells per line in the vertical layout")
                                 SpinBox { from: 1; to: 6; value: tab.tableColumns; onValueModified: { tab.tableColumns = value; tab.changed() } }
                             }
                         }
@@ -419,6 +565,16 @@ Item {
                             spacing: 5
                             Label { text: qsTr("Metrics"); color: App.Theme.text; font.pixelSize: 20; font.weight: Font.Bold }
                             Label { Layout.fillWidth: true; text: qsTr("Only options supported by the detected MangoHud configuration are selectable."); color: App.Theme.textSecondary; wrapMode: Text.WordWrap }
+                            SettingRow {
+                                Layout.fillWidth: true
+                                title: qsTr("Frametime graph")
+                                description: qsTr("Line graph of recent frame times")
+                                AppSwitch {
+                                    objectName: "mangoHudFrameTimingGraph"
+                                    checked: tab.frameTimingGraph
+                                    onToggled: { tab.frameTimingGraph = checked; tab.changed() }
+                                }
+                            }
                             Repeater {
                                 model: tab.metricModel
                                 delegate: SettingRow {
@@ -428,6 +584,7 @@ Item {
                                     title: modelData.label
                                     description: tab.metricSupported(modelData.id) ? "" : qsTr("Unavailable in this MangoHud version")
                                     AppSwitch {
+                                        objectName: "mangoHudMetric_" + metricRow.modelData.id
                                         enabled: tab.metricSupported(metricRow.modelData.id)
                                         checked: tab.hasMetric(metricRow.modelData.id)
                                         onToggled: tab.setMetric(metricRow.modelData.id, checked)
@@ -553,10 +710,29 @@ Item {
                                 ToolTip.text: text
                                 HoverHandler { id: conflictHover }
                             }
-                            Label { Layout.fillWidth: true; text: qsTr("Generated configuration"); color: App.Theme.textSecondary }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                AppButton {
+                                    objectName: "mangoHudConfigToggle"
+                                    Layout.fillWidth: true
+                                    kind: "secondary"
+                                    compact: true
+                                    text: (tab.configExpanded ? "\u25BE " : "\u25B8 ") + qsTr("Generated configuration")
+                                    onClicked: tab.configExpanded = !tab.configExpanded
+                                }
+                                AppButton {
+                                    objectName: "mangoHudConfigCopy"
+                                    kind: "secondary"
+                                    compact: true
+                                    text: qsTr("Copy")
+                                    enabled: tab.configPreview.length > 0
+                                    onClicked: tab.copyConfig()
+                                }
+                            }
                             Rectangle {
+                                visible: tab.configExpanded
                                 Layout.fillWidth: true; Layout.preferredHeight: 260; radius: App.Theme.radiusMedium; color: App.Theme.input; clip: true
-                                ScrollView { anchors.fill: parent; anchors.margins: 10; contentWidth: availableWidth; TextEdit { width: parent.width; readOnly: true; selectByMouse: true; text: tab.configPreview; color: App.Theme.text; font.family: "monospace"; wrapMode: TextEdit.WrapAnywhere } }
+                                ScrollView { anchors.fill: parent; anchors.margins: 10; contentWidth: availableWidth; TextEdit { id: configTextEdit; objectName: "mangoHudConfigText"; width: parent.width; readOnly: true; selectByMouse: true; text: tab.configPreview; color: App.Theme.text; font.family: "monospace"; wrapMode: TextEdit.WrapAnywhere } }
                             }
                             Label { Layout.fillWidth: true; text: qsTr("Profile: %1").arg(tab.profilePath || "-"); color: App.Theme.textMuted; elide: Text.ElideMiddle; ToolTip.visible: profileHover.hovered; ToolTip.text: text; HoverHandler { id: profileHover } }
                             Label { Layout.fillWidth: true; text: qsTr("Configuration: %1").arg(tab.configPath || "-"); color: App.Theme.textMuted; elide: Text.ElideMiddle; ToolTip.visible: configHover.hovered; ToolTip.text: text; HoverHandler { id: configHover } }
@@ -573,10 +749,19 @@ Item {
                 padding: 14
                 contentItem: ColumnLayout {
                     spacing: 10
-                    Label { text: qsTr("Visual preview"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
-                    Label { Layout.fillWidth: true; text: qsTr("Example data - not live game measurements"); color: App.Theme.warning; font.pixelSize: App.Theme.fontCaption; wrapMode: Text.WordWrap }
+                    Label { text: qsTr("Layout preview - sample values"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+                    Label { Layout.fillWidth: true; text: qsTr("Built from the current settings. Values are examples, not measurements, and the look is approximate."); color: App.Theme.warning; font.pixelSize: App.Theme.fontCaption; wrapMode: Text.WordWrap }
                     Rectangle {
                         id: previewSurface
+                        objectName: "mangoHudPreviewSurface"
+                        readonly property var layout: tab.previewLayout || ({})
+                        readonly property string corner: String(layout.position || "top-left")
+                        readonly property bool horizontalLayout: Boolean(layout.horizontal)
+                        readonly property bool compactLayout: Boolean(layout.compact)
+                        // The surface stands for a 1280 px wide screen.
+                        readonly property real screenScale: width / 1280
+                        readonly property real textSize: Math.max(7, Number(layout.fontSize || 24) * Math.max(screenScale, 0.3))
+                        readonly property real cellSpacing: compactLayout ? 2 : 5
                         Layout.fillWidth: true
                         Layout.preferredHeight: width * 0.62
                         radius: App.Theme.radiusMedium
@@ -584,24 +769,125 @@ Item {
                         clip: true
                         Rectangle {
                             id: hudPreview
-                            width: tab.horizontal ? Math.min(parent.width - 12, 250) : Math.min(parent.width - 12, 150)
-                            height: tab.horizontal ? 42 : Math.min(parent.height - 12, 138)
-                            radius: Math.min(tab.roundCorners, Math.min(width, height) / 2)
-                            color: Qt.rgba(0.02, 0.02, 0.02, tab.backgroundAlpha)
-                            x: tab.position.indexOf("right") >= 0 ? parent.width - width - 6 : tab.position.indexOf("center") >= 0 ? (parent.width - width) / 2 : 6
-                            y: tab.position.indexOf("bottom") === 0 ? parent.height - height - 6 : tab.position.indexOf("middle") === 0 ? (parent.height - height) / 2 : 6
-                            Flow {
-                                anchors.fill: parent
-                                anchors.margins: 8
-                                spacing: tab.compact ? 3 : 6
-                                flow: tab.horizontal ? Flow.LeftToRight : Flow.TopToBottom
-                                Label { visible: tab.hasMetric("fps"); text: "FPS 60"; color: "#F4F7FB"; font.pixelSize: Math.max(9, Math.min(18, tab.fontSize * 0.55)); font.weight: Font.Bold }
-                                Label { visible: tab.hasMetric("gpu_usage"); text: "GPU 78%"; color: "#65DDB9"; font.pixelSize: Math.max(9, Math.min(18, tab.fontSize * 0.55)) }
-                                Label { visible: tab.hasMetric("cpu_usage"); text: "CPU 42%"; color: "#79B8FF"; font.pixelSize: Math.max(9, Math.min(18, tab.fontSize * 0.55)) }
-                                Label { visible: tab.hasMetric("vram"); text: "VRAM 5.2 GiB"; color: "#D49AF2"; font.pixelSize: Math.max(9, Math.min(18, tab.fontSize * 0.55)) }
-                                Label { visible: tab.hasMetric("ram"); text: "RAM 12.4 GiB"; color: "#F29BC0"; font.pixelSize: Math.max(9, Math.min(18, tab.fontSize * 0.55)) }
+                            objectName: "mangoHudPreviewHud"
+                            visible: !Boolean(previewSurface.layout.empty)
+                            readonly property real inset: previewSurface.compactLayout ? 3 : 6
+                            width: Math.min(parent.width - 8, hudContent.implicitWidth + inset * 2)
+                            height: Math.min(parent.height - 8, hudContent.implicitHeight + inset * 2)
+                            radius: Math.min(Number(previewSurface.layout.roundCorners || 0) * Math.max(previewSurface.screenScale, 0.3), Math.min(width, height) / 2)
+                            color: tab.hudBackground(String(previewSurface.layout.backgroundColor || "#020202"), Number(previewSurface.layout.backgroundAlpha !== undefined ? previewSurface.layout.backgroundAlpha : 0.5))
+                            // MangoHud has no border option; none is drawn here either.
+                            border.width: 0
+                            x: previewSurface.corner.indexOf("right") >= 0 ? parent.width - width - 4
+                               : previewSurface.corner.indexOf("center") >= 0 ? (parent.width - width) / 2 : 4
+                            y: previewSurface.corner.indexOf("bottom") === 0 ? parent.height - height - 4
+                               : previewSurface.corner.indexOf("middle") === 0 ? (parent.height - height) / 2 : 4
+                            clip: true
+                            Column {
+                                id: hudContent
+                                x: hudPreview.inset
+                                y: hudPreview.inset
+                                spacing: previewSurface.cellSpacing
+                                Grid {
+                                    objectName: "mangoHudPreviewGrid"
+                                    visible: !previewSurface.horizontalLayout
+                                    columns: Math.max(1, Number(previewSurface.layout.tableColumns || 3))
+                                    columnSpacing: previewSurface.cellSpacing * 2
+                                    rowSpacing: previewSurface.compactLayout ? 0 : previewSurface.cellSpacing / 2
+                                    Repeater {
+                                        model: previewSurface.horizontalLayout ? [] : (previewSurface.layout.cells || [])
+                                        delegate: Label {
+                                            required property var modelData
+                                            text: String(modelData.text || "")
+                                            color: String(modelData.color || "transparent")
+                                            font.pixelSize: previewSurface.textSize
+                                            font.weight: modelData.label ? Font.Bold : Font.Normal
+                                        }
+                                    }
+                                }
+                                Row {
+                                    objectName: "mangoHudPreviewRow"
+                                    visible: previewSurface.horizontalLayout
+                                    spacing: previewSurface.cellSpacing * 2
+                                    Repeater {
+                                        model: previewSurface.horizontalLayout ? (previewSurface.layout.inlineCells || []) : []
+                                        delegate: Label {
+                                            required property var modelData
+                                            text: String(modelData.text || "")
+                                            color: String(modelData.color || "transparent")
+                                            font.pixelSize: previewSurface.textSize
+                                            font.weight: modelData.label ? Font.Bold : Font.Normal
+                                        }
+                                    }
+                                }
+                                Row {
+                                    objectName: "mangoHudPreviewGraph"
+                                    visible: Boolean(previewSurface.layout.frameTimingGraph)
+                                    height: Math.max(10, previewSurface.textSize * 2)
+                                    spacing: 1
+                                    Repeater {
+                                        model: [6, 7, 6, 8, 6, 5, 7, 12, 6, 6, 7, 6, 5, 6, 9, 6, 6, 7, 6, 6]
+                                        delegate: Rectangle {
+                                            required property int modelData
+                                            anchors.bottom: parent ? parent.bottom : undefined
+                                            width: Math.max(2, previewSurface.textSize * 0.45)
+                                            height: parent ? parent.height * modelData / 12 : 0
+                                            color: String(previewSurface.layout.frametimeColor || "#00FF00")
+                                        }
+                                    }
+                                }
                             }
                         }
+                        Label {
+                            anchors.centerIn: parent
+                            visible: Boolean(previewSurface.layout.empty)
+                            text: qsTr("MangoHud shows no metrics with these settings")
+                            color: App.Theme.textMuted
+                            font.pixelSize: App.Theme.fontCaption
+                        }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        visible: (tab.previewLayout.hiddenMetrics || []).length > 0
+                        text: qsTr("Some GPU, CPU or frametime values are hidden: MangoHud shows them only with GPU usage, CPU usage or FPS enabled.")
+                        color: App.Theme.warning
+                        font.pixelSize: App.Theme.fontCaption
+                        wrapMode: Text.WordWrap
+                    }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+                        AppButton {
+                            objectName: "mangoHudLivePreviewButton"
+                            Layout.fillWidth: true
+                            text: qsTr("Live preview")
+                            kind: "secondary"
+                            enabled: tab.profileLoaded && !tab.livePreviewRunning && tab.profileEnabled && tab.metrics.length > 0
+                            onClicked: tab.startLivePreview()
+                        }
+                        AppButton {
+                            objectName: "mangoHudStopLivePreviewButton"
+                            visible: tab.livePreviewRunning
+                            text: qsTr("Close preview")
+                            kind: "secondary"
+                            onClicked: tab.stopLivePreview()
+                        }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Runs mangohud vkcube with the current settings. Nothing is saved.")
+                        color: App.Theme.textMuted
+                        font.pixelSize: App.Theme.fontCaption
+                        wrapMode: Text.WordWrap
+                    }
+                    Label {
+                        objectName: "mangoHudLivePreviewMessage"
+                        Layout.fillWidth: true
+                        visible: tab.livePreviewMessage.length > 0
+                        text: tab.livePreviewMessage
+                        color: App.Theme.danger
+                        font.pixelSize: App.Theme.fontCaption
+                        wrapMode: Text.WordWrap
                     }
                     Label { Layout.fillWidth: true; text: qsTr("Preset: %1").arg(tab.presetModel[tab.indexOf(tab.presetModel.map(function(item) { return item.id }), tab.preset, 0)].label); color: App.Theme.textSecondary; elide: Text.ElideRight }
                     Label { Layout.fillWidth: true; text: qsTr("%1 metrics selected").arg(tab.metrics.length); color: App.Theme.textSecondary }
@@ -622,6 +908,7 @@ Item {
             Layout.fillWidth: true
             Label { Layout.fillWidth: true; text: tab.dirty ? qsTr("Unsaved changes") : qsTr("Profile saved"); color: tab.dirty ? App.Theme.warning : App.Theme.textMuted }
             AppButton {
+                objectName: "resetMangoHudProfileButton"
                 text: qsTr("Reset Game Optimization settings")
                 kind: "secondary"
                 onClicked: if (tab.controller && tab.controller.resetMangoHudProfile) tab.applyProfile(tab.controller.resetMangoHudProfile(tab.gameId))

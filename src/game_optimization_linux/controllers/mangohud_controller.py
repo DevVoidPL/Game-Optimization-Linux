@@ -16,6 +16,7 @@ from ..services import (
     SteamLaunchError,
     uses_flatpak_steam,
 )
+from ..services.mangohud import display_config_text, hud_layout, preset_metric_sets
 
 if TYPE_CHECKING:
     from .app_controller import AppController
@@ -148,6 +149,41 @@ class MangoHudController:
         result["success"] = True
         return result
 
+    def startMangoHudLivePreview(
+        self, game_id: str, values: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Run ``mangohud vkcube`` with the current, possibly unsaved, draft.
+
+        Nothing is saved: the draft is rendered into a temporary config that
+        the preview service deletes when the process ends.
+        """
+
+        game = self._app._resolve_game(game_id, show_error=False)
+        app_id = self._profile_key(game)
+        if game is None or not app_id:
+            return {"success": False, "code": "unsupported_game",
+                    "message": "MangoHud profiles require a supported game"}
+        try:
+            profile = self._effective_mangohud_profile(
+                self._app._mangohud_profile_from_payload(app_id, values)
+            )
+        except Exception as error:
+            return {"success": False, "code": "invalid", "message": str(error)}
+        if not profile.enabled or not profile.metrics:
+            return {"success": False, "code": "disabled",
+                    "message": "Select a preset with metrics first"}
+        availability = self._app._mangohud_detector.detect("native")
+        text = MangoHudConfigWriter(availability.supported_keys).render(profile)
+        result = self._app._mangohud_live_preview.start(text).to_dict()
+        if result["code"] == "mangohud_missing":
+            # The same installation hint as the MangoHud availability banner.
+            result["message"] = availability.message or result["message"]
+        result["running"] = self._app._mangohud_live_preview.running
+        return result
+
+    def stopMangoHudLivePreview(self) -> bool:
+        return self._app._mangohud_live_preview.stop()
+
     def openMangoHudDirectory(self, game_id: str) -> bool:
         game = self._app._resolve_game(game_id, show_error=False)
         app_id = self._profile_key(game)
@@ -213,6 +249,14 @@ class MangoHudController:
             "toggleLoggingKey": "toggle_logging_key",
             "selectedExecutable": "executable_path",
             "executablePath": "executable_path",
+            "frameTimingGraph": "frame_timing_graph",
+            "textColor": "text_color",
+            "gpuColor": "gpu_color",
+            "cpuColor": "cpu_color",
+            "vramColor": "vram_color",
+            "ramColor": "ram_color",
+            "frametimeColor": "frametime_color",
+            "backgroundColor": "background_color",
         }
         normalized = {aliases.get(str(key), str(key)): value for key, value in values.items()}
         preset = str(normalized.get("preset", base.preset)).strip().lower()
@@ -240,6 +284,14 @@ class MangoHudController:
             "output_folder",
             "toggle_logging_key",
             "executable_path",
+            "frame_timing_graph",
+            "text_color",
+            "gpu_color",
+            "cpu_color",
+            "vram_color",
+            "ram_color",
+            "frametime_color",
+            "background_color",
         }
         for key, value in normalized.items():
             if key in allowed:
@@ -301,6 +353,16 @@ class MangoHudController:
                 "outputFolder": profile.output_folder,
                 "toggleLoggingKey": profile.toggle_logging_key,
                 "executablePath": profile.executable_path,
+                "frameTimingGraph": profile.frame_timing_graph,
+                "textColor": profile.text_color,
+                "gpuColor": profile.gpu_color,
+                "cpuColor": profile.cpu_color,
+                "vramColor": profile.vram_color,
+                "ramColor": profile.ram_color,
+                "frametimeColor": profile.frametime_color,
+                "backgroundColor": profile.background_color,
+                "presetMetrics": preset_metric_sets(),
+                "livePreviewRunning": self._app._mangohud_live_preview.running,
                 "updatedAt": profile.updated_at.astimezone(UTC).isoformat(),
                 "profilePath": str(self._app._mangohud_repository.profile_path(profile.app_id)),
                 "configPath": str(self._app._mangohud_repository.config_path(profile.app_id)),
@@ -318,7 +380,10 @@ class MangoHudController:
         )
         data.update(strategy.to_dict())
         writer = MangoHudConfigWriter(availability.supported_keys)
-        data["configPreview"] = writer.render(effective_profile)
+        # The generator and the layout preview read the same normalized
+        # profile and supported keys.  Displayed text never shows $HOME.
+        data["configPreview"] = display_config_text(writer.render(effective_profile))
+        data["previewLayout"] = hud_layout(effective_profile, writer.supported_keys)
         return data
 
     def _effective_mangohud_profile(self, profile: MangoHudProfile) -> MangoHudProfile:

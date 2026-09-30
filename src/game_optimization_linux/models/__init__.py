@@ -78,12 +78,14 @@ from .manual_game import (
 )
 from .settings import AppSettings
 from .mangohud import (
+    MANGOHUD_DEFAULT_COLORS,
     MANGOHUD_METRICS,
     MANGOHUD_POSITIONS,
     MANGOHUD_PRESETS,
     MANGOHUD_SCHEMA_VERSION,
     MangoHudProfile,
     PRESET_METRICS,
+    preset_for_metrics,
     validate_app_id,
     validate_game_key,
 )
@@ -206,6 +208,7 @@ __all__ = [
     "GamepadEvent",
     "GamepadType",
     "Launcher",
+    "MANGOHUD_DEFAULT_COLORS",
     "MANGOHUD_METRICS",
     "MANGOHUD_POSITIONS",
     "MANGOHUD_PRESETS",
@@ -243,6 +246,7 @@ __all__ = [
     "OptiScalerProfile",
     "PostLaunchBehavior",
     "PRESET_METRICS",
+    "preset_for_metrics",
     "SessionType",
     "SizeScanStatus",
     "SystemInfo",

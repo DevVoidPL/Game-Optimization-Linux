@@ -8356,6 +8356,126 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Save profile</source>
         <translation>Save profile</translation>
     </message>
+    <message>
+        <location line="+0" />
+        <source>A live preview is already running</source>
+        <translation>A live preview is already running</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Background color</source>
+        <translation>Background color</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Built from the current settings. Values are examples, not measurements, and the look is approximate.</source>
+        <translation>Built from the current settings. Values are examples, not measurements, and the look is approximate.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cells per line in the vertical layout</source>
+        <translation>Cells per line in the vertical layout</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Close preview</source>
+        <translation>Close preview</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Configuration copied</source>
+        <translation>Configuration copied</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Copy</source>
+        <translation>Copy</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Could not start the live preview: %1</source>
+        <translation>Could not start the live preview: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>CPU color</source>
+        <translation>CPU color</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Frametime graph</source>
+        <translation>Frametime graph</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Frametime graph color</source>
+        <translation>Frametime graph color</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>GPU color</source>
+        <translation>GPU color</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Layout preview - sample values</source>
+        <translation>Layout preview - sample values</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Line graph of recent frame times</source>
+        <translation>Line graph of recent frame times</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Live preview</source>
+        <translation>Live preview</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Live preview requires the vulkan-tools package</source>
+        <translation>Live preview requires the vulkan-tools package</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>MangoHud shows no metrics with these settings</source>
+        <translation>MangoHud shows no metrics with these settings</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>RAM color</source>
+        <translation>RAM color</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Runs mangohud vkcube with the current settings. Nothing is saved.</source>
+        <translation>Runs mangohud vkcube with the current settings. Nothing is saved.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Select a preset with metrics first</source>
+        <translation>Select a preset with metrics first</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Some GPU, CPU or frametime values are hidden: MangoHud shows them only with GPU usage, CPU usage or FPS enabled.</source>
+        <translation>Some GPU, CPU or frametime values are hidden: MangoHud shows them only with GPU usage, CPU usage or FPS enabled.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Text color</source>
+        <translation>Text color</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The live preview ended with an error: %1</source>
+        <translation>The live preview ended with an error: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>VRAM color</source>
+        <translation>VRAM color</translation>
+    </message>
 </context>
 <context>
     <name>ManualGameDialog</name>

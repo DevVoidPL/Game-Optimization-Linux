@@ -2957,6 +2957,90 @@ def probe_tasks_lifecycle(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+def _mangohud_control_interactions(
+    application: QGuiApplication,
+    view: QQuickView,
+    root: QQuickItem,
+    repository: Any,
+) -> dict[str, Any]:
+    """Drive real MangoHud controls with mouse and keyboard, then save/reload."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        if not item.isVisible():
+            raise AssertionError(f"MangoHud control {name} is not visible")
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(
+            view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y()))
+        )
+        _settle(application, 6)
+
+    def wait_preview() -> None:
+        QTest.qWait(260)
+        _settle(application, 6)
+
+    def layout() -> dict[str, Any]:
+        return dict(_variant(root.property("previewLayout")) or {})
+
+    result: dict[str, Any] = {}
+    root.setProperty("categoryIndex", 2)
+    _settle(application, 8)
+    click("mangoHudFrameTimingGraph")
+    result["graph_dirty"] = root.property("dirty") is True
+    wait_preview()
+    result["graph_in_preview"] = bool(layout().get("frameTimingGraph")) and _item(
+        root, "mangoHudPreviewGraph"
+    ).isVisible()
+    click("mangoHudMetric_gpu_power")
+    result["manual_metric_preset"] = str(root.property("preset"))
+    click("mangoHudMetric_gpu_power")
+    result["restored_metric_preset"] = str(root.property("preset"))
+
+    root.setProperty("categoryIndex", 1)
+    _settle(application, 8)
+    click("mangoHudColor_gpuColor")
+    QTest.keyClick(view, Qt.Key_A, Qt.ControlModifier)
+    for character in "ff0000":
+        QTest.keyClick(view, character)
+    _settle(application, 6)
+    result["color_value"] = str(root.property("gpuColor"))
+    wait_preview()
+    cells = layout().get("cells") or []
+    result["preview_gpu_label_color"] = str(cells[0].get("color", "")) if cells else ""
+    click("mangoHudHorizontal")
+    wait_preview()
+    result["horizontal_preview"] = (
+        _item(root, "mangoHudPreviewRow").isVisible()
+        and not _item(root, "mangoHudPreviewGrid").isVisible()
+    )
+    result["unsaved_before_save"] = root.property("dirty") is True
+
+    click("saveMangoHudProfileButton")
+    _settle(application, 10)
+    saved = repository.load(str(root.property("appId")))
+    config = repository.config_path(saved.app_id).read_text(encoding="utf-8").splitlines()
+    result["saved_clean"] = root.property("dirty") is False
+    result["saved_fields"] = [saved.frame_timing_graph, saved.gpu_color, saved.horizontal]
+    result["saved_keys"] = [
+        "frame_timing" in config, "gpu_color=FF0000" in config, "horizontal" in config
+    ]
+
+    _invoke_qml(root, "loadProfile")
+    _settle(application, 10)
+    result["reloaded_color_text"] = str(_item(root, "mangoHudColor_gpuColor").property("text"))
+    result["reloaded_graph"] = root.property("frameTimingGraph") is True
+
+    click("resetMangoHudProfileButton")
+    _settle(application, 10)
+    result["reset_color_text"] = str(_item(root, "mangoHudColor_gpuColor").property("text"))
+    result["reset_horizontal_switch"] = bool(_item(root, "mangoHudHorizontal").property("checked"))
+    result["reset_preset"] = str(root.property("preset"))
+    return result
+
+
 def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     """Exercise the rendered Desktop editor against an isolated real controller."""
 
@@ -3069,6 +3153,8 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
         "save_button_inside": True,
         "screenshot_size": screenshot.stat().st_size,
     }
+    # Runs after the base result: its final reset removes the saved config.
+    result.update(_mangohud_control_interactions(application, view, root, repository))
     view.close()
     controller.shutdown()
     return result

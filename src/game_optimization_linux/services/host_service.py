@@ -58,6 +58,7 @@ _HOST_EXECUTABLES = frozenset(
         "gamemoded",
         "mangohud",
         "vulkaninfo",
+        "vkcube",
         "btrfs",
         "compsize",
         "bottles",
@@ -90,6 +91,10 @@ _TOOL_SPECS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("com.heroicgameslauncher.hgl",),
     ),
     "lutris": (("lutris",), ("net.lutris.Lutris",)),
+}
+_LIVE_PREVIEW_PROBES: dict[str, tuple[str, ...]] = {
+    "mangohud": ("--version",),
+    "vkcube": ("--help",),
 }
 _VERSION_ARGUMENTS: dict[str, tuple[str, ...]] = {
     "flatpak": ("--version",),
@@ -333,6 +338,19 @@ class HostServiceClient:
             )
         self._tool_cache[normalized] = dict(payload)
         return payload
+
+    def host_command_available(self, command: str) -> bool:
+        """Whether a MangoHud live-preview command exists on the host PATH.
+
+        Only the two fixed preview programs are accepted.  ``vkcube --help``
+        prints usage and exits without opening a window.
+        """
+
+        arguments = _LIVE_PREVIEW_PROBES.get(str(command))
+        if arguments is None:
+            raise HostServiceError("Unsupported host preview command")
+        result = self._run_fixed(str(command), arguments, timeout=8.0)
+        return result is not None and not self._missing_command(result)
 
     def _steam_info(self) -> dict[str, Any]:
         """Detect Steam without starting the client or any compatibility probe."""

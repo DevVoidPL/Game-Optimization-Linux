@@ -307,6 +307,23 @@ def test_mangohud_desktop_editor_renders_and_saves_appid_profile(tmp_path: Path)
     assert result["application_config"].endswith("/MangoHud/wine-Spelunky.conf")
     assert result["application_config_managed"] is True
     assert result["save_button_inside"] is True
+    # Real clicks/typing: dirty, save, exact MangoHud keys, reload and reset.
+    assert result["graph_dirty"] is True
+    assert result["graph_in_preview"] is True
+    assert result["manual_metric_preset"] == "custom"
+    assert result["restored_metric_preset"] == "basic"
+    assert result["color_value"] == "FF0000"
+    assert result["preview_gpu_label_color"].upper() == "#FF0000"
+    assert result["horizontal_preview"] is True
+    assert result["unsaved_before_save"] is True
+    assert result["saved_clean"] is True
+    assert result["saved_fields"] == [True, "FF0000", True]
+    assert result["saved_keys"] == [True, True, True]
+    assert result["reloaded_color_text"] == "FF0000"
+    assert result["reloaded_graph"] is True
+    assert result["reset_color_text"] == "2E9762"
+    assert result["reset_horizontal_switch"] is False
+    assert result["reset_preset"] == "disabled"
 
 
 def test_optimization_desktop_editor_saves_real_appid_profile(tmp_path: Path) -> None:
