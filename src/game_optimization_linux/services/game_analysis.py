@@ -105,6 +105,30 @@ class GameAnalyzer:
             system=snapshot,
         )
 
+    def detect_engine(self, root: Path) -> tuple[DetectedValue, str]:
+        """Detect the engine of a game directory with the existing signatures.
+
+        Returns the detected value (``Unknown`` when no signature is reliable)
+        and the engine version when the files state it.  Read-only and bounded
+        by ``maximum_files``.
+        """
+
+        resolved = Path(root).resolve(strict=True)
+        if not resolved.is_dir():
+            raise ValueError("Game root is not a directory")
+        files = self._scan(resolved)
+        folded = {relative.casefold(): path for relative, path in files}
+        engine = self._detect_engine(resolved, files, folded)
+        return (
+            DetectedValue(
+                engine.name,
+                engine.confidence,
+                "filesystem signatures" if engine.evidence else "no reliable signature",
+                engine.evidence,
+            ),
+            engine.version,
+        )
+
     def _scan(self, root: Path) -> tuple[tuple[str, Path], ...]:
         results: list[tuple[str, Path]] = []
         seen = 0

@@ -326,6 +326,32 @@ def test_mangohud_desktop_editor_renders_and_saves_appid_profile(tmp_path: Path)
     assert result["reset_preset"] == "disabled"
 
 
+def test_deep_analysis_ui_starts_cancels_filters_and_exports(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "deep")
+    result = payload["result"]
+    assert result["notice"] == (
+        "The analysis does not change game files. Review items require manual "
+        "confirmation in the next stage."
+    )
+    assert result["apply_enabled"] is False
+    assert result["initial_status"] == "idle"
+    assert result["running_status"] == "running"
+    assert result["progress_visible"] is True and result["cancel_visible"] is True
+    assert result["analyze_disabled_while_running"] is True
+    assert result["cancelled_status"] == "cancelled"
+    assert result["cancelled_saved"] is False
+    assert result["completed_status"] == "completed"
+    assert result["categories"] == ["languages", "audio", "cache", "residues", "textures", "btrfs"]
+    assert result["audio_rendered"] is True
+    assert "confidence" in result["engine_label"]
+    assert result["filter"] == "review"
+    assert result["filtered_safeties"] == ["review"]
+    assert result["export_schema"] == 1
+    assert result["export_private"] is False
+    assert result["export_message"].startswith("Report exported")
+    assert result["game_unchanged"] is True
+
+
 def test_gamescope_desktop_sections_follow_capabilities_and_persist(tmp_path: Path) -> None:
     payload = _run_probe(tmp_path, "gamescope")
     result = payload["result"]

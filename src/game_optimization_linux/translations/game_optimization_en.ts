@@ -16085,4 +16085,397 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <translation>Application updates will be delivered later through Flatpak or the system package manager.</translation>
     </message>
 </context>
+<context>
+    <name>DeepAnalysisSection</name>
+    <message>
+        <location line="+0" />
+        <source> (allocated blocks, approximate)</source>
+        <translation> (allocated blocks, approximate)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source> (confidence %1%)</source>
+        <translation> (confidence %1%)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source> (estimated)</source>
+        <translation> (estimated)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source> in %1 files</source>
+        <translation> in %1 files</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source> (measured with compsize)</source>
+        <translation> (measured with compsize)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1%</source>
+        <translation>%1%</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 files, %2</source>
+        <translation>%1 files, %2</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Active Proton prefix (compatdata)</source>
+        <translation>Active Proton prefix (compatdata)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>All</source>
+        <translation>All</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Already compressed formats</source>
+        <translation>Already compressed formats</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Analyze deeply</source>
+        <translation>Analyze deeply</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Analyzing</source>
+        <translation>Analyzing</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>and %1 more files</source>
+        <translation>and %1 more files</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Apply plan - available in the next stage</source>
+        <translation>Apply plan - available in the next stage</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Audio</source>
+        <translation>Audio</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Backup copies</source>
+        <translation>Backup copies</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Backups inside save/config folders</source>
+        <translation>Backups inside save/config folders</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Btrfs compression</source>
+        <translation>Btrfs compression</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cache and logs</source>
+        <translation>Cache and logs</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancelled</source>
+        <translation>Cancelled</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Chinese</source>
+        <translation>Chinese</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Completed</source>
+        <translation>Completed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Compression 2.0: deep analysis</source>
+        <translation>Compression 2.0: deep analysis</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Crash dumps</source>
+        <translation>Crash dumps</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Czech</source>
+        <translation>Czech</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Deep analysis is available; transparent compression requires Btrfs</source>
+        <translation>Deep analysis is available; transparent compression requires Btrfs</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Engine</source>
+        <translation>Engine</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Engine cache</source>
+        <translation>Engine cache</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Engine packages (core, opaque)</source>
+        <translation>Engine packages (core, opaque)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>English</source>
+        <translation>English</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Export deep analysis report</source>
+        <translation>Export deep analysis report</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Export JSON report</source>
+        <translation>Export JSON report</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Failed</source>
+        <translation>Failed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>File system</source>
+        <translation>File system</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>French</source>
+        <translation>French</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>German</source>
+        <translation>German</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Italian</source>
+        <translation>Italian</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Japanese</source>
+        <translation>Japanese</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>JSON reports (*.json)</source>
+        <translation>JSON reports (*.json)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Korean</source>
+        <translation>Korean</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Languages</source>
+        <translation>Languages</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Leftovers</source>
+        <translation>Leftovers</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Likely worth compressing</source>
+        <translation>Likely worth compressing</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Logical size</source>
+        <translation>Logical size</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Not analyzed</source>
+        <translation>Not analyzed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Not reversible once removed</source>
+        <translation>Not reversible once removed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Nothing found for this filter</source>
+        <translation>Nothing found for this filter</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Old logs</source>
+        <translation>Old logs</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Physical size</source>
+        <translation>Physical size</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Polish</source>
+        <translation>Polish</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Portuguese</source>
+        <translation>Portuguese</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Proton prefixes of uninstalled games</source>
+        <translation>Proton prefixes of uninstalled games</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recent logs</source>
+        <translation>Recent logs</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Redistributable installers</source>
+        <translation>Redistributable installers</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Report exported: %1</source>
+        <translation>Report exported: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Reversible (restored by the launcher or regenerated)</source>
+        <translation>Reversible (restored by the launcher or regenerated)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Review</source>
+        <translation>Review</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Russian</source>
+        <translation>Russian</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Safe</source>
+        <translation>Safe</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Separate HD texture pack</source>
+        <translation>Separate HD texture pack</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Shader cache of this game</source>
+        <translation>Shader cache of this game</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Shared / neutral audio</source>
+        <translation>Shared / neutral audio</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Shared Wwise banks (SFX)</source>
+        <translation>Shared Wwise banks (SFX)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Source: %1. Nothing is selected for removal automatically.</source>
+        <translation>Source: %1. Nothing is selected for removal automatically.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Spanish</source>
+        <translation>Spanish</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam shader cache of this game</source>
+        <translation>Steam shader cache of this game</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam shader cache of uninstalled games</source>
+        <translation>Steam shader cache of uninstalled games</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Target language</source>
+        <translation>Target language</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Temporary files</source>
+        <translation>Temporary files</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Texture files (required)</source>
+        <translation>Texture files (required)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Textures and packages</source>
+        <translation>Textures and packages</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The analysis does not change game files. Review items require manual confirmation in the next stage.</source>
+        <translation>The analysis does not change game files. Review items require manual confirmation in the next stage.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The analysis was cancelled. No incomplete report was saved.</source>
+        <translation>The analysis was cancelled. No incomplete report was saved.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The report could not be exported</source>
+        <translation>The report could not be exported</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Unknown compressibility</source>
+        <translation>Unknown compressibility</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Unsupported</source>
+        <translation>Unsupported</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Why detected</source>
+        <translation>Why detected</translation>
+    </message>
+</context>
 </TS>

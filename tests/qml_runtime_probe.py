@@ -3160,6 +3160,130 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+def probe_deep_analysis(application: QGuiApplication) -> dict[str, Any]:
+    """Read-only deep analysis UI: start, progress, cancel, filter and export."""
+
+    import threading
+
+    from PySide6.QtCore import QPoint, QPointF, QUrl
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import GamepadService, SettingsStore
+    from game_optimization_linux.services.deep_optimization import (
+        DeepAnalysisRepository,
+        DeepOptimizationAnalyzer,
+    )
+    from game_optimization_linux.services.game_analysis import GameAnalyzer
+    from game_optimization_linux.services.game_executable import GameExecutableResolver
+
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-deep-qml-"))
+    game_root = temporary_root / "game"
+    for relative, data in {
+        "audio/pl_PL/dialogue.pck": b"p" * 10, "audio/en_US/dialogue.pck": b"e" * 20,
+        "common/dialogue.pck": b"c" * 5, "Logs/old.log": b"l", "Game.exe": b"MZ",
+        "Textures/rock_low.dds": b"t", "data/level.pak": b"k" * 8,
+    }.items():
+        path = game_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    os.utime(game_root / "Logs/old.log", (1_000_000_000, 1_000_000_000))
+    before = {
+        str(path.relative_to(game_root)): (path.stat().st_mtime_ns, path.read_bytes())
+        for path in game_root.rglob("*") if path.is_file()
+    }
+    game = replace(demo_games()[0], install_path=game_root, library_path=None, steam_app_id="4242")
+    release = threading.Event()
+    detector = GameAnalyzer(GameExecutableResolver())
+
+    def gated_engine(root: Path):
+        release.wait(5.0)
+        return detector.detect_engine(root)
+
+    repository = DeepAnalysisRepository(temporary_root / "data" / "deep-analysis")
+    controller = AppController(
+        parent=application,
+        ui_sound_service=NoOpUiSoundService(),
+        game_provider=DemoGameProvider((game,)),
+        settings_store=SettingsStore(temporary_root / "settings.json"),
+        gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        deep_analysis_repository=repository,
+        deep_analyzer=DeepOptimizationAnalyzer(
+            engine_detector=gated_engine, system_language=lambda: "pl",
+            running_detector=lambda _root: (),
+        ),
+        auto_refresh=False,
+    )
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 2400)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", controller.games[0]["id"])
+    _settle(application, 10)
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        if not item.isVisible() or not item.property("enabled"):
+            raise AssertionError(f"Deep analysis control {name} is not clickable")
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    def wait_status(expected: str) -> None:
+        deadline = time.monotonic() + 6.0
+        while time.monotonic() < deadline and str(root.property("status")) != expected:
+            QTest.qWait(50)
+        _settle(application, 6)
+
+    result: dict[str, Any] = {
+        "notice": str(_item(root, "deepAnalysisReadOnlyNotice").property("text")),
+        "apply_enabled": bool(_item(root, "deepApplyButton").property("enabled")),
+        "initial_status": str(root.property("status")),
+    }
+    click("deepAnalyzeButton")
+    QTest.qWait(300)
+    _settle(application, 6)
+    result["running_status"] = str(root.property("status"))
+    result["progress_visible"] = _item(root, "deepAnalysisProgress").isVisible()
+    result["cancel_visible"] = _item(root, "deepCancelButton").isVisible()
+    result["analyze_disabled_while_running"] = not bool(_item(root, "deepAnalyzeButton").property("enabled"))
+    click("deepCancelButton")
+    release.set()
+    wait_status("cancelled")
+    result["cancelled_status"] = str(root.property("status"))
+    result["cancelled_saved"] = repository.path(game.id).exists()
+
+    click("deepAnalyzeButton")
+    wait_status("completed")
+    result["completed_status"] = str(root.property("status"))
+    analysis = dict(_variant(root.property("analysis")) or {})
+    result["categories"] = [item["id"] for item in analysis.get("categories", [])]
+    result["audio_rendered"] = bool(_named(root, "deepCategory_audio"))
+    result["engine_label"] = str(_item(root, "deepEngineLabel").property("text"))
+    click("deepFilter_review")
+    filtered = dict(_variant(root.property("analysis")) or {})
+    result["filter"] = filtered.get("filter")
+    result["filtered_safeties"] = sorted({
+        group["safety"] for category in filtered.get("categories", []) for group in category["groups"]
+    })
+    click("deepFilter_all")
+    export_path = temporary_root / "exports" / "report.json"
+    _invoke_qml(root, "exportReport", QUrl.fromLocalFile(str(export_path)).toString())
+    _settle(application, 4)
+    text = export_path.read_text(encoding="utf-8")
+    result["export_schema"] = json.loads(text)["schemaVersion"]
+    result["export_private"] = str(temporary_root) in text
+    result["export_message"] = str(_item(root, "deepExportMessage").property("text"))
+    after = {
+        str(path.relative_to(game_root)): (path.stat().st_mtime_ns, path.read_bytes())
+        for path in game_root.rglob("*") if path.is_file()
+    }
+    result["game_unchanged"] = before == after
+    view.close()
+    controller.shutdown()
+    return result
+
+
 GAMESCOPE_PROBE_OPTIONS = (
     "-W", "-H", "-w", "-h", "-r", "--framerate-limit", "-f", "-b", "-S", "-F",
     "--display-index", "--sharpness", "--fsr-sharpness", "--adaptive-sync", "-g",
@@ -4661,6 +4785,7 @@ def main() -> int:
             "mangohud",
             "optimization",
             "gamescope",
+            "deep",
             "couch",
             "couch_settings",
             "updates",
@@ -4702,6 +4827,8 @@ def main() -> int:
         result = probe_optimization_editor(application)
     elif args.mode == "gamescope":
         result = probe_gamescope_editor(application)
+    elif args.mode == "deep":
+        result = probe_deep_analysis(application)
     elif args.mode == "couch":
         result = probe_couch(application, args.width, args.height, args.scenario, args.theme)
     elif args.mode == "couch_settings":

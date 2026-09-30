@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 from pathlib import Path
 from queue import SimpleQueue
 from threading import Event
@@ -155,6 +156,8 @@ from .games_model import GamesListModel
 from .library_controller import LibraryController
 from .library_scanner import LibraryScanner
 from .mangohud_controller import MangoHudController
+from .deep_optimization_controller import DeepOptimizationController
+from ..services.deep_optimization import DeepAnalysisRepository, DeepOptimizationAnalyzer
 from .narrator_controller import NarratorController
 from .narrator_region_selector import NarratorRegionSelectorCoordinator
 from .optimization_controller import OptimizationController
@@ -311,6 +314,7 @@ class AppController(QObject):
     mangoHudProfileChanged = Signal(str)
     mangoHudLivePreviewChanged = Signal("QVariantMap")
     gamescopeTestChanged = Signal("QVariantMap")
+    deepAnalysisChanged = Signal(str)
     optiScalerChanged = Signal(str)
     # QVariantMap (not ``object``): QML must be able to read the result.
     optiScalerStatusChanged = Signal(str, "QVariantMap")
@@ -355,6 +359,8 @@ class AppController(QObject):
         mangohud_detector: MangoHudDetector | None = None,
         mangohud_launch_integration: MangoHudLaunchIntegration | None = None,
         mangohud_live_preview: MangoHudLivePreview | None = None,
+        deep_analysis_repository: DeepAnalysisRepository | None = None,
+        deep_analyzer: DeepOptimizationAnalyzer | None = None,
         gamescope_test_run: GamescopeTestRun | None = None,
         optimization_profile_repository: GameOptimizationProfileRepository | None = None,
         optimization_analysis_repository: OptimizationAnalysisRepository | None = None,
@@ -454,10 +460,15 @@ class AppController(QObject):
             host_service = HostServiceClient()
         self._host_service = host_service
         analyzer: BtrfsCompressionAnalyzer | None = None
+        deep_report_loader = None
         if not self._demo_mode and task_service is None:
             analyzer = BtrfsCompressionAnalyzer(
                 filesystem_provider=self._filesystem_provider,
                 host_service=host_service,
+            )
+            deep_cache = AnalysisCache(ANALYSIS_CACHE_FILE)
+            deep_report_loader = lambda game, cancel: deep_cache.load(  # noqa: E731
+                game, cancel_event=cancel
             )
             if update_tracker is None and not explicit_provider:
                 update_tracker = GameUpdateTracker(
@@ -595,6 +606,24 @@ class AppController(QObject):
         self._optimization_advisor = optimization_advisor or OptimizationAdvisor()
         self._game_analyzer = GameAnalyzer(
             self._mangohud_launch_integration.executable_resolver
+        )
+        # Read-only deep cleaning/compression analysis reuses the existing
+        # engine detector, filesystem provider and Btrfs integration.
+        self._deep_optimization_controller = DeepOptimizationController(
+            self,
+            deep_analyzer or DeepOptimizationAnalyzer(
+                engine_detector=self._game_analyzer.detect_engine,
+                filesystem_provider=self._filesystem_provider,
+                btrfs_analyzer=analyzer,
+                btrfs_report_loader=deep_report_loader,
+                compsize_available=lambda: self._deep_compsize_available(),
+                installed_app_ids=lambda: tuple(
+                    str(game.steam_app_id)
+                    for game in self._domain_games.values()
+                    if game.steam_app_id
+                ),
+            ),
+            deep_analysis_repository or DeepAnalysisRepository(),
         )
         self._game_settings_advisor = GameSettingsAdvisor()
         self._mangohud_log_parser = MangoHudLogParser()
@@ -2072,6 +2101,34 @@ class AppController(QObject):
     ) -> dict[str, Any]:
         return self._optimization_controller.saveOptimizationProfile(game_id, values)
 
+    def _deep_compsize_available(self) -> bool:
+        if self._host_service is not None:
+            try:
+                return self._host_service.tool_info("compsize").get("available") is True
+            except Exception:
+                return False
+        return shutil.which("compsize") is not None
+
+    @Slot(str, result="QVariantMap")
+    def startDeepAnalysis(self, game_id: str) -> dict[str, Any]:
+        return self._deep_optimization_controller.start(game_id)
+
+    @Slot(str, result=bool)
+    def cancelDeepAnalysis(self, game_id: str) -> bool:
+        return self._deep_optimization_controller.cancel(game_id)
+
+    @Slot(str, str, result="QVariantMap")
+    def getDeepAnalysis(self, game_id: str, safety_filter: str = "all") -> dict[str, Any]:
+        return self._deep_optimization_controller.state(game_id, safety_filter)
+
+    @Slot(str, str, result="QVariantMap")
+    def setDeepAnalysisLanguage(self, game_id: str, language: str) -> dict[str, Any]:
+        return self._deep_optimization_controller.set_language(game_id, language)
+
+    @Slot(str, str, result="QVariantMap")
+    def exportDeepAnalysis(self, game_id: str, destination: str) -> dict[str, Any]:
+        return self._deep_optimization_controller.export(game_id, destination)
+
     @Slot(result="QVariantMap")
     def refreshGamescopeDetection(self) -> dict[str, Any]:
         return self._optimization_controller.refreshGamescopeDetection()
@@ -2389,6 +2446,12 @@ class AppController(QObject):
             self._gamepad_service.stop()
         if hasattr(self, "_ui_sound_service"):
             self._ui_sound_service.shutdown()
+        deep_controller = getattr(self, "_deep_optimization_controller", None)
+        if deep_controller is not None:
+            try:
+                deep_controller.shutdown()
+            except Exception:
+                logger.exception("Could not stop the deep analysis")
         gamescope_test = getattr(self, "_gamescope_test_run", None)
         if gamescope_test is not None:
             try:
