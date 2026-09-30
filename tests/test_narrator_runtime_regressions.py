@@ -207,7 +207,7 @@ def test_split_merge_does_not_hide_changed_numbers():
 def test_ocr_variants_of_one_line_are_read_once(tmp_path: Path, caplog):
     """Facts from a game: one line read by OCR in three ways is spoken once."""
     caplog.set_level(
-        logging.INFO, logger="game_optimization_linux.services.narrator_pipeline"
+        logging.DEBUG, logger="game_optimization_linux.services.narrator_pipeline"
     )
     replay = Replay(tmp_path, polish=True)
     try:
@@ -229,6 +229,14 @@ def test_ocr_variants_of_one_line_are_read_once(tmp_path: Path, caplog):
             if record.getMessage().startswith("Narrator OCR:")
         ]
         assert len(lines) == 6
+        info_lines = [
+            record.getMessage()
+            for record in caplog.records
+            if record.levelno >= logging.INFO
+            and record.getMessage().startswith("Narrator OCR:")
+        ]
+        assert len(info_lines) == 1
+        assert "decision=accepted" in info_lines[0]
         assert "decision=accepted" in lines[1]
         assert lines[-1].startswith(
             "Narrator OCR: raw='2959sj Siema tu (@9s Adamo' "

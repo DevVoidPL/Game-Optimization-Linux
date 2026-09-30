@@ -231,9 +231,9 @@ class NarratorController:
                         )
                         self.stop()
                     else:
-                        logger.info(
-                            "Narrator autostart: %s: session was started manually; keeping it",
+                        self._log_decision(
                             game_key,
+                            "session was started manually; keeping it",
                         )
                 continue
             if game_key == active_key:

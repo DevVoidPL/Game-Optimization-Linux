@@ -66,6 +66,12 @@ class PiperSynthesis:
     client_decode_ms: float | None = None
     worker_startup_ms: float | None = None
     worker_reused: bool = True
+    worker_pid: int = 0
+    worker_thread_name: str = ""
+    process_nice: int | None = None
+    onnx_intra_op_threads: int = 0
+    onnx_inter_op_threads: int = 0
+    onnx_execution_mode: str = ""
     # The length_scale Piper actually used, and the voice's own default, as
     # reported by the worker. length_scale is inverse to speed.
     length_scale: float | None = None
@@ -138,9 +144,20 @@ class PiperWorkerClient:
         self._stderr_tail: deque[str] = deque(maxlen=40)
         self.initialization_ms: float | None = None
         self.startup_ms: float | None = None
+        self.worker_pid = 0
+        self.worker_thread_name = ""
+        self.process_nice: int | None = None
+        self.onnx_intra_op_threads = 0
+        self.onnx_inter_op_threads = 0
+        self.onnx_execution_mode = ""
+        self.last_start_reused = False
 
     def start(self) -> None:
         with self._io_lock:
+            existing = self._process
+            self.last_start_reused = bool(
+                existing is not None and existing.poll() is None
+            )
             self._ensure_process()
 
     def synthesize(
@@ -217,6 +234,22 @@ class PiperWorkerClient:
                 client_decode_ms=decode_ms,
                 worker_startup_ms=self.startup_ms if not reused else None,
                 worker_reused=reused,
+                worker_pid=self._response_int(response, "worker_pid") or self.worker_pid,
+                worker_thread_name=self._response_string(
+                    response, "worker_thread"
+                ) or self.worker_thread_name,
+                process_nice=self._response_int(response, "process_nice"),
+                onnx_intra_op_threads=(
+                    self._response_int(response, "onnx_intra_op_threads")
+                    or self.onnx_intra_op_threads
+                ),
+                onnx_inter_op_threads=(
+                    self._response_int(response, "onnx_inter_op_threads")
+                    or self.onnx_inter_op_threads
+                ),
+                onnx_execution_mode=self._response_string(
+                    response, "onnx_execution_mode"
+                ) or self.onnx_execution_mode,
                 length_scale=self._response_float(response, "length_scale"),
                 voice_default_length_scale=self._response_float(
                     response, "voice_default_length_scale"
@@ -294,6 +327,23 @@ class PiperWorkerClient:
         self.initialization_ms = self._response_float(
             response, "initialization_ms"
         )
+        self.worker_pid = (
+            self._response_int(response, "worker_pid")
+            or int(getattr(process, "pid", 0) or 0)
+        )
+        self.worker_thread_name = self._response_string(
+            response, "worker_thread"
+        )
+        self.process_nice = self._response_int(response, "process_nice")
+        self.onnx_intra_op_threads = (
+            self._response_int(response, "onnx_intra_op_threads") or 0
+        )
+        self.onnx_inter_op_threads = (
+            self._response_int(response, "onnx_inter_op_threads") or 0
+        )
+        self.onnx_execution_mode = self._response_string(
+            response, "onnx_execution_mode"
+        )
         return process
 
     @staticmethod
@@ -304,6 +354,21 @@ class PiperWorkerClient:
             return max(0.0, float(response[name]))
         except (KeyError, TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _response_int(response: dict[str, object], name: str) -> int | None:
+        try:
+            value = response[name]
+            if isinstance(value, bool):
+                return None
+            return int(value)
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _response_string(response: dict[str, object], name: str) -> str:
+        value = response.get(name)
+        return str(value) if isinstance(value, str) else ""
 
     def _read_response(self, process: subprocess.Popen[str]) -> dict[str, object]:
         assert process.stdout is not None
@@ -376,6 +441,7 @@ class PiperPolishTtsProvider:
         self._inference_lock = Lock()
         self._worker: PiperWorker | None = None
         self._worker_voice_id = ""
+        self._last_prepare_reused: bool | None = None
 
     def prepare(self, voice_id: str) -> None:
         """Load only the selected voice in the persistent worker."""
@@ -388,9 +454,52 @@ class PiperPolishTtsProvider:
             if callable(start):
                 try:
                     start()
+                    reused = getattr(worker, "last_start_reused", None)
+                    self._last_prepare_reused = (
+                        bool(reused) if isinstance(reused, bool) else None
+                    )
                 except Exception:
                     self._drop_worker(worker)
                     raise
+
+    @property
+    def model_prepare_reused(self) -> bool | None:
+        return self._last_prepare_reused
+
+    def _worker_value(self, name: str, default: object) -> object:
+        with self._state_lock:
+            worker = self._worker
+        return getattr(worker, name, default) if worker is not None else default
+
+    @property
+    def worker_pid(self) -> int:
+        return int(self._worker_value("worker_pid", 0) or 0)
+
+    @property
+    def worker_thread_name(self) -> str:
+        return str(self._worker_value("worker_thread_name", "") or "")
+
+    @property
+    def worker_initialization_ms(self) -> float | None:
+        value = self._worker_value("initialization_ms", None)
+        return float(value) if isinstance(value, (int, float)) else None
+
+    @property
+    def worker_process_nice(self) -> int | None:
+        value = self._worker_value("process_nice", None)
+        return int(value) if isinstance(value, int) and not isinstance(value, bool) else None
+
+    @property
+    def worker_onnx_intra_op_threads(self) -> int:
+        return int(self._worker_value("onnx_intra_op_threads", 0) or 0)
+
+    @property
+    def worker_onnx_inter_op_threads(self) -> int:
+        return int(self._worker_value("onnx_inter_op_threads", 0) or 0)
+
+    @property
+    def worker_onnx_execution_mode(self) -> str:
+        return str(self._worker_value("onnx_execution_mode", "") or "")
 
     @property
     def model_path(self) -> Path:

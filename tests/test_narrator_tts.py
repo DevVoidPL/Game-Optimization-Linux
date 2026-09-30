@@ -8,7 +8,12 @@ from types import SimpleNamespace
 import pytest
 
 from game_optimization_linux.services.narrator_piper_worker import (
+    ONNX_EXECUTION_MODE,
+    ONNX_INTER_OP_THREADS,
+    ONNX_INTRA_OP_THREADS,
+    PIPER_WORKER_NICE_INCREMENT,
     _load_voice,
+    _lower_process_priority,
     serve,
 )
 from game_optimization_linux.services.narrator_tts import (
@@ -318,24 +323,92 @@ def test_piper_provider_rejects_invalid_worker_audio(tmp_path: Path) -> None:
         )
 
 
-def test_piper_worker_loads_voice_with_cpu_backend(monkeypatch: pytest.MonkeyPatch) -> None:
-    calls = []
+def test_piper_worker_loads_voice_with_bounded_cpu_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = tmp_path / "voice.onnx.json"
+    config_path.write_text('{"voice": "test"}', encoding="utf-8")
+    options_created = []
+    sessions = []
+    voices = []
 
-    class Voice:
+    class Options:
+        def __init__(self) -> None:
+            self.intra_op_num_threads = 0
+            self.inter_op_num_threads = 0
+            self.execution_mode = None
+            self.entries = {}
+            options_created.append(self)
+
+        def add_session_config_entry(self, name: str, value: str) -> None:
+            self.entries[name] = value
+
+    sequential = object()
+
+    def inference_session(model_path: str, **values):
+        session = SimpleNamespace(model_path=model_path, **values)
+        sessions.append(session)
+        return session
+
+    class PiperConfig:
         @staticmethod
-        def load(model_path: str, **values):
-            calls.append((model_path, values))
-            return object()
+        def from_dict(values):
+            return ("config", values)
 
-    monkeypatch.setitem(__import__("sys").modules, "piper", SimpleNamespace(PiperVoice=Voice))
-    _load_voice(Path("voice.onnx"), Path("voice.onnx.json"))
+    class PiperVoice:
+        def __init__(self, **values) -> None:
+            voices.append(values)
 
-    assert calls == [
-        (
-            "voice.onnx",
-            {"config_path": "voice.onnx.json", "use_cuda": False},
-        )
-    ]
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "onnxruntime",
+        SimpleNamespace(
+            SessionOptions=Options,
+            ExecutionMode=SimpleNamespace(ORT_SEQUENTIAL=sequential),
+            InferenceSession=inference_session,
+        ),
+    )
+    monkeypatch.setitem(
+        __import__("sys").modules,
+        "piper",
+        SimpleNamespace(PiperConfig=PiperConfig, PiperVoice=PiperVoice),
+    )
+
+    _load_voice(tmp_path / "voice.onnx", config_path)
+
+    assert len(options_created) == len(sessions) == len(voices) == 1
+    options = options_created[0]
+    assert options.intra_op_num_threads == ONNX_INTRA_OP_THREADS == 1
+    assert options.inter_op_num_threads == ONNX_INTER_OP_THREADS == 1
+    assert options.execution_mode is sequential
+    assert options.entries == {
+        "session.intra_op.allow_spinning": "0",
+        "session.inter_op.allow_spinning": "0",
+    }
+    assert sessions[0].providers == ["CPUExecutionProvider"]
+    assert voices[0]["session"] is sessions[0]
+    assert voices[0]["config"] == ("config", {"voice": "test"})
+
+
+def test_piper_worker_nice_is_scoped_and_has_soft_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls = []
+    monkeypatch.setattr(
+        "game_optimization_linux.services.narrator_piper_worker.os.nice",
+        lambda increment: calls.append(increment) or 5,
+    )
+    assert _lower_process_priority() == 5
+    assert calls == [PIPER_WORKER_NICE_INCREMENT]
+
+    def unavailable(_increment: int) -> int:
+        raise OSError("nice unavailable")
+
+    monkeypatch.setattr(
+        "game_optimization_linux.services.narrator_piper_worker.os.nice",
+        unavailable,
+    )
+    assert _lower_process_priority() is None
 
 
 def test_piper_worker_keeps_voice_loaded_and_returns_framed_pcm(
@@ -413,6 +486,11 @@ def test_piper_worker_keeps_voice_loaded_and_returns_framed_pcm(
     assert load_count == 1
     assert ready["status"] == "ready"
     assert ready["initialization_ms"] >= 0.0
+    assert ready["onnx_intra_op_threads"] == ONNX_INTRA_OP_THREADS
+    assert ready["onnx_inter_op_threads"] == ONNX_INTER_OP_THREADS
+    assert ready["onnx_execution_mode"] == ONNX_EXECUTION_MODE
+    assert ready["worker_pid"] > 0
+    assert ready["worker_thread"]
     assert voice.phrases == ["Pierwsza kwestia", "Druga kwestia"]
     assert configs == pytest.approx([0.8, 1.0])
     # No advanced override was requested, so Piper must fall back to the voice's
@@ -420,6 +498,10 @@ def test_piper_worker_keeps_voice_loaded_and_returns_framed_pcm(
     assert noise_settings == [(None, None), (None, None)]
     assert [item["request_id"] for item in responses] == [1, 2]
     assert all(item["ok"] is True for item in responses)
+    assert {item["worker_pid"] for item in responses} == {ready["worker_pid"]}
+    assert {item["worker_thread"] for item in responses} == {
+        ready["worker_thread"]
+    }
     assert responses[0]["sample_rate"] == 22050
     assert responses[0]["channels"] == 1
     assert responses[0]["sample_format"] == "s16le"

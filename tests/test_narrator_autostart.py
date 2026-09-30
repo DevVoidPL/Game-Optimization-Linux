@@ -442,3 +442,29 @@ def test_gamepad_navigation_is_gated_by_window_active_but_shortcut_is_not(narrat
     controller.setCouchWindowActive(True)
     controller._on_gamepad_action("NavigateDown")
     assert dispatched == ["NavigateDown"]
+
+
+def test_unchanged_manual_session_autostart_message_logs_once(
+    narrator, caplog: pytest.LogCaptureFixture
+) -> None:
+    _controller, controller_narrator, pipeline, _capture, activity, game, save = narrator
+    save()
+    clock = [500.0]
+    controller_narrator._clock = pipeline._clock = lambda: clock[0]
+    activity.active = True
+    assert controller_narrator.start(game.id, automatic=False)
+
+    activity.active = False
+    logger_name = "game_optimization_linux.controllers.narrator_controller"
+    with caplog.at_level("INFO", logger=logger_name):
+        for generation in range(1, 80):
+            activity.commands_generation = generation
+            clock[0] += 0.2
+            controller_narrator.poll()
+
+    messages = [
+        record.getMessage()
+        for record in caplog.records
+        if "session was started manually; keeping it" in record.getMessage()
+    ]
+    assert len(messages) == 1

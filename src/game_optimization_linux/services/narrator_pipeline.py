@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from collections import deque
 from collections.abc import Callable
-from concurrent.futures import Future, ThreadPoolExecutor
+from concurrent.futures import Executor, Future, ThreadPoolExecutor
 from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 import logging
+import os
 from queue import SimpleQueue
 import re
-from threading import RLock
+from threading import current_thread, RLock
 import time
 from typing import Protocol
 import unicodedata
@@ -1503,7 +1504,8 @@ class NarratorPipeline:
         activity: GameActivityProvider,
         translation_cache: TranslationCache | None = None,
         *,
-        executor: ThreadPoolExecutor | None = None,
+        executor: Executor | None = None,
+        tts_executor: Executor | None = None,
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.capture = capture
@@ -1517,6 +1519,20 @@ class NarratorPipeline:
             max_workers=2, thread_name_prefix="game-optimization-narrator"
         )
         self._owns_executor = executor is None
+        if tts_executor is not None:
+            self._tts_executor = tts_executor
+            self._owns_tts_executor = False
+        elif executor is None:
+            self._tts_executor = ThreadPoolExecutor(
+                max_workers=1,
+                thread_name_prefix="game-optimization-narrator-tts",
+            )
+            self._owns_tts_executor = True
+        else:
+            # Lightweight deterministic tests may intentionally share one
+            # injected executor; production always takes the dedicated branch.
+            self._tts_executor = self._executor
+            self._owns_tts_executor = False
         self._clock = clock
         self._events: SimpleQueue[NarratorEvent] = SimpleQueue()
         self._lock = RLock()
@@ -1541,6 +1557,7 @@ class NarratorPipeline:
         self._ocr_future: Future[OcrResult] | None = None
         self._ocr_prepare_future: Future[object] | None = None
         self._tts_prepare_future: Future[object] | None = None
+        self._tts_prepare_started_at: float | None = None
         self._request_active = False
         self._pending_frame: CaptureFrame | None = None
         self._pending_frame_stabilization_ms = 0.0
@@ -1550,6 +1567,7 @@ class NarratorPipeline:
         self._inactive_since: float | None = None
         self._stage_futures: set[Future[object]] = set()
         self._stage_kinds: dict[Future[object], str] = {}
+        self._tts_futures: set[Future[object]] = set()
         self._audio_supersession_baseline = 0
         self._latest_capture_frame: CaptureFrame | None = None
         self._latest_capture_game_key = ""
@@ -1574,6 +1592,57 @@ class NarratorPipeline:
             NarratorSessionStatus.STOPPED,
             NarratorSessionStatus.ERROR,
         }
+
+    def _tts_queue_depth(self) -> int:
+        with self._lock:
+            return sum(not future.done() for future in self._tts_futures)
+
+    def _audio_queue_depth(self) -> int:
+        try:
+            return max(0, int(getattr(self.audio, "queue_depth", 0)))
+        except (TypeError, ValueError):
+            return 0
+
+    def _log_stage(
+        self,
+        event: str,
+        *,
+        session_id: str,
+        phrase_id: int,
+        duration_ms: float,
+        queue_depth: int,
+        model: str,
+    ) -> None:
+        worker_pid = int(getattr(self.tts, "worker_pid", 0) or 0)
+        worker_thread = str(
+            getattr(self.tts, "worker_thread_name", "") or "unknown"
+        )
+        worker_nice = getattr(self.tts, "worker_process_nice", None)
+        intra = int(getattr(self.tts, "worker_onnx_intra_op_threads", 0) or 0)
+        inter = int(getattr(self.tts, "worker_onnx_inter_op_threads", 0) or 0)
+        mode = str(
+            getattr(self.tts, "worker_onnx_execution_mode", "") or "unknown"
+        )
+        logger.info(
+            "Narrator stage event=%s session=%s phrase_id=%d duration_ms=%.1f "
+            "queue_depth=%d pid=%d thread=%s model=%s worker_pid=%d "
+            "worker_thread=%s worker_nice=%s onnx_intra=%d onnx_inter=%d "
+            "onnx_mode=%s",
+            event,
+            session_id,
+            phrase_id,
+            max(0.0, duration_ms),
+            max(0, queue_depth),
+            os.getpid(),
+            current_thread().name,
+            model,
+            worker_pid,
+            worker_thread,
+            worker_nice if worker_nice is not None else "unknown",
+            intra,
+            inter,
+            mode,
+        )
 
     def latest_preview_frame(self, game_key: str) -> CaptureFrame | None:
         """Return the last in-memory full capture frame for one game."""
@@ -1787,6 +1856,12 @@ class NarratorPipeline:
                 audio_status="ready" if self.audio.available else "unavailable",
             )
             self._emit(NarratorSessionStatus.STARTING)
+            logger.info(
+                "Narrator session event=started session=%s pid=%d thread=%s",
+                self._session_id,
+                os.getpid(),
+                current_thread().name,
+            )
             ocr_language = (
                 "pl"
                 if settings.subtitle_language_mode
@@ -1803,9 +1878,11 @@ class NarratorPipeline:
                 )
             prepare_tts = getattr(self.tts, "prepare", None)
             if callable(prepare_tts):
-                self._tts_prepare_future = self._executor.submit(
+                self._tts_prepare_started_at = self._clock()
+                self._tts_prepare_future = self._tts_executor.submit(
                     prepare_tts, settings.voice_id
                 )
+                self._tts_futures.add(self._tts_prepare_future)
                 self._tts_prepare_future.add_done_callback(
                     self._tts_preparation_finished
                 )
@@ -1922,6 +1999,7 @@ class NarratorPipeline:
             if self._tts_prepare_future is not None:
                 self._tts_prepare_future.cancel()
                 self._tts_prepare_future = None
+            self._tts_prepare_started_at = None
             for future in tuple(self._stage_futures):
                 future.cancel()
             self._stage_futures.clear()
@@ -1973,6 +2051,12 @@ class NarratorPipeline:
                     status=NarratorSessionStatus.STOPPED,
                     message=message,
                 )
+            )
+            logger.info(
+                "Narrator session event=stopped session=%s pid=%d thread=%s",
+                session_id,
+                os.getpid(),
+                current_thread().name,
             )
             return self._snapshot
 
@@ -2151,6 +2235,8 @@ class NarratorPipeline:
     def shutdown(self) -> None:
         self.cancel_preview_frame()
         self.stop()
+        if self._owns_tts_executor:
+            self._tts_executor.shutdown(wait=True, cancel_futures=True)
         close_capture = getattr(self.capture, "close", None)
         if callable(close_capture):
             close_capture()
@@ -2180,9 +2266,13 @@ class NarratorPipeline:
 
     def _tts_preparation_finished(self, future: Future[object]) -> None:
         with self._lock:
+            self._tts_futures.discard(future)
             if future is not self._tts_prepare_future:
                 return
             self._tts_prepare_future = None
+            started_at = self._tts_prepare_started_at
+            self._tts_prepare_started_at = None
+            session_id = self._session_id
         if future.cancelled():
             return
         try:
@@ -2193,6 +2283,22 @@ class NarratorPipeline:
                 "retry on demand: %s",
                 error,
             )
+            return
+        reused = getattr(self.tts, "model_prepare_reused", None)
+        model = "warm" if reused is True else "cold" if reused is False else "unknown"
+        duration_ms = (
+            max(0.0, (self._clock() - started_at) * 1000.0)
+            if started_at is not None
+            else float(getattr(self.tts, "worker_initialization_ms", 0.0) or 0.0)
+        )
+        self._log_stage(
+            "tts_model_ready",
+            session_id=session_id,
+            phrase_id=0,
+            duration_ms=duration_ms,
+            queue_depth=self._tts_queue_depth(),
+            model=model,
+        )
 
     def _start_ocr(
         self,
@@ -2456,7 +2562,16 @@ class NarratorPipeline:
                 or observation.canonical_text
                 or canonical_before
             )
-            logger.info(
+            ocr_log = (
+                logger.info
+                if (
+                    final_decision == "accepted"
+                    or final_decision.startswith("candidate_reset_")
+                    or reason_code in {"candidate_timeout", "confirmed_disappearance"}
+                )
+                else logger.debug
+            )
+            ocr_log(
                 "Narrator OCR: raw=%r cleaned=%r similarity=%s decision=%s "
                 "confidence=%s quality=%s line_confidence=%s episode_id=%d "
                 "candidate_id=%d strong_votes=%d required_votes=%d canonical=%r "
@@ -2867,16 +2982,29 @@ class NarratorPipeline:
             tts_submitted=True,
         )
         self._funnel["tts_submitted"] = self._funnel.get("tts_submitted", 0) + 1
-        tts_future = self._executor.submit(
+        queued_at = self._clock()
+        self._log_stage(
+            "tts_queued",
+            session_id=self._session_id,
+            phrase_id=work_id,
+            duration_ms=max(0.0, (queued_at - timing.accepted_at) * 1000.0),
+            queue_depth=self._tts_queue_depth() + 1,
+            model="unknown",
+        )
+        tts_future = self._tts_executor.submit(
             self._synthesize_timed,
             spoken_text,
             settings.voice_id,
             settings.speech_rate,
             settings.noise_scale,
             settings.noise_w_scale,
+            self._session_id,
+            work_id,
+            queued_at,
         )
         self._stage_futures.add(tts_future)
         self._stage_kinds[tts_future] = "tts"
+        self._tts_futures.add(tts_future)
         tts_future.add_done_callback(
             lambda completed: self._tts_finished(
                 completed,
@@ -2896,8 +3024,23 @@ class NarratorPipeline:
         speech_rate: float,
         noise_scale: float | None = None,
         noise_w_scale: float | None = None,
+        session_id: str = "",
+        phrase_id: int = 0,
+        queued_at: float = 0.0,
     ) -> _TtsStageResult:
         started_at = self._clock()
+        self._log_stage(
+            "tts_started",
+            session_id=session_id,
+            phrase_id=phrase_id,
+            duration_ms=(
+                max(0.0, (started_at - queued_at) * 1000.0)
+                if queued_at
+                else 0.0
+            ),
+            queue_depth=max(0, self._tts_queue_depth() - 1),
+            model="unknown",
+        )
         # Only forward the advanced overrides when the user actually set them,
         # so providers that do not accept them keep working and Piper falls back
         # to each voice's own configured values.
@@ -2913,10 +3056,32 @@ class NarratorPipeline:
             speech_rate=speech_rate,
             **advanced,
         )
+        finished_at = self._clock()
+        model = "warm" if audio.worker_reused else "cold"
+        self._log_stage(
+            "tts_model_ready",
+            session_id=session_id,
+            phrase_id=phrase_id,
+            duration_ms=audio.worker_startup_ms or 0.0,
+            queue_depth=max(0, self._tts_queue_depth() - 1),
+            model=model,
+        )
+        self._log_stage(
+            "tts_inference_finished",
+            session_id=session_id,
+            phrase_id=phrase_id,
+            duration_ms=(
+                audio.inference_ms
+                if audio.inference_ms is not None
+                else max(0.0, (finished_at - started_at) * 1000.0)
+            ),
+            queue_depth=max(0, self._tts_queue_depth() - 1),
+            model=model,
+        )
         return _TtsStageResult(
             audio=audio,
             started_at=started_at,
-            finished_at=self._clock(),
+            finished_at=finished_at,
         )
 
     def _tts_finished(
@@ -2933,6 +3098,9 @@ class NarratorPipeline:
         with self._lock:
             self._stage_futures.discard(future)
             self._stage_kinds.pop(future, None)
+            self._tts_futures.discard(future)
+        if future.cancelled():
+            return
         try:
             stage = future.result()
         except Exception as error:
@@ -2982,6 +3150,16 @@ class NarratorPipeline:
                 len(translated),
                 len(translated.split()),
             )
+            self._log_stage(
+                "audio_queued",
+                session_id=self._session_id,
+                phrase_id=work_id,
+                duration_ms=max(
+                    0.0, (self._clock() - timing.accepted_at) * 1000.0
+                ),
+                queue_depth=self._audio_queue_depth() + 1,
+                model="warm" if audio.worker_reused else "cold",
+            )
             try:
                 self._latest_audio_request_id = work_id
                 self.audio.play(
@@ -2999,10 +3177,12 @@ class NarratorPipeline:
                         timing=timing,
                         generation=generation,
                         request_id=work_id,
+                        model="warm" if audio.worker_reused else "cold",
                     ),
                     completed_callback=lambda: self._audio_completed(
                         generation=generation,
                         request_id=work_id,
+                        model="warm" if audio.worker_reused else "cold",
                     ),
                     error_callback=lambda message: self._audio_failed(
                         message,
@@ -3023,6 +3203,7 @@ class NarratorPipeline:
         timing: _AcceptedSubtitleTiming,
         generation: int,
         request_id: int,
+        model: str,
     ) -> None:
         with self._lock:
             if (
@@ -3058,6 +3239,14 @@ class NarratorPipeline:
                 playback_started_at_monotonic=now,
                 audio_status="speaking",
             )
+            self._log_stage(
+                "audio_started",
+                session_id=self._session_id,
+                phrase_id=request_id,
+                duration_ms=elapsed_ms,
+                queue_depth=self._audio_queue_depth(),
+                model=model,
+            )
             logger.debug(
                 "Narrator latency accepted=%r frame_acquisition=%.1fms "
                 "roi=%.1fms ocr_preprocess=%.1fms ocr=%.1fms "
@@ -3092,7 +3281,9 @@ class NarratorPipeline:
                 spoken_text=translated,
             )
 
-    def _audio_completed(self, *, generation: int, request_id: int) -> None:
+    def _audio_completed(
+        self, *, generation: int, request_id: int, model: str
+    ) -> None:
         with self._lock:
             if (
                 generation != self._generation
@@ -3100,9 +3291,23 @@ class NarratorPipeline:
                 or self._settings is None
             ):
                 return
+            now = self._clock()
+            playback_started = self._snapshot.playback_started_at_monotonic
             self._snapshot = replace(self._snapshot, audio_status="ready")
             self._funnel["played_to_completion"] = (
                 self._funnel.get("played_to_completion", 0) + 1
+            )
+            self._log_stage(
+                "audio_finished",
+                session_id=self._session_id,
+                phrase_id=request_id,
+                duration_ms=(
+                    max(0.0, (now - playback_started) * 1000.0)
+                    if playback_started is not None
+                    else 0.0
+                ),
+                queue_depth=self._audio_queue_depth(),
+                model=model,
             )
             if not self._request_active:
                 self._emit(NarratorSessionStatus.LISTENING)
@@ -3384,6 +3589,7 @@ class NarratorPipeline:
         if self._tts_prepare_future is not None:
             self._tts_prepare_future.cancel()
             self._tts_prepare_future = None
+        self._tts_prepare_started_at = None
         for future in tuple(self._stage_futures):
             future.cancel()
         self._stage_futures.clear()
