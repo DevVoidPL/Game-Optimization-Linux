@@ -83,8 +83,14 @@ class NarratorSettingsRepository:
         path = self.path(normalized)
         defaults = self.load_defaults()
         if not path.is_file():
-            return replace(defaults, game_key=normalized,
-                          subtitle_region=NarratorGameSettings.default(normalized).subtitle_region)
+            return replace(
+                defaults,
+                game_key=normalized,
+                subtitle_region=NarratorGameSettings.default(
+                    normalized
+                ).subtitle_region,
+                subtitle_region_source="default",
+            )
         raw = json.loads(path.read_text(encoding="utf-8"))
         if not isinstance(raw, Mapping):
             raise ValueError("narrator settings must contain a JSON object")
@@ -96,7 +102,17 @@ class NarratorSettingsRepository:
             "subtitle_region",
             NarratorGameSettings.default(normalized).to_dict()["subtitle_region"],
         )
-        return NarratorGameSettings.from_dict(merged, expected_game_key=normalized)
+        settings = NarratorGameSettings.from_dict(
+            merged, expected_game_key=normalized
+        )
+        return replace(
+            settings,
+            subtitle_region_source=(
+                "saved"
+                if isinstance(raw.get("subtitle_region"), Mapping)
+                else "default"
+            ),
+        )
 
     def load_overrides(self, game_key: object) -> dict[str, Any]:
         normalized = validate_game_key(game_key)

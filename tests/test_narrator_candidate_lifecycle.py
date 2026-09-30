@@ -83,14 +83,17 @@ def test_expired_candidate_is_reported_with_its_text() -> None:
 
 
 def test_reset_reports_the_abandoned_candidate() -> None:
-    """An empty observation clears a candidate; the log must still name it."""
+    """Confirmed disappearance names the candidate that it abandons."""
 
     gate = _gate()
     good = gate.observe(_GOOD, 0.94, now=1.0)
-    gate.observe("", None, now=1.3)  # retained on the first gap
+    first_gap = gate.observe("", None, now=1.2)
+    second_gap = gate.observe("", None, now=1.3)
     reset = gate.observe("", None, now=1.4)
 
-    assert reset.decision.startswith("candidate_reset_")
+    assert first_gap.candidate_id == second_gap.candidate_id == good.candidate_id
+    assert reset.decision == "candidate_reset_empty"
+    assert reset.reason_code == "confirmed_disappearance"
     assert reset.replaced_candidate_id == good.candidate_id
     assert reset.replaced_candidate_text == _GOOD
 

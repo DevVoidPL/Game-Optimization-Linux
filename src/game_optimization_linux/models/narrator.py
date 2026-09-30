@@ -175,6 +175,11 @@ class NarratorGameSettings:
     noise_scale: float | None = None
     noise_w_scale: float | None = None
     subtitle_region: NormalizedRect = field(default_factory=NormalizedRect)
+    # Runtime-only provenance for the one-shot ROI diagnostic. It is omitted
+    # from to_dict(), so saving settings never changes the on-disk schema.
+    subtitle_region_source: str = field(
+        default="default", compare=False, repr=False
+    )
     capture_sampling_hz: float = 6.0
     visual_change_threshold: float = 0.08
     stabilization_ms: int = 240
@@ -195,6 +200,8 @@ class NarratorGameSettings:
             "subtitle_language_mode",
             NarratorSubtitleLanguageMode(self.subtitle_language_mode),
         )
+        if self.subtitle_region_source not in {"default", "saved"}:
+            raise ValueError("subtitle_region_source must be default or saved")
         for name in (
             "subtitle_adapter_id",
             "ocr_provider_id",
@@ -319,6 +326,11 @@ class NarratorGameSettings:
                 values.get("subtitle_region")
                 if isinstance(values.get("subtitle_region"), Mapping)
                 else None
+            ),
+            subtitle_region_source=(
+                "saved"
+                if isinstance(values.get("subtitle_region"), Mapping)
+                else "default"
             ),
             capture_sampling_hz=values.get("capture_sampling_hz", 6.0),
             visual_change_threshold=values.get("visual_change_threshold", 0.08),
@@ -460,6 +472,14 @@ class OcrResult:
     # from "a readable subtitle was present and still lost".
     strongest_line_confidence: float | None = None
     strongest_line_text: str = ""
+    selected_line_confidence: float | None = None
+    quality_score: float | None = None
+    input_width: int = 0
+    input_height: int = 0
+    preprocessed_width: int = 0
+    preprocessed_height: int = 0
+    leading_low_quality_tokens: tuple[str, ...] = ()
+    trailing_low_quality_tokens: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -502,6 +522,13 @@ class OcrDecisionObservation:
     clean_short_phrase_evidence: bool = False
     visual_change_decision: str = ""
     filter_summary: str = ""
+    episode_id: int = 0
+    canonical_text: str = ""
+    selected_line_confidence: float | None = None
+    quality_score: float | None = None
+    char_similarity: float | None = None
+    token_similarity: float | None = None
+    reason_code: str = ""
 
     def to_dict(self, *, now: float | None = None) -> dict[str, Any]:
         current = time.monotonic() if now is None else float(now)
@@ -540,6 +567,13 @@ class OcrDecisionObservation:
             "cleanShortPhraseEvidence": self.clean_short_phrase_evidence,
             "visualChangeDecision": self.visual_change_decision,
             "filterSummary": self.filter_summary,
+            "episodeId": self.episode_id,
+            "canonicalText": self.canonical_text,
+            "selectedLineConfidence": self.selected_line_confidence,
+            "qualityScore": self.quality_score,
+            "charSimilarity": self.char_similarity,
+            "tokenSimilarity": self.token_similarity,
+            "reasonCode": self.reason_code,
         }
 
 

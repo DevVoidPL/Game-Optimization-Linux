@@ -230,10 +230,24 @@ def test_ocr_variants_of_one_line_are_read_once(tmp_path: Path, caplog):
         ]
         assert len(lines) == 6
         assert "decision=accepted" in lines[1]
-        assert lines[-1] == (
+        assert lines[-1].startswith(
             "Narrator OCR: raw='2959sj Siema tu (@9s Adamo' "
             "cleaned='Siema tu Adamo' similarity=0.957 "
             "decision=duplicate_accepted_phrase"
         )
+        for field in (
+            "confidence=0.950",
+            "quality=",
+            "line_confidence=",
+            "episode_id=1",
+            "candidate_id=0",
+            "strong_votes=0",
+            "required_votes=2",
+            "canonical='Siema, Tu adam'",
+            "char_similarity=0.957",
+            "token_similarity=0.667",
+            "reason=active_episode_variant",
+        ):
+            assert field in lines[-1]
     finally:
         replay.pipeline.shutdown()

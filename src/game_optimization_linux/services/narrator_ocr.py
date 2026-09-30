@@ -581,6 +581,14 @@ class TesseractOcrProvider:
             filter_summary=quality["filter_summary"],
             strongest_line_confidence=strongest_confidence,
             strongest_line_text=strongest_text,
+            selected_line_confidence=quality["selected_line_confidence"],
+            quality_score=quality["quality_score"],
+            input_width=frame.width,
+            input_height=frame.height,
+            preprocessed_width=image.width(),
+            preprocessed_height=image.height(),
+            leading_low_quality_tokens=quality["leading_low_quality_tokens"],
+            trailing_low_quality_tokens=quality["trailing_low_quality_tokens"],
         )
 
     def prepare(self, language: str) -> None:
@@ -1285,6 +1293,63 @@ class TesseractOcrProvider:
         return len(visible) >= 2 and fragments / len(visible) >= 0.60
 
     @staticmethod
+    def _edge_low_quality_tokens(
+        tokens: list[dict[str, object]],
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """Return weak edge-token evidence without deleting possible words.
+
+        A token is only marked when it is short, below 0.60 confidence and at
+        least 0.20 below its own retained line.  The text gate combines this
+        evidence with a repeated/canonical core before removing a lone possible
+        word, so legal short words such as ``a`` or ``UP`` are not blacklisted.
+        """
+
+        groups: dict[tuple[int, int, int, int], list[dict[str, object]]] = {}
+        for token in tokens:
+            if not bool(token.get("included")) or not str(token["text"]).strip():
+                continue
+            key = tuple(
+                int(token[name])
+                for name in ("page", "block", "paragraph", "line")
+            )
+            groups.setdefault(key, []).append(token)
+        retained_lines = [values for values in groups.values() if values]
+        if not retained_lines:
+            return (), ()
+
+        def weak(token: dict[str, object], line_confidence: float | None) -> bool:
+            text = str(token["text"]).strip()
+            if (
+                not text
+                or len(text) > OCR_EDGE_GARBAGE_MAX_LENGTH
+                or not bool(token.get("valid_confidence"))
+                or line_confidence is None
+            ):
+                return False
+            token_confidence = float(token["confidence"]) / 100.0
+            return (
+                token_confidence < OCR_EDGE_GARBAGE_CONFIDENCE / 100.0
+                and line_confidence - token_confidence >= 0.20
+            )
+
+        first_line = retained_lines[0]
+        last_line = retained_lines[-1]
+        first_confidence = TesseractOcrProvider._token_confidence(first_line)
+        last_confidence = TesseractOcrProvider._token_confidence(last_line)
+        leading: list[str] = []
+        for token in first_line:
+            if not weak(token, first_confidence):
+                break
+            leading.append(str(token["text"]).strip())
+        trailing: list[str] = []
+        for token in reversed(last_line):
+            if not weak(token, last_confidence):
+                break
+            trailing.append(str(token["text"]).strip())
+        trailing.reverse()
+        return tuple(leading), tuple(trailing)
+
+    @staticmethod
     def _quality_evidence(
         text: str,
         confidence: float | None,
@@ -1369,6 +1434,52 @@ class TesseractOcrProvider:
                 if str(token.get("filter_reason", ""))
             }
         )
+        included_lines: dict[
+            tuple[int, int, int, int], list[dict[str, object]]
+        ] = {}
+        for token in included:
+            key = tuple(
+                int(token[name])
+                for name in ("page", "block", "paragraph", "line")
+            )
+            included_lines.setdefault(key, []).append(token)
+        selected_line_confidence = max(
+            (
+                value
+                for value in (
+                    TesseractOcrProvider._token_confidence(line)
+                    for line in included_lines.values()
+                )
+                if value is not None
+            ),
+            default=None,
+        )
+        quality_parts = [
+            (confidence, 0.65),
+            (selected_line_confidence, 0.25),
+            (minimum_confidence, 0.10),
+        ]
+        quality_weight = sum(
+            weight for value, weight in quality_parts if value is not None
+        )
+        quality_score = (
+            sum(float(value) * weight for value, weight in quality_parts if value is not None)
+            / quality_weight
+            if quality_weight
+            else None
+        )
+        if quality_score is not None and visible:
+            quality_score = max(
+                0.0,
+                min(
+                    1.0,
+                    quality_score
+                    - min(0.12, len(dropped) / len(visible) * 0.12),
+                ),
+            )
+        leading_low_quality, trailing_low_quality = (
+            TesseractOcrProvider._edge_low_quality_tokens(tokens)
+        )
         return {
             "token_count": len(visible),
             "included_token_count": len(included),
@@ -1378,6 +1489,10 @@ class TesseractOcrProvider:
             "geometry_coherent": geometry_coherent,
             "clean_short_phrase_evidence": clean_short,
             "filter_summary": ",".join(reasons) if reasons else "unchanged",
+            "selected_line_confidence": selected_line_confidence,
+            "quality_score": quality_score,
+            "leading_low_quality_tokens": leading_low_quality,
+            "trailing_low_quality_tokens": trailing_low_quality,
         }
 
     @staticmethod

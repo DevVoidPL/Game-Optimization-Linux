@@ -155,12 +155,15 @@ def test_one_confidence_failure_retains_candidate_without_counting_it() -> None:
     assert observation.credible is False
     assert observation.rejection_reason == "low_confidence"
     assert observation.decision == "candidate_retained_after_low_confidence"
+    assert observation.reason_code == "transient_low_confidence"
     assert observation.candidate_observation_count == 1
     assert observation.needs_confirmation is True
 
-    reset = gate.observe("Zostań tutaj.", 0.40, now=1.3)
-    assert reset.decision == "candidate_reset_low_confidence"
-    assert reset.candidate_observation_count == 0
+    confirmed = gate.observe("Zostań tutaj.", 0.95, now=1.3)
+    assert confirmed.decision == "accepted_consensus"
+    assert confirmed.accepted_text == "Zostań tutaj."
+    assert confirmed.candidate_observation_count == 2
+    assert confirmed.candidate_id == observation.candidate_id
 
 
 def test_wildly_different_ocr_frames_do_not_emit_a_phrase() -> None:
@@ -185,14 +188,25 @@ def test_one_empty_observation_does_not_destroy_two_frame_consensus() -> None:
     assert gate.observe("No.", 0.90, now=1.4).accepted_text == "No."
 
 
-def test_two_empty_observations_still_clear_consensus() -> None:
+def test_two_empty_observations_retain_candidate_and_third_resets_consensus() -> None:
     gate = SubtitleTextGate()
-    gate.observe("Uciekaj!", 0.94, now=1.0)
+    started = gate.observe("Uciekaj!", 0.94, now=1.0)
 
-    assert gate.observe("", None, now=1.1).needs_confirmation is True
-    reset = gate.observe("", None, now=1.2)
+    first_gap = gate.observe("", None, now=1.1)
+    second_gap = gate.observe("", None, now=1.2)
+    assert first_gap.decision == "candidate_retained_after_empty"
+    assert second_gap.decision == "candidate_retained_after_empty"
+    assert first_gap.candidate_observation_count == 1
+    assert second_gap.candidate_observation_count == 1
+    assert first_gap.candidate_id == second_gap.candidate_id == started.candidate_id
+
+    reset = gate.observe("", None, now=1.3)
     assert reset.decision == "candidate_reset_empty"
-    assert gate.observe("Uciekaj!", 0.94, now=1.3).decision == "candidate_started"
+    assert reset.reason_code == "confirmed_disappearance"
+    assert reset.replaced_candidate_id == started.candidate_id
+    assert reset.replaced_candidate_text == "Uciekaj!"
+    assert reset.needs_confirmation is False
+    assert gate.observe("Uciekaj!", 0.94, now=1.4).decision == "candidate_started"
 
 
 @pytest.mark.parametrize(
@@ -827,3 +841,44 @@ def test_opt_in_debug_capture_is_private_detailed_and_strictly_bounded(
     assert processed.read_bytes() == processed_payloads[0]
     for path in session.iterdir():
         assert stat.S_IMODE(path.stat().st_mode) == 0o600
+
+
+def test_provider_marks_relative_low_quality_edge_tokens_without_blacklist(
+    tmp_path: Path,
+) -> None:
+    model = tmp_path / TESSERACT_COMPONENT_ID / TESSERACT_MODEL_RELATIVE_PATH
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"test model")
+    words = (
+        ("UT", 18),
+        ("des", 24),
+        ("Wsiądź", 96),
+        ("do", 95),
+        ("swojego", 97),
+        ("samochodu.", 96),
+        ("R", 20),
+        ("A", 22),
+    )
+    payload = TSV_HEADER + "".join(
+        f"5\t1\t1\t1\t1\t{index}\t{index * 80}\t20\t70\t24\t{confidence}\t{word}\n"
+        for index, (word, confidence) in enumerate(words, start=1)
+    )
+    provider = TesseractOcrProvider(
+        tmp_path,
+        executable="/usr/bin/tesseract",
+        runner=lambda argv, **values: subprocess.CompletedProcess(
+            argv, 0, payload.encode(), b""
+        ),
+    )
+
+    result = provider.recognize(_frame(), language="en")
+
+    assert result.filtered_text.startswith("UT des Wsiądź")
+    assert result.leading_low_quality_tokens == ("UT", "des")
+    assert result.trailing_low_quality_tokens == ()
+    assert result.filtered_text.endswith("samochodu.")
+    assert result.filter_summary == "edge_garbage"
+    assert result.selected_line_confidence is not None
+    assert result.quality_score is not None
+    assert (result.input_width, result.input_height) == (80, 24)
+    assert (result.preprocessed_width, result.preprocessed_height) == (160, 48)

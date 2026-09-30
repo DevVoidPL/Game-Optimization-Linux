@@ -90,3 +90,45 @@ def test_global_page_owns_narrator_configuration_and_picker(tmp_path) -> None:
     assert "narratorActions" in couch_details
     assert not (root / "pages" / "details" / "NarratorTab.qml").exists()
     assert not (root / "pages" / "details" / "NarratorSection.qml").exists()
+
+
+def test_legacy_schema_one_profile_round_trip_preserves_user_values(
+    tmp_path: Path,
+) -> None:
+    repository = NarratorSettingsRepository(tmp_path)
+    path = repository.path("123")
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "game_key": "123",
+                "enabled": True,
+                "voice_id": "legacy-voice",
+                "ocr_min_confidence": 0.73,
+                "duplicate_cooldown_ms": 6100,
+                "subtitle_region": {
+                    "x": 0.15,
+                    "y": 0.65,
+                    "width": 0.7,
+                    "height": 0.2,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    loaded = repository.load("123")
+    assert loaded.schema_version == 1
+    assert loaded.voice_id == "legacy-voice"
+    assert loaded.ocr_min_confidence == 0.73
+    assert loaded.duplicate_cooldown_ms == 6100
+    assert loaded.subtitle_region_source == "saved"
+
+    repository.save(loaded)
+    serialized = json.loads(path.read_text(encoding="utf-8"))
+    assert serialized["schema_version"] == 1
+    assert serialized["ocr_min_confidence"] == 0.73
+    assert serialized["duplicate_cooldown_ms"] == 6100
+    assert "subtitle_region_source" not in serialized
+    assert repository.load("123") == loaded

@@ -47,6 +47,8 @@ OCR_DECISION_HISTORY_LIMIT = 20
 # OCR_DUPLICATE_MAX_EDITS added, removed or changed characters.
 OCR_DUPLICATE_MAX_EDITS = 1
 OCR_DUPLICATE_MIN_KEY_LENGTH = 10
+# Gate and deduplication must agree when a subtitle really disappeared.
+SUBTITLE_DISAPPEARANCE_OBSERVATIONS = 3
 
 
 class SubtitleSource(Protocol):
@@ -134,6 +136,13 @@ def normalize_subtitle(text: str) -> str:
     return " ".join(printable.split())
 
 
+_EDGE_SYMBOLS = "|│¦_=+<>"
+_COMPARE_WORD_SPLIT = re.compile(r"[^0-9a-ząćęłńóśźż]+")
+_NEGATION_WORDS = frozenset(
+    {"nie", "bez", "brak", "no", "not", "never", "cannot", "cant", "dont", "wont"}
+)
+
+
 def subtitle_identity(text: str) -> str:
     """Normalize case, punctuation and OCR-lost accents for comparisons."""
     normalized = normalize_subtitle(text).casefold().translate(
@@ -151,16 +160,283 @@ def subtitle_identity(text: str) -> str:
     )
 
 
-def _drop_mixed_tokens(text: str) -> str:
-    """Remove OCR tokens that mix digits with letters (``2959sj``, ``(@9s``)."""
+def _trim_symbolic_edges(text: str) -> str:
+    """Remove only language-free symbols from the outside of a phrase."""
 
+    value = normalize_subtitle(text).strip()
+    while value and value[0] in _EDGE_SYMBOLS:
+        value = value[1:].lstrip()
+    while value and value[-1] in _EDGE_SYMBOLS:
+        value = value[:-1].rstrip()
+    return value
+
+
+def _is_proven_mixed_noise(token: str) -> bool:
+    """Recognise structural OCR garbage without deleting identifiers like R2D2."""
+
+    compact = token.strip().strip(".,!?…:;\"„”()[]{}")
+    letters = sum(character.isalpha() for character in compact)
+    digits = sum(character.isdigit() for character in compact)
+    if not letters or not digits:
+        return False
+    if any(
+        not character.isalnum() and character not in {"'", "’", "-"}
+        for character in compact
+    ):
+        return True
+    return bool(
+        re.match(r"^\d{2,}[^\W\d_]+$", compact, flags=re.UNICODE)
+        and digits / max(1, letters + digits) >= 0.50
+    )
+
+
+def _drop_proven_noise_tokens(text: str) -> str:
     return " ".join(
-        token
-        for token in text.split()
-        if not (
-            any(character.isdigit() for character in token)
-            and any(character.isalpha() for character in token)
+        token for token in text.split() if not _is_proven_mixed_noise(token)
+    )
+
+
+def _comparison_words(identity: str) -> list[str]:
+    return [word for word in _COMPARE_WORD_SPLIT.split(identity) if word]
+
+
+def _lcs_length(first: list[str], second: list[str]) -> int:
+    rows = len(first)
+    columns = len(second)
+    table = [[0] * (columns + 1) for _ in range(rows + 1)]
+    for row in range(rows - 1, -1, -1):
+        for column in range(columns - 1, -1, -1):
+            if first[row] == second[column]:
+                table[row][column] = 1 + table[row + 1][column + 1]
+            else:
+                table[row][column] = max(
+                    table[row + 1][column], table[row][column + 1]
+                )
+    return table[0][0]
+
+
+def _has_polarity_prefix_conflict(first: list[str], second: list[str]) -> bool:
+    for left in first:
+        for right in second:
+            if left == right:
+                continue
+            short, long = sorted((left, right), key=len)
+            if len(short) < 3:
+                continue
+            if any(long == prefix + short for prefix in ("un", "non", "dis")):
+                return True
+    return False
+
+
+@dataclass(frozen=True, slots=True)
+class _PhraseMetrics:
+    char_similarity: float
+    token_similarity: float
+    common_core_words: int
+    common_core_ratio: float
+    numbers_match: bool
+    semantic_conflict: bool
+
+
+def _phrase_metrics(first_text: str, second_text: str) -> _PhraseMetrics:
+    first = subtitle_identity(first_text)
+    second = subtitle_identity(second_text)
+    first_compact = first.replace(" ", "")
+    second_compact = second.replace(" ", "")
+    char_similarity = (
+        SequenceMatcher(None, first_compact, second_compact, autojunk=False).ratio()
+        if first_compact and second_compact
+        else 0.0
+    )
+    first_words = _comparison_words(first)
+    second_words = _comparison_words(second)
+    token_similarity = (
+        SequenceMatcher(None, first_words, second_words, autojunk=False).ratio()
+        if first_words and second_words
+        else 0.0
+    )
+    common = _lcs_length(first_words, second_words)
+    shorter = min(len(first_words), len(second_words))
+    first_numbers = re.findall(r"\d+", first)
+    second_numbers = re.findall(r"\d+", second)
+    numbers_match = first_numbers == second_numbers
+    semantic_conflict = (
+        not numbers_match
+        or (set(first_words) & _NEGATION_WORDS)
+        != (set(second_words) & _NEGATION_WORDS)
+        or _has_polarity_prefix_conflict(first_words, second_words)
+    )
+    return _PhraseMetrics(
+        char_similarity=char_similarity,
+        token_similarity=token_similarity,
+        common_core_words=common,
+        common_core_ratio=common / shorter if shorter else 0.0,
+        numbers_match=numbers_match,
+        semantic_conflict=semantic_conflict,
+    )
+
+
+def _looks_like_edge_scrap(word: str) -> bool:
+    letters = [character for character in word if character.isalpha()]
+    longest_consonant_run = max(
+        (len(value) for value in re.split(r"[aąeęioóuy]+", word)),
+        default=0,
+    )
+    return bool(
+        len(word) <= 2
+        or not letters
+        or not any(character in "aąeęioóuy" for character in letters)
+        or longest_consonant_run >= 4
+    )
+
+
+def _only_ocr_like_changes(first_text: str, second_text: str) -> bool:
+    """Reject real word substitutions while permitting bounded OCR damage."""
+
+    first = _comparison_words(subtitle_identity(first_text))
+    second = _comparison_words(subtitle_identity(second_text))
+    matcher = SequenceMatcher(None, first, second, autojunk=False)
+    for tag, first_start, first_end, second_start, second_end in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        left = first[first_start:first_end]
+        right = second[second_start:second_end]
+        if tag in {"insert", "delete"}:
+            changed = left or right
+            at_edge = (
+                first_start == second_start == 0
+                or first_end == len(first) and second_end == len(second)
+            )
+            if not at_edge:
+                return False
+            if len(changed) == 1:
+                continue
+            if len(changed) > 2 or not all(
+                _looks_like_edge_scrap(word) for word in changed
+            ):
+                return False
+            continue
+        left_joined = "".join(left)
+        right_joined = "".join(right)
+        if not left_joined or not right_joined:
+            return False
+        if SequenceMatcher(
+            None, left_joined, right_joined, autojunk=False
+        ).ratio() < 0.72:
+            return False
+    return True
+
+
+def _same_episode_variant(first_text: str, second_text: str) -> bool:
+    """Use several guarded signals; no character threshold is authoritative."""
+
+    first = subtitle_identity(first_text)
+    second = subtitle_identity(second_text)
+    if not first or not second:
+        return False
+    if first == second or _dedup_is_split_merge_variant(first, second):
+        return True
+    metrics = _phrase_metrics(first, second)
+    if metrics.semantic_conflict:
+        return False
+    if (
+        _dedup_is_garbage_variant(first, second)
+        or _is_ocr_slip_variant(first, second)
+    ):
+        return True
+    first_words = _comparison_words(first)
+    second_words = _comparison_words(second)
+    if min(len(first_words), len(second_words)) < 3:
+        return False
+    if not _only_ocr_like_changes(first, second):
+        return False
+    return bool(
+        (
+            metrics.char_similarity >= 0.90
+            and metrics.token_similarity >= 0.70
+            and metrics.common_core_ratio >= 0.65
         )
+        or (
+            metrics.char_similarity >= 0.84
+            and metrics.token_similarity >= 0.65
+            and metrics.common_core_words >= 3
+            and metrics.common_core_ratio >= 0.75
+        )
+    )
+
+
+def _token_matches_marker(token: str, marker: str) -> bool:
+    return bool(subtitle_identity(token)) and subtitle_identity(token) == subtitle_identity(marker)
+
+
+def _strip_low_quality_edges(
+    text: str,
+    *,
+    leading: tuple[str, ...],
+    trailing: tuple[str, ...],
+    reference_text: str,
+) -> str:
+    """Remove weak edge evidence only as a cluster or outside a known core."""
+
+    tokens = _trim_symbolic_edges(text).split()
+    if not tokens:
+        return ""
+
+    def removable(
+        markers: tuple[str, ...], original: str, candidate: str
+    ) -> bool:
+        if len(markers) >= 2:
+            return True
+        if not markers or not reference_text:
+            return False
+        before = _phrase_metrics(original, reference_text)
+        after = _phrase_metrics(candidate, reference_text)
+        return (
+            not after.semantic_conflict
+            and after.common_core_words >= 1
+            and after.char_similarity >= before.char_similarity + 0.05
+            and after.token_similarity >= before.token_similarity
+        )
+
+    matched_leading = 0
+    for marker, token in zip(leading, tokens):
+        if not _token_matches_marker(token, marker):
+            break
+        matched_leading += 1
+    if matched_leading and removable(
+        leading[:matched_leading],
+        " ".join(tokens),
+        " ".join(tokens[matched_leading:]),
+    ):
+        tokens = tokens[matched_leading:]
+
+    matched_trailing = 0
+    for marker, token in zip(reversed(trailing), reversed(tokens)):
+        if not _token_matches_marker(token, marker):
+            break
+        matched_trailing += 1
+    if matched_trailing and removable(
+        trailing[len(trailing) - matched_trailing :],
+        " ".join(tokens),
+        " ".join(tokens[: len(tokens) - matched_trailing]),
+    ):
+        tokens = tokens[: len(tokens) - matched_trailing]
+    return _trim_symbolic_edges(" ".join(tokens))
+
+
+def _clean_observed_text(
+    text: str,
+    *,
+    leading_low_quality_tokens: tuple[str, ...] = (),
+    trailing_low_quality_tokens: tuple[str, ...] = (),
+    reference_text: str = "",
+) -> str:
+    cleaned = _drop_proven_noise_tokens(_trim_symbolic_edges(text))
+    return _strip_low_quality_edges(
+        cleaned,
+        leading=tuple(leading_low_quality_tokens),
+        trailing=tuple(trailing_low_quality_tokens),
+        reference_text=reference_text,
     )
 
 
@@ -215,13 +491,15 @@ class OcrGateObservation:
     candidate_match_kind: str = ""
     candidate_replaced: bool = False
     decision: str = ""
-    # Diagnostics only. A stable identity per candidate, so every observation
-    # belonging to one subtitle attempt can be grouped, and a replacement can
-    # name what it displaced. candidate_identity is the normalized text, which
-    # changes on replacement and therefore cannot serve as an identity.
     candidate_id: int = 0
     replaced_candidate_id: int = 0
     replaced_candidate_text: str = ""
+    quality_score: float | None = None
+    selected_line_confidence: float | None = None
+    canonical_text: str = ""
+    char_similarity: float | None = None
+    token_similarity: float | None = None
+    reason_code: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -244,7 +522,7 @@ class _TtsStageResult:
 
 
 class SubtitleTextGate:
-    """Reject implausible OCR and require short temporal text consensus."""
+    """Reject implausible OCR and require bounded, quality-ranked consensus."""
 
     def __init__(
         self,
@@ -261,21 +539,23 @@ class SubtitleTextGate:
         self._candidate_text = ""
         self._candidate_identity = ""
         self._candidate_confidence = -1.0
+        self._candidate_quality = -1.0
         self._candidate_count = 0
         self._candidate_since = 0.0
-        self._candidate_gap_count = 0
+        self._accepted_text = ""
         self._accepted_identity = ""
+        self._absence_streak = 0
         self._needs_confirmation = False
-        # Diagnostics only: monotonic counter, one value per created candidate,
-        # so all observations of one subtitle attempt share an identity.
         self._candidate_id = 0
-        # Diagnostics only: difflib similarity of the latest cleaned line to the
-        # last line read. Logged, never used for a decision.
         self.last_line_similarity: float | None = None
 
     @property
     def needs_confirmation(self) -> bool:
         return self._needs_confirmation
+
+    @property
+    def canonical_text(self) -> str:
+        return self._accepted_text
 
     def observe(
         self,
@@ -285,28 +565,44 @@ class SubtitleTextGate:
         now: float,
         raw_text: str | None = None,
         strong_short_phrase_evidence: bool = False,
+        quality_score: float | None = None,
+        selected_line_confidence: float | None = None,
+        leading_low_quality_tokens: tuple[str, ...] = (),
+        trailing_low_quality_tokens: tuple[str, ...] = (),
+        frame_had_text: bool | None = None,
     ) -> OcrGateObservation:
         raw = str(text if raw_text is None else raw_text)
-        filtered = normalize_subtitle(text)
         previous_candidate = self._candidate_text
         previous_identity = self._candidate_identity
         previous_since = self._candidate_since
+        reference = (
+            self._accepted_text if self._accepted_identity else previous_candidate
+        )
+        filtered = _clean_observed_text(
+            text,
+            leading_low_quality_tokens=leading_low_quality_tokens,
+            trailing_low_quality_tokens=trailing_low_quality_tokens,
+            reference_text=reference,
+        )
+        had_text = bool(raw.strip()) if frame_had_text is None else bool(frame_had_text)
+        if had_text:
+            self._absence_streak = 0
+        else:
+            self._absence_streak += 1
+        confirmed_disappearance = (
+            self._absence_streak >= SUBTITLE_DISAPPEARANCE_OBSERVATIONS
+        )
         self.last_line_similarity = None
         reason = self._validate(filtered, confidence)
-        if not reason:
-            # A line that passed the filters can still carry noise tokens mixing
-            # digits and letters. Drop them before comparison, translation and
-            # speech; a line left without a word is rejected.
-            filtered = _drop_mixed_tokens(filtered)
-            if sum(character.isalpha() for character in filtered) < 2:
-                reason = "min_alphabetic"
+        if reason == "empty" and had_text:
+            reason = "noise"
+
         if reason:
             if (
                 previous_candidate
+                and not confirmed_disappearance
                 and now - previous_since <= self.stability_window_seconds
-                and self._candidate_gap_count == 0
             ):
-                self._candidate_gap_count = 1
                 self._needs_confirmation = True
                 return OcrGateObservation(
                     raw,
@@ -319,41 +615,57 @@ class SubtitleTextGate:
                     candidate_observation_count=self._candidate_count,
                     required_observations=self.required_observations,
                     candidate_id=self._candidate_id,
+                    quality_score=quality_score,
+                    selected_line_confidence=selected_line_confidence,
+                    canonical_text=self._accepted_text,
                     decision=f"candidate_retained_after_{reason}",
+                    reason_code=f"transient_{reason}",
                 )
-            # The candidate is abandoned here. Reported before _clear, so the
-            # terminal record still names it and its text.
             abandoned_id = self._candidate_id if previous_candidate else 0
-            # Only an empty reading means the subtitle is gone. Garbage or a
-            # low-confidence reading keeps the last line read, otherwise that
-            # line is read again once OCR recovers.
-            self._clear(no_subtitle=reason == "empty")
+            if confirmed_disappearance:
+                self._clear(no_subtitle=True)
+            elif previous_candidate:
+                self._reset_candidate()
+            pending_episode_disappearance = bool(
+                self._accepted_identity
+                and not had_text
+                and not confirmed_disappearance
+            )
+            if pending_episode_disappearance:
+                self._needs_confirmation = True
+            elif not previous_candidate:
+                self._needs_confirmation = False
             return OcrGateObservation(
                 raw,
                 filtered,
                 confidence,
                 reason,
+                needs_confirmation=pending_episode_disappearance,
                 required_observations=self.required_observations,
                 candidate_id=abandoned_id,
                 replaced_candidate_id=abandoned_id,
                 replaced_candidate_text=previous_candidate,
+                quality_score=quality_score,
+                selected_line_confidence=selected_line_confidence,
+                canonical_text=self._accepted_text,
                 decision=(
                     f"candidate_reset_{reason}"
                     if previous_candidate
                     else f"rejected_{reason}"
                 ),
+                reason_code=(
+                    "confirmed_disappearance"
+                    if confirmed_disappearance
+                    else "candidate_timeout" if previous_candidate else reason
+                ),
             )
 
         identity = subtitle_identity(filtered)
-        accepted_similarity = self._similarity(identity, self._accepted_identity)
+        accepted_metrics = _phrase_metrics(filtered, self._accepted_text)
         if self._accepted_identity:
-            self.last_line_similarity = self._similarity(
-                identity.replace(" ", ""),
-                self._accepted_identity.replace(" ", ""),
-            )
-        if self._accepted_identity and self._strict_identities_match(
-            identity,
-            self._accepted_identity,
+            self.last_line_similarity = accepted_metrics.char_similarity
+        if self._accepted_identity and _same_episode_variant(
+            filtered, self._accepted_text
         ):
             self._reset_candidate()
             return OcrGateObservation(
@@ -363,23 +675,25 @@ class SubtitleTextGate:
                 "duplicate",
                 credible=True,
                 required_observations=self.required_observations,
-                candidate_similarity=accepted_similarity,
+                candidate_similarity=accepted_metrics.char_similarity,
                 candidate_match_kind=(
                     "normalized_exact"
                     if identity == self._accepted_identity
-                    else "ocr_variant"
+                    else "active_episode_variant"
                 ),
+                quality_score=quality_score,
+                selected_line_confidence=selected_line_confidence,
+                canonical_text=self._accepted_text,
+                char_similarity=accepted_metrics.char_similarity,
+                token_similarity=accepted_metrics.token_similarity,
                 decision="duplicate_accepted_phrase",
+                reason_code="active_episode_variant",
             )
 
-        # Normal subtitle acceptance remains a two-observation consensus. A
-        # short subtitle can be visible for only one sampled OCR frame, though.
-        # Permit one observation only when the OCR provider proved that it is a
-        # clean, very-high-confidence, single-line cluster and the caller also
-        # observed an actual subtitle-region image change. This evidence is not
-        # inferred from text length alone and is never available to plain OCR
-        # strings or noisy/filtered observations.
         if strong_short_phrase_evidence and not self._candidate_identity:
+            self._candidate_id += 1
+            accepted_candidate_id = self._candidate_id
+            self._accepted_text = filtered
             self._accepted_identity = identity
             self._reset_candidate()
             return OcrGateObservation(
@@ -393,33 +707,39 @@ class SubtitleTextGate:
                 candidate_observation_count=1,
                 required_observations=1,
                 candidate_match_kind="strong_short_evidence",
+                candidate_id=accepted_candidate_id,
+                quality_score=quality_score,
+                selected_line_confidence=selected_line_confidence,
+                canonical_text=filtered,
+                char_similarity=1.0,
+                token_similarity=1.0,
                 decision="accepted_strong_short_evidence",
+                reason_code="strong_short_evidence",
             )
 
-        within_window = (
+        within_window = bool(
             self._candidate_identity
             and now - self._candidate_since <= self.stability_window_seconds
         )
-        candidate_similarity = self._similarity(identity, self._candidate_identity)
+        candidate_metrics = _phrase_metrics(filtered, self._candidate_text)
         match_kind = self._identity_match_kind(
             identity,
             self._candidate_identity,
-            similarity=candidate_similarity,
+            metrics=candidate_metrics,
         )
         similar = within_window and bool(match_kind)
         if not similar:
-            # A new candidate begins here, whether or not it displaced one.
-            # Recorded before the identity is overwritten, so the log can name
-            # exactly which candidate was abandoned and with what text.
             replaced_id = self._candidate_id if previous_identity else 0
             replaced_text = self._candidate_text if previous_identity else ""
             self._candidate_id += 1
             self._candidate_text = filtered
             self._candidate_identity = identity
             self._candidate_confidence = confidence if confidence is not None else -1.0
+            self._candidate_quality = self._variant_quality(
+                confidence, quality_score, selected_line_confidence
+            )
             self._candidate_count = 1
             self._candidate_since = now
-            self._candidate_gap_count = 0
             self._needs_confirmation = True
             return OcrGateObservation(
                 raw,
@@ -433,12 +753,21 @@ class SubtitleTextGate:
                 candidate_observation_count=1,
                 required_observations=self.required_observations,
                 candidate_similarity=(
-                    candidate_similarity if previous_identity else None
+                    candidate_metrics.char_similarity if previous_identity else None
                 ),
                 candidate_replaced=bool(previous_identity),
                 candidate_id=self._candidate_id,
                 replaced_candidate_id=replaced_id,
                 replaced_candidate_text=replaced_text,
+                quality_score=quality_score,
+                selected_line_confidence=selected_line_confidence,
+                canonical_text=self._accepted_text,
+                char_similarity=(
+                    candidate_metrics.char_similarity if previous_identity else None
+                ),
+                token_similarity=(
+                    candidate_metrics.token_similarity if previous_identity else None
+                ),
                 decision=(
                     "candidate_window_expired"
                     if previous_identity
@@ -449,14 +778,23 @@ class SubtitleTextGate:
                         else "candidate_started"
                     )
                 ),
+                reason_code=(
+                    "candidate_timeout"
+                    if previous_identity
+                    and now - previous_since > self.stability_window_seconds
+                    else "dissimilar_candidate" if previous_identity else "new_candidate"
+                ),
             )
 
         self._candidate_count += 1
-        self._candidate_gap_count = 0
-        if confidence is not None and confidence > self._candidate_confidence:
+        candidate_quality = self._variant_quality(
+            confidence, quality_score, selected_line_confidence
+        )
+        if candidate_quality > self._candidate_quality:
             self._candidate_text = filtered
             self._candidate_identity = identity
-            self._candidate_confidence = confidence
+            self._candidate_confidence = confidence if confidence is not None else -1.0
+            self._candidate_quality = candidate_quality
         if self._candidate_count < self.required_observations:
             self._needs_confirmation = True
             return OcrGateObservation(
@@ -469,18 +807,23 @@ class SubtitleTextGate:
                 candidate_text=self._candidate_text,
                 candidate_observation_count=self._candidate_count,
                 required_observations=self.required_observations,
-                candidate_similarity=candidate_similarity,
+                candidate_similarity=candidate_metrics.char_similarity,
                 candidate_match_kind=match_kind,
                 candidate_id=self._candidate_id,
+                quality_score=quality_score,
+                selected_line_confidence=selected_line_confidence,
+                canonical_text=self._accepted_text,
+                char_similarity=candidate_metrics.char_similarity,
+                token_similarity=candidate_metrics.token_similarity,
                 decision="candidate_confirming",
+                reason_code="strong_vote",
             )
 
         accepted = self._candidate_text
-        self._accepted_identity = self._candidate_identity
         accepted_count = self._candidate_count
-        # Captured before _reset_candidate clears it, so the accepting
-        # observation still reports which candidate reached consensus.
         accepted_candidate_id = self._candidate_id
+        self._accepted_text = accepted
+        self._accepted_identity = subtitle_identity(accepted)
         self._reset_candidate()
         return OcrGateObservation(
             raw,
@@ -492,73 +835,74 @@ class SubtitleTextGate:
             candidate_text=accepted,
             candidate_observation_count=accepted_count,
             required_observations=self.required_observations,
-            candidate_similarity=candidate_similarity,
+            candidate_similarity=candidate_metrics.char_similarity,
             candidate_match_kind=match_kind,
             candidate_id=accepted_candidate_id,
+            quality_score=quality_score,
+            selected_line_confidence=selected_line_confidence,
+            canonical_text=accepted,
+            char_similarity=candidate_metrics.char_similarity,
+            token_similarity=candidate_metrics.token_similarity,
             decision="accepted_consensus",
+            reason_code="consensus_reached",
         )
+
+    @staticmethod
+    def _variant_quality(
+        confidence: float | None,
+        quality_score: float | None,
+        selected_line_confidence: float | None,
+    ) -> float:
+        if quality_score is not None:
+            return quality_score
+        if selected_line_confidence is not None:
+            return selected_line_confidence
+        return confidence if confidence is not None else -1.0
 
     def _clear(self, *, no_subtitle: bool) -> None:
         self._reset_candidate()
         if no_subtitle:
+            # End only the active episode. Keep the canonical text for
+            # diagnostics and cooldown correlation across appearances.
             self._accepted_identity = ""
 
     def _reset_candidate(self) -> None:
         self._candidate_text = ""
         self._candidate_identity = ""
         self._candidate_confidence = -1.0
+        self._candidate_quality = -1.0
         self._candidate_count = 0
         self._candidate_since = 0.0
-        self._candidate_gap_count = 0
         self._needs_confirmation = False
-
-    @staticmethod
-    def _similarity(first: str, second: str) -> float:
-        if not first or not second:
-            return 0.0
-        if first == second:
-            return 1.0
-        return SequenceMatcher(None, first, second, autojunk=False).ratio()
 
     def _identity_match_kind(
         self,
         first: str,
         second: str,
         *,
-        similarity: float,
+        metrics: _PhraseMetrics,
     ) -> str:
-        if not self._numbers_match(first, second):
+        if not first or not second:
             return ""
-        if similarity >= self.similarity_threshold:
-            return "normalized_exact" if first == second else "similarity"
-        # One OCR substitution/insertion/deletion in a real word must not keep
-        # restarting a two-frame consensus. Keep short dialogue conservative:
-        # e.g. "Nie" and "Nic" are not interchangeable. Numeric changes are
-        # semantic ("Room 101" vs "Room 102"), so never relax those.
+        if first == second:
+            return "normalized_exact"
+        if _dedup_is_split_merge_variant(first, second):
+            return "split_merge"
+        if metrics.semantic_conflict:
+            return ""
         if (
             min(len(first), len(second)) >= 5
             and self._edit_distance_at_most_one(first, second)
         ):
             return "single_edit"
+        if (
+            metrics.char_similarity >= self.similarity_threshold
+            and _only_ocr_like_changes(first, second)
+        ):
+            return "similarity"
+        if _same_episode_variant(first, second):
+            return "multi_signal_core"
         return ""
-
-    def _strict_identities_match(self, first: str, second: str) -> bool:
-        # Similarity is useful for candidate consensus, not for deciding that
-        # an already spoken sentence with a changed word is the same dialogue.
-        # Only a single OCR character slip in a long enough line is forgiven.
-        return (
-            self._numbers_match(first, second)
-            and (
-                first == second
-                or _dedup_is_split_merge_variant(first, second)
-                or _dedup_is_garbage_variant(first, second)
-                or _is_ocr_slip_variant(first, second)
-            )
-        )
-
-    @staticmethod
-    def _numbers_match(first: str, second: str) -> bool:
-        return re.findall(r"\d+", first) == re.findall(r"\d+", second)
 
     @staticmethod
     def _edit_distance_at_most_one(first: str, second: str) -> bool:
@@ -676,7 +1020,7 @@ _DEDUP_MIN_CORE_WORDS = 3
 _DEDUP_MIN_CORE_RATIO = 0.7
 # Consecutive text-free observations that end a subtitle episode. More than one,
 # so a single dropped or misread frame cannot re-arm the same phrase.
-_DEDUP_EPISODE_ABSENT_FRAMES = 3
+_DEDUP_EPISODE_ABSENT_FRAMES = SUBTITLE_DISAPPEARANCE_OBSERVATIONS
 
 
 def _dedup_words(identity: str) -> list[str]:
@@ -837,23 +1181,27 @@ def _dedup_is_split_merge_variant(candidate: str, spoken: str) -> bool:
 
 
 class PhraseDeduplicator:
-    """Speak each subtitle once per episode.
-
-    An *episode* is one appearance of one subtitle on screen. It begins when a
-    phrase is handed onwards for synthesis and ends only when the subtitle really
-    goes away: either a clearly different phrase is accepted, or the text is
-    absent for several consecutive observations. A cooldown expiring is not the
-    end of an episode - a subtitle that lingers on screen would otherwise be read
-    again, which is the reported bug.
-    """
+    """Speak each subtitle once until a shared, confirmed disappearance."""
 
     def __init__(self) -> None:
         self._visible_phrase = ""
         self._spoken_at: dict[str, float] = {}
-        # The phrase already read in the current episode, and how many
-        # consecutive observations have carried no text at all.
         self._episode_identity = ""
+        self._canonical_text = ""
         self._absent_streak = 0
+        self._next_episode_id = 0
+        self._active_episode_id = 0
+        self.last_char_similarity: float | None = None
+        self.last_token_similarity: float | None = None
+        self.last_rejection_reason = ""
+
+    @property
+    def episode_id(self) -> int:
+        return self._active_episode_id
+
+    @property
+    def canonical_text(self) -> str:
+        return self._canonical_text
 
     def accept(
         self,
@@ -863,62 +1211,74 @@ class PhraseDeduplicator:
         cooldown_seconds: float,
         frame_had_text: bool | None = None,
     ) -> str | None:
-        normalized = normalize_subtitle(text)
+        normalized = _drop_proven_noise_tokens(_trim_symbolic_edges(text))
         identity = subtitle_identity(normalized)
+        self.last_char_similarity = None
+        self.last_token_similarity = None
+        self.last_rejection_reason = ""
         if not identity:
             self._visible_phrase = ""
-            # A rejected frame that still contained text means the subtitle is
-            # very likely on screen, so it must not disarm the episode. Only a
-            # genuinely empty run counts towards a stable disappearance.
             if frame_had_text:
                 self._absent_streak = 0
             else:
                 self._absent_streak += 1
-                if self._absent_streak >= _DEDUP_EPISODE_ABSENT_FRAMES:
-                    # The subtitle really went away, so a later appearance is a
-                    # new subtitle. Forget the cooldown for it as well, otherwise
-                    # a quick genuine repeat would still be swallowed.
-                    if self._episode_identity:
-                        self._spoken_at.pop(self._episode_identity, None)
+                if self._absent_streak >= SUBTITLE_DISAPPEARANCE_OBSERVATIONS:
                     self._episode_identity = ""
+                    self._active_episode_id = 0
             return None
         self._absent_streak = 0
-        # Already read in this episode, exactly or with OCR noise on the edges.
-        # Blocked for the whole episode, however long it lasts.
-        if self._episode_identity and (
-            identity == self._episode_identity
-            or _dedup_is_garbage_variant(identity, self._episode_identity)
-            or _dedup_is_split_merge_variant(identity, self._episode_identity)
-        ):
-            return None
-        if identity == self._visible_phrase:
-            return None
-        self._visible_phrase = identity
-        previous = self._spoken_at.get(identity)
-        if previous is not None and now - previous < cooldown_seconds:
-            return None
-        # The same line re-recognised with OCR noise at its edges produces a
-        # different identity and used to slip through, so the phrase was spoken
-        # twice. Compare against what was actually spoken inside the existing
-        # cooldown window; only edge garbage is forgiven.
-        for spoken_identity, spoken_at in self._spoken_at.items():
-            if now - spoken_at >= cooldown_seconds:
-                continue
-            if (
-                _dedup_is_garbage_variant(identity, spoken_identity)
-                or _dedup_is_split_merge_variant(identity, spoken_identity)
-            ):
+        if self._episode_identity:
+            metrics = _phrase_metrics(normalized, self._canonical_text)
+            self.last_char_similarity = metrics.char_similarity
+            self.last_token_similarity = metrics.token_similarity
+            if _same_episode_variant(normalized, self._canonical_text):
+                self.last_rejection_reason = "active_episode_duplicate"
                 return None
-        # Latch here, at the moment the phrase is handed onwards for synthesis, so
-        # a second variant cannot reach the queue before the first is marked. A
-        # clearly different phrase starts a new episode by replacing the latch.
+        if identity == self._visible_phrase:
+            self.last_rejection_reason = "visible_duplicate"
+            return None
+        expired = [
+            spoken_identity
+            for spoken_identity, spoken_at in self._spoken_at.items()
+            if now - spoken_at >= cooldown_seconds
+        ]
+        for spoken_identity in expired:
+            self._spoken_at.pop(spoken_identity, None)
+        previous = self._spoken_at.get(identity)
+        if previous is not None:
+            self.last_rejection_reason = "cooldown_exact"
+            return None
+        for spoken_identity in self._spoken_at:
+            if _same_episode_variant(identity, spoken_identity):
+                self.last_rejection_reason = "cooldown_variant"
+                return None
+        self._visible_phrase = identity
+        self._next_episode_id += 1
+        self._active_episode_id = self._next_episode_id
         self._episode_identity = identity
+        self._canonical_text = normalized
         return normalized
 
     def mark_spoken(self, text: str, *, now: float) -> None:
         identity = subtitle_identity(text)
         if identity:
             self._spoken_at[identity] = now
+
+
+def _region_pixel_rect(
+    frame: CaptureFrame, region: object
+) -> tuple[int, int, int, int]:
+    x = max(0, min(frame.width - 1, round(float(getattr(region, "x")) * frame.width)))
+    y = max(0, min(frame.height - 1, round(float(getattr(region, "y")) * frame.height)))
+    width = max(
+        1,
+        min(frame.width - x, round(float(getattr(region, "width")) * frame.width)),
+    )
+    height = max(
+        1,
+        min(frame.height - y, round(float(getattr(region, "height")) * frame.height)),
+    )
+    return x, y, width, height
 
 
 def crop_frame(frame: CaptureFrame, region: object) -> CaptureFrame:
@@ -932,16 +1292,7 @@ def crop_frame(frame: CaptureFrame, region: object) -> CaptureFrame:
     channels = channels_by_format.get(frame.pixel_format.casefold())
     if channels is None:
         raise ValueError(f"unsupported capture pixel format: {frame.pixel_format}")
-    x = max(0, min(frame.width - 1, round(float(getattr(region, "x")) * frame.width)))
-    y = max(0, min(frame.height - 1, round(float(getattr(region, "y")) * frame.height)))
-    width = max(
-        1,
-        min(frame.width - x, round(float(getattr(region, "width")) * frame.width)),
-    )
-    height = max(
-        1,
-        min(frame.height - y, round(float(getattr(region, "height")) * frame.height)),
-    )
+    x, y, width, height = _region_pixel_rect(frame, region)
     output_stride = width * channels
     output = bytearray(output_stride * height)
     source = memoryview(frame.pixels)
@@ -964,6 +1315,9 @@ def crop_frame(frame: CaptureFrame, region: object) -> CaptureFrame:
 
 class SubtitleRegionStabilizer:
     def __init__(self) -> None:
+        self.reset()
+
+    def reset(self) -> None:
         self._accepted_signature = b""
         self._pending_signature = b""
         self._pending_since = 0.0
@@ -1182,6 +1536,8 @@ class NarratorPipeline:
         self._lost_strong_lines: deque[dict[str, object]] = deque(maxlen=10)
         self._last_ocr_diagnostic: tuple[str, str, float | None] | None = None
         self._last_ocr_backend_diagnostic: tuple[str, str] | None = None
+        self._roi_diagnostic: dict[str, object] | None = None
+        self._roi_diagnostic_logged = False
         self._ocr_future: Future[OcrResult] | None = None
         self._ocr_prepare_future: Future[object] | None = None
         self._tts_prepare_future: Future[object] | None = None
@@ -1398,6 +1754,8 @@ class NarratorPipeline:
             self._lost_strong_lines.clear()
             self._last_ocr_diagnostic = None
             self._last_ocr_backend_diagnostic = None
+            self._roi_diagnostic = None
+            self._roi_diagnostic_logged = False
             self._request_active = False
             self._pending_frame = None
             self._pending_frame_stabilization_ms = 0.0
@@ -1678,10 +2036,25 @@ class NarratorPipeline:
             )
             started = self._clock()
             try:
+                pixel_rect = _region_pixel_rect(frame, settings.subtitle_region)
                 cropped = crop_frame(frame, settings.subtitle_region)
             except Exception as error:
                 self._recoverable_error(f"Could not crop the subtitle region: {error}")
                 return
+            if self._roi_diagnostic is None:
+                region = settings.subtitle_region
+                self._roi_diagnostic = {
+                    "frame_width": frame.width,
+                    "frame_height": frame.height,
+                    "region_x": region.x,
+                    "region_y": region.y,
+                    "region_width": region.width,
+                    "region_height": region.height,
+                    "region_source": settings.subtitle_region_source,
+                    "pixel_rect": pixel_rect,
+                    "crop_width": cropped.width,
+                    "crop_height": cropped.height,
+                }
             capture_ms = max(0.0, (self._clock() - started) * 1000.0)
             stabilization_started = self._clock()
             if self._text_gate.needs_confirmation:
@@ -1901,6 +2274,9 @@ class NarratorPipeline:
                 return
             gate_started = self._clock()
             now = gate_started
+            frame_had_text = bool(
+                (result.raw_text or result.filtered_text or result.text).strip()
+            )
             observation = self._text_gate.observe(
                 result.filtered_text or result.text,
                 result.confidence,
@@ -1910,7 +2286,50 @@ class NarratorPipeline:
                     result.clean_short_phrase_evidence
                     and visual_decision in {"initial_probe", "localized_change"}
                 ),
+                quality_score=result.quality_score,
+                selected_line_confidence=result.selected_line_confidence,
+                leading_low_quality_tokens=result.leading_low_quality_tokens,
+                trailing_low_quality_tokens=result.trailing_low_quality_tokens,
+                frame_had_text=frame_had_text,
             )
+            if observation.reason_code == "confirmed_disappearance":
+                reset_stabilizer = getattr(self._stabilizer, "reset", None)
+                if callable(reset_stabilizer):
+                    reset_stabilizer()
+            if not self._roi_diagnostic_logged and self._roi_diagnostic is not None:
+                diagnostic = self._roi_diagnostic
+                pixel_x, pixel_y, pixel_width, pixel_height = diagnostic["pixel_rect"]
+                processed_width = (
+                    result.preprocessed_width
+                    or result.input_width
+                    or int(diagnostic["crop_width"])
+                )
+                processed_height = (
+                    result.preprocessed_height
+                    or result.input_height
+                    or int(diagnostic["crop_height"])
+                )
+                logger.info(
+                    "Narrator OCR ROI: frame=%dx%d "
+                    "region=(%.6f,%.6f,%.6f,%.6f) source=%s "
+                    "rect=(%d,%d,%d,%d) crop=%dx%d tesseract=%dx%d",
+                    diagnostic["frame_width"],
+                    diagnostic["frame_height"],
+                    diagnostic["region_x"],
+                    diagnostic["region_y"],
+                    diagnostic["region_width"],
+                    diagnostic["region_height"],
+                    diagnostic["region_source"],
+                    pixel_x,
+                    pixel_y,
+                    pixel_width,
+                    pixel_height,
+                    diagnostic["crop_width"],
+                    diagnostic["crop_height"],
+                    processed_width,
+                    processed_height,
+                )
+                self._roi_diagnostic_logged = True
             backend_diagnostic = (result.backend, result.fallback_reason)
             if backend_diagnostic != self._last_ocr_backend_diagnostic:
                 logger.debug(
@@ -1983,38 +2402,100 @@ class NarratorPipeline:
                 result.debug_capture_path or "none",
             )
 
-            # Visibility belongs to every observation, including unconfirmed
-            # candidates and duplicates. Otherwise separated blanks accumulate
-            # as a false consecutive disappearance and release the TTS latch.
+            # Gate and episode latch consume the same raw-text presence signal.
+            # Therefore one empty frame cannot mean two different states.
+            canonical_before = self._deduplicator.canonical_text
+            episode_metrics = (
+                _phrase_metrics(observation.filtered_text, canonical_before)
+                if observation.filtered_text and canonical_before
+                else None
+            )
             self._deduplicator.accept(
                 "",
                 now=now,
                 cooldown_seconds=settings.duplicate_cooldown_ms / 1000.0,
-                frame_had_text=bool(
-                    (result.raw_text or result.filtered_text or result.text).strip()
-                ),
+                frame_had_text=frame_had_text,
             )
-            phrase = self._deduplicator.accept(
-                observation.accepted_text,
-                now=self._clock(),
-                cooldown_seconds=settings.duplicate_cooldown_ms / 1000.0,
-            ) if observation.accepted_text else None
+            phrase = (
+                self._deduplicator.accept(
+                    observation.accepted_text,
+                    now=self._clock(),
+                    cooldown_seconds=settings.duplicate_cooldown_ms / 1000.0,
+                )
+                if observation.accepted_text
+                else None
+            )
             final_decision = observation.decision or "rejected_unknown"
+            reason_code = observation.reason_code or rejection_reason or final_decision
             if observation.accepted_text and phrase is None:
                 final_decision = "rejected_duplicate"
                 rejection_reason = "duplicate"
+                reason_code = (
+                    self._deduplicator.last_rejection_reason
+                    or "active_episode_duplicate"
+                )
                 self._ocr_rejection_counts["duplicate"] = (
                     self._ocr_rejection_counts.get("duplicate", 0) + 1
                 )
             elif phrase:
                 final_decision = "accepted"
+                reason_code = "new_episode_consensus"
             line_similarity = self._text_gate.last_line_similarity
+            char_similarity = (
+                observation.char_similarity
+                if observation.char_similarity is not None
+                else episode_metrics.char_similarity if episode_metrics is not None else None
+            )
+            token_similarity = (
+                observation.token_similarity
+                if observation.token_similarity is not None
+                else episode_metrics.token_similarity if episode_metrics is not None else None
+            )
+            canonical_text = (
+                self._deduplicator.canonical_text
+                or observation.canonical_text
+                or canonical_before
+            )
             logger.info(
-                "Narrator OCR: raw=%r cleaned=%r similarity=%s decision=%s",
+                "Narrator OCR: raw=%r cleaned=%r similarity=%s decision=%s "
+                "confidence=%s quality=%s line_confidence=%s episode_id=%d "
+                "candidate_id=%d strong_votes=%d required_votes=%d canonical=%r "
+                "char_similarity=%s token_similarity=%s reason=%s",
                 observation.raw_text,
                 observation.filtered_text,
                 f"{line_similarity:.3f}" if line_similarity is not None else "none",
                 final_decision,
+                (
+                    f"{observation.confidence:.3f}"
+                    if observation.confidence is not None
+                    else "none"
+                ),
+                (
+                    f"{observation.quality_score:.3f}"
+                    if observation.quality_score is not None
+                    else "none"
+                ),
+                (
+                    f"{observation.selected_line_confidence:.3f}"
+                    if observation.selected_line_confidence is not None
+                    else "none"
+                ),
+                self._deduplicator.episode_id,
+                observation.candidate_id,
+                observation.candidate_observation_count,
+                observation.required_observations,
+                canonical_text,
+                (
+                    f"{char_similarity:.3f}"
+                    if char_similarity is not None
+                    else "none"
+                ),
+                (
+                    f"{token_similarity:.3f}"
+                    if token_similarity is not None
+                    else "none"
+                ),
+                reason_code,
             )
             # Loss funnel. Every observation is counted exactly once under the
             # decision the pipeline already assigned it, so no new vocabulary is
@@ -2092,6 +2573,15 @@ class NarratorPipeline:
                     ),
                     visual_change_decision=visual_decision,
                     filter_summary=result.filter_summary,
+                    episode_id=self._deduplicator.episode_id,
+                    canonical_text=canonical_text,
+                    selected_line_confidence=(
+                        result.selected_line_confidence
+                    ),
+                    quality_score=result.quality_score,
+                    char_similarity=char_similarity,
+                    token_similarity=token_similarity,
+                    reason_code=reason_code,
                 )
             )
             stabilization_dedup_ms = stabilization_ms + max(
