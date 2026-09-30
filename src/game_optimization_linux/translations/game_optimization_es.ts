@@ -12469,6 +12469,496 @@ Current: %2</source>
         <source>Gamescope</source>
         <translation>Gamescope</translation>
     </message>
+    <message>
+        <location line="+0"/>
+        <source>0% = least, 100% = most sharpening</source>
+        <translation>0% = mínimo, 100% = máximo enfoque</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>A Gamescope test is already running</source>
+        <translation>Ya hay una prueba de Gamescope en marcha</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Adaptive Sync / VRR</source>
+        <translation>Adaptive Sync / VRR</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Always grab the cursor</source>
+        <translation>Capturar siempre el cursor</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Auto</source>
+        <translation>Auto</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Auto lets Gamescope choose.</source>
+        <translation>Auto deja que Gamescope elija.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Automatic (recommended)</source>
+        <translation>Automático (recomendado)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Available</source>
+        <translation>Disponible</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Backend</source>
+        <translation>Backend</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Borderless</source>
+        <translation>Sin bordes</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Close test</source>
+        <translation>Cerrar prueba</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Convert SDR games to HDR (inverse tone mapping)</source>
+        <translation>Convertir juegos SDR a HDR (inverse tone mapping)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Copy Steam launch options</source>
+        <translation>Copiar opciones de lanzamiento de Steam</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Could not start the Gamescope test: %1</source>
+        <translation>No se pudo iniciar la prueba de Gamescope: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Default</source>
+        <translation>Predeterminado</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Display only. Game launches always use a safe argument list, never this text.</source>
+        <translation>Solo para mostrar. Los juegos se inician siempre con una lista segura de argumentos, nunca con este texto.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>-e / --steam; never enabled automatically, intended for Steam games</source>
+        <translation>-e / --steam; nunca se activa automáticamente, pensado para juegos de Steam</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Enable HDR</source>
+        <translation>Activar HDR</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Experimental</source>
+        <translation>Experimental</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Fill / crop</source>
+        <translation>Fill / rellenar recortando</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Fill keeps the aspect ratio and crops the edges.</source>
+        <translation>Fill mantiene la proporción y recorta los bordes.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Filter</source>
+        <translation>Filtro</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Fit / keep aspect ratio</source>
+        <translation>Fit / mantener proporción</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Fit keeps the aspect ratio and may add black bars.</source>
+        <translation>Fit mantiene la proporción y puede añadir franjas negras.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Fit method</source>
+        <translation>Método de ajuste</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Force full-size game window inside Gamescope</source>
+        <translation>Forzar ventana del juego a tamaño completo dentro de Gamescope</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>FSR: good general-purpose upscaling.</source>
+        <translation>FSR: buen escalado de uso general.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Game render resolution</source>
+        <translation>Resolución de renderizado del juego</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Gamescope %1</source>
+        <translation>Gamescope %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Gamescope FPS limit</source>
+        <translation>Límite de FPS de Gamescope</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Gamescope --help could not be read. Only the basic options are available; advanced options are disabled.</source>
+        <translation>No se pudo leer gamescope --help. Solo están disponibles las opciones básicas; las avanzadas están desactivadas.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Gamescope is not installed</source>
+        <translation>Gamescope no está instalado</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Gamescope may round the limit to a divisor of the refresh rate</source>
+        <translation>Gamescope puede redondear el límite a un divisor de la frecuencia de refresco</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Gamescope output resolution</source>
+        <translation>Resolución de salida de Gamescope</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Gamescope WSI layer detected; its variable is set only while HDR is on.</source>
+        <translation>Capa Gamescope WSI detectada; su variable solo se establece con HDR activado.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Gamescope WSI layer not found: HDR games may be shown as SDR.</source>
+        <translation>No se encontró la capa Gamescope WSI: los juegos HDR pueden mostrarse como SDR.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Generated Gamescope arguments</source>
+        <translation>Argumentos de Gamescope generados</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Grab the keyboard</source>
+        <translation>Capturar el teclado</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>HDR and colors</source>
+        <translation>HDR y colores</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>HDR in Gamescope also depends on the Wayland desktop, the monitor, the driver and the game. If colors look washed out, turn HDR/ITM off.</source>
+        <translation>El HDR en Gamescope también depende del escritorio Wayland, el monitor, el controlador y el juego. Si los colores se ven apagados, desactiva HDR/ITM.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Height</source>
+        <translation>Alto</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Hide the cursor after a delay</source>
+        <translation>Ocultar el cursor tras un retardo</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Image scaling</source>
+        <translation>Escalado de imagen</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Input and window behavior</source>
+        <translation>Entrada y comportamiento de la ventana</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Integer scales by whole numbers; best for pixel-art games.</source>
+        <translation>Integer escala por números enteros; ideal para juegos pixel-art.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Integer scaling</source>
+        <translation>Integer / escalado entero</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Integrations and diagnostics</source>
+        <translation>Integraciones y diagnóstico</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Limit when unfocused</source>
+        <translation>Límite sin foco</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Linear: smooth default filtering.</source>
+        <translation>Linear: filtrado suave predeterminado.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Maximum scale</source>
+        <translation>Escala máxima</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Missing</source>
+        <translation>No disponible</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Monitor</source>
+        <translation>Monitor</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Mouse sensitivity</source>
+        <translation>Sensibilidad del ratón</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Native / automatic</source>
+        <translation>Nativa / automática</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Native Wayland clients</source>
+        <translation>Clientes Wayland nativos</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Nearest / Pixel: best for pixel-art games.</source>
+        <translation>Nearest / Pixel: ideal para juegos pixel-art.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>NIS: an alternative sharpening upscaler.</source>
+        <translation>NIS: un escalador alternativo con enfoque.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Not a Wayland session: HDR may not work.</source>
+        <translation>No es una sesión Wayland: el HDR puede no funcionar.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>NVIDIA: HDR requires working DRM kernel modesetting (nvidia-drm.modeset=1).</source>
+        <translation>NVIDIA: el HDR requiere DRM modeset activo (nvidia-drm.modeset=1).</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Off</source>
+        <translation>Desactivado</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Only for SDR games; never applied to native HDR automatically</source>
+        <translation>Solo para juegos SDR; nunca se aplica automáticamente al HDR nativo</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Only nested desktop backends listed by the local Gamescope</source>
+        <translation>Solo backends de escritorio (nested) listados por el Gamescope local</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Only one mode is used at a time</source>
+        <translation>Solo se usa un modo a la vez</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>-r: empty uses the FPS target of this profile</source>
+        <translation>-r: vacío usa el objetivo de FPS de este perfil</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Refresh detection</source>
+        <translation>Actualizar detección</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Render and output sizes are equal: the filter only changes the image, it does not increase FPS.</source>
+        <translation>Las resoluciones de renderizado y salida son iguales: el filtro solo cambia la imagen, no aumenta los FPS.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Requires VRR support in the monitor, the driver and the current session</source>
+        <translation>Requiere soporte VRR en el monitor, el controlador y la sesión actual</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Restore Gamescope settings</source>
+        <translation>Restaurar ajustes de Gamescope</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Runs gamescope with the current settings and vkcube. Nothing is saved; HDR is used only in the HDR test.</source>
+        <translation>Ejecuta gamescope con los ajustes actuales y vkcube. No se guarda nada; el HDR solo se usa en la prueba HDR.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>SDR content brightness in HDR</source>
+        <translation>Brillo del contenido SDR en HDR</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>SDR gamut wideness</source>
+        <translation>Amplitud de gama SDR</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>SDR source brightness</source>
+        <translation>Brillo de la fuente SDR</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>SGSR: Snapdragon Game Super Resolution with sharpening.</source>
+        <translation>SGSR: Snapdragon Game Super Resolution con enfoque.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Sharpness</source>
+        <translation>Nitidez</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Smoothness and frame limit</source>
+        <translation>Fluidez y límite de fotogramas</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Steam integration (advanced)</source>
+        <translation>Integración con Steam (avanzado)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Steam launch options copied</source>
+        <translation>Opciones de lanzamiento de Steam copiadas</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Stretch</source>
+        <translation>Stretch / estirar</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Stretch fills the screen and changes the aspect ratio.</source>
+        <translation>Stretch llena la pantalla y cambia la proporción.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Target HDR brightness</source>
+        <translation>Brillo HDR objetivo</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Test Gamescope</source>
+        <translation>Probar Gamescope</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Test with HDR</source>
+        <translation>Probar con HDR</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The Gamescope test ended with an error: %1</source>
+        <translation>La prueba de Gamescope terminó con un error: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The Gamescope test requires the vulkan-tools package</source>
+        <translation>La prueba de Gamescope requiere el paquete vulkan-tools</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The Gamescope WSI layer is checked on the host when the game starts.</source>
+        <translation>La capa Gamescope WSI se comprueba en el host al iniciar el juego.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The installed Gamescope has no --hdr-enabled: HDR is unavailable.</source>
+        <translation>El Gamescope instalado no tiene --hdr-enabled: HDR no disponible.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Used only by the FSR and NIS filters</source>
+        <translation>Solo lo usan los filtros FSR y NIS</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Virtual refresh rate</source>
+        <translation>Frecuencia de refresco virtual</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>-W / -H: the size of the Gamescope window or screen</source>
+        <translation>-W / -H: tamaño de la ventana o pantalla de Gamescope</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>-w / -h: the size the game renders at</source>
+        <translation>-w / -h: tamaño al que renderiza el juego</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Wayland session: the basic requirement is met.</source>
+        <translation>Sesión Wayland: se cumple el requisito básico.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Width</source>
+        <translation>Ancho</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Window</source>
+        <translation>Ventana</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Window mode</source>
+        <translation>Modo</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Window mode and resolution</source>
+        <translation>Modo de ventana y resolución</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>You may need Super+G to release the grab</source>
+        <translation>Puede que necesites Super+G para liberar la captura</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>--display-index; Gamescope's numbering may differ from the list of screens</source>
+        <translation>--display-index; la numeración de Gamescope puede diferir de la lista de pantallas</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>MangoHud is drawn by Gamescope (--mangoapp) with this game's MangoHud profile; the game gets no second overlay.</source>
+        <translation>Gamescope dibuja MangoHud (--mangoapp) con el perfil de MangoHud de este juego; el juego no recibe una segunda superposición.</translation>
+    </message>
 </context>
 <context>
     <name>OverviewTab</name>

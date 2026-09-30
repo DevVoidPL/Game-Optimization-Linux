@@ -3160,6 +3160,157 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+GAMESCOPE_PROBE_OPTIONS = (
+    "-W", "-H", "-w", "-h", "-r", "--framerate-limit", "-f", "-b", "-S", "-F",
+    "--display-index", "--sharpness", "--fsr-sharpness", "--adaptive-sync", "-g",
+    "--hdr-enabled", "--mangoapp", "-m", "-o", "--backend", "--force-windows-fullscreen",
+    "--hdr-sdr-content-nits", "--sdr-gamut-wideness", "--hdr-itm-enabled",
+    "--hdr-itm-sdr-nits", "--hdr-itm-target-nits", "--force-grab-cursor", "-C", "-s",
+    "--expose-wayland", "-e",
+)
+
+
+def probe_gamescope_editor(application: QGuiApplication) -> dict[str, Any]:
+    """Desktop Gamescope sections: capabilities, real clicks, save, reload, reset."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.models import GameOptimizationProfile
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import (
+        GameOptimizationProfileRepository,
+        GamepadService,
+        RunnerIntegration,
+        RuntimeToolAvailability,
+        SettingsStore,
+    )
+
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-gamescope-qml-"))
+    game = replace(demo_games()[0], steam_app_id="224760")
+    repository = GameOptimizationProfileRepository(temporary_root / "config" / "games")
+    repository.save(replace(
+        GameOptimizationProfile.default("224760"),
+        preset="custom", gamescope_enabled=True, gamescope_mode="native",
+        manual_overrides={"gamescope": True},
+    ))
+
+    class ToolDetector:
+        full = True
+
+        def detect(self, *, refresh: bool = False) -> tuple[RuntimeToolAvailability, RuntimeToolAvailability]:
+            del refresh
+            return (
+                RuntimeToolAvailability("GameMode", False),
+                RuntimeToolAvailability(
+                    "Gamescope", True, "/usr/bin/gamescope", "3.16.30",
+                    GAMESCOPE_PROBE_OPTIONS if self.full else (),
+                    supported_filters=("linear", "nearest", "fsr", "nis", "pixel", "sgsr") if self.full else (),
+                    supported_scalers=("auto", "integer", "fit", "fill", "stretch") if self.full else (),
+                    supported_backends=("auto", "drm", "sdl", "wayland") if self.full else (),
+                ),
+            )
+
+    detector = ToolDetector()
+    controller = AppController(
+        parent=application,
+        ui_sound_service=NoOpUiSoundService(),
+        game_provider=DemoGameProvider((game,)),
+        settings_store=SettingsStore(temporary_root / "settings.json"),
+        gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        optimization_profile_repository=repository,
+        runner_integration=RunnerIntegration(temporary_root / "bin" / "game-optimization-run"),
+        runtime_tool_detector=detector,  # type: ignore[arg-type]
+        auto_refresh=False,
+    )
+    view, root = _view(application, "pages/details/OptimizationTab.qml", 1600, 1000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameData", controller.games[0])
+    _settle(application, 20)
+    QTest.qWait(80)
+    _settle(application, 10)
+    if str(root.property("appId")) != "224760":
+        raise AssertionError(f"Optimization profile did not load: {root.property('errorMessage')!r}")
+
+    def visible(name: str) -> bool:
+        items = _named(root, name)
+        return bool(items) and isinstance(items[0], QQuickItem) and items[0].isVisible()
+
+    def row_visible(name: str) -> bool:
+        # The row (SettingRow) hosting a control decides its visibility.
+        item = _item(root, name)
+        return item.isVisible()
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        scroll = _item(root, "optimizationScroll")
+        flickable = scroll.property("contentItem")
+        target = item.mapToItem(flickable.property("contentItem"), QPointF(0, 0)) if flickable else None
+        if flickable is not None and target is not None:
+            flickable.setProperty("contentY", max(0.0, target.y() - 200))
+            _settle(application, 6)
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    for section in ("gamescopeSectionHdr", "gamescopeSectionInput", "gamescopeSectionDiagnostics"):
+        _item(root, section).setProperty("expanded", True)
+    _settle(application, 8)
+    result: dict[str, Any] = {
+        "full_hdr_section": visible("gamescopeSectionHdr"),
+        "full_display_index": row_visible("gamescopeDisplayIndex"),
+        "full_force_grab": row_visible("gamescopeForceGrabCursor"),
+        "full_advanced_warning": visible("gamescopeAdvancedUnavailable"),
+        "full_filters": list(_variant(root.property("filterValues")) or []),
+        "full_backends": list(_variant(root.property("backendValues")) or []),
+        "version_badge": str(_item(root, "gamescopeAvailabilityBadge").property("text")),
+    }
+
+    click("gamescopeAdaptiveSync")
+    result["dirty_after_click"] = root.property("dirty") is True
+    click("gamescopeForceWindowsFullscreen")
+    QTest.qWait(220)
+    _settle(application, 8)
+    arguments = list(_variant(root.property("gamescopeArguments")) or [])
+    result["preview_arguments"] = arguments
+    result["steam_options"] = str(root.property("gamescopeSteamLaunchOptions"))
+    click("saveOptimizationProfileButton")
+    _settle(application, 10)
+    saved = repository.load("224760")
+    result["saved_flags"] = [saved.gamescope_adaptive_sync, saved.gamescope_force_windows_fullscreen]
+    result["clean_after_save"] = root.property("dirty") is False
+
+    _invoke_qml(root, "loadProfile")
+    _settle(application, 10)
+    result["reloaded_switches"] = [
+        bool(_item(root, "gamescopeAdaptiveSync").property("checked")),
+        bool(_item(root, "gamescopeForceWindowsFullscreen").property("checked")),
+    ]
+
+    click("resetGamescopeSettings")
+    _settle(application, 10)
+    reset = repository.load("224760")
+    result["reset_profile"] = [reset.gamescope_enabled, reset.gamescope_adaptive_sync,
+                               reset.gamescope_force_windows_fullscreen, reset.preset]
+    result["reset_switch"] = bool(_item(root, "gamescopeAdaptiveSync").property("checked"))
+
+    detector.full = False
+    _invoke_qml(root, "loadProfile")
+    _settle(application, 10)
+    result.update({
+        "basic_advanced_warning": visible("gamescopeAdvancedUnavailable"),
+        "basic_hdr_section": visible("gamescopeSectionHdr"),
+        "basic_force_grab": row_visible("gamescopeForceGrabCursor"),
+        "basic_display_index": row_visible("gamescopeDisplayIndex"),
+        "basic_filters": list(_variant(root.property("filterValues")) or []),
+    })
+    view.close()
+    controller.shutdown()
+    return result
+
+
 def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     from game_optimization_linux.controllers import AppController
     from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
@@ -4509,6 +4660,7 @@ def main() -> int:
             "tasks",
             "mangohud",
             "optimization",
+            "gamescope",
             "couch",
             "couch_settings",
             "updates",
@@ -4548,6 +4700,8 @@ def main() -> int:
         result = probe_mangohud_editor(application)
     elif args.mode == "optimization":
         result = probe_optimization_editor(application)
+    elif args.mode == "gamescope":
+        result = probe_gamescope_editor(application)
     elif args.mode == "couch":
         result = probe_couch(application, args.width, args.height, args.scenario, args.theme)
     elif args.mode == "couch_settings":

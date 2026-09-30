@@ -114,6 +114,7 @@ from ..services import (
     MangoHudLaunchIntegration,
     MangoHudProfileRepository,
     MangoHudLivePreview,
+    GamescopeTestRun,
     ManualGameStore,
     NarratorComponentManager,
     NarratorGameActivityDetector,
@@ -309,6 +310,7 @@ class AppController(QObject):
     systemUsageChanged = Signal()
     mangoHudProfileChanged = Signal(str)
     mangoHudLivePreviewChanged = Signal("QVariantMap")
+    gamescopeTestChanged = Signal("QVariantMap")
     optiScalerChanged = Signal(str)
     # QVariantMap (not ``object``): QML must be able to read the result.
     optiScalerStatusChanged = Signal(str, "QVariantMap")
@@ -353,6 +355,7 @@ class AppController(QObject):
         mangohud_detector: MangoHudDetector | None = None,
         mangohud_launch_integration: MangoHudLaunchIntegration | None = None,
         mangohud_live_preview: MangoHudLivePreview | None = None,
+        gamescope_test_run: GamescopeTestRun | None = None,
         optimization_profile_repository: GameOptimizationProfileRepository | None = None,
         optimization_analysis_repository: OptimizationAnalysisRepository | None = None,
         automatic_optimization_repository: AutomaticOptimizationRepository | None = None,
@@ -553,6 +556,15 @@ class AppController(QObject):
             mangohud_launch_integration
             or MangoHudLaunchIntegration(
                 self._mangohud_repository, self._mangohud_detector
+            )
+        )
+        self._gamescope_test_run = gamescope_test_run or GamescopeTestRun(
+            host_service=host_service
+        )
+        # Called from the test watcher thread; the signal is queued to QML.
+        self._gamescope_test_run.on_finished = (
+            lambda result: self.gamescopeTestChanged.emit(
+                {**result.to_dict(), "running": False}
             )
         )
         self._mangohud_live_preview = mangohud_live_preview or MangoHudLivePreview(
@@ -2060,6 +2072,26 @@ class AppController(QObject):
     ) -> dict[str, Any]:
         return self._optimization_controller.saveOptimizationProfile(game_id, values)
 
+    @Slot(result="QVariantMap")
+    def refreshGamescopeDetection(self) -> dict[str, Any]:
+        return self._optimization_controller.refreshGamescopeDetection()
+
+    @Slot(str, result="QVariantMap")
+    def resetGamescopeSettings(self, game_id: str) -> dict[str, Any]:
+        return self._optimization_controller.resetGamescopeSettings(game_id)
+
+    @Slot(str, "QVariantMap", bool, result="QVariantMap")
+    def startGamescopeTest(
+        self, game_id: str, values: Mapping[str, Any], include_hdr: bool = False
+    ) -> dict[str, Any]:
+        return self._optimization_controller.startGamescopeTest(
+            game_id, values, bool(include_hdr)
+        )
+
+    @Slot(result=bool)
+    def stopGamescopeTest(self) -> bool:
+        return self._optimization_controller.stopGamescopeTest()
+
     @Slot(str, result="QVariantMap")
     def testGameOptimizationRunner(self, game_id: str) -> dict[str, Any]:
         return self._optimization_controller.testGameOptimizationRunner(game_id)
@@ -2357,6 +2389,12 @@ class AppController(QObject):
             self._gamepad_service.stop()
         if hasattr(self, "_ui_sound_service"):
             self._ui_sound_service.shutdown()
+        gamescope_test = getattr(self, "_gamescope_test_run", None)
+        if gamescope_test is not None:
+            try:
+                gamescope_test.shutdown()
+            except Exception:
+                logger.exception("Could not stop the Gamescope test")
         live_preview = getattr(self, "_mangohud_live_preview", None)
         if live_preview is not None:
             try:

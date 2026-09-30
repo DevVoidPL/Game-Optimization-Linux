@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+import json
 from pathlib import Path
 import re
 import shutil
@@ -92,14 +93,30 @@ class RuntimeToolAvailability:
     # Values the local release lists for -F / -S (empty = not verified).
     supported_filters: tuple[str, ...] = ()
     supported_scalers: tuple[str, ...] = ()
+    supported_backends: tuple[str, ...] = ()
+    # Enable variable of the installed Gamescope WSI layer manifest, if found.
+    wsi_environment: tuple[str, str] | tuple[()] = ()
+
+    @property
+    def help_verified(self) -> bool:
+        """True when ``--help`` was parsed; otherwise only basic flags are used."""
+
+        return bool(self.supported_options)
+
+    @property
+    def effective_options(self) -> tuple[str, ...]:
+        return self.supported_options if self.help_verified else GAMESCOPE_BASIC_OPTIONS
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name, "available": self.available,
             "executable": self.executable, "version": self.version,
-            "supportedOptions": list(self.supported_options), "message": self.message,
+            "supportedOptions": list(self.effective_options), "message": self.message,
             "supportedFilters": list(self.supported_filters),
             "supportedScalers": list(self.supported_scalers),
+            "supportedBackends": list(self.supported_backends),
+            "helpVerified": self.help_verified,
+            "wsiEnvironment": "=".join(self.wsi_environment) if self.wsi_environment else "",
         }
 
 
@@ -109,8 +126,63 @@ GAMESCOPE_KNOWN_OPTIONS = (
     "-W", "-H", "-w", "-h", "-r", "--framerate-limit", "-f", "-b",
     "-S", "-F", "--display-index", "--sharpness", "--fsr-sharpness",
     "--adaptive-sync", "-g", "--hdr-enabled", "--mangoapp",
+    "-m", "-o", "--backend", "--force-windows-fullscreen",
+    "--hdr-sdr-content-nits", "--sdr-gamut-wideness",
+    # Older releases spell the inverse tone mapping switch without "d".
+    "--hdr-itm-enabled", "--hdr-itm-enable",
+    "--hdr-itm-sdr-nits", "--hdr-itm-target-nits",
+    "--force-grab-cursor", "-C", "-s", "--expose-wayland", "-e",
+)
+# Used when --help cannot be read: the long-standing core of the integration.
+GAMESCOPE_BASIC_OPTIONS = ("-W", "-H", "-w", "-h", "-r", "-f", "-b", "-S")
+# Only nested desktop backends; drm/headless/openvr are never emitted.
+GAMESCOPE_DESKTOP_BACKENDS = ("wayland", "sdl")
+GAMESCOPE_WSI_LAYER_DIRECTORIES = (
+    Path("/usr/share/vulkan/implicit_layer.d"),
+    Path("/etc/vulkan/implicit_layer.d"),
+    Path("/usr/local/share/vulkan/implicit_layer.d"),
 )
 _ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def parse_gamescope_backends(help_text: str) -> tuple[str, ...]:
+    """Backend names listed under ``--backend`` as ``name => description``."""
+
+    lines = _ANSI_ESCAPE.sub("", help_text or "").splitlines()
+    for index, line in enumerate(lines):
+        if re.match(r"^\s*--backend\b", line):
+            values: list[str] = []
+            for following in lines[index + 1:]:
+                match = re.match(r"^\s+([a-z][a-z0-9_-]*)\s+=>", following)
+                if not match:
+                    break
+                values.append(match.group(1).casefold())
+            return tuple(values)
+    return ()
+
+
+def detect_gamescope_wsi(
+    directories: Sequence[Path] = GAMESCOPE_WSI_LAYER_DIRECTORIES,
+) -> tuple[str, str] | tuple[()]:
+    """Read the enable variable from the installed Gamescope WSI layer manifest."""
+
+    for directory in directories:
+        try:
+            manifests = sorted(Path(directory).glob("*gamescope_wsi*.json"))
+        except OSError:
+            continue
+        for manifest in manifests:
+            try:
+                data = json.loads(manifest.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            layer = data.get("layer") if isinstance(data, Mapping) else None
+            enable = layer.get("enable_environment") if isinstance(layer, Mapping) else None
+            if isinstance(enable, Mapping) and len(enable) == 1:
+                key, value = next(iter(enable.items()))
+                if re.fullmatch(r"[A-Z][A-Z0-9_]*", str(key)) and str(value):
+                    return str(key), str(value)
+    return ()
 
 
 def parse_gamescope_help(help_text: str) -> tuple[tuple[str, ...], tuple[str, ...], tuple[str, ...]]:
@@ -143,11 +215,14 @@ class RuntimeToolDetector:
         which: Callable[[str], str | None] = shutil.which,
         runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
         host_service: object | None = None,
+        wsi_layer_directories: Sequence[Path] = GAMESCOPE_WSI_LAYER_DIRECTORIES,
     ) -> None:
         self._which = which
         self._run = runner
         self._host_service = host_service
+        self._wsi_layer_directories = tuple(wsi_layer_directories)
         self._cache: tuple[RuntimeToolAvailability, RuntimeToolAvailability] | None = None
+        self._refresh = False
 
     def _command(self, arguments: Sequence[str]) -> subprocess.CompletedProcess[str] | None:
         try:
@@ -192,11 +267,14 @@ class RuntimeToolDetector:
             ((version_result.stdout or "") + "\n" + (version_result.stderr or "")) if version_result else ""
         )
         supported, filters, scalers = parse_gamescope_help(help_text)
+        runs = help_result is not None or version_result is not None
         return RuntimeToolAvailability(
-            "Gamescope", bool(help_result and help_result.returncode == 0), executable,
-            version, supported,
-            "Gamescope is available" if help_result and help_result.returncode == 0 else "gamescope --help failed",
-            filters, scalers,
+            "Gamescope", runs, executable, version, supported,
+            "Gamescope is available" if supported
+            else "Gamescope --help could not be read; only basic options are available"
+            if runs else "gamescope --help failed",
+            filters, scalers, parse_gamescope_backends(help_text),
+            detect_gamescope_wsi(self._wsi_layer_directories),
         )
 
     def _host_tool(self, key: str, label: str) -> RuntimeToolAvailability:
@@ -206,6 +284,8 @@ class RuntimeToolDetector:
                 label, False, message=f"{label} host detection is unavailable"
             )
         try:
+            raw = query(key, refresh=True) if self._refresh else query(key)
+        except TypeError:
             raw = query(key)
         except Exception as error:
             return RuntimeToolAvailability(
@@ -240,20 +320,36 @@ class RuntimeToolDetector:
                 return ()
             return tuple(str(item).casefold() for item in value if isinstance(item, str))
 
+        version = str(raw.get("version") or "")
+        if key == "gamescope":
+            version = parse_gamescope_version(version)
+        message = str(raw.get("diagnostic_message") or "")
+        if key == "gamescope" and available and not options:
+            message = "Gamescope --help could not be read; only basic options are available"
         return RuntimeToolAvailability(
             label,
             available,
             executable if available else "",
-            str(raw.get("version") or ""),
+            version,
             options,
-            str(raw.get("diagnostic_message") or ""),
+            message,
             string_list("supported_filters"),
             string_list("supported_scalers"),
+            string_list("supported_backends"),
+            # The layer manifest lives on the host; the host runner reads it
+            # itself at launch, so the sandbox never guesses the variable.
+            (),
         )
 
     def detect(self, *, refresh: bool = False) -> tuple[RuntimeToolAvailability, RuntimeToolAvailability]:
+        """Probe once per application run; ``refresh`` re-runs the probes."""
+
         if self._cache is None or refresh:
-            self._cache = (self.gamemode(), self.gamescope())
+            self._refresh = refresh
+            try:
+                self._cache = (self.gamemode(), self.gamescope())
+            finally:
+                self._refresh = False
         return self._cache
 
 
@@ -338,6 +434,7 @@ class OptimizationLaunchPlanner:
         mangohud_activation_owner: str = "none",
         measurement_environment: Mapping[str, str] | None = None,
         allow_placeholder: bool = False,
+        mangohud_config_path: str | Path = "",
     ) -> GameRuntimeLaunchPlan:
         command = [str(value) for value in game_argv]
         if not command or not command[0] or (command[0] == "%command%" and not allow_placeholder):
@@ -355,6 +452,7 @@ class OptimizationLaunchPlanner:
         wrapper_environment_removed: tuple[str, ...] = ()
         wrapper_environment_overrides: dict[str, str] = {}
         environment_restore_keys: tuple[str, ...] = ()
+        mangoapp_removed: set[str] = set()
         inherited = existing_environment or {}
         normalized_mangohud_owner = str(
             mangohud_activation_owner or "none"
@@ -368,8 +466,6 @@ class OptimizationLaunchPlanner:
             reasons.append("MangoHud uses its per-executable application configuration")
         elif normalized_mangohud_owner == "steam_environment":
             reasons.append("MangoHud uses the existing Steam environment activation")
-        elif normalized_mangohud_owner == "mangoapp":
-            reasons.append("Gamescope mangoapp is the sole MangoHud activation owner")
         elif normalized_mangohud_owner == "measurement_session":
             reasons.append("MangoHud logging is active for one baseline session")
         for raw_key, raw_value in sorted((proton_environment or {}).items()):
@@ -469,7 +565,7 @@ class OptimizationLaunchPlanner:
                     gamescope.message or "Gamescope was requested but is unavailable"
                 )
             else:
-                supported = set(gamescope.supported_options)
+                supported = set(gamescope.effective_options)
                 flags: list[str] = []
                 def add(option: str, value: object | None = None) -> None:
                     if option not in supported:
@@ -480,28 +576,75 @@ class OptimizationLaunchPlanner:
                     if value is not None:
                         flags.append(str(value))
 
+                def optional(option: str, value: object | None = None) -> bool:
+                    # Newer desktop options never block a launch: an option
+                    # missing from the local --help is skipped, not guessed.
+                    if option not in supported:
+                        warnings.append(
+                            f"Installed Gamescope does not support {option}; the option was skipped"
+                        )
+                        return False
+                    flags.append(option)
+                    if value is not None:
+                        flags.append(str(value))
+                    return True
+
+                def decimal(value: float) -> str:
+                    return f"{value:g}"
+
                 same_size = (
                     profile.gamescope_input_width == profile.gamescope_output_width
                     and profile.gamescope_input_height == profile.gamescope_output_height
                 )
-                if not same_size:
+                emit_input = not profile.gamescope_input_auto and (
+                    profile.gamescope_output_auto or not same_size
+                )
+                if emit_input:
                     add("-w", profile.gamescope_input_width)
                     add("-h", profile.gamescope_input_height)
-                add("-W", profile.gamescope_output_width)
-                add("-H", profile.gamescope_output_height)
-                reasons.append(
-                    f"Gamescope renders at {profile.gamescope_input_width}×{profile.gamescope_input_height} "
-                    f"and outputs {profile.gamescope_output_width}×{profile.gamescope_output_height}"
+                if not profile.gamescope_output_auto:
+                    add("-W", profile.gamescope_output_width)
+                    add("-H", profile.gamescope_output_height)
+                render = (
+                    "automatic size" if profile.gamescope_input_auto
+                    else f"{profile.gamescope_input_width}×{profile.gamescope_input_height}"
                 )
-                # Gamescope is the sole limiter owner when active.  The local
-                # release documents -r as the nested refresh in frames per
-                # second; emitting --framerate-limit as well created two
-                # competing limiters for the same game.
-                if profile.target_fps_mode != "unlimited":
-                    add("-r", profile.target_fps)
-                    fps_limit_owner = "gamescope"
-                    effective_fps_limit = profile.target_fps
+                output = (
+                    "the native size" if profile.gamescope_output_auto
+                    else f"{profile.gamescope_output_width}×{profile.gamescope_output_height}"
+                )
+                reasons.append(f"Gamescope renders at {render} and outputs {output}")
+                # Gamescope is the sole limiter owner when active.  -r is the
+                # nested refresh in frames per second.  Without an explicit
+                # virtual refresh the profile FPS target keeps driving -r,
+                # exactly as before; --framerate-limit is only an explicit
+                # user choice.
+                refresh = 0
+                if profile.gamescope_nested_refresh > 0:
+                    refresh = profile.gamescope_nested_refresh
+                    add("-r", refresh)
+                    reasons.append(f"Gamescope virtual refresh rate: {refresh} Hz")
+                elif profile.target_fps_mode != "unlimited":
+                    refresh = profile.target_fps
+                    add("-r", refresh)
                     reasons.append(f"Gamescope owns the FPS limit at {profile.target_fps} FPS")
+                limit = 0
+                if profile.gamescope_framerate_limit > 0 and optional(
+                    "--framerate-limit", profile.gamescope_framerate_limit
+                ):
+                    limit = profile.gamescope_framerate_limit
+                    reasons.append(
+                        f"Gamescope framerate limit {limit} FPS (applied as a divisor of the refresh rate)"
+                    )
+                if refresh or limit:
+                    fps_limit_owner = "gamescope"
+                    effective_fps_limit = limit or refresh
+                if profile.gamescope_unfocused_refresh > 0 and optional(
+                    "-o", profile.gamescope_unfocused_refresh
+                ):
+                    reasons.append(
+                        f"Gamescope limits the unfocused game to {profile.gamescope_unfocused_refresh} FPS"
+                    )
                 if profile.gamescope_scaler != "auto":
                     if gamescope.supported_scalers and profile.gamescope_scaler not in gamescope.supported_scalers:
                         raise ValueError(
@@ -528,6 +671,8 @@ class OptimizationLaunchPlanner:
                         reasons.append(
                             f"Gamescope sharpness {profile.gamescope_sharpness} (0 sharpest, 20 softest)"
                         )
+                if profile.gamescope_max_scale > 0:
+                    optional("-m", decimal(profile.gamescope_max_scale))
                 # Exactly one window mode; windowed passes neither -f nor -b.
                 if profile.gamescope_window_mode == "fullscreen":
                     add("-f")
@@ -537,18 +682,91 @@ class OptimizationLaunchPlanner:
                     reasons.append("Gamescope uses borderless mode")
                 else:
                     reasons.append("Gamescope uses a normal window")
+                if profile.gamescope_display_index >= 0:
+                    optional("--display-index", profile.gamescope_display_index)
+                if profile.gamescope_force_windows_fullscreen:
+                    optional("--force-windows-fullscreen")
+                if profile.gamescope_backend != "auto":
+                    if (
+                        profile.gamescope_backend in GAMESCOPE_DESKTOP_BACKENDS
+                        and profile.gamescope_backend in gamescope.supported_backends
+                    ):
+                        optional("--backend", profile.gamescope_backend)
+                    else:
+                        warnings.append(
+                            f"Installed Gamescope does not list the {profile.gamescope_backend} backend; automatic backend is used"
+                        )
                 if profile.gamescope_adaptive_sync:
                     add("--adaptive-sync")
                     reasons.append("Gamescope requests adaptive sync; display support is not verified")
                 if profile.gamescope_grab_keyboard:
                     add("-g")
                     reasons.append("Gamescope grabs the keyboard")
+                if profile.gamescope_force_grab_cursor:
+                    optional("--force-grab-cursor")
+                if profile.gamescope_hide_cursor_delay > 0:
+                    optional("-C", profile.gamescope_hide_cursor_delay)
+                if profile.gamescope_mouse_sensitivity > 0:
+                    optional("-s", decimal(profile.gamescope_mouse_sensitivity))
+                if profile.gamescope_expose_wayland:
+                    optional("--expose-wayland")
+                if profile.gamescope_steam_integration:
+                    optional("-e")
                 if profile.gamescope_hdr:
                     add("--hdr-enabled")
                     warnings.append(
                         "Gamescope HDR is experimental and needs a compatible display, driver and Gamescope WSI"
                     )
-                if profile.target_display_id:
+                    # HDR sub-options only apply with HDR on; ITM only to SDR input.
+                    if profile.gamescope_hdr_sdr_content_nits > 0:
+                        optional("--hdr-sdr-content-nits", profile.gamescope_hdr_sdr_content_nits)
+                    if profile.gamescope_sdr_gamut_wideness >= 0:
+                        optional("--sdr-gamut-wideness", decimal(profile.gamescope_sdr_gamut_wideness))
+                    if profile.gamescope_hdr_itm:
+                        itm_flag = next(
+                            (flag for flag in ("--hdr-itm-enabled", "--hdr-itm-enable") if flag in supported),
+                            "",
+                        )
+                        if itm_flag:
+                            flags.append(itm_flag)
+                            reasons.append("Gamescope converts SDR games to HDR (inverse tone mapping)")
+                            if profile.gamescope_hdr_itm_sdr_nits > 0:
+                                optional("--hdr-itm-sdr-nits", profile.gamescope_hdr_itm_sdr_nits)
+                            if profile.gamescope_hdr_itm_target_nits > 0:
+                                optional("--hdr-itm-target-nits", profile.gamescope_hdr_itm_target_nits)
+                        else:
+                            warnings.append(
+                                "Installed Gamescope does not support inverse tone mapping; the option was skipped"
+                            )
+                    if gamescope.wsi_environment:
+                        key, value = gamescope.wsi_environment
+                        if inherited.get(key) not in (None, value):
+                            environment_conflicts.append(key)
+                        environment[key] = value
+                        environment_sources[key] = "gamescope_hdr"
+                        reasons.append(f"Gamescope WSI layer enabled for HDR clients ({key}={value})")
+                if normalized_mangohud_owner in {"per_application_config", "steam_environment"}:
+                    if "--mangoapp" in supported:
+                        # One overlay only: mangoapp draws MangoHud in
+                        # Gamescope, so the in-game layer is switched off.
+                        flags.append("--mangoapp")
+                        normalized_mangohud_owner = "mangoapp"
+                        mangoapp_removed = {"MANGOHUD", "MANGOHUD_CONFIG"}
+                        if mangohud_config_path:
+                            environment["MANGOHUD_CONFIGFILE"] = str(mangohud_config_path)
+                            environment_sources["MANGOHUD_CONFIGFILE"] = "mangohud_profile"
+                        reasons.append(
+                            "Gamescope mangoapp is the sole MangoHud activation owner"
+                        )
+                        if fps_limit_owner == "mangohud":
+                            warnings.append(
+                                "The MangoHud FPS limit is not applied while Gamescope draws MangoHud with --mangoapp"
+                            )
+                    else:
+                        warnings.append(
+                            "Installed Gamescope has no --mangoapp; MangoHud stays inside the game and may not work with Gamescope"
+                        )
+                if profile.target_display_id and profile.gamescope_display_index < 0:
                     warnings.append(
                         "The selected Qt display cannot be mapped safely to Gamescope; desktop placement will be used"
                     )
@@ -565,7 +783,11 @@ class OptimizationLaunchPlanner:
                 }
                 for key in measurement_keys:
                     restore[key] = environment[key]
-                wrapper_environment_removed = tuple(sorted({*removed, *measurement_keys}))
+                for key in mangoapp_removed:
+                    restore.pop(key, None)
+                wrapper_environment_removed = tuple(
+                    sorted({*removed, *measurement_keys, *mangoapp_removed})
+                )
                 environment_restore_keys = tuple(sorted(restore))
                 if restore:
                     inner = [

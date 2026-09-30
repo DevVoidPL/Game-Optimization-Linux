@@ -135,7 +135,7 @@ from .library_cache import (
     LibraryCacheError,
 )
 from .manual_games import ManualGameStore, ManualGameStoreError
-from .mangohud_preview import LivePreviewResult, MangoHudLivePreview
+from .mangohud_preview import GamescopeTestRun, LivePreviewResult, MangoHudLivePreview
 from .mangohud import (
     CONFIG_FILE_NAME as MANGOHUD_CONFIG_FILE_NAME,
     FLATPAK_MANGOHUD_PREFIX,
@@ -533,6 +533,7 @@ __all__ = [
     "MangoHudProfileRepository",
     "LivePreviewResult",
     "MangoHudLivePreview",
+    "GamescopeTestRun",
     "ExecutableCandidate",
     "ExecutableResolution",
     "GameExecutableResolver",

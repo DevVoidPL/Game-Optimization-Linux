@@ -326,6 +326,36 @@ def test_mangohud_desktop_editor_renders_and_saves_appid_profile(tmp_path: Path)
     assert result["reset_preset"] == "disabled"
 
 
+def test_gamescope_desktop_sections_follow_capabilities_and_persist(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "gamescope")
+    result = payload["result"]
+    # Full local --help: advanced sections and options are offered.
+    assert result["full_hdr_section"] is True
+    assert result["full_display_index"] is True
+    assert result["full_force_grab"] is True
+    assert result["full_advanced_warning"] is False
+    assert result["full_filters"] == ["linear", "nearest", "fsr", "nis", "pixel", "sgsr"]
+    assert result["full_backends"] == ["auto", "wayland", "sdl"]
+    # Real clicks mark the draft dirty and reach the generated argv.
+    assert result["dirty_after_click"] is True
+    assert "--adaptive-sync" in result["preview_arguments"]
+    assert "--force-windows-fullscreen" in result["preview_arguments"]
+    assert result["steam_options"].startswith("gamescope ")
+    assert result["steam_options"].endswith(" -- %command%")
+    assert result["saved_flags"] == [True, True]
+    assert result["clean_after_save"] is True
+    assert result["reloaded_switches"] == [True, True]
+    # Restore resets only Gamescope fields to program defaults.
+    assert result["reset_profile"] == [False, False, False, "custom"]
+    assert result["reset_switch"] is False
+    # Unreadable --help: basic integration only, advanced options hidden.
+    assert result["basic_advanced_warning"] is True
+    assert result["basic_hdr_section"] is False
+    assert result["basic_force_grab"] is False
+    assert result["basic_display_index"] is False
+    assert result["basic_filters"] == ["linear"]
+
+
 def test_optimization_desktop_editor_saves_real_appid_profile(tmp_path: Path) -> None:
     payload = _run_probe(tmp_path, "optimization")
     result = payload["result"]

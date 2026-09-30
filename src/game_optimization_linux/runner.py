@@ -546,6 +546,13 @@ def main(
                 "measurement_session" if baseline_session else mangohud_activation_owner
             ),
             measurement_environment=measurement_environment,
+            # With --mangoapp the generated per-game MangoHud profile is still
+            # the configuration MangoHud reads.
+            mangohud_config_path=(
+                mango_profiles.config_path(app_id)
+                if mangohud_profile.enabled and mango_profiles.config_path(app_id).is_file()
+                else ""
+            ),
         )
         print(
             f"game-optimization-run: LaunchPlan AppID={app_id} Steam command: "
