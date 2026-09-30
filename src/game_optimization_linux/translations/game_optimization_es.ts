@@ -2780,6 +2780,11 @@
     </message>
     <message>
         <location line="+2"/>
+        <source>Polish voice - Darkman</source>
+        <translation>Voz polaca - Darkman</translation>
+    </message>
+    <message>
+        <location line="+2"/>
         <source>Narrator audio output</source>
         <translation type="unfinished"></translation>
     </message>

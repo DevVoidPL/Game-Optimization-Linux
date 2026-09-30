@@ -120,6 +120,7 @@ from ..services import (
     NarratorSettingsRepository,
     ArgosCTranslate2TranslationProvider,
     PIPER_BASS_VOICE_ID,
+    PIPER_DARKMAN_VOICE_ID,
     PIPER_VOICE_ID,
     TESSERACT_POLISH_COMPONENT_ID,
     PiperPolishTtsProvider,
@@ -690,6 +691,11 @@ class AppController(QObject):
             if callable(voice_available)
             else False
         )
+        darkman_available = bool(
+            voice_available(PIPER_DARKMAN_VOICE_ID)
+            if callable(voice_available)
+            else False
+        )
         self._narrator_component_manager.set_runtime_state(
             "tts.polish-voice",
             gosia_available,
@@ -709,6 +715,15 @@ class AppController(QObject):
             ),
         )
         self._narrator_component_manager.set_runtime_state(
+            "tts.polish-darkman",
+            darkman_available,
+            (
+                "The Darkman Polish voice is ready"
+                if darkman_available
+                else "The Darkman Polish voice is not installed"
+            ),
+        )
+        self._narrator_component_manager.set_runtime_state(
             "audio.qt-pcm",
             narrator_pipeline.audio.available,
             (
@@ -723,6 +738,7 @@ class AppController(QObject):
             "translation.opus-en-pl",
             "tts.polish-voice",
             "tts.polish-bass",
+            "tts.polish-darkman",
             "audio.qt-pcm",
         ):
             self._narrator_controller._refresh_component_runtime(component_id)

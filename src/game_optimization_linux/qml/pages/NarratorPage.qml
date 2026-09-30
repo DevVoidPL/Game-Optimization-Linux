@@ -403,6 +403,8 @@ Item {
             return qsTr("Local Polish voice") + " - Gosia"
         if (componentId === "tts.polish-bass")
             return qsTr("Local Polish voice") + " - Bass"
+        if (componentId === "tts.polish-darkman")
+            return qsTr("Local Polish voice") + " - Darkman"
         if (componentId === "audio.qt-pcm")
             return qsTr("PCM audio output")
         return String(value(component, ["name"], componentId))

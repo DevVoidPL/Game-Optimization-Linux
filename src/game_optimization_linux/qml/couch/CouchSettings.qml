@@ -298,6 +298,8 @@ FocusScope {
             return qsTr("Polish voice - Gosia")
         if (componentId === "tts.polish-bass")
             return qsTr("Polish voice - Bass")
+        if (componentId === "tts.polish-darkman")
+            return qsTr("Polish voice - Darkman")
         if (componentId === "audio.qt-pcm")
             return qsTr("Narrator audio output")
         return String(fallback || componentId)

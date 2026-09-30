@@ -21,6 +21,10 @@ from game_optimization_linux.services.narrator_tts import (
     PIPER_BASS_CONFIG_RELATIVE_PATH,
     PIPER_BASS_MODEL_RELATIVE_PATH,
     PIPER_BASS_VOICE_ID,
+    PIPER_DARKMAN_COMPONENT_ID,
+    PIPER_DARKMAN_CONFIG_RELATIVE_PATH,
+    PIPER_DARKMAN_MODEL_RELATIVE_PATH,
+    PIPER_DARKMAN_VOICE_ID,
     PIPER_COMPONENT_ID,
     PIPER_CONFIG_RELATIVE_PATH,
     PIPER_MODEL_RELATIVE_PATH,
@@ -176,6 +180,7 @@ def test_piper_provider_lists_gosia_and_bass_without_falling_back(
     assert [(voice.voice_id, voice.name) for voice in provider.voices] == [
         (PIPER_VOICE_ID, "Gosia"),
         (PIPER_BASS_VOICE_ID, "Bass"),
+        (PIPER_DARKMAN_VOICE_ID, "Darkman"),
     ]
     assert provider.available_voice_ids == (PIPER_VOICE_ID,)
     assert provider.voice_installed(PIPER_BASS_VOICE_ID) is False
@@ -524,3 +529,48 @@ def test_piper_worker_reports_bad_request_without_stopping_server() -> None:
     assert ready["status"] == "ready"
     assert response["ok"] is False
     assert response["request_id"] is None
+
+
+def _install_darkman_voice(root: Path) -> tuple[Path, Path]:
+    component = root / PIPER_DARKMAN_COMPONENT_ID
+    model = component / PIPER_DARKMAN_MODEL_RELATIVE_PATH
+    config = component / PIPER_DARKMAN_CONFIG_RELATIVE_PATH
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"darkman-model")
+    config.write_text("{}", encoding="utf-8")
+    return model, config
+
+
+def test_darkman_voice_is_loaded_through_the_same_piper_worker_path(
+    tmp_path: Path,
+) -> None:
+    _install_voice(tmp_path)
+    darkman_paths = _install_darkman_voice(tmp_path)
+    created: list[tuple[Path, Path, _Worker]] = []
+
+    def factory(model_path: Path, config_path: Path) -> _Worker:
+        worker = _Worker()
+        created.append((model_path, config_path, worker))
+        return worker
+
+    provider = PiperPolishTtsProvider(
+        tmp_path,
+        worker_factory=factory,
+        runtime_available=lambda: True,
+    )
+    assert PIPER_DARKMAN_VOICE_ID in provider.available_voice_ids
+    assert provider.default_voice_id == PIPER_VOICE_ID
+
+    provider.select_voice(PIPER_DARKMAN_VOICE_ID)
+    audio = provider.synthesize(
+        "Darkman mówi.",
+        language="pl",
+        voice_id=PIPER_DARKMAN_VOICE_ID,
+        speech_rate=1.0,
+    )
+
+    assert audio.samples
+    assert len(created) == 1
+    assert created[0][:2] == darkman_paths
+    assert created[0][2].calls == [("Darkman mówi.", 1.0)]
+    provider.close()

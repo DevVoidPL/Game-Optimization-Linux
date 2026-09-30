@@ -3406,6 +3406,11 @@
     </message>
     <message>
         <location line="+2" />
+        <source>Polish voice - Darkman</source>
+        <translation>Polski głos - Darkman</translation>
+    </message>
+    <message>
+        <location line="+2" />
         <source>Narrator audio output</source>
         <translation>Wyjście audio Lektora</translation>
     </message>

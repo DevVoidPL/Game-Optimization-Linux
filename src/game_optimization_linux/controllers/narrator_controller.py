@@ -330,6 +330,7 @@ class NarratorController:
             "translation.opus-en-pl": "translation_model_required",
             "tts.polish-voice": "polish_voice_required",
             "tts.polish-bass": "polish_voice_required",
+            "tts.polish-darkman": "polish_voice_required",
             "audio.qt-pcm": "audio_runtime",
         }
         result: list[dict[str, Any]] = []
@@ -1104,6 +1105,7 @@ class NarratorController:
             "translation.opus-en-pl": self._app._narrator_pipeline.translator,
             "tts.polish-voice": self._app._narrator_pipeline.tts,
             "tts.polish-bass": self._app._narrator_pipeline.tts,
+            "tts.polish-darkman": self._app._narrator_pipeline.tts,
             "audio.qt-pcm": self._app._narrator_pipeline.audio,
         }
         provider = providers.get(component_id)
@@ -1127,6 +1129,7 @@ class NarratorController:
         voice_ids = {
             "tts.polish-voice": "pl_PL-gosia-medium",
             "tts.polish-bass": "pl_PL-bass-high",
+            "tts.polish-darkman": "pl_PL-darkman-medium",
         }
         voice_id = voice_ids.get(component_id)
         if voice_id and hasattr(provider, "voice_available"):

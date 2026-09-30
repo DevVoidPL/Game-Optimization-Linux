@@ -35,6 +35,13 @@ PIPER_BASS_VOICE_ID = "pl_PL-bass-high"
 PIPER_BASS_VOICE_VERSION = "5b44ec7bab7c5822cfec48fbd5aa99db71a823d6"
 PIPER_BASS_MODEL_RELATIVE_PATH = Path("voices") / "pl_PL-bass-high.onnx"
 PIPER_BASS_CONFIG_RELATIVE_PATH = Path("voices") / "pl_PL-bass-high.onnx.json"
+PIPER_DARKMAN_COMPONENT_ID = "tts.polish-darkman"
+PIPER_DARKMAN_VOICE_ID = "pl_PL-darkman-medium"
+PIPER_DARKMAN_VOICE_VERSION = "c10ece1aade47bb51c153c893d14e5bf8e5b7117"
+PIPER_DARKMAN_MODEL_RELATIVE_PATH = Path("voices") / "pl_PL-darkman-medium.onnx"
+PIPER_DARKMAN_CONFIG_RELATIVE_PATH = (
+    Path("voices") / "pl_PL-darkman-medium.onnx.json"
+)
 _WORKER_BOOTSTRAP = (
     "import runpy, sys; "
     "path = sys.argv.pop(1); "
@@ -96,6 +103,15 @@ POLISH_VOICES = (
         component_id=PIPER_BASS_COMPONENT_ID,
         model_relative_path=PIPER_BASS_MODEL_RELATIVE_PATH,
         config_relative_path=PIPER_BASS_CONFIG_RELATIVE_PATH,
+    ),
+    PolishVoice(
+        voice_id=PIPER_DARKMAN_VOICE_ID,
+        name="Darkman",
+        language="pl",
+        version=PIPER_DARKMAN_VOICE_VERSION,
+        component_id=PIPER_DARKMAN_COMPONENT_ID,
+        model_relative_path=PIPER_DARKMAN_MODEL_RELATIVE_PATH,
+        config_relative_path=PIPER_DARKMAN_CONFIG_RELATIVE_PATH,
     ),
 )
 
@@ -723,6 +739,11 @@ __all__ = [
     "PIPER_BASS_MODEL_RELATIVE_PATH",
     "PIPER_BASS_VOICE_ID",
     "PIPER_BASS_VOICE_VERSION",
+    "PIPER_DARKMAN_COMPONENT_ID",
+    "PIPER_DARKMAN_CONFIG_RELATIVE_PATH",
+    "PIPER_DARKMAN_MODEL_RELATIVE_PATH",
+    "PIPER_DARKMAN_VOICE_ID",
+    "PIPER_DARKMAN_VOICE_VERSION",
     "PIPER_CONFIG_RELATIVE_PATH",
     "PIPER_MODEL_RELATIVE_PATH",
     "PIPER_PROVIDER_ID",

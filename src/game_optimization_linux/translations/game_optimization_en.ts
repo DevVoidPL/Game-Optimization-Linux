@@ -2796,6 +2796,11 @@
     </message>
     <message>
         <location line="+2" />
+        <source>Polish voice - Darkman</source>
+        <translation>Polish voice - Darkman</translation>
+    </message>
+    <message>
+        <location line="+2" />
         <source>Narrator audio output</source>
         <translation>Narrator audio output</translation>
     </message>
