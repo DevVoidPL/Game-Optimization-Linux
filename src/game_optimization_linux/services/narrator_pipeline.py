@@ -625,111 +625,381 @@ def _token_identity(token: str) -> str:
     return " ".join(_comparison_words(subtitle_identity(token)))
 
 
-def _unstable_edge_token(token: str, core_has_lowercase: bool) -> bool:
-    identity = _token_identity(token)
-    if identity in _NEGATION_WORDS:
-        return False
+def _split_token(token: str) -> tuple[str, str, str]:
+    """Split a surface token into leading punctuation, word and trailing punctuation."""
+
+    start = 0
+    while start < len(token) and not token[start].isalnum():
+        start += 1
+    stop = len(token)
+    while stop > start and not token[stop - 1].isalnum():
+        stop -= 1
+    return token[:start], token[start:stop], token[stop:]
+
+
+def _surface_tokens(text: str) -> list[tuple[str, str, str]]:
+    """Word tokens with punctuation; standalone punctuation joins the previous word."""
+
+    tokens: list[tuple[str, str, str]] = []
+    for token in normalize_subtitle(text).split():
+        lead, core, trail = _split_token(token)
+        if core:
+            tokens.append((lead, core, trail))
+        elif tokens:
+            previous_lead, previous_core, previous_trail = tokens[-1]
+            tokens[-1] = (previous_lead, previous_core, f"{previous_trail} {token}")
+    return tokens
+
+
+def _fuzzy_word(first: str, second: str) -> bool:
+    """Same word read with an OCR slip or with glyphs cut at a line edge."""
+
+    if first == second:
+        return True
+    short, long = sorted((first, second), key=len)
+    if (
+        len(short) >= 3
+        and len(long) - len(short) <= 4
+        and (long.startswith(short) or long.endswith(short))
+    ):
+        return True
     return bool(
-        identity.isdigit()
-        or len(identity) == 1
-        or _looks_like_edge_scrap(identity)
-        or (
-            core_has_lowercase
-            and token.strip(".,!?…:;\"'„”()").isupper()
-            and len(identity) <= 4
-        )
+        len(short) >= 4
+        and SequenceMatcher(None, first, second, autojunk=False).ratio() >= 0.72
     )
 
 
-def _trim_unstable_edges(text: str, others: list[str]) -> str:
-    """Drop edge debris that the rest of the observation cluster disproves.
+def _diacritic_count(word: str) -> int:
+    return sum(character.isalpha() and not character.isascii() for character in word)
 
-    An edge token survives when the same neighbouring word pair occurs in
-    another observation. Only structural debris (digits, single glyphs,
-    vowel-less scraps, short capitals inside lowercase text, symbol-mixed
-    tokens) is ever removed, so real words and word order stay intact.
-    """
 
-    tokens = normalize_subtitle(text).split()
-    other_pairs: set[tuple[str, str]] = set()
-    for other in others:
-        identities = [
-            _token_identity(token)
-            for token in normalize_subtitle(other).split()
-            if _token_identity(token)
-        ]
-        other_pairs.update(zip(identities, identities[1:]))
-    core_has_lowercase = any(character.islower() for character in text)
+def _structural_token(core: str, surface: str) -> bool:
+    """Symbols, lone digits and lone characters carry no dialogue on an edge."""
 
-    def artifact(token: str) -> bool:
-        return bool(_token_identity(token)) and any(
-            character in _ARTIFACT_CHARACTERS for character in token
-        )
+    identity = _token_identity(core)
+    return bool(
+        not identity
+        or identity.isdigit()
+        or len(identity) == 1
+        or any(character in _ARTIFACT_CHARACTERS for character in surface)
+    )
 
-    while len(tokens) > 1:
-        token = tokens[0]
-        identity = _token_identity(token)
-        following = _token_identity(tokens[1])
-        if not identity or artifact(token):
-            tokens.pop(0)
-            continue
-        if (
-            _unstable_edge_token(token, core_has_lowercase)
-            and (identity, following) not in other_pairs
-        ):
-            tokens.pop(0)
-            continue
-        break
-    while len(tokens) > 1:
-        token = tokens[-1]
-        identity = _token_identity(token)
-        previous = _token_identity(tokens[-2])
-        if not identity:
-            if all(character in ".!?…" for character in token):
-                break
-            tokens.pop()
-            continue
-        if artifact(token):
-            tokens.pop()
-            continue
-        if (
-            _unstable_edge_token(token, core_has_lowercase)
-            and (previous, identity) not in other_pairs
-        ):
-            tokens.pop()
-            continue
-        break
-    return _trim_symbolic_edges(" ".join(tokens))
+
+def _line_edge_indices(lines: tuple[str, ...], word_count: int) -> set[int]:
+    counts = [
+        len(_surface_tokens(line)) for line in lines if _surface_tokens(line)
+    ]
+    if not counts or sum(counts) != word_count:
+        return {0, max(0, word_count - 1)}
+    edges: set[int] = set()
+    position = 0
+    for count in counts:
+        edges.update({position, position + count - 1})
+        position += count
+    return edges
 
 
 def _cluster_representative(
     variants: list[tuple[str, float, tuple[str, ...]]],
 ) -> tuple[str, tuple[str, ...]]:
-    """Choose the cluster medoid after removing cluster-unstable edge debris."""
+    """Token-voted consensus text built only from whole observed tokens.
+
+    The medoid is only the alignment pivot. Every other variant votes on each
+    aligned pivot word; a word cut at a line edge is completed from a variant
+    that saw it whole, accents lost by OCR are restored, and punctuation is
+    taken from its own position (a sentence stop before a lowercase word needs
+    a strict majority). Words missing from the pivot's outer edges are taken
+    from the best variant that saw them. Only symbols, lone digits and lone
+    characters that no other clean variant repeats are trimmed from the edges.
+    """
 
     if not variants:
         return "", ()
     if len(variants) == 1:
         return variants[0][0], variants[0][2]
     texts = [text for text, _quality, _lines in variants]
-    trimmed = [
-        _trim_unstable_edges(text, texts[:index] + texts[index + 1 :]) or text
-        for index, text in enumerate(texts)
-    ]
-    best_index = 0
+    tokenized = [_surface_tokens(text) for text in texts]
+    keys = [[_token_identity(core) for _lead, core, _trail in tokens] for tokens in tokenized]
+    pivot_index = 0
     best_score = float("-inf")
-    for index, (candidate, (_text, quality, _lines)) in enumerate(
-        zip(trimmed, variants)
-    ):
+    for index, (text, quality, _lines) in enumerate(variants):
+        if not tokenized[index]:
+            continue
         agreement = sum(
-            _phrase_metrics(candidate, other).char_similarity
-            for other_index, other in enumerate(trimmed)
+            _phrase_metrics(text, other).char_similarity
+            for other_index, other in enumerate(texts)
             if other_index != index
-        ) / (len(trimmed) - 1)
+        ) / (len(texts) - 1)
         score = agreement * 0.6 + max(0.0, quality) * 0.4
         if score > best_score:
-            best_index, best_score = index, score
-    return trimmed[best_index], variants[best_index][2]
+            pivot_index, best_score = index, score
+    pivot = tokenized[pivot_index]
+    pivot_keys = keys[pivot_index]
+    if not pivot:
+        return variants[pivot_index][0], variants[pivot_index][2]
+    slots: list[list[tuple[str, str, float]]] = [
+        [(core, trail, variants[pivot_index][1])] for _lead, core, trail in pivot
+    ]
+    leading: list[tuple[float, list[tuple[str, str, str]]]] = []
+    trailing: list[tuple[float, list[tuple[str, str, str]]]] = []
+    for index, tokens in enumerate(tokenized):
+        if index == pivot_index or not tokens:
+            continue
+        quality = variants[index][1]
+        matcher = SequenceMatcher(None, pivot_keys, keys[index], autojunk=False)
+        for tag, first_start, first_end, second_start, second_end in matcher.get_opcodes():
+            if tag == "equal":
+                for offset in range(first_end - first_start):
+                    _lead, core, trail = tokens[second_start + offset]
+                    slots[first_start + offset].append((core, trail, quality))
+                continue
+            paired = min(first_end - first_start, second_end - second_start)
+            for offset in range(paired):
+                if _fuzzy_word(
+                    pivot_keys[first_start + offset], keys[index][second_start + offset]
+                ):
+                    _lead, core, trail = tokens[second_start + offset]
+                    slots[first_start + offset].append((core, trail, quality))
+            extra = tokens[second_start + paired : second_end]
+            if not extra or not all(
+                not _structural_token(core, lead + core + trail)
+                and not _looks_like_edge_scrap(_token_identity(core))
+                for lead, core, trail in extra
+            ):
+                continue
+            if first_start == 0 and first_end - first_start == 0:
+                leading.append((quality, list(extra)))
+            elif first_end == len(pivot):
+                trailing.append((quality, list(extra)))
+    edges = _line_edge_indices(variants[pivot_index][2], len(pivot))
+
+    def choose_word(slot_index: int) -> str:
+        votes = slots[slot_index]
+        by_key: dict[str, list[str]] = {}
+        for core, _trail, _quality in votes:
+            by_key.setdefault(_token_identity(core), []).append(core)
+        pivot_key = pivot_keys[slot_index]
+        chosen_key = max(
+            by_key,
+            key=lambda key: (len(by_key[key]), key == pivot_key),
+        )
+        if slot_index in edges:
+            completions = [
+                key
+                for key in by_key
+                if len(key) > len(chosen_key)
+                and (key.startswith(chosen_key) or key.endswith(chosen_key))
+            ]
+            if completions:
+                chosen_key = max(completions, key=len)
+        forms = by_key[chosen_key]
+        pivot_core = pivot[slot_index][1]
+        return max(
+            forms,
+            key=lambda form: (
+                _diacritic_count(form),
+                forms.count(form),
+                form == pivot_core,
+            ),
+        )
+
+    words = [choose_word(index) for index in range(len(pivot))]
+
+    def supplier_trail(slot_index: int, word: str) -> str:
+        for core, trail, _quality in slots[slot_index]:
+            if core == word:
+                return trail
+        return pivot[slot_index][2]
+
+    def choose_trail(slot_index: int, next_word: str) -> str:
+        """Punctuation from the pivot's own position, never invented."""
+
+        votes = [trail for _core, trail, _quality in slots[slot_index]]
+        pivot_trail = pivot[slot_index][2]
+        if not next_word:
+            word = words[slot_index]
+            if _token_identity(word) != pivot_keys[slot_index]:
+                # The final word was completed from a variant that saw it
+                # whole; take that variant's punctuation with it.
+                return supplier_trail(slot_index, word)
+            return pivot_trail
+        terminal = any(
+            character in ".!?" for character in pivot_trail.replace("...", "")
+        )
+        if (
+            pivot_trail
+            and terminal
+            and next_word[:1].islower()
+            and votes.count(pivot_trail) * 2 <= len(votes)
+        ):
+            return ""
+        return pivot_trail
+
+    extension_leading = max(leading, key=lambda item: item[0])[1] if leading else []
+    extension_trailing = max(trailing, key=lambda item: item[0])[1] if trailing else []
+    def confirmed(slot_index: int) -> bool:
+        """Another variant saw the same token at the aligned position."""
+
+        key = _token_identity(words[slot_index])
+        return (
+            sum(
+                _token_identity(core) == key
+                and not any(
+                    character in _ARTIFACT_CHARACTERS for character in core + trail
+                )
+                for core, trail, _quality in slots[slot_index]
+            )
+            >= 2
+        )
+
+    # Entries carry (lead, core, trail, confirmed-by-another-variant).
+    result: list[tuple[str, str, str, bool]] = [
+        (lead, core, trail, True) for lead, core, trail in extension_leading
+    ]
+    for index, word in enumerate(words):
+        following = (
+            words[index + 1]
+            if index + 1 < len(words)
+            else (extension_trailing[0][1] if extension_trailing else "")
+        )
+        result.append(
+            (pivot[index][0], word, choose_trail(index, following), confirmed(index))
+        )
+    result.extend(
+        (lead, core, trail, True) for lead, core, trail in extension_trailing
+    )
+
+    def removable_edge(entry: tuple[str, str, str, bool]) -> bool:
+        lead, core, trail, is_confirmed = entry
+        return not is_confirmed and _structural_token(core, lead + core + trail)
+
+    while len(result) > 1 and removable_edge(result[0]):
+        result.pop(0)
+    while len(result) > 1 and removable_edge(result[-1]):
+        dropped_trail = result.pop()[2].strip()
+        last_lead, last_core, last_trail, last_confirmed = result[-1]
+        terminal = "".join(
+            character for character in dropped_trail if character in ".!?…"
+        )
+        if terminal and not last_trail:
+            result[-1] = (last_lead, last_core, terminal, last_confirmed)
+    text = " ".join(
+        lead + core + trail for lead, core, trail, _confirmed in result
+    )
+    return _trim_symbolic_edges(text), variants[pivot_index][2]
+
+
+def _line_word_positions(
+    text: str, lines: tuple[str, ...] | list[str]
+) -> tuple[list[str], set[int], int]:
+    """Comparison words with the indices of every line's first and last word."""
+
+    words: list[str] = []
+    edges: set[int] = set()
+    line_count = 0
+    for line in lines:
+        line_words = _comparison_words(subtitle_identity(line))
+        if not line_words:
+            continue
+        edges.update({len(words), len(words) + len(line_words) - 1})
+        words.extend(line_words)
+        line_count += 1
+    if not words:
+        words = _comparison_words(subtitle_identity(text))
+        edges = {0, max(0, len(words) - 1)}
+        line_count = 1
+    return words, edges, line_count
+
+
+def _long_episode_variant(
+    first_text: str,
+    first_lines: tuple[str, ...] | list[str],
+    second_text: str,
+    second_lines: tuple[str, ...] | list[str],
+) -> bool:
+    """One long multi-line subtitle re-read with line-edge damage.
+
+    Differences may only drop, add or mangle words at the start or end of a
+    line (the ROI clips glyphs there) or be single OCR-misread words. The
+    shared word core must cover most of the shorter text, and number,
+    negation and polarity protection is unchanged.
+    """
+
+    first, first_edges, first_line_count = _line_word_positions(first_text, first_lines)
+    second, second_edges, second_line_count = _line_word_positions(
+        second_text, second_lines
+    )
+    shorter = min(len(first), len(second))
+    if shorter < 6 or max(first_line_count, second_line_count) < 2:
+        return False
+    if _phrase_metrics(first_text, second_text).semantic_conflict:
+        return False
+    matched = 0
+    misreads = 0
+    regions = 0
+    matcher = SequenceMatcher(None, first, second, autojunk=False)
+    for tag, first_start, first_end, second_start, second_end in matcher.get_opcodes():
+        if tag == "equal":
+            matched += first_end - first_start
+            continue
+        regions += 1
+        at_line_edge = bool(
+            {first_start, first_end - 1} & first_edges
+            or {second_start, second_end - 1} & second_edges
+            or first_start == first_end and first_start in {
+                edge + 1 for edge in first_edges
+            }
+            or second_start == second_end and second_start in {
+                edge + 1 for edge in second_edges
+            }
+        )
+        left_region = first[first_start:first_end]
+        right_region = second[second_start:second_end]
+        paired = min(len(left_region), len(right_region))
+
+        def pairs(from_end: bool) -> list[tuple[str, str]]:
+            if from_end:
+                return list(zip(left_region[len(left_region) - paired :],
+                                right_region[len(right_region) - paired :]))
+            return list(zip(left_region[:paired], right_region[:paired]))
+
+        candidates = (pairs(False), pairs(True))
+        chosen = max(
+            candidates,
+            key=lambda values: sum(_fuzzy_word(a, b) for a, b in values),
+        )
+        from_end = chosen is candidates[1] and candidates[1] != candidates[0]
+        for left, right in chosen:
+            if _fuzzy_word(left, right):
+                matched += 1
+                misreads += 1
+            elif at_line_edge and (
+                _looks_like_edge_scrap(left) or _looks_like_edge_scrap(right)
+            ):
+                continue
+            else:
+                return False
+        if from_end:
+            extra = [
+                *left_region[: len(left_region) - paired],
+                *right_region[: len(right_region) - paired],
+            ]
+        else:
+            extra = [*left_region[paired:], *right_region[paired:]]
+        if not extra:
+            continue
+        if any(word in _NEGATION_WORDS for word in extra):
+            return False
+        if not at_line_edge:
+            return False
+        # The ROI can clip up to a few words at the start or end of a line.
+        if len(extra) > 3:
+            return False
+    if regions > 2 * max(first_line_count, second_line_count):
+        return False
+    if misreads > max(2, shorter // 5):
+        return False
+    return matched / shorter >= 0.80
 
 
 def _token_matches_marker(token: str, marker: str) -> bool:
@@ -1072,6 +1342,9 @@ class SubtitleTextGate:
         if self._accepted_identity and (
             _same_episode_variant(filtered, self._accepted_text)
             or _line_extension_variant(observed_lines, self._accepted_lines)
+            or _long_episode_variant(
+                filtered, observed_lines, self._accepted_text, self._accepted_lines
+            )
         ):
             self._reset_candidate()
             return OcrGateObservation(
