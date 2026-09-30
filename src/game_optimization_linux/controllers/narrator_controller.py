@@ -387,6 +387,7 @@ class NarratorController:
                 "stabilizationMs": "stabilization_ms",
                 "ocrMinConfidence": "ocr_min_confidence",
                 "duplicateCooldownMs": "duplicate_cooldown_ms",
+                "readSpeakerNames": "read_speaker_names",
             }
             for source, target in aliases.items():
                 if source in values:
@@ -431,7 +432,7 @@ class NarratorController:
                 "volume", "speech_rate", "noise_scale", "noise_w_scale",
                 "capture_sampling_hz", "visual_change_threshold",
                 "stabilization_ms", "ocr_min_confidence",
-                "duplicate_cooldown_ms",
+                "duplicate_cooldown_ms", "read_speaker_names",
             ) if field in raw
         ]
         result["subtitleRegionInherited"] = False
@@ -463,6 +464,7 @@ class NarratorController:
                 "stabilizationMs": "stabilization_ms",
                 "ocrMinConfidence": "ocr_min_confidence",
                 "duplicateCooldownMs": "duplicate_cooldown_ms",
+                "readSpeakerNames": "read_speaker_names",
             }
             for source, target in aliases.items():
                 if source in values:
@@ -519,7 +521,7 @@ class NarratorController:
                     "volume", "speech_rate", "noise_scale", "noise_w_scale",
                     "capture_sampling_hz", "visual_change_threshold",
                     "stabilization_ms", "ocr_min_confidence",
-                    "duplicate_cooldown_ms",
+                    "duplicate_cooldown_ms", "read_speaker_names",
                 ),
             )
         except Exception as error:
@@ -1270,6 +1272,7 @@ class NarratorController:
             "stabilizationMs": settings.stabilization_ms,
             "ocrMinConfidence": settings.ocr_min_confidence,
             "duplicateCooldownMs": settings.duplicate_cooldown_ms,
+            "readSpeakerNames": settings.read_speaker_names,
             "updatedAt": settings.updated_at.isoformat(),
         }
 

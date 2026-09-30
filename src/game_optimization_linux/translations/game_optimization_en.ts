@@ -3058,6 +3058,16 @@
     </message>
     <message>
         <location line="+1" />
+        <source>Read character names</source>
+        <translation>Read character names</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Speak the character name label before a subtitle line.</source>
+        <translation>Speak the character name label before a subtitle line.</translation>
+    </message>
+    <message>
+        <location line="+1" />
         <source>Voice articulation overrides</source>
         <translation>Voice articulation overrides</translation>
     </message>

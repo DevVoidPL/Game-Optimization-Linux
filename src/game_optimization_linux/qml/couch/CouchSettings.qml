@@ -387,6 +387,7 @@ FocusScope {
             { "id": "narrator-global-stabilization", "category": "narrator", "title": qsTr("Subtitle stabilization"), "value": qsTr("%1 ms").arg(Number(narratorGlobalData.stabilizationMs || 240)), "enabled": narratorGlobalData.success === true, "description": qsTr("Wait for subtitles to settle before recognition.") },
             { "id": "narrator-global-confidence", "category": "narrator", "title": qsTr("Minimum OCR confidence"), "value": qsTr("%1%").arg(Math.round(Number(narratorGlobalData.ocrMinConfidence || 0.62) * 100)), "enabled": narratorGlobalData.success === true, "description": qsTr("Reject recognition results below this confidence.") },
             { "id": "narrator-global-cooldown", "category": "narrator", "title": qsTr("Duplicate subtitle cooldown"), "value": qsTr("%1 s").arg((Number(narratorGlobalData.duplicateCooldownMs || 4500) / 1000).toFixed(1)), "enabled": narratorGlobalData.success === true, "description": qsTr("Delay before the same subtitle may be spoken again.") },
+            { "id": "narrator-global-speaker-names", "category": "narrator", "title": qsTr("Read character names"), "value": boolLabel(narratorGlobalData.readSpeakerNames === true), "enabled": narratorGlobalData.success === true, "description": qsTr("Speak the character name label before a subtitle line.") },
             { "id": "narrator-global-articulation", "category": "narrator", "title": qsTr("Voice articulation overrides"), "value": articulation ? qsTr("Custom") : qsTr("Voice defaults"), "enabled": narratorGlobalData.success === true, "description": qsTr("Use each voice's tuned defaults or expose custom Piper articulation values.") },
             { "id": "narrator-global-noise-w", "category": "narrator", "title": qsTr("Phoneme width variation"), "value": Number(narratorGlobalData.noiseWScale === null || narratorGlobalData.noiseWScale === undefined ? 0.8 : narratorGlobalData.noiseWScale).toFixed(3), "enabled": narratorGlobalData.success === true && articulation, "description": qsTr("Advanced Piper timing variation for newly created profiles.") },
             { "id": "narrator-global-noise", "category": "narrator", "title": qsTr("Voice variation"), "value": Number(narratorGlobalData.noiseScale === null || narratorGlobalData.noiseScale === undefined ? 0.667 : narratorGlobalData.noiseScale).toFixed(3), "enabled": narratorGlobalData.success === true && articulation, "description": qsTr("Advanced Piper voice variation for newly created profiles.") },
@@ -634,6 +635,8 @@ FocusScope {
             return saveNarratorGlobal({ "ocrMinConfidence": clamp(Number(narratorGlobalData.ocrMinConfidence || 0.62) + delta * 0.05, 0, 1) })
         if (id === "narrator-global-cooldown")
             return saveNarratorGlobal({ "duplicateCooldownMs": clamp(Number(narratorGlobalData.duplicateCooldownMs || 4500) + delta * 250, 250, 60000) })
+        if (id === "narrator-global-speaker-names")
+            return saveNarratorGlobal({ "readSpeakerNames": narratorGlobalData.readSpeakerNames !== true })
         if (id === "narrator-global-articulation") {
             var overridden = narratorGlobalData.noiseScale !== null
                     && narratorGlobalData.noiseScale !== undefined

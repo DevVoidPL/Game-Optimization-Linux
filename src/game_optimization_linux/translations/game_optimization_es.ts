@@ -3042,6 +3042,16 @@
     </message>
     <message>
         <location line="+1"/>
+        <source>Read character names</source>
+        <translation>Leer nombres de personajes</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Speak the character name label before a subtitle line.</source>
+        <translation>Leer el nombre del personaje antes de la línea de subtítulos.</translation>
+    </message>
+    <message>
+        <location line="+1"/>
         <source>Voice articulation overrides</source>
         <translation type="unfinished"></translation>
     </message>

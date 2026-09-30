@@ -351,7 +351,8 @@ def test_sequence_g_stable_ui_inside_roi_is_not_content_blacklisted(
     try:
         replay.observe(text)
         replay.observe(text)
-        assert replay.tts.values == [text]
+        assert replay.pipeline.snapshot.last_accepted_ocr_text == text
+        assert replay.tts.values == ["PRZEGLĄDAJ Q KONTO ROCKSTAR GAMES"]
     finally:
         replay.close()
 

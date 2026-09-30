@@ -161,6 +161,87 @@ def subtitle_identity(text: str) -> str:
     )
 
 
+_TTS_PUNCTUATION = ".,!?;:…"
+_TTS_KEPT_SYMBOLS = frozenset(".,!?;:'\"()… ")
+_TTS_QUOTE_MAP = str.maketrans({"„": '"', "”": '"', "“": '"', "’": "'", "‘": "'"})
+_TTS_DASHES = "-\N{EN DASH}\N{EM DASH}"
+_TTS_STANDALONE_DASH = "\x00"
+_TTS_PUNCTUATION_RUN = re.compile(r"(?:[.,!?;:…]\s*){2,}")
+_TTS_SPEAKER_LABEL = re.compile(
+    r"^\s*([^\W\d_][^\s\d:]*(?:\s+[^\W\d_][^\s\d:]*){0,2}):\s+(.+)$",
+    re.DOTALL,
+)
+
+
+def _collapse_punctuation_run(match: re.Match[str]) -> str:
+    run = match.group(0)
+    compact = run.replace(" ", "")
+    if "…" in compact or "..." in compact:
+        value = "..."
+    else:
+        value = compact[0]
+    return value + (" " if run[-1].isspace() else "")
+
+
+def sanitize_tts_text(text: str) -> str:
+    """Final character filter for speech only; display text is unchanged."""
+
+    value = normalize_subtitle(text).translate(_TTS_QUOTE_MAP)
+    characters: list[str] = []
+    for index, character in enumerate(value):
+        previous = value[index - 1] if index else ""
+        following = value[index + 1] if index + 1 < len(value) else ""
+        if character.isalnum() or character in _TTS_KEPT_SYMBOLS:
+            characters.append(character)
+        elif character == "%":
+            characters.append("%" if previous.isdigit() else " ")
+        elif character in _TTS_DASHES:
+            inside_word = previous.isalnum() and following.isalnum()
+            characters.append(character if inside_word else _TTS_STANDALONE_DASH)
+        else:
+            characters.append(" ")
+    value = "".join(characters)
+    # Tokens made only of quotes/brackets/punctuation carry no speech.
+    tokens = [
+        token
+        for token in value.split()
+        if any(character.isalnum() for character in token)
+        or token.strip("'\"()") and all(
+            character in _TTS_PUNCTUATION or character == _TTS_STANDALONE_DASH
+            for character in token.strip("'\"()")
+        )
+    ]
+    value = " ".join(tokens).strip(" " + _TTS_STANDALONE_DASH)
+    value = value.replace(_TTS_STANDALONE_DASH, ",")
+    value = re.sub(r"\s+([.,!?;:…])", r"\1", value)
+    value = _TTS_PUNCTUATION_RUN.sub(_collapse_punctuation_run, value)
+    value = re.sub(r"\.{4,}", "...", value)
+    value = value.lstrip(_TTS_PUNCTUATION + ") ").strip()
+    value = " ".join(value.split())
+    if not any(character.isalpha() for character in value):
+        return ""
+    return value
+
+
+def strip_speaker_label(text: str) -> str:
+    """Remove a leading ``Name:`` speaker label of at most three words."""
+
+    match = _TTS_SPEAKER_LABEL.match(text)
+    if match is None:
+        return text
+    label, remainder = match.group(1), match.group(2).strip()
+    if not all(word[:1].isupper() for word in label.split()):
+        return text
+    first_letter = next(
+        (character for character in remainder if character.isalpha()), ""
+    )
+    if not first_letter.isupper():
+        return text
+    if sum(character.isalpha() for character in remainder) < 2:
+        return text
+    return remainder
+
+
 def _trim_symbolic_edges(text: str) -> str:
     """Remove only language-free symbols from the outside of a phrase."""
 
@@ -3389,6 +3470,25 @@ class NarratorPipeline:
             or work_id != self._work_id
         ):
             return
+        speech_text = sanitize_tts_text(spoken_text)
+        if speech_text and not settings.read_speaker_names:
+            speech_text = strip_speaker_label(speech_text)
+        logger.debug(
+            "Narrator TTS text filter phrase_id=%d removed_characters=%d",
+            work_id,
+            max(0, len(spoken_text) - len(speech_text)),
+        )
+        if not speech_text:
+            self._update_ocr_decision(
+                work_id, decision="accepted_tts_empty_after_filter"
+            )
+            self._snapshot = replace(
+                self._snapshot,
+                last_translation=last_translation,
+                translation_ms=translation_ms,
+                translation_status=translation_status,
+            )
+            return
         self._snapshot = replace(
             self._snapshot,
             last_translation=last_translation,
@@ -3413,7 +3513,7 @@ class NarratorPipeline:
         )
         tts_future = self._tts_executor.submit(
             self._synthesize_timed,
-            spoken_text,
+            speech_text,
             settings.voice_id,
             settings.speech_rate,
             settings.noise_scale,

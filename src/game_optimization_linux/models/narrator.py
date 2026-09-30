@@ -185,6 +185,8 @@ class NarratorGameSettings:
     stabilization_ms: int = 240
     ocr_min_confidence: float = 0.62
     duplicate_cooldown_ms: int = 4500
+    # Speech only: when False a leading "Name:" speaker label is not read.
+    read_speaker_names: bool = False
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
@@ -193,6 +195,8 @@ class NarratorGameSettings:
             raise ValueError("unsupported narrator settings schema version")
         if not isinstance(self.enabled, bool):
             raise ValueError("enabled must be a boolean")
+        if not isinstance(self.read_speaker_names, bool):
+            raise ValueError("read_speaker_names must be a boolean")
         object.__setattr__(self, "source_mode", NarratorSourceMode(self.source_mode))
         object.__setattr__(self, "capture_source", CaptureSourceType(self.capture_source))
         object.__setattr__(
@@ -337,6 +341,7 @@ class NarratorGameSettings:
             stabilization_ms=values.get("stabilization_ms", 240),
             ocr_min_confidence=values.get("ocr_min_confidence", 0.62),
             duplicate_cooldown_ms=values.get("duplicate_cooldown_ms", 4500),
+            read_speaker_names=values.get("read_speaker_names", False),
             updated_at=parsed_updated_at,
         )
 
@@ -364,6 +369,7 @@ class NarratorGameSettings:
             "stabilization_ms": self.stabilization_ms,
             "ocr_min_confidence": self.ocr_min_confidence,
             "duplicate_cooldown_ms": self.duplicate_cooldown_ms,
+            "read_speaker_names": self.read_speaker_names,
             "updated_at": self.updated_at.isoformat(),
         }
 

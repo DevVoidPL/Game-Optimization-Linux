@@ -3511,6 +3511,16 @@
     </message>
     <message>
         <location line="+1" />
+        <source>Read character names</source>
+        <translation>Czytaj nazwy postaci</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Speak the character name label before a subtitle line.</source>
+        <translation>Odczytuj nazwę postaci przed kwestią z napisów.</translation>
+    </message>
+    <message>
+        <location line="+1" />
         <source>Use each voice's tuned defaults or expose custom Piper articulation values.</source>
         <translation>Używaj dostrojonych ustawień głosu albo udostępnij niestandardowe wartości artykulacji Piper.</translation>
     </message>

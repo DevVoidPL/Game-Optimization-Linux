@@ -77,7 +77,11 @@ def test_c_short_line_with_edge_garbage_groups_and_is_clean(tmp_path: Path) -> N
             "E - Policjant Owens: Dzięki |", confidence=0.69, quality=0.621
         )
         assert second.candidate_id == first.candidate_id
-        assert replay.tts.values == ["Policjant Owens: Dzięki."]
+        assert replay.pipeline.snapshot.last_accepted_ocr_text == (
+            "Policjant Owens: Dzięki."
+        )
+        # Speaker labels are not spoken by default.
+        assert replay.tts.values == ["Dzięki."]
     finally:
         replay.close()
 
@@ -143,7 +147,7 @@ def test_f_new_dialogue_is_read_without_and_after_disappearance(
         assert len(replay.tts.values) == 3
         assert replay.tts.values[1:] == [
             "Tylko czekałem, aż ktoś pociągnie za spust.",
-            "Kelnerka: Sałatka z kurczakiem, bez sosu.",
+            "Sałatka z kurczakiem, bez sosu.",
         ]
     finally:
         replay.close()
