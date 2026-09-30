@@ -716,7 +716,7 @@ def test_provider_preserves_literal_raw_text_and_returns_filtered_phrase(
 @pytest.mark.parametrize(
     ("text", "tokens", "expected"),
     (
-        ("Siema", (("Siema", 97, 20, 10, 100, 30),), True),
+        ("Siema", (("Siema", 97, 20, 10, 100, 30),), False),
         ("Co tam?", (("Co", 97, 20, 10, 40, 30), ("tam?", 96, 70, 10, 70, 30)), True),
         ("EE", (("EE", 99, 20, 10, 50, 30),), False),
         ("PZA M w", (("PZA", 99, 20, 10, 50, 30), ("M", 99, 80, 10, 20, 30), ("w", 99, 110, 10, 20, 30)), False),

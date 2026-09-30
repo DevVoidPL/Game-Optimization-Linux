@@ -1410,9 +1410,13 @@ class TesseractOcrProvider:
             and str(word_tokens[0]["text"]).isupper()
             and len(str(word_tokens[0]["text"])) <= 3
         )
+        meaningful_tokens = sum(
+            int(token["alphabetic_characters"]) >= 2 for token in word_tokens
+        )
         clean_short = bool(
             text
-            and 1 <= len(word_tokens) <= 3
+            and 2 <= len(word_tokens) <= 3
+            and meaningful_tokens >= 2
             and len(line_keys) == 1
             and not dropped
             and confidence is not None

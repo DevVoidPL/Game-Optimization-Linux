@@ -137,7 +137,7 @@ def normalize_subtitle(text: str) -> str:
     return " ".join(printable.split())
 
 
-_EDGE_SYMBOLS = "|│¦_=+<>"
+_EDGE_SYMBOLS = "|│¦_=+<>*"
 _COMPARE_WORD_SPLIT = re.compile(r"[^0-9a-ząćęłńóśźż]+")
 _NEGATION_WORDS = frozenset(
     {"nie", "bez", "brak", "no", "not", "never", "cannot", "cant", "dont", "wont"}
@@ -192,13 +192,89 @@ def _is_proven_mixed_noise(token: str) -> bool:
 
 
 def _drop_proven_noise_tokens(text: str) -> str:
-    return " ".join(
-        token for token in text.split() if not _is_proven_mixed_noise(token)
-    )
+    kept: list[str] = []
+    for token in text.split():
+        symbolic = token.strip("'\"„”")
+        if symbolic and all(character in _EDGE_SYMBOLS for character in symbolic):
+            continue
+        if not _is_proven_mixed_noise(token):
+            kept.append(token)
+    return " ".join(kept)
 
 
 def _comparison_words(identity: str) -> list[str]:
     return [word for word in _COMPARE_WORD_SPLIT.split(identity) if word]
+
+
+def _numeric_token(token: str) -> bool:
+    words = _comparison_words(subtitle_identity(token))
+    return bool(words) and all(word.isdigit() for word in words)
+
+
+def _semantic_number_words(text: str) -> list[str]:
+    """Comparison words without numbers proven detached from the sentence.
+
+    A leading number run directly followed by a capitalised word, or a trailing
+    number run after terminal punctuation, is OCR debris next to the line
+    (``4 To nie…``, ``Dzięki. 4``). ``Pokój 101`` keeps its number because it
+    is attached to the preceding word.
+    """
+
+    tokens = [
+        token
+        for token in normalize_subtitle(text).split()
+        if _comparison_words(subtitle_identity(token))
+    ]
+    start = 0
+    while start < len(tokens) and _numeric_token(tokens[start]):
+        start += 1
+    if not (start and start < len(tokens) and tokens[start][:1].isupper()):
+        start = 0
+    end = len(tokens)
+    while end > start and _numeric_token(tokens[end - 1]):
+        end -= 1
+    if not (
+        end < len(tokens)
+        and end > start
+        and tokens[end - 1].rstrip("\"'”)").endswith((".", "!", "?", "…"))
+    ):
+        end = len(tokens)
+    words: list[str] = []
+    for token in tokens[start:end]:
+        words.extend(_comparison_words(subtitle_identity(token)))
+    return words
+
+
+def _numbers_conflict(
+    first_words: list[str], second_words: list[str], *, strong_core: bool
+) -> bool:
+    """Aligned number changes are semantic; one-sided unstable numbers are not.
+
+    A number present at the same aligned position in both variants but with a
+    different value (``101``/``102``) is always a conflict. A number that has
+    no counterpart at all is OCR instability only when a strong shared core
+    proves that both observations are the same line.
+    """
+
+    if [word for word in first_words if word.isdigit()] == [
+        word for word in second_words if word.isdigit()
+    ]:
+        return False
+    matcher = SequenceMatcher(None, first_words, second_words, autojunk=False)
+    for tag, first_start, first_end, second_start, second_end in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        left = [word for word in first_words[first_start:first_end] if word.isdigit()]
+        right = [
+            word for word in second_words[second_start:second_end] if word.isdigit()
+        ]
+        if not left and not right:
+            continue
+        if left and right:
+            return True
+        if not strong_core:
+            return True
+    return False
 
 
 def _lcs_length(first: list[str], second: list[str]) -> int:
@@ -258,9 +334,12 @@ def _phrase_metrics(first_text: str, second_text: str) -> _PhraseMetrics:
     )
     common = _lcs_length(first_words, second_words)
     shorter = min(len(first_words), len(second_words))
-    first_numbers = re.findall(r"\d+", first)
-    second_numbers = re.findall(r"\d+", second)
-    numbers_match = first_numbers == second_numbers
+    strong_core = common >= 3 and bool(shorter) and common / shorter >= 0.75
+    numbers_match = not _numbers_conflict(
+        _semantic_number_words(first_text),
+        _semantic_number_words(second_text),
+        strong_core=strong_core,
+    )
     semantic_conflict = (
         not numbers_match
         or (set(first_words) & _NEGATION_WORDS)
@@ -296,36 +375,122 @@ def _only_ocr_like_changes(first_text: str, second_text: str) -> bool:
 
     first = _comparison_words(subtitle_identity(first_text))
     second = _comparison_words(subtitle_identity(second_text))
+    common = _lcs_length(first, second)
+    shorter = min(len(first), len(second))
+    common_ratio = common / shorter if shorter else 0.0
+    strong_core = common >= 6 and common_ratio >= 0.85
+    weak_budget = max(1, common // 8) if strong_core else 0
     matcher = SequenceMatcher(None, first, second, autojunk=False)
     for tag, first_start, first_end, second_start, second_end in matcher.get_opcodes():
         if tag == "equal":
             continue
         left = first[first_start:first_end]
         right = second[second_start:second_end]
+        at_edge = (
+            first_start == second_start == 0
+            or first_end == len(first) and second_end == len(second)
+        )
         if tag in {"insert", "delete"}:
             changed = left or right
-            at_edge = (
-                first_start == second_start == 0
-                or first_end == len(first) and second_end == len(second)
-            )
-            if not at_edge:
+            if any(word in _NEGATION_WORDS for word in changed):
                 return False
-            if len(changed) == 1:
-                continue
-            if len(changed) > 2 or not all(
-                _looks_like_edge_scrap(word) for word in changed
+            if at_edge:
+                if len(changed) == 1:
+                    continue
+                if len(changed) <= 3 and all(
+                    word.isdigit() or _looks_like_edge_scrap(word)
+                    for word in changed
+                ):
+                    continue
+                return False
+            # A line break can leave one glyph or digit inside a long line.
+            if (
+                strong_core
+                and len(changed) == 1
+                and (changed[0].isdigit() or len(changed[0]) == 1)
             ):
-                return False
-            continue
+                continue
+            return False
         left_joined = "".join(left)
         right_joined = "".join(right)
         if not left_joined or not right_joined:
             return False
-        if SequenceMatcher(
+        if (
+            at_edge
+            and common >= 3
+            and all(
+                word.isdigit() or _looks_like_edge_scrap(word)
+                for word in (*left, *right)
+            )
+        ):
+            continue
+        ratio = SequenceMatcher(
             None, left_joined, right_joined, autojunk=False
-        ).ratio() < 0.72:
-            return False
+        ).ratio()
+        if ratio >= 0.72:
+            continue
+        # Glyph confusion (b/d, i/l, c/g) inside an otherwise identical long
+        # line. Bounded per phrase so unrelated vocabulary never collapses.
+        if (
+            weak_budget
+            and len(left) == len(right) == 1
+            and (ratio >= 0.60 or max(len(left[0]), len(right[0])) <= 2)
+        ):
+            weak_budget -= 1
+            continue
+        return False
     return True
+
+
+def _meaningful_lines(text: str) -> list[str]:
+    lines: list[str] = []
+    for line in str(text).split("\n"):
+        cleaned = _drop_proven_noise_tokens(_trim_symbolic_edges(line))
+        words = _comparison_words(subtitle_identity(cleaned))
+        if not words:
+            continue
+        if all(word.isdigit() or _looks_like_edge_scrap(word) for word in words):
+            continue
+        lines.append(cleaned)
+    return lines
+
+
+def _line_extension_variant(
+    first_lines: list[str] | tuple[str, ...],
+    second_lines: list[str] | tuple[str, ...],
+) -> bool:
+    """One multi-line subtitle whose last line appeared, vanished or was cut.
+
+    Matching whole leading lines must carry most of the shorter text. A new
+    dialogue that shares only one line with the old one stays distinct.
+    """
+
+    shorter, longer = sorted((list(first_lines), list(second_lines)), key=len)
+    if len(longer) < 2 or not shorter:
+        return False
+    matched = 0
+    for left, right in zip(shorter, longer):
+        if not _same_episode_variant(left, right):
+            break
+        matched += 1
+    if matched == 0:
+        return False
+    shorter_words = sum(
+        len(_comparison_words(subtitle_identity(line))) for line in shorter
+    )
+    matched_words = sum(
+        len(_comparison_words(subtitle_identity(line))) for line in shorter[:matched]
+    )
+    if not shorter_words or matched_words / shorter_words < 0.70:
+        return False
+    if matched == len(shorter):
+        return True
+    # Both show the same leading lines; only the final partial line differs.
+    return (
+        len(shorter) >= 3
+        and matched == len(shorter) - 1
+        and len(longer) == len(shorter)
+    )
 
 
 def _same_episode_variant(first_text: str, second_text: str) -> bool:
@@ -337,7 +502,7 @@ def _same_episode_variant(first_text: str, second_text: str) -> bool:
         return False
     if first == second or _dedup_is_split_merge_variant(first, second):
         return True
-    metrics = _phrase_metrics(first, second)
+    metrics = _phrase_metrics(first_text, second_text)
     if metrics.semantic_conflict:
         return False
     if (
@@ -363,7 +528,127 @@ def _same_episode_variant(first_text: str, second_text: str) -> bool:
             and metrics.common_core_words >= 3
             and metrics.common_core_ratio >= 0.75
         )
+        or (
+            metrics.char_similarity >= 0.86
+            and metrics.token_similarity >= 0.50
+            and metrics.common_core_words >= 3
+            and metrics.common_core_ratio >= 0.75
+        )
     )
+
+
+_ARTIFACT_CHARACTERS = frozenset("%$#@©®^~`\\{}[]<>|_=+*")
+
+
+def _token_identity(token: str) -> str:
+    return " ".join(_comparison_words(subtitle_identity(token)))
+
+
+def _unstable_edge_token(token: str, core_has_lowercase: bool) -> bool:
+    identity = _token_identity(token)
+    if identity in _NEGATION_WORDS:
+        return False
+    return bool(
+        identity.isdigit()
+        or len(identity) == 1
+        or _looks_like_edge_scrap(identity)
+        or (
+            core_has_lowercase
+            and token.strip(".,!?…:;\"'„”()").isupper()
+            and len(identity) <= 4
+        )
+    )
+
+
+def _trim_unstable_edges(text: str, others: list[str]) -> str:
+    """Drop edge debris that the rest of the observation cluster disproves.
+
+    An edge token survives when the same neighbouring word pair occurs in
+    another observation. Only structural debris (digits, single glyphs,
+    vowel-less scraps, short capitals inside lowercase text, symbol-mixed
+    tokens) is ever removed, so real words and word order stay intact.
+    """
+
+    tokens = normalize_subtitle(text).split()
+    other_pairs: set[tuple[str, str]] = set()
+    for other in others:
+        identities = [
+            _token_identity(token)
+            for token in normalize_subtitle(other).split()
+            if _token_identity(token)
+        ]
+        other_pairs.update(zip(identities, identities[1:]))
+    core_has_lowercase = any(character.islower() for character in text)
+
+    def artifact(token: str) -> bool:
+        return bool(_token_identity(token)) and any(
+            character in _ARTIFACT_CHARACTERS for character in token
+        )
+
+    while len(tokens) > 1:
+        token = tokens[0]
+        identity = _token_identity(token)
+        following = _token_identity(tokens[1])
+        if not identity or artifact(token):
+            tokens.pop(0)
+            continue
+        if (
+            _unstable_edge_token(token, core_has_lowercase)
+            and (identity, following) not in other_pairs
+        ):
+            tokens.pop(0)
+            continue
+        break
+    while len(tokens) > 1:
+        token = tokens[-1]
+        identity = _token_identity(token)
+        previous = _token_identity(tokens[-2])
+        if not identity:
+            if all(character in ".!?…" for character in token):
+                break
+            tokens.pop()
+            continue
+        if artifact(token):
+            tokens.pop()
+            continue
+        if (
+            _unstable_edge_token(token, core_has_lowercase)
+            and (previous, identity) not in other_pairs
+        ):
+            tokens.pop()
+            continue
+        break
+    return _trim_symbolic_edges(" ".join(tokens))
+
+
+def _cluster_representative(
+    variants: list[tuple[str, float, tuple[str, ...]]],
+) -> tuple[str, tuple[str, ...]]:
+    """Choose the cluster medoid after removing cluster-unstable edge debris."""
+
+    if not variants:
+        return "", ()
+    if len(variants) == 1:
+        return variants[0][0], variants[0][2]
+    texts = [text for text, _quality, _lines in variants]
+    trimmed = [
+        _trim_unstable_edges(text, texts[:index] + texts[index + 1 :]) or text
+        for index, text in enumerate(texts)
+    ]
+    best_index = 0
+    best_score = float("-inf")
+    for index, (candidate, (_text, quality, _lines)) in enumerate(
+        zip(trimmed, variants)
+    ):
+        agreement = sum(
+            _phrase_metrics(candidate, other).char_similarity
+            for other_index, other in enumerate(trimmed)
+            if other_index != index
+        ) / (len(trimmed) - 1)
+        score = agreement * 0.6 + max(0.0, quality) * 0.4
+        if score > best_score:
+            best_index, best_score = index, score
+    return trimmed[best_index], variants[best_index][2]
 
 
 def _token_matches_marker(token: str, marker: str) -> bool:
@@ -383,10 +668,24 @@ def _strip_low_quality_edges(
     if not tokens:
         return ""
 
+    reference_words = set(_comparison_words(subtitle_identity(reference_text)))
+
+    def protected(marker: str) -> bool:
+        identity = subtitle_identity(marker)
+        return bool(
+            identity in _NEGATION_WORDS
+            or identity.isdigit()
+            or identity in reference_words
+        )
+
     def removable(
         markers: tuple[str, ...], original: str, candidate: str
     ) -> bool:
+        if any(protected(marker) for marker in markers):
+            return False
         if len(markers) >= 2:
+            return True
+        if markers and len(subtitle_identity(markers[0])) > 1:
             return True
         if not markers or not reference_text:
             return False
@@ -541,10 +840,15 @@ class SubtitleTextGate:
         self._candidate_identity = ""
         self._candidate_confidence = -1.0
         self._candidate_quality = -1.0
+        self._candidate_variants: list[tuple[str, float, tuple[str, ...]]] = []
         self._candidate_count = 0
         self._candidate_since = 0.0
+        # One displaced cluster, so a single interleaved misread cannot erase
+        # the votes of the subtitle that is still on screen.
+        self._previous_cluster: dict[str, object] | None = None
         self._accepted_text = ""
         self._accepted_identity = ""
+        self._accepted_lines: tuple[str, ...] = ()
         self._absence_streak = 0
         self._needs_confirmation = False
         self._candidate_id = 0
@@ -585,6 +889,25 @@ class SubtitleTextGate:
             trailing_low_quality_tokens=trailing_low_quality_tokens,
             reference_text=reference,
         )
+        observed_lines = tuple(_meaningful_lines(text))
+        if len(observed_lines) >= 2 and (
+            leading_low_quality_tokens or trailing_low_quality_tokens
+        ):
+            observed_lines = tuple(
+                _clean_observed_text(
+                    line,
+                    leading_low_quality_tokens=(
+                        leading_low_quality_tokens if index == 0 else ()
+                    ),
+                    trailing_low_quality_tokens=(
+                        trailing_low_quality_tokens
+                        if index == len(observed_lines) - 1
+                        else ()
+                    ),
+                    reference_text=reference,
+                )
+                for index, line in enumerate(observed_lines)
+            )
         had_text = bool(raw.strip()) if frame_had_text is None else bool(frame_had_text)
         if had_text:
             self._absence_streak = 0
@@ -665,8 +988,9 @@ class SubtitleTextGate:
         accepted_metrics = _phrase_metrics(filtered, self._accepted_text)
         if self._accepted_identity:
             self.last_line_similarity = accepted_metrics.char_similarity
-        if self._accepted_identity and _same_episode_variant(
-            filtered, self._accepted_text
+        if self._accepted_identity and (
+            _same_episode_variant(filtered, self._accepted_text)
+            or _line_extension_variant(observed_lines, self._accepted_lines)
         ):
             self._reset_candidate()
             return OcrGateObservation(
@@ -696,6 +1020,7 @@ class SubtitleTextGate:
             accepted_candidate_id = self._candidate_id
             self._accepted_text = filtered
             self._accepted_identity = identity
+            self._accepted_lines = observed_lines
             self._reset_candidate()
             return OcrGateObservation(
                 raw,
@@ -723,13 +1048,30 @@ class SubtitleTextGate:
             and now - self._candidate_since <= self.stability_window_seconds
         )
         candidate_metrics = _phrase_metrics(filtered, self._candidate_text)
-        match_kind = self._identity_match_kind(
-            identity,
-            self._candidate_identity,
-            metrics=candidate_metrics,
+        match_kind = (
+            self._cluster_match_kind(filtered, observed_lines)
+            if within_window
+            else ""
         )
-        similar = within_window and bool(match_kind)
+        if (
+            not match_kind
+            and self._previous_cluster is not None
+            and now - float(self._previous_cluster["since"])
+            <= self.stability_window_seconds
+        ):
+            self._swap_previous_cluster()
+            match_kind = self._cluster_match_kind(filtered, observed_lines)
+            if match_kind:
+                match_kind = f"restored_{match_kind}"
+                candidate_metrics = _phrase_metrics(filtered, self._candidate_text)
+            else:
+                self._swap_previous_cluster()
+        similar = bool(match_kind)
         if not similar:
+            if previous_identity and now - previous_since <= self.stability_window_seconds:
+                self._previous_cluster = self._cluster_state()
+            else:
+                self._previous_cluster = None
             replaced_id = self._candidate_id if previous_identity else 0
             replaced_text = self._candidate_text if previous_identity else ""
             self._candidate_id += 1
@@ -739,6 +1081,9 @@ class SubtitleTextGate:
             self._candidate_quality = self._variant_quality(
                 confidence, quality_score, selected_line_confidence
             )
+            self._candidate_variants = [
+                (self._candidate_text, self._candidate_quality, observed_lines)
+            ]
             self._candidate_count = 1
             self._candidate_since = now
             self._needs_confirmation = True
@@ -791,6 +1136,10 @@ class SubtitleTextGate:
         candidate_quality = self._variant_quality(
             confidence, quality_score, selected_line_confidence
         )
+        self._candidate_variants.append(
+            (filtered, candidate_quality, observed_lines)
+        )
+        self._candidate_variants = self._candidate_variants[-12:]
         if candidate_quality > self._candidate_quality:
             self._candidate_text = filtered
             self._candidate_identity = identity
@@ -820,12 +1169,17 @@ class SubtitleTextGate:
                 reason_code="strong_vote",
             )
 
-        accepted = self._candidate_text
+        accepted, accepted_lines = _cluster_representative(
+            self._candidate_variants
+        )
+        accepted = accepted or self._candidate_text
         accepted_count = self._candidate_count
         accepted_candidate_id = self._candidate_id
         self._accepted_text = accepted
         self._accepted_identity = subtitle_identity(accepted)
+        self._accepted_lines = accepted_lines
         self._reset_candidate()
+        self._previous_cluster = None
         return OcrGateObservation(
             raw,
             filtered,
@@ -848,6 +1202,55 @@ class SubtitleTextGate:
             reason_code="consensus_reached",
         )
 
+    def _cluster_match_kind(
+        self, filtered: str, observed_lines: tuple[str, ...]
+    ) -> str:
+        identity = subtitle_identity(filtered)
+        variants = self._candidate_variants or [
+            (self._candidate_text, self._candidate_quality, ())
+        ]
+        for text, _quality, lines in reversed(variants):
+            if not text:
+                continue
+            kind = self._identity_match_kind(
+                identity,
+                subtitle_identity(text),
+                metrics=_phrase_metrics(filtered, text),
+                first_text=filtered,
+                second_text=text,
+            )
+            if kind:
+                return kind
+            if _line_extension_variant(observed_lines, lines):
+                return "line_extension"
+        return ""
+
+    def _cluster_state(self) -> dict[str, object]:
+        return {
+            "text": self._candidate_text,
+            "identity": self._candidate_identity,
+            "confidence": self._candidate_confidence,
+            "quality": self._candidate_quality,
+            "variants": list(self._candidate_variants),
+            "count": self._candidate_count,
+            "since": self._candidate_since,
+            "id": self._candidate_id,
+        }
+
+    def _swap_previous_cluster(self) -> None:
+        previous = self._previous_cluster
+        if previous is None:
+            return
+        self._previous_cluster = self._cluster_state()
+        self._candidate_text = str(previous["text"])
+        self._candidate_identity = str(previous["identity"])
+        self._candidate_confidence = float(previous["confidence"])
+        self._candidate_quality = float(previous["quality"])
+        self._candidate_variants = list(previous["variants"])  # type: ignore[arg-type]
+        self._candidate_count = int(previous["count"])
+        self._candidate_since = float(previous["since"])
+        self._candidate_id = int(previous["id"])
+
     @staticmethod
     def _variant_quality(
         confidence: float | None,
@@ -862,16 +1265,19 @@ class SubtitleTextGate:
 
     def _clear(self, *, no_subtitle: bool) -> None:
         self._reset_candidate()
+        self._previous_cluster = None
         if no_subtitle:
             # End only the active episode. Keep the canonical text for
             # diagnostics and cooldown correlation across appearances.
             self._accepted_identity = ""
+            self._accepted_lines = ()
 
     def _reset_candidate(self) -> None:
         self._candidate_text = ""
         self._candidate_identity = ""
         self._candidate_confidence = -1.0
         self._candidate_quality = -1.0
+        self._candidate_variants = []
         self._candidate_count = 0
         self._candidate_since = 0.0
         self._needs_confirmation = False
@@ -882,6 +1288,8 @@ class SubtitleTextGate:
         second: str,
         *,
         metrics: _PhraseMetrics,
+        first_text: str = "",
+        second_text: str = "",
     ) -> str:
         if not first or not second:
             return ""
@@ -901,7 +1309,7 @@ class SubtitleTextGate:
             and _only_ocr_like_changes(first, second)
         ):
             return "similarity"
-        if _same_episode_variant(first, second):
+        if _same_episode_variant(first_text or first, second_text or second):
             return "multi_signal_core"
         return ""
 
@@ -959,6 +1367,15 @@ class SubtitleTextGate:
             and isolated / len(fragments) >= 0.60
         ):
             return "isolated_fragments"
+        # Only tiny fragments and no word of three letters: at moderate
+        # confidence this is debris (``SĄ w``), not a short dialogue line.
+        if (
+            len(fragments) >= 2
+            and isolated >= 1
+            and all(len(fragment) <= 2 for fragment in fragments)
+            and confidence < 0.80
+        ):
+            return "isolated_fragments"
 
         for fragment in fragments:
             compact = fragment.replace("'", "").replace("’", "")
@@ -976,7 +1393,10 @@ class SubtitleTextGate:
                 if len(run) < 8:
                     continue
                 longest_consonant_run = max(
-                    (len(value) for value in re.split(r"[aeiouyAEIOUY]+", run)),
+                    (
+                        len(value)
+                        for value in re.split(r"[aąeęioóuyAĄEĘIOÓUY]+", run)
+                    ),
                     default=0,
                 )
                 if longest_consonant_run >= 7:
