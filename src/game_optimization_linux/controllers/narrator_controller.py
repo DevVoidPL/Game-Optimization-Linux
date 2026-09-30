@@ -1203,6 +1203,10 @@ class NarratorController:
         if not default_profile and profile_ids:
             default_profile = str(profile_ids[0])
         voices: list[dict[str, Any]] = []
+        components_by_id = {
+            str(component.get("componentId", "")): component
+            for component in self.components()
+        }
         for voice in tuple(getattr(tts, "voices", ())):
             if isinstance(voice, Mapping):
                 voice_id = str(voice.get("id", ""))
@@ -1225,6 +1229,11 @@ class NarratorController:
                         voice_id
                     )
                 )
+                component = components_by_id.get(component_id, {})
+                definition = getattr(
+                    self._app._narrator_component_manager, "_definitions", {}
+                ).get(component_id)
+                quality = voice_id.rsplit("-", 1)[-1] if "-" in voice_id else ""
                 voices.append(
                     {
                         "id": voice_id,
@@ -1232,6 +1241,25 @@ class NarratorController:
                         "componentId": component_id,
                         "installed": installed,
                         "available": available,
+                        "quality": quality if quality in {"low", "medium", "high"} else "",
+                        "componentState": str(component.get("state", "")),
+                        "managed": bool(component.get("managed", False)),
+                        "canInstall": bool(component.get("canInstall", False)),
+                        "downloadSizeBytes": (
+                            definition.download_size_bytes
+                            if definition is not None
+                            else component.get("downloadSizeBytes")
+                        ),
+                        "installedSizeBytes": component.get("installedSizeBytes"),
+                        "version": (
+                            definition.version
+                            if definition is not None
+                            else str(component.get("version", ""))
+                        ),
+                        "licenseId": str(component.get("licenseId", "")),
+                        "runtimeLicenseId": str(component.get("runtimeLicenseId", "")),
+                        "artifactLicenseId": str(component.get("artifactLicenseId", "")),
+                        "attribution": str(component.get("attribution", "")),
                     }
                 )
         default_voice = str(getattr(tts, "default_voice_id", ""))

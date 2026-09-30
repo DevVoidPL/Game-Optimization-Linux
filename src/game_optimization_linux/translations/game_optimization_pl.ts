@@ -9700,6 +9700,41 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>The subtitle area could not be saved.</source>
         <translation type="vanished">Nie udało się zapisać obszaru napisów.</translation>
     </message>
+    <message>
+        <location line="+0" />
+        <source>Download %1</source>
+        <translation>Pobierz %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Download (%1)</source>
+        <translation>Pobierz (%1)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Downloading</source>
+        <translation>Pobieranie</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Installed</source>
+        <translation>Zainstalowany</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>License and attribution</source>
+        <translation>Licencja i autorstwo</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Read character names</source>
+        <translation>Czytaj nazwy postaci</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Speak the character name label before a subtitle line.</source>
+        <translation>Odczytuj nazwę postaci przed kwestią z napisów.</translation>
+    </message>
 </context>
 <context>
     <name>NarratorSection</name>

@@ -9672,6 +9672,41 @@ Continúe solo después de revisar este riesgo.</translation>
         <source>The subtitle area could not be saved.</source>
         <translation type="vanished">No se pudo guardar el área de subtítulos.</translation>
     </message>
+    <message>
+        <location line="+0"/>
+        <source>Download %1</source>
+        <translation>Descargar %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Download (%1)</source>
+        <translation>Descargar (%1)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Downloading</source>
+        <translation>Descargando</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Installed</source>
+        <translation>Instalada</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>License and attribution</source>
+        <translation>Licencia y autoría</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Read character names</source>
+        <translation>Leer nombres de personajes</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Speak the character name label before a subtitle line.</source>
+        <translation>Leer el nombre del personaje antes de la línea de subtítulos.</translation>
+    </message>
 </context>
 <context>
     <name>NarratorSection</name>

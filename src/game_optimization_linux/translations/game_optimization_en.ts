@@ -9688,6 +9688,41 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>The subtitle area could not be saved.</source>
         <translation type="vanished">The subtitle area could not be saved.</translation>
     </message>
+    <message>
+        <location line="+0" />
+        <source>Download %1</source>
+        <translation>Download %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Download (%1)</source>
+        <translation>Download (%1)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Downloading</source>
+        <translation>Downloading</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Installed</source>
+        <translation>Installed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>License and attribution</source>
+        <translation>License and attribution</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Read character names</source>
+        <translation>Read character names</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Speak the character name label before a subtitle line.</source>
+        <translation>Speak the character name label before a subtitle line.</translation>
+    </message>
 </context>
 <context>
     <name>NarratorSection</name>

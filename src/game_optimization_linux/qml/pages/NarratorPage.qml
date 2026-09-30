@@ -27,6 +27,9 @@ Item {
     property string ttsProviderId: ""
     property string voiceId: ""
     property var voices: []
+    // Shared global setting, also edited in Couch mode settings.
+    property bool readSpeakerNames: false
+    property string expandedVoiceLicenseId: ""
     property real narratorVolume: 0.85
     property real speechRate: 1.0
     // Advanced articulation overrides. When articulationOverridden is false the
@@ -162,6 +165,7 @@ Item {
         ttsProviderId = String(value(settings, ["tts_provider_id", "ttsProviderId"], ""))
         voiceId = String(value(settings, ["voice_id", "voiceId"], ""))
         voices = value(settings, ["voices"], []) || []
+        readSpeakerNames = Boolean(value(settings, ["readSpeakerNames", "read_speaker_names"], false))
         narratorVolume = Number(value(settings, ["volume"], 0.85))
         speechRate = Number(value(settings, ["speech_rate", "speechRate"], 1.0))
         // A null/absent value means the voice's own articulation is in use.
@@ -373,6 +377,62 @@ Item {
         if (component === null || !saveSettings())
             return
         runComponentAction(component)
+    }
+
+    // Voices are managed in "Voice and translation"; the optional component
+    // list keeps capture, OCR, translation and audio only.
+    function nonVoiceComponents() {
+        var result = []
+        var source = componentsData || []
+        for (var i = 0; i < source.length; ++i) {
+            if (String(value(source[i], ["kind"], "")) !== "tts")
+                result.push(source[i])
+        }
+        return result
+    }
+
+    function voiceState(voice) {
+        return String(value(voice, ["componentState"], ""))
+    }
+
+    function voiceStatusLabel(voice) {
+        var state = voiceState(voice)
+        if (state === "installing")
+            return qsTr("Downloading")
+        if (Boolean(value(voice, ["installed"], false)))
+            return qsTr("Installed")
+        return qsTr("Download %1").arg(formatBytes(value(voice, ["downloadSizeBytes"], null)))
+    }
+
+    function selectVoice(voice) {
+        if (sessionActive)
+            return
+        voiceId = String(value(voice, ["id"], ""))
+    }
+
+    function downloadVoice(voice) {
+        if (sessionActive)
+            return
+        voiceId = String(value(voice, ["id"], ""))
+        installSelectedVoice()
+    }
+
+    function removeVoice(voice) {
+        if (sessionActive || !controller
+                || typeof controller.removeNarratorComponent !== "function")
+            return
+        var voiceIdentifier = String(value(voice, ["id"], ""))
+        if (voiceIdentifier === voiceId)
+            return
+        controller.removeNarratorComponent(
+                    String(value(voice, ["componentId", "component_id"], "")))
+    }
+
+    function setReadSpeakerNames(enabled) {
+        if (!controller || typeof controller.saveNarratorGlobalSettings !== "function")
+            return
+        if (controller.saveNarratorGlobalSettings({ "readSpeakerNames": enabled }))
+            readSpeakerNames = enabled
     }
 
     function translationProfileLabels(options) {
@@ -724,9 +784,65 @@ Item {
         }
     }
 
+    // Fixed action bar: session status and start/stop stay visible while the
+    // settings below scroll.
+    Rectangle {
+        id: actionBar
+        objectName: "narratorActionBar"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        implicitHeight: actionBarRow.implicitHeight + 20
+        height: implicitHeight
+        color: App.Theme.backgroundElevated
+        z: 1
+
+        RowLayout {
+            id: actionBarRow
+            anchors.fill: parent
+            anchors.leftMargin: App.Theme.contentPadding
+            anchors.rightMargin: App.Theme.contentPadding
+            anchors.topMargin: 10
+            anchors.bottomMargin: 10
+            spacing: 12
+
+            StatusBadge {
+                objectName: "narratorActionBarStatus"
+                text: page.sessionLabel(page.sessionStatus)
+                status: page.sessionTone(page.sessionStatus)
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: String(page.value(page.sessionData, ["message"], ""))
+                color: App.Theme.textSecondary
+                font.pixelSize: App.Theme.fontCaption
+                elide: Text.ElideRight
+            }
+
+            AppButton {
+                objectName: "narratorStartStop"
+                text: page.sessionActive ? qsTr("Stop narrator")
+                      : page.sessionData.cardState === "error" ? qsTr("Retry") : qsTr("Start narrator")
+                kind: page.sessionActive ? "danger" : "primary"
+                enabled: page.sessionActive
+                         || (page.selectedGameId.length > 0
+                             && page.narratorEnabled
+                             && page.componentsReady
+                             && page.selectedVoiceReady)
+                toolTip: enabled ? "" : qsTr("Enable the narrator and install all required local narrator components first")
+                onClicked: page.sessionActive
+                           ? page.stopNarrator() : page.startNarrator()
+            }
+        }
+    }
+
     ScrollView {
         id: scroll
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.top: actionBar.bottom
         contentWidth: availableWidth
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
         ScrollBar.vertical.policy: ScrollBar.AsNeeded
@@ -1025,15 +1141,136 @@ Item {
                             font.pixelSize: App.Theme.fontCaption
                         }
 
-                        AppComboBox {
-                            property var values: page.optionIds(page.voices)
+                        ColumnLayout {
+                            objectName: "narratorVoiceList"
                             Layout.fillWidth: true
-                            model: page.optionLabels(page.voices)
-                            currentIndex: page.indexOfValue(values, page.voiceId, 0)
-                            enabled: values.length > 0 && !page.sessionActive
-                            onActivated: function(index) {
-                                if (index >= 0 && index < values.length)
-                                    page.voiceId = values[index]
+                            spacing: 6
+
+                            Repeater {
+                                model: page.voices || []
+
+                                delegate: Rectangle {
+                                    id: voiceRow
+                                    required property var modelData
+                                    readonly property string voiceIdentifier: String(page.value(modelData, ["id"], ""))
+                                    readonly property bool selected: voiceIdentifier === page.voiceId
+                                    readonly property bool installed: Boolean(page.value(modelData, ["installed"], false))
+                                    readonly property bool installing: page.voiceState(modelData) === "installing"
+                                    readonly property bool licenseExpanded: page.expandedVoiceLicenseId === voiceIdentifier
+                                    Layout.fillWidth: true
+                                    implicitHeight: voiceRowColumn.implicitHeight + 16
+                                    radius: 8
+                                    color: selected ? App.Theme.backgroundElevated : "transparent"
+                                    border.width: 1
+                                    border.color: selected ? App.Theme.accent : App.Theme.border
+
+                                    ColumnLayout {
+                                        id: voiceRowColumn
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.margins: 8
+                                        spacing: 6
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            RadioButton {
+                                                checked: voiceRow.selected
+                                                enabled: !page.sessionActive
+                                                text: String(page.value(voiceRow.modelData, ["name", "id"], ""))
+                                                onClicked: page.selectVoice(voiceRow.modelData)
+                                            }
+
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["quality"], "")).length > 0
+                                                text: String(page.value(voiceRow.modelData, ["quality"], ""))
+                                                color: App.Theme.textMuted
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+
+                                            Item { Layout.fillWidth: true }
+
+                                            StatusBadge {
+                                                text: page.voiceStatusLabel(voiceRow.modelData)
+                                                status: voiceRow.installed ? "success"
+                                                        : voiceRow.installing ? "info" : "neutral"
+                                            }
+
+                                            AppButton {
+                                                visible: voiceRow.selected && !voiceRow.installed && !voiceRow.installing
+                                                compact: true
+                                                text: qsTr("Download (%1)").arg(page.formatBytes(page.value(voiceRow.modelData, ["downloadSizeBytes"], null)))
+                                                iconSource: App.UiIcons.actionDownload
+                                                enabled: !page.sessionActive
+                                                         && Boolean(page.value(voiceRow.modelData, ["canInstall"], false))
+                                                onClicked: page.downloadVoice(voiceRow.modelData)
+                                            }
+
+                                            AppButton {
+                                                visible: !voiceRow.selected && voiceRow.installed
+                                                         && Boolean(page.value(voiceRow.modelData, ["managed"], false))
+                                                compact: true
+                                                kind: "danger"
+                                                text: qsTr("Remove")
+                                                iconSource: App.UiIcons.actionRemove
+                                                enabled: !page.sessionActive
+                                                onClicked: page.removeVoice(voiceRow.modelData)
+                                            }
+
+                                            AppButton {
+                                                compact: true
+                                                kind: "secondary"
+                                                text: qsTr("License and attribution")
+                                                onClicked: page.expandedVoiceLicenseId =
+                                                           voiceRow.licenseExpanded ? "" : voiceRow.voiceIdentifier
+                                            }
+                                        }
+
+                                        AppProgressBar {
+                                            visible: voiceRow.installing
+                                            Layout.fillWidth: true
+                                            indeterminateMode: true
+                                        }
+
+                                        Flow {
+                                            visible: voiceRow.licenseExpanded
+                                            Layout.fillWidth: true
+                                            spacing: 14
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["licenseId"], "")).length > 0
+                                                text: qsTr("License: %1").arg(page.value(voiceRow.modelData, ["licenseId"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["runtimeLicenseId"], "")).length > 0
+                                                text: qsTr("Runtime license: %1").arg(page.value(voiceRow.modelData, ["runtimeLicenseId"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["artifactLicenseId"], "")).length > 0
+                                                text: qsTr("Model license: %1").arg(page.value(voiceRow.modelData, ["artifactLicenseId"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["attribution"], "")).length > 0
+                                                text: qsTr("Attribution: %1").arg(page.value(voiceRow.modelData, ["attribution"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["version"], "")).length > 0
+                                                text: qsTr("Version: %1").arg(page.value(voiceRow.modelData, ["version"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         }
 
@@ -1046,31 +1283,32 @@ Item {
                             wrapMode: Text.WordWrap
                         }
 
-                        RowLayout {
-                            visible: page.voices.length > 0 && !page.selectedVoiceReady
+                        Label {
+                            visible: page.voices.length > 0 && page.selectedVoiceInstalled()
+                                     && !page.selectedVoiceReady
                             Layout.fillWidth: true
-                            spacing: 10
+                            text: String(page.value(page.selectedVoice(), ["name", "id"], ""))
+                                  + " - " + qsTr("Unavailable in this build")
+                            color: App.Theme.warning
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
 
-                            Label {
-                                Layout.fillWidth: true
-                                text: String(page.value(page.selectedVoice(), ["name", "id"], ""))
-                                      + " - " + (page.selectedVoiceInstalled()
-                                                   ? qsTr("Unavailable in this build")
-                                                   : qsTr("Not installed"))
-                                color: App.Theme.warning
-                                font.pixelSize: App.Theme.fontCaption
-                                wrapMode: Text.WordWrap
-                            }
+                        AppSwitch {
+                            objectName: "narratorReadSpeakerNames"
+                            Layout.fillWidth: true
+                            text: qsTr("Read character names")
+                            checked: page.readSpeakerNames
+                            enabled: !page.sessionActive
+                            onToggled: page.setReadSpeakerNames(checked)
+                        }
 
-                            AppButton {
-                                visible: !page.selectedVoiceInstalled()
-                                compact: true
-                                text: qsTr("Install")
-                                iconSource: App.UiIcons.actionInstall
-                                enabled: !page.sessionActive
-                                         && page.selectedVoiceComponent() !== null
-                                onClicked: page.installSelectedVoice()
-                            }
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Speak the character name label before a subtitle line.")
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
                         }
 
                         Divider { Layout.fillWidth: true }
@@ -1457,7 +1695,7 @@ Item {
                     rowSpacing: 12
 
                     Repeater {
-                        model: page.componentsData || []
+                        model: page.nonVoiceComponents()
 
                         delegate: SurfaceCard {
                             id: componentCard
@@ -1993,19 +2231,6 @@ Item {
                                     controller.chooseNarratorWindowAgain(page.selectedGameId)
                                 page.refreshSession()
                             }
-                        }
-                        AppButton {
-                            text: page.sessionActive ? qsTr("Stop narrator")
-                                  : page.sessionData.cardState === "error" ? qsTr("Retry") : qsTr("Start narrator")
-                            kind: page.sessionActive ? "danger" : "primary"
-                            enabled: page.sessionActive
-                                     || (page.selectedGameId.length > 0
-                                         && page.narratorEnabled
-                                         && page.componentsReady
-                                         && page.selectedVoiceReady)
-                            toolTip: enabled ? "" : qsTr("Enable the narrator and install all required local narrator components first")
-                            onClicked: page.sessionActive
-                                       ? page.stopNarrator() : page.startNarrator()
                         }
                     }
                 }
