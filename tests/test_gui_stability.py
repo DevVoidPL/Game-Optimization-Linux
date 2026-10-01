@@ -333,6 +333,13 @@ def test_deep_cleanup_ui_selection_quarantine_restart_restore_finalize(tmp_path:
     assert result["nothing_selected"] is True
     assert result["quarantine_disabled_initially"] is True
     assert (result["target_enabled"], result["fallback_enabled"], result["shared_enabled"]) == (False, False, False)
+    # Review + selectable has a checkbox; Review + external only a lock.
+    assert result["review_selectable_checkbox"] is True
+    assert (result["external_checkbox"], result["external_lock"], result["target_lock"]) == (False, True, True)
+    assert result["external_badge"] == "Outside the scope of this plan"
+    # Crash dump, old log, German text and redist (11 B); the 50 B own shader
+    # cache is external and never counted.
+    assert result["selectable_bytes"] == "11 B"
     assert result["global_checkboxes"] == 0
     assert result["safe_selection"] == ["cache/crash_dumps", "cache/logs_old"]
     assert result["summary"] == {"files": 3, "bytes": 9, "safe": 2, "review": 1}
@@ -358,6 +365,13 @@ def test_deep_analysis_polish_ui_and_long_groups_collapse(tmp_path: Path) -> Non
     assert result["status"] == "completed"
     # G. No English labels remain in the Polish UI.
     assert result["english_labels"] == []
+    assert result["badges"] == sorted([
+        "Bezpieczne - można przenieść",
+        "Do sprawdzenia - można przenieść",
+        "Chronione - nie można usunąć",
+        "Poza zakresem tego planu",
+        "Brak bezpiecznej reguły - nie można usunąć",
+    ])
     assert result["has_polish_analyze"] is True
     assert result["fallback_notice"] is True
     # H. Long groups show 10 paths, expand to at most 100 and collapse again;

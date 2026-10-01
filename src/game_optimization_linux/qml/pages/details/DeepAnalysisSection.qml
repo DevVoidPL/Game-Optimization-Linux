@@ -89,8 +89,10 @@ SurfaceCard {
             if (selectedGroups[key] && allowed.indexOf(key) >= 0 && !hasActive) next[key] = true
         selectedGroups = next
     }
+    // Selectability comes from the backend (actionability + executor list).
     function isSelectable(group) {
-        return Boolean(group.removable) && selectableIds.indexOf(String(group.groupId)) >= 0
+        return String(group.actionability || "") === "selectable"
+               && selectableIds.indexOf(String(group.groupId)) >= 0
                && !hasActive && !cleanupBusy && !planStale
     }
     function setSelected(groupId, value) {
@@ -107,13 +109,35 @@ SurfaceCard {
         }
         selectedGroups = next
     }
-    function notSelectableReason(group) {
-        var role = String(group.role || "")
-        if (role === "target") return qsTr("target language")
-        if (role === "fallback") return qsTr("fallback language")
-        if (role === "shared" || group.key === "shared" || group.key === "wwise_shared") return qsTr("shared audio")
-        if (group.safety === "unsupported") return qsTr("unsupported")
-        return qsTr("not handled in this stage")
+    function actionabilityLabel(group) {
+        var value = String(group.actionability || "unsupported")
+        if (value === "selectable")
+            return group.safety === "safe" ? qsTr("Safe - can be moved") : qsTr("Review - can be moved")
+        if (value === "protected") return qsTr("Protected - cannot be removed")
+        if (value === "external") return qsTr("Outside the scope of this plan")
+        return qsTr("No safe rule - cannot be removed")
+    }
+    function actionabilityTone(group) {
+        var value = String(group.actionability || "unsupported")
+        if (value === "selectable") return group.safety === "safe" ? "available" : "warning"
+        if (value === "protected") return "active"
+        return "paused"
+    }
+    function reasonText(group) {
+        var code = String(group.actionabilityReason || "")
+        if (code === "target_language") return qsTr("The selected target language is required by the game.")
+        if (code === "fallback_language") return qsTr("The fallback language is required for the selected language.")
+        if (code === "shared_audio") return qsTr("Shared audio is used by every language.")
+        if (code === "active_proton_prefix") return qsTr("The active Proton prefix can contain configuration and saves.")
+        if (code === "current_game_shader_cache") return qsTr("The shader cache of this game is outside the game folder; it is rebuilt and removing it can cause stutter.")
+        if (code === "global_leftover") return qsTr("Leftover of another game; it belongs to the global Steam leftovers.")
+        if (code === "core_archive") return qsTr("Core archive required by the game.")
+        if (code === "required_texture") return qsTr("Textures and mipmaps are required while the game runs.")
+        if (code === "launcher_dlc") return qsTr("Optional DLC content; remove it through the launcher or DLC settings.")
+        if (code === "user_data_backup") return qsTr("May be the only copy of a save or configuration.")
+        if (code === "compression_only") return qsTr("These files are only analyzed for Btrfs compression; they are never removed.")
+        if (code === "unknown_type") return qsTr("There is no safe rule to remove this type of data.")
+        return ""
     }
     function startQuarantine() {
         if (!controller || typeof controller.startDeepQuarantine !== "function") return
@@ -462,24 +486,35 @@ SurfaceCard {
             CheckBox {
                 objectName: "deepSelect_" + String(groupRow.group.groupId).replace("/", "_").replace(":", "_")
                 visible: groupRow.showSelection && Boolean(section.analysis.hasPlan)
+                         && String(groupRow.group.actionability) === "selectable"
                 enabled: section.isSelectable(groupRow.group)
                 checked: Boolean(section.selectedGroups[groupRow.group.groupId])
                 onToggled: section.setSelected(String(groupRow.group.groupId), checked)
-                ToolTip.visible: hovered && !enabled
-                ToolTip.text: qsTr("Not selectable: %1").arg(section.notSelectableReason(groupRow.group))
+            }
+            Label {
+                objectName: "deepLock_" + String(groupRow.group.groupId).replace("/", "_").replace(":", "_")
+                visible: groupRow.showSelection && Boolean(section.analysis.hasPlan)
+                         && String(groupRow.group.actionability) !== "selectable"
+                Layout.preferredWidth: 28
+                horizontalAlignment: Text.AlignHCenter
+                text: "\uD83D\uDD12"
+                color: App.Theme.textMuted
+                Accessible.name: section.actionabilityLabel(groupRow.group)
             }
             Label { Layout.fillWidth: true; text: section.groupTitle(groupRow.group); color: App.Theme.text; elide: Text.ElideRight }
             Label { text: section.formatBytes(groupRow.group.bytes) + (groupRow.group.sizeExact ? "" : qsTr(" (estimated)")); color: App.Theme.textSecondary }
             Label { text: qsTr("%1%").arg(Math.round(Number(groupRow.group.confidence || 0) * 100)); color: App.Theme.textMuted }
-            StatusBadge { text: section.safetyLabel(String(groupRow.group.safety)); status: section.safetyTone(String(groupRow.group.safety)) }
+            StatusBadge { objectName: "deepBadge"; text: section.actionabilityLabel(groupRow.group); status: section.actionabilityTone(groupRow.group) }
             AppButton { compact: true; kind: "ghost"; text: (groupRow.expanded ? "\u25BE " : "\u25B8 ") + qsTr("Why detected"); onClicked: section.toggleGroup(groupRow.identifier) }
         }
         Label {
-            visible: groupRow.showSelection && Boolean(section.analysis.hasPlan) && !groupRow.group.removable
-                     && (String(groupRow.group.role || "") !== "" || groupRow.group.key === "shared" || groupRow.group.key === "wwise_shared")
+            objectName: "deepReason"
+            visible: String(groupRow.group.actionability) !== "selectable" && text.length > 0
+            Layout.fillWidth: true
             Layout.leftMargin: 36
-            text: qsTr("Not selectable: %1").arg(section.notSelectableReason(groupRow.group))
+            text: section.reasonText(groupRow.group)
             color: App.Theme.textMuted; font.pixelSize: App.Theme.fontCaption
+            wrapMode: Text.WordWrap
         }
         ColumnLayout {
             visible: groupRow.expanded
@@ -626,8 +661,14 @@ SurfaceCard {
                 Label { objectName: "deepNeedsConfirmation"; Layout.fillWidth: true; text: qsTr("%1 (not guaranteed)").arg(section.formatBytes(section.savings.needsConfirmation)); color: App.Theme.text }
                 Label { text: qsTr("Btrfs compression potential"); color: App.Theme.textMuted }
                 Label { Layout.fillWidth: true; text: qsTr("%1 eligible; savings depend on the data").arg(section.formatBytes(section.savings.btrfsEligible)); color: App.Theme.text; wrapMode: Text.WordWrap }
-                Label { text: qsTr("Protected / unsupported"); color: App.Theme.textMuted }
-                Label { Layout.fillWidth: true; text: section.formatBytes(section.savings.protected); color: App.Theme.text }
+                Label { text: qsTr("Can be moved to quarantine"); color: App.Theme.textMuted }
+                Label { objectName: "deepSelectableBytes"; Layout.fillWidth: true; text: section.formatBytes(section.savings.selectableBytes); color: App.Theme.text }
+                Label { text: qsTr("Protected by the program"); color: App.Theme.textMuted }
+                Label { objectName: "deepProtectedBytes"; Layout.fillWidth: true; text: section.formatBytes(section.savings.protectedBytes); color: App.Theme.text }
+                Label { text: qsTr("Outside the scope of the game plan"); color: App.Theme.textMuted }
+                Label { objectName: "deepExternalBytes"; Layout.fillWidth: true; text: section.formatBytes(section.savings.externalBytes); color: App.Theme.text }
+                Label { text: qsTr("No safe rule"); color: App.Theme.textMuted }
+                Label { objectName: "deepUnsupportedBytes"; Layout.fillWidth: true; text: section.formatBytes(section.savings.unsupportedBytes); color: App.Theme.text }
                 Repeater {
                     model: section.savings.languages || []
                     delegate: Label {

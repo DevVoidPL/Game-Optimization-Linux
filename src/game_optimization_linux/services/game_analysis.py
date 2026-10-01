@@ -163,6 +163,7 @@ class GameAnalyzer:
             self._unity(files, folded),
             self._redengine(files, folded),
             self._rage(files, folded),
+            self._unreal3(files, folded),
         ]
         matches = sorted(matches, key=lambda item: item.confidence, reverse=True)
         first = matches[0]
@@ -329,18 +330,76 @@ class GameAnalyzer:
         bin_x64 = next((value for value in lower if value.startswith("bin/x64/") and value.endswith(".exe")), "")
         content = next((value for value in lower if value.startswith("content/content") or "/content/content" in value), "")
         prelauncher = next((value for value in lower if Path(value).name == "redprelauncher.exe"), "")
+        bin_x64 = bin_x64 or next(
+            (value for value in lower if value.startswith("bin/x64_dx12/") and value.endswith(".exe")), ""
+        )
+        content_root = [value for value in lower if re.match(r"content/(content|patch)\d+/", value)]
+        bundles = [value for value in content_root if value.endswith(".bundle")]
+        metadata = next((value for value in content_root if value.endswith("/metadata.store")), "")
+        caches = [value for value in content_root if value.endswith(".cache")]
+        dlc = next((value for value in lower if re.match(r"dlc/[^/]+/content/", value)), "")
         for value, detail, weight in (
             (r6, "REDengine r6 data", 0.28),
             (archive, "REDengine archive/pc/content data", 0.28),
             (bin_x64, "REDengine bin/x64 executable", 0.22),
             (content, "REDengine content package hierarchy", 0.22),
             (prelauncher, "REDlauncher prelauncher", 0.12),
+            (bundles[0] if len(bundles) >= 3 else "", f"{len(bundles)} REDengine 3 .bundle packages", 0.16),
+            (metadata, "REDengine 3 metadata.store", 0.14),
+            (caches[0] if caches else "", "REDengine 3 content .cache files", 0.10),
+            (dlc, "REDengine dlc/<name>/content hierarchy", 0.08),
         ):
             if value:
                 evidence.append(DetectionEvidence(value, detail, weight))
         confidence = min(0.98, sum(item.weight for item in evidence))
+        if not (r6 and archive) and len(evidence) < 3:
+            # A lone package or executable never identifies the engine.
+            confidence = min(confidence, 0.4)
         version = "4" if r6 and archive else "3" if content and bin_x64 else ""
         return _EngineMatch("REDengine", confidence, tuple(evidence), version)
+
+    @staticmethod
+    def _unreal3(
+        files: Sequence[tuple[str, Path]], folded: Mapping[str, Path]
+    ) -> _EngineMatch:
+        """Unreal Engine 3: cooked .upk packages plus the UE3 tree layout.
+
+        A single .upk/.tfc file is never enough; at least four independent
+        signatures, including cooked content, are required.
+        """
+
+        del folded
+        lower = [relative.casefold() for relative, _path in files]
+        evidence: list[DetectionEvidence] = []
+        cooked = next((value for value in lower
+                       if re.search(r"(^|/)cookedpc(console|server)?/", value) and value.endswith(".upk")), "")
+        packages = [value for value in lower if value.endswith(".upk")]
+        textures = [value for value in lower if value.endswith(".tfc")]
+        maps = next((value for value in lower if value.endswith(".udk")), "")
+        binaries = next((value for value in lower
+                         if re.search(r"(^|/)binaries/win(32|64)/[^/]+\.exe$", value)), "")
+        engine_config = next((value for value in lower
+                              if re.search(r"(^|/)engine/config/baseengine\.ini$", value)), "")
+        game_config = next((value for value in lower
+                            if re.search(r"(^|/)[^/]+game/config/default(engine|game)\.ini$", value)), "")
+        localization = next((value for value in lower
+                             if re.search(r"(^|/)localization/int/[^/]+\.int$", value)), "")
+        for value, detail, weight in (
+            (cooked, "UE3 CookedPC/CookedPCConsole package", 0.30),
+            (packages[0] if len(packages) >= 3 else "", f"{len(packages)} UE3 .upk packages", 0.20),
+            (textures[0] if textures else "", "UE3 texture file cache (.tfc)", 0.12),
+            (maps, "UE3 map (.udk)", 0.06),
+            (binaries, "UE3 Binaries/Win32 or Win64 executable", 0.15),
+            (engine_config, "UE3 Engine/Config/BaseEngine.ini", 0.10),
+            (game_config, "UE3 <Game>Game/Config defaults", 0.10),
+            (localization, "UE3 Localization/INT .int files", 0.10),
+        ):
+            if value:
+                evidence.append(DetectionEvidence(value, detail, weight))
+        confidence = min(0.97, sum(item.weight for item in evidence))
+        if not cooked or len(evidence) < 4:
+            confidence = min(confidence, 0.4)
+        return _EngineMatch("Unreal Engine 3", confidence, tuple(evidence), "3" if confidence >= 0.55 else "")
 
     @staticmethod
     def _rage(

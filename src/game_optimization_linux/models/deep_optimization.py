@@ -32,6 +32,25 @@ NON_EXECUTABLE_KEYS = frozenset({
     "protected_backups", "packages_opaque", "texture_files", "hd_texture_pack",
 })
 PROTECTED_ROLES = frozenset({"target", "fallback", "shared"})
+# What the user may do with a group, separate from its safety assessment:
+# "selectable" (quarantine), "protected" (recognized and deliberately kept),
+# "external" (outside the game root/transaction scope), "unsupported" (no
+# safe execution rule).
+ACTIONABILITY = ("selectable", "protected", "external", "unsupported")
+_PROTECTED_KEYS = {
+    "compatdata_active": "active_proton_prefix",
+    "packages_opaque": "core_archive",
+    "texture_files": "required_texture",
+    "hd_texture_pack": "launcher_dlc",
+    "protected_backups": "user_data_backup",
+    "shared": "shared_audio",
+    "wwise_shared": "shared_audio",
+}
+_EXTERNAL_KEYS = {
+    "steam_shadercache_installed": "current_game_shader_cache",
+    "steam_shadercache_uninstalled": "global_leftover",
+    "compatdata_uninstalled": "global_leftover",
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -118,6 +137,32 @@ class DeepGroup:
         return f"{self.category}/{self.key}"
 
     @property
+    def actionability(self) -> str:
+        return self.actionability_reason[0]
+
+    @property
+    def actionability_reason(self) -> tuple[str, str]:
+        """(actionability, reason code); computed, so older plans stay valid."""
+
+        if self.removable:
+            return "selectable", "safe_to_move" if self.safety == "safe" else "review_before_moving"
+        if self.role == "target":
+            return "protected", "target_language"
+        if self.role == "fallback":
+            return "protected", "fallback_language"
+        if self.role == "shared" or self.key in {"shared", "wwise_shared"}:
+            return "protected", "shared_audio"
+        if self.scope == "global":
+            return "external", "global_leftover"
+        if self.key in _EXTERNAL_KEYS:
+            return "external", _EXTERNAL_KEYS[self.key]
+        if self.key in _PROTECTED_KEYS:
+            return "protected", _PROTECTED_KEYS[self.key]
+        if self.category == "btrfs":
+            return "unsupported", "unknown_type" if self.key == "unknown_compressibility" else "compression_only"
+        return "unsupported", "unknown_type"
+
+    @property
     def removable(self) -> bool:
         """Whether the quarantine executor may ever touch this group."""
 
@@ -139,6 +184,8 @@ class DeepGroup:
             "owner": self.owner,
             "groupId": self.group_id,
             "removable": self.removable,
+            "actionability": self.actionability,
+            "actionabilityReason": self.actionability_reason[1],
             "language": self.language,
             "safety": self.safety,
             "action": self.action,
@@ -302,16 +349,28 @@ class DeepOptimizationPlan:
 
     def savings_summary(self) -> dict[str, Any]:
         game = [group for group in self.groups if group.scope == "game"]
-        removable = [group for group in game if group.action == "remove_candidate"]
         compression = [group for group in game if group.action == "compress_candidate"]
         languages: dict[str, dict[str, Any]] = {}
         for group in game:
             if group.language:
                 entry = languages.setdefault(group.language, {"code": group.language, "bytes": 0, "role": group.role})
                 entry["bytes"] += group.bytes
+        selectable = [group for group in game if group.actionability == "selectable"]
+        # Btrfs groups are a second view of the same files; the actionability
+        # buckets therefore only count primary content groups (disjoint).
+        primary = [group for group in self.groups if group.category != "btrfs"]
+
+        def bucket(name: str) -> int:
+            return sum(group.bytes for group in primary if group.actionability == name)
+
         return {
-            "safeNow": sum(group.bytes for group in removable if group.safety == "safe"),
-            "needsConfirmation": sum(group.bytes for group in removable if group.safety == "review"),
+            # Only selectable groups can ever be freed through this game's plan.
+            "safeNow": sum(group.bytes for group in selectable if group.safety == "safe"),
+            "needsConfirmation": sum(group.bytes for group in selectable if group.safety == "review"),
+            "selectableBytes": bucket("selectable"),
+            "protectedBytes": bucket("protected"),
+            "externalBytes": bucket("external"),
+            "unsupportedBytes": bucket("unsupported"),
             "global": sum(group.bytes for group in self.groups if group.scope == "global" and group.is_savings),
             "btrfsEligible": sum(group.bytes for group in compression),
             "btrfsMeasuredSavings": self.sizes.measured_savings,
@@ -368,6 +427,7 @@ __all__ = [
     "DEEP_SCOPES",
     "LANGUAGE_ROLES",
     "DeepBtrfsInfo",
+    "ACTIONABILITY",
     "DeepItem",
     "DeepSizes",
     "EXECUTABLE_CATEGORIES",

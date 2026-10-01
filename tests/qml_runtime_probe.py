@@ -3320,6 +3320,8 @@ def probe_deep_cleanup(application: QGuiApplication) -> dict[str, Any]:
     (library / "steamapps" / "appmanifest_4242.acf").write_text('"AppState" {}', encoding="utf-8")
     (library / "steamapps/shadercache/999").mkdir(parents=True)
     (library / "steamapps/shadercache/999/a.foz").write_bytes(b"g")
+    (library / "steamapps/shadercache/4242").mkdir(parents=True)
+    (library / "steamapps/shadercache/4242/own.foz").write_bytes(b"s" * 50)
     game = replace(demo_games()[0], id="steam-4242", install_path=game_root, library_path=library,
                    steam_app_id="4242", launcher=Launcher.STEAM)
     data_root = temporary_root / "data"
@@ -3384,6 +3386,15 @@ def probe_deep_cleanup(application: QGuiApplication) -> dict[str, Any]:
         "target_enabled": bool(checkbox("languages/lang:pl").property("enabled")),
         "fallback_enabled": bool(checkbox("audio/lang:en").property("enabled")),
         "shared_enabled": bool(checkbox("audio/shared").property("enabled")),
+        "review_selectable_checkbox": checkbox("languages/lang:de").isVisible(),
+        "external_checkbox": checkbox("cache/steam_shadercache_installed").isVisible(),
+        "external_lock": _item(root, "deepLock_cache_steam_shadercache_installed").isVisible(),
+        "target_lock": _item(root, "deepLock_languages_lang_pl").isVisible(),
+        "external_badge": str(next(
+            item.property("text") for item in _descendants(_item(root, "deepGroup_cache_steam_shadercache_installed"))
+            if item.objectName() == "deepBadge"
+        )),
+        "selectable_bytes": str(_item(root, "deepSelectableBytes").property("text")),
         "global_checkboxes": sum(
             1 for item in _descendants(_item(root, "deepGlobalLeftovers"))
             if item.objectName().startswith("deepSelect_") and isinstance(item, QQuickItem) and item.isVisible()
@@ -3443,6 +3454,9 @@ def probe_deep_cleanup(application: QGuiApplication) -> dict[str, Any]:
 
 
 DEEP_ENGLISH_LABELS = (
+    "Safe - can be moved", "Review - can be moved", "Protected - cannot be removed",
+    "Outside the scope of this plan", "No safe rule - cannot be removed",
+    "Can be moved to quarantine", "Protected by the program", "No safe rule",
     "Analyze deeply", "Export JSON report", "Apply plan", "Engine", "File system",
     "Logical size", "Target language", "Safe", "Review", "Unsupported", "Why detected",
     "Languages", "Cache and logs", "Leftovers", "Textures and packages",
@@ -3472,7 +3486,8 @@ def probe_deep_analysis_polish(application: QGuiApplication) -> dict[str, Any]:
     if not translations.set_language("pl"):
         raise AssertionError("Polish catalog could not be installed")
     temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-deep-pl-"))
-    game_root = temporary_root / "game"
+    library = temporary_root / "SteamLibrary"
+    game_root = library / "steamapps" / "common" / "game"
     files: dict[str, bytes] = {
         "audio/en_US/vo.pck": b"e" * 20, "loc/strings_pl.txt": b"p", "loc/strings_de.txt": b"d",
         "Game.exe": b"MZ", "data/level.xyz": b"?", "Crashes/a.dmp": b"d",
@@ -3484,7 +3499,11 @@ def probe_deep_analysis_polish(application: QGuiApplication) -> dict[str, Any]:
         path = game_root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(data)
-    game = replace(demo_games()[0], install_path=game_root, library_path=None, steam_app_id="4242")
+    os.utime(game_root / "Crashes/a.dmp", (1_000_000_000, 1_000_000_000))
+    (library / "steamapps" / "appmanifest_4242.acf").write_text('"AppState" {}', encoding="utf-8")
+    (library / "steamapps/shadercache/4242").mkdir(parents=True)
+    (library / "steamapps/shadercache/4242/own.foz").write_bytes(b"s")
+    game = replace(demo_games()[0], install_path=game_root, library_path=library, steam_app_id="4242")
     controller = AppController(
         parent=application,
         ui_sound_service=NoOpUiSoundService(),
@@ -3529,7 +3548,12 @@ def probe_deep_analysis_polish(application: QGuiApplication) -> dict[str, Any]:
         _settle(application, 6)
 
     logs = "deepGroup_cache_logs_recent"
+    badges = sorted({
+        str(item.property("text")) for item in _descendants(root)
+        if item.objectName() == "deepBadge" and isinstance(item, QQuickItem) and item.isVisible()
+    })
     result = {
+        "badges": badges,
         "status": str(root.property("status")),
         "english_labels": english,
         "has_polish_analyze": "Analizuj głęboko" in texts,
@@ -3658,7 +3682,14 @@ def probe_gamescope_editor(application: QGuiApplication) -> dict[str, Any]:
     click("gamescopeAdaptiveSync")
     result["dirty_after_click"] = root.property("dirty") is True
     click("gamescopeForceWindowsFullscreen")
-    QTest.qWait(220)
+    # The preview is debounced (150 ms); under load wait for its result
+    # instead of a fixed delay, so the save button is really enabled.
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline and not (
+        "--force-windows-fullscreen" in list(_variant(root.property("gamescopeArguments")) or [])
+        and bool(_item(root, "saveOptimizationProfileButton").property("enabled"))
+    ):
+        QTest.qWait(50)
     _settle(application, 8)
     arguments = list(_variant(root.property("gamescopeArguments")) or [])
     result["preview_arguments"] = arguments

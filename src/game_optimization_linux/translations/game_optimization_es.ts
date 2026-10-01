@@ -17114,5 +17114,110 @@ Solo se procesarán los archivos incluidos en el plan verificado.</translation>
         <source>unsupported</source>
         <translation>no compatible</translation>
     </message>
+    <message>
+        <location line="+0"/>
+        <source>Can be moved to quarantine</source>
+        <translation>Se puede mover a la cuarentena</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Core archive required by the game.</source>
+        <translation>Archivo central necesario para el juego.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Leftover of another game; it belongs to the global Steam leftovers.</source>
+        <translation>Resto de otro juego; pertenece a los restos globales de Steam.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>May be the only copy of a save or configuration.</source>
+        <translation>Puede ser la única copia de una partida o configuración.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>No safe rule</source>
+        <translation>Sin regla segura</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>No safe rule - cannot be removed</source>
+        <translation>Sin regla segura - no se puede eliminar</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Optional DLC content; remove it through the launcher or DLC settings.</source>
+        <translation>Contenido DLC opcional; elimínalo desde el lanzador o los ajustes de DLC.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Outside the scope of the game plan</source>
+        <translation>Fuera del alcance del plan del juego</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Outside the scope of this plan</source>
+        <translation>Fuera del alcance de este plan</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Protected - cannot be removed</source>
+        <translation>Protegido - no se puede eliminar</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Protected by the program</source>
+        <translation>Protegido por el programa</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Review - can be moved</source>
+        <translation>Revisar - se puede mover</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Safe - can be moved</source>
+        <translation>Seguro - se puede mover</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Shared audio is used by every language.</source>
+        <translation>El audio compartido lo usan todos los idiomas.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Textures and mipmaps are required while the game runs.</source>
+        <translation>Las texturas y los mipmaps son necesarios mientras el juego se ejecuta.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The active Proton prefix can contain configuration and saves.</source>
+        <translation>El prefijo de Proton activo puede contener configuración y partidas.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The fallback language is required for the selected language.</source>
+        <translation>El idioma de respaldo es necesario para el idioma seleccionado.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The selected target language is required by the game.</source>
+        <translation>El idioma objetivo seleccionado lo necesita el juego.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The shader cache of this game is outside the game folder; it is rebuilt and removing it can cause stutter.</source>
+        <translation>La caché de shaders de este juego está fuera de su carpeta; se regenera y eliminarla puede provocar tirones.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>There is no safe rule to remove this type of data.</source>
+        <translation>No hay una regla segura para eliminar este tipo de datos.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>These files are only analyzed for Btrfs compression; they are never removed.</source>
+        <translation>Estos archivos solo se analizan para la compresión Btrfs; nunca se eliminan.</translation>
+    </message>
 </context>
 </TS>
