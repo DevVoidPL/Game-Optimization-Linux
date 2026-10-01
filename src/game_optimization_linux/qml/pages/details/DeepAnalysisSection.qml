@@ -739,6 +739,11 @@ SurfaceCard {
                         Label { text: section.formatBytes(categoryCard.modelData.bytes) + qsTr(" in %1 files").arg(Number(categoryCard.modelData.files || 0)); color: App.Theme.textSecondary }
                     }
                     Label { visible: (categoryCard.modelData.groups || []).length === 0; text: qsTr("Nothing found for this filter"); color: App.Theme.textMuted; font.pixelSize: App.Theme.fontCaption }
+                    DeepRecompressionPanel {
+                        visible: String(categoryCard.modelData.id) === "btrfs" && Boolean(section.summary.isBtrfs)
+                        controller: section.controller
+                        gameId: section.gameId
+                    }
                     Repeater {
                         model: categoryCard.modelData.groups || []
                         delegate: GroupRow {

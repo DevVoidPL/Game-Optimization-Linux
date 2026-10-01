@@ -17281,4 +17281,252 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <translation>Te pliki są analizowane tylko pod kątem kompresji Btrfs; nigdy nie są usuwane.</translation>
     </message>
 </context>
+<context>
+    <name>DeepRecompressionPanel</name>
+    <message>
+        <location line="+0" />
+        <source>%1 files, %2</source>
+        <translation>%1 plików, %2</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 files, %2, profile %3</source>
+        <translation>%1 plików, %2, profil %3</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 of %2 files, %3; current: %4; %5 s</source>
+        <translation>%1 z %2 plików, %3; bieżący: %4; %5 s</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 recompressed, %2 without gain, %3 skipped, %4 s</source>
+        <translation>zrekompresowano %1, bez zysku %2, pominięto %3, %4 s</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>A higher level can make writing and updating files slower; reading usually stays fast. The gain depends on the data, and already compressed files do not benefit.</source>
+        <translation>Wyższy poziom może wydłużyć zapis i aktualizację plików; odczyt zwykle pozostaje szybki. Zysk zależy od danych, a pliki już skompresowane nie skorzystają.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Already compressed: %1 - skipped formats: %2 - shared/reflink: %3 - not worth it: %4 - candidates: %5</source>
+        <translation>Już skompresowane: %1 - pominięte formaty: %2 - shared/reflink: %3 - nieopłacalne: %4 - kandydaci: %5</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Also compress future files of this game</source>
+        <translation>Kompresuj również przyszłe pliki tej gry</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Analyze compressibility</source>
+        <translation>Przeanalizuj kompresowalność</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Balanced (zstd:3)</source>
+        <translation>Zrównoważony (zstd:3)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>before %1, after %2, freed %3</source>
+        <translation>przed %1, po %2, zwolniono %3</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>btrfs-progs %1: %2, per-file shared-extent check available</source>
+        <translation>btrfs-progs %1: %2, dostępne sprawdzanie współdzielonych extentów dla każdego pliku</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancel</source>
+        <translation>Anuluj</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancel stops after the current file; processed files are not rolled back.</source>
+        <translation>Anulowanie zadziała po bieżącym pliku; przetworzone pliki nie są cofane.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancelled after the current file; already processed files stay recompressed.</source>
+        <translation>Anulowano po bieżącym pliku; przetworzone pliki pozostają zrekompresowane.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Candidates: %1 logical; estimated savings %2 to %3 (zlib estimate, not a Zstd result)</source>
+        <translation>Kandydaci: %1 logicznie; szacowana oszczędność od %2 do %3 (szacunek zlib, nie wynik Zstd)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Candidates by file type (%1)</source>
+        <translation>Kandydaci według typu pliku (%1)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Close the game first.</source>
+        <translation>Najpierw zamknij grę.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>estimated %1 to %2</source>
+        <translation>szacunkowo od %1 do %2</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Fast (zstd:1)</source>
+        <translation>Szybki (zstd:1)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Finish or restore the active quarantine first.</source>
+        <translation>Najpierw zakończ lub przywróć aktywną kwarantannę.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Game files changed. Run the analysis again</source>
+        <translation>Pliki gry zmieniły się. Uruchom analizę ponownie</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Measurement source: %1</source>
+        <translation>Źródło pomiaru: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Not enough free space for the largest file and a safety margin.</source>
+        <translation>Za mało wolnego miejsca na największy plik i margines bezpieczeństwa.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>not measured</source>
+        <translation>brak pomiaru</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Profile</source>
+        <translation>Profil</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>recommended</source>
+        <translation>rekomendowane</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompress</source>
+        <translation>Rekompresuj</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompression</source>
+        <translation>Rekompresja</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompression does not change the logical content of files, but it rebuilds their extents on Btrfs. The operation cannot be undone from the application. Shared extents are skipped.</source>
+        <translation>Rekompresja nie zmienia logicznej zawartości plików, ale przebudowuje ich extenty na Btrfs. Operacji nie można cofnąć z aplikacji. Współdzielone extenty są pomijane.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompression finished.</source>
+        <translation>Rekompresja zakończona.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompression is unavailable: the local btrfs-progs cannot check shared extents per file.</source>
+        <translation>Rekompresja niedostępna: lokalne btrfs-progs nie potrafią sprawdzić współdzielonych extentów dla każdego pliku.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Run the deep analysis first.</source>
+        <translation>Najpierw uruchom głęboką analizę.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Select at least one file type.</source>
+        <translation>Wybierz co najmniej jeden typ pliku.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Select recommended</source>
+        <translation>Zaznacz rekomendowane</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Selected: %1 files, %2; estimated savings %3 to %4</source>
+        <translation>Wybrano: %1 plików, %2; szacowana oszczędność od %3 do %4</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Start recompression</source>
+        <translation>Rozpocznij rekompresję</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Stopped: a file changed during recompression. Run a new analysis.</source>
+        <translation>Zatrzymano: plik zmienił się podczas rekompresji. Uruchom nową analizę.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Stopped: several files of one type gave no gain. Run a new analysis.</source>
+        <translation>Zatrzymano: kilka plików jednego typu nie dało zysku. Uruchom nową analizę.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Stronger (zstd:6)</source>
+        <translation>Mocniejszy (zstd:6)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The file system is read-only.</source>
+        <translation>System plików jest tylko do odczytu.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The game is being updated; try again when the launcher is done.</source>
+        <translation>Gra jest aktualizowana; spróbuj ponownie po zakończeniu pracy launchera.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The game is not on Btrfs.</source>
+        <translation>Gra nie znajduje się na Btrfs.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The local btrfs-progs cannot recompress files with a per-file shared-extent check.</source>
+        <translation>Lokalne btrfs-progs nie mogą rekompresować plików ze sprawdzaniem współdzielonych extentów dla każdego pliku.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The operation could not be completed: %1</source>
+        <translation>Nie udało się zakończyć operacji: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>unavailable: the local btrfs-progs does not document how to restore the previous property</source>
+        <translation>niedostępne: lokalne btrfs-progs nie dokumentują, jak przywrócić poprzednią właściwość</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Zstd levels %1</source>
+        <translation>poziomy Zstd %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>compsize from the compression summary</source>
+        <translation>compsize z podsumowania kompresji</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>existing compression analysis</source>
+        <translation>istniejąca analiza kompresji</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>no exact measurement</source>
+        <translation>brak dokładnego pomiaru</translation>
+    </message>
+</context>
 </TS>

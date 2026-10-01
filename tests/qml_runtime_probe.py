@@ -3453,6 +3453,99 @@ def probe_deep_cleanup(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+def probe_deep_recompression(application: QGuiApplication) -> dict[str, Any]:
+    """Stage 2B UI with a mocked Btrfs provider: no real btrfs command runs."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.services import GamepadService, SettingsStore
+    from test_btrfs_recompression import _setup
+
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-recompression-qml-"))
+    game, root_path, _deep, repository, provider, planner = _setup(temporary_root)
+    controller = AppController(
+        parent=application,
+        ui_sound_service=NoOpUiSoundService(),
+        game_provider=DemoGameProvider((game,)),
+        settings_store=SettingsStore(temporary_root / "settings.json"),
+        gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        deep_analysis_repository=repository,
+        deep_recompression_planner=planner,
+        auto_refresh=False,
+    )
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 6000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", game.id)
+    _settle(application, 10)
+    panel = _item(root, "deepRecompressionPanel")
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        if not item.isVisible() or not item.property("enabled"):
+            raise AssertionError(f"Recompression control {name} is not clickable")
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    def recompression() -> dict[str, Any]:
+        return dict(_variant(panel.property("recompression")) or {})
+
+    def wait_until(predicate, timeout: float = 6.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and not predicate():
+            QTest.qWait(50)
+        _settle(application, 8)
+
+    result: dict[str, Any] = {
+        "panel_visible": panel.isVisible(),
+        "capabilities_text": str(_item(root, "deepRecompressionCapabilities").property("text")),
+        "future_enabled": bool(_item(root, "deepFutureCompression").property("enabled")),
+    }
+    click("deepRecompressionAnalyze")
+    wait_until(lambda: bool(recompression().get("plan", {}).get("planId")) and not recompression().get("busy"))
+    result["nothing_selected"] = dict(_variant(panel.property("selectedTypes")) or {}) == {}
+    result["start_disabled"] = not bool(_item(root, "deepRecompressionStart").property("enabled"))
+    result["list_collapsed"] = not any(item.objectName().startswith("deepRecompressionType_") for item in _descendants(panel))
+    result["estimate"] = str(_item(root, "deepRecompressionEstimate").property("text"))
+    click("deepRecompressionRecommended")
+    result["selected"] = sorted(dict(_variant(panel.property("selectedTypes")) or {}))
+    result["selection_text"] = str(_item(root, "deepRecompressionSelection").property("text"))
+    click("deepRecompressionToggleList")
+    result["type_rows"] = sorted(item.objectName() for item in _descendants(panel)
+                                 if item.objectName().startswith("deepRecompressionType_"))
+    click("deepRecompressionStart")
+    result["confirm_text"] = str(_item(root, "deepRecompressionWarning").property("text"))
+    click("deepRecompressionConfirmButton")
+    wait_until(lambda: not recompression().get("busy") and bool(recompression().get("result")))
+    result["result_text"] = str(_item(root, "deepRecompressionResult").property("text"))
+    result["history"] = [entry["state"] for entry in recompression().get("history", [])]
+    result["history_text"] = [str(item.property("text")) for item in _descendants(panel)
+                              if item.objectName() == "deepRecompressionHistoryEntry"]
+    result["defragments"] = len(provider.defragments())
+
+    # Second run, cancelled while the first file is processed.  The mocked
+    # extents are reset so the files are candidates again (as new data).
+    provider.encoded.clear()
+    click("deepRecompressionAnalyze")
+    wait_until(lambda: bool(recompression().get("plan", {}).get("planId")) and not recompression().get("busy"))
+    provider.on_defragment = lambda _path: time.sleep(0.6)
+    click("deepRecompressionRecommended")
+    click("deepRecompressionStart")
+    click("deepRecompressionConfirmButton")
+    wait_until(lambda: bool(recompression().get("busy")) and _item(root, "deepRecompressionCancel").isVisible())
+    result["progress_visible"] = _item(root, "deepRecompressionProgress").isVisible()
+    click("deepRecompressionCancel")
+    wait_until(lambda: not recompression().get("busy") and bool(recompression().get("result")))
+    result["cancel_text"] = str(_item(root, "deepRecompressionResult").property("text"))
+    result["history_after_cancel"] = [entry["state"] for entry in recompression().get("history", [])]
+    view.close()
+    controller.shutdown()
+    return result
+
+
 DEEP_ENGLISH_LABELS = (
     "Safe - can be moved", "Review - can be moved", "Protected - cannot be removed",
     "Outside the scope of this plan", "No safe rule - cannot be removed",
@@ -5082,6 +5175,7 @@ def main() -> int:
             "deep",
             "deep_polish",
             "deep_cleanup",
+            "deep_recompression",
             "couch",
             "couch_settings",
             "updates",
@@ -5129,6 +5223,8 @@ def main() -> int:
         result = probe_deep_analysis_polish(application)
     elif args.mode == "deep_cleanup":
         result = probe_deep_cleanup(application)
+    elif args.mode == "deep_recompression":
+        result = probe_deep_recompression(application)
     elif args.mode == "couch":
         result = probe_couch(application, args.width, args.height, args.scenario, args.theme)
     elif args.mode == "couch_settings":

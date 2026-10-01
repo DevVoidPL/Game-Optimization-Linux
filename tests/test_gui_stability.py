@@ -326,6 +326,29 @@ def test_mangohud_desktop_editor_renders_and_saves_appid_profile(tmp_path: Path)
     assert result["reset_preset"] == "disabled"
 
 
+def test_deep_recompression_ui_selection_confirmation_progress_cancel_history(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "deep_recompression")
+    result = payload["result"]
+    assert result["panel_visible"] is True
+    assert "per-file shared-extent check" in result["capabilities_text"]
+    assert result["future_enabled"] is False  # restore of the property is not documented locally
+    assert result["nothing_selected"] is True and result["start_disabled"] is True
+    assert result["list_collapsed"] is True
+    assert "zlib estimate, not a Zstd result" in result["estimate"]
+    assert result["selected"] == [".csv", ".dll", ".txt"]
+    assert result["selection_text"].startswith("Selected: 3 files")
+    assert len(result["type_rows"]) == 3
+    assert result["confirm_text"].startswith("Recompression does not change the logical content of files")
+    assert "cannot be undone" in result["confirm_text"] and "Shared extents are skipped" in result["confirm_text"]
+    assert result["result_text"] == "Recompression finished."
+    assert result["history"] == ["completed"]
+    assert "not measured" in result["history_text"][0] and "3 recompressed" in result["history_text"][0]
+    assert result["defragments"] == 3
+    assert result["progress_visible"] is True
+    assert result["cancel_text"].startswith("Cancelled after the current file")
+    assert result["history_after_cancel"] == ["cancelled", "completed"]
+
+
 def test_deep_cleanup_ui_selection_quarantine_restart_restore_finalize(tmp_path: Path) -> None:
     payload = _run_probe(tmp_path, "deep_cleanup")
     result = payload["result"]

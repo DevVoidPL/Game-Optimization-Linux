@@ -158,6 +158,13 @@ from .library_scanner import LibraryScanner
 from .mangohud_controller import MangoHudController
 from .deep_optimization_controller import DeepOptimizationController
 from .deep_cleanup_controller import DeepCleanupController
+from .deep_recompression_controller import DeepRecompressionController
+from ..providers.btrfs_compression import BtrfsCompressionProvider
+from ..services.btrfs_recompression import (
+    BtrfsRecompressionExecutor,
+    BtrfsRecompressionPlanner,
+    RecompressionGuards,
+)
 from ..services.deep_cleanup import CleanupJournal, DeepCleanupExecutor
 from ..services.deep_optimization import DeepAnalysisRepository, DeepOptimizationAnalyzer
 from .narrator_controller import NarratorController
@@ -318,6 +325,7 @@ class AppController(QObject):
     gamescopeTestChanged = Signal("QVariantMap")
     deepAnalysisChanged = Signal(str)
     deepCleanupChanged = Signal(str)
+    deepRecompressionChanged = Signal(str)
     optiScalerChanged = Signal(str)
     # QVariantMap (not ``object``): QML must be able to read the result.
     optiScalerStatusChanged = Signal(str, "QVariantMap")
@@ -365,6 +373,7 @@ class AppController(QObject):
         deep_analysis_repository: DeepAnalysisRepository | None = None,
         deep_analyzer: DeepOptimizationAnalyzer | None = None,
         deep_cleanup_executor: DeepCleanupExecutor | None = None,
+        deep_recompression_planner: BtrfsRecompressionPlanner | None = None,
         gamescope_test_run: GamescopeTestRun | None = None,
         optimization_profile_repository: GameOptimizationProfileRepository | None = None,
         optimization_analysis_repository: OptimizationAnalysisRepository | None = None,
@@ -642,6 +651,23 @@ class AppController(QObject):
             ),
             self._deep_optimization_controller._repository,
             self._deep_optimization_controller._plan,
+        )
+        # Stage 2B: per-file Btrfs recompression through the existing provider.
+        provider = getattr(self._compression_service, "_provider", None)
+        recompression_planner = deep_recompression_planner or (
+            BtrfsRecompressionPlanner(provider, filesystem_provider=self._filesystem_provider)
+            if isinstance(provider, BtrfsCompressionProvider) else None
+        )
+        self._deep_recompression_controller = DeepRecompressionController(
+            self,
+            recompression_planner,
+            BtrfsRecompressionExecutor(recompression_planner, RecompressionGuards(
+                game_running=self._recompression_game_running,
+                game_updating=self._recompression_game_updating,
+                quarantine_active=self._recompression_quarantine_active,
+            )) if recompression_planner is not None else None,
+            self._deep_optimization_controller._plan,
+            self._deep_optimization_controller._repository.fingerprint,
         )
         self._game_settings_advisor = GameSettingsAdvisor()
         self._mangohud_log_parser = MangoHudLogParser()
@@ -2127,6 +2153,53 @@ class AppController(QObject):
                 return False
         return shutil.which("compsize") is not None
 
+    def _recompression_game_running(self, game: Game) -> bool:
+        planner = getattr(self._deep_recompression_controller, "_planner", None)
+        provider = getattr(planner, "_provider", None)
+        checker = getattr(provider, "_is_game_running", None)
+        try:
+            return bool(checker(game)) if callable(checker) else False
+        except Exception:
+            return True  # fail closed
+
+    def _recompression_game_updating(self, game: Game) -> bool:
+        if self._deep_cleanup_game_updating(game):
+            return True
+        planner = getattr(self._deep_recompression_controller, "_planner", None)
+        provider = getattr(planner, "_provider", None)
+        checker = getattr(provider, "_steam_is_updating", None)
+        try:
+            if callable(checker) and checker(game):
+                return True
+        except Exception:
+            return True
+        active = getattr(self._compression_service, "_active_games", set())
+        return game.id in active  # another compression task writes this game
+
+    def _recompression_quarantine_active(self, game: Game) -> bool:
+        state = self._deep_cleanup_controller.state(game.id)
+        return bool(state.get("active")) or bool(state.get("busy"))
+
+    @Slot(str, result="QVariantMap")
+    def getDeepRecompression(self, game_id: str) -> dict[str, Any]:
+        return self._deep_recompression_controller.state(game_id)
+
+    @Slot(str, int, result="QVariantMap")
+    def analyzeDeepRecompression(self, game_id: str, level: int) -> dict[str, Any]:
+        return self._deep_recompression_controller.analyze(game_id, None if level < 0 else level)
+
+    @Slot(str, "QVariantList", result="QVariantMap")
+    def startDeepRecompression(self, game_id: str, types: list[Any]) -> dict[str, Any]:
+        return self._deep_recompression_controller.start(game_id, [str(item) for item in types or []])
+
+    @Slot(str, result=bool)
+    def cancelDeepRecompression(self, game_id: str) -> bool:
+        return self._deep_recompression_controller.cancel(game_id)
+
+    @Slot(str, bool, result="QVariantMap")
+    def setDeepFutureCompression(self, game_id: str, enabled: bool) -> dict[str, Any]:
+        return self._deep_recompression_controller.set_future_property(game_id, bool(enabled))
+
     def _deep_cleanup_game_updating(self, game: Game) -> bool:
         tracker = getattr(self, "_update_tracker", None)
         if tracker is None:
@@ -2498,6 +2571,12 @@ class AppController(QObject):
             self._gamepad_service.stop()
         if hasattr(self, "_ui_sound_service"):
             self._ui_sound_service.shutdown()
+        recompression_controller = getattr(self, "_deep_recompression_controller", None)
+        if recompression_controller is not None:
+            try:
+                recompression_controller.shutdown()
+            except Exception:
+                logger.exception("Could not stop the deep recompression")
         cleanup_controller = getattr(self, "_deep_cleanup_controller", None)
         if cleanup_controller is not None:
             try:

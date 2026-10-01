@@ -17253,4 +17253,252 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <translation>These files are only analyzed for Btrfs compression; they are never removed.</translation>
     </message>
 </context>
+<context>
+    <name>DeepRecompressionPanel</name>
+    <message>
+        <location line="+0" />
+        <source>%1 files, %2</source>
+        <translation>%1 files, %2</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 files, %2, profile %3</source>
+        <translation>%1 files, %2, profile %3</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 of %2 files, %3; current: %4; %5 s</source>
+        <translation>%1 of %2 files, %3; current: %4; %5 s</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 recompressed, %2 without gain, %3 skipped, %4 s</source>
+        <translation>%1 recompressed, %2 without gain, %3 skipped, %4 s</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>A higher level can make writing and updating files slower; reading usually stays fast. The gain depends on the data, and already compressed files do not benefit.</source>
+        <translation>A higher level can make writing and updating files slower; reading usually stays fast. The gain depends on the data, and already compressed files do not benefit.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Already compressed: %1 - skipped formats: %2 - shared/reflink: %3 - not worth it: %4 - candidates: %5</source>
+        <translation>Already compressed: %1 - skipped formats: %2 - shared/reflink: %3 - not worth it: %4 - candidates: %5</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Also compress future files of this game</source>
+        <translation>Also compress future files of this game</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Analyze compressibility</source>
+        <translation>Analyze compressibility</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Balanced (zstd:3)</source>
+        <translation>Balanced (zstd:3)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>before %1, after %2, freed %3</source>
+        <translation>before %1, after %2, freed %3</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>btrfs-progs %1: %2, per-file shared-extent check available</source>
+        <translation>btrfs-progs %1: %2, per-file shared-extent check available</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancel stops after the current file; processed files are not rolled back.</source>
+        <translation>Cancel stops after the current file; processed files are not rolled back.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancelled after the current file; already processed files stay recompressed.</source>
+        <translation>Cancelled after the current file; already processed files stay recompressed.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Candidates: %1 logical; estimated savings %2 to %3 (zlib estimate, not a Zstd result)</source>
+        <translation>Candidates: %1 logical; estimated savings %2 to %3 (zlib estimate, not a Zstd result)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Candidates by file type (%1)</source>
+        <translation>Candidates by file type (%1)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Close the game first.</source>
+        <translation>Close the game first.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>estimated %1 to %2</source>
+        <translation>estimated %1 to %2</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Fast (zstd:1)</source>
+        <translation>Fast (zstd:1)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Finish or restore the active quarantine first.</source>
+        <translation>Finish or restore the active quarantine first.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Game files changed. Run the analysis again</source>
+        <translation>Game files changed. Run the analysis again</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Measurement source: %1</source>
+        <translation>Measurement source: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Not enough free space for the largest file and a safety margin.</source>
+        <translation>Not enough free space for the largest file and a safety margin.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>not measured</source>
+        <translation>not measured</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Profile</source>
+        <translation>Profile</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>recommended</source>
+        <translation>recommended</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompress</source>
+        <translation>Recompress</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompression</source>
+        <translation>Recompression</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompression does not change the logical content of files, but it rebuilds their extents on Btrfs. The operation cannot be undone from the application. Shared extents are skipped.</source>
+        <translation>Recompression does not change the logical content of files, but it rebuilds their extents on Btrfs. The operation cannot be undone from the application. Shared extents are skipped.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompression finished.</source>
+        <translation>Recompression finished.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recompression is unavailable: the local btrfs-progs cannot check shared extents per file.</source>
+        <translation>Recompression is unavailable: the local btrfs-progs cannot check shared extents per file.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Run the deep analysis first.</source>
+        <translation>Run the deep analysis first.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Select at least one file type.</source>
+        <translation>Select at least one file type.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Select recommended</source>
+        <translation>Select recommended</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Selected: %1 files, %2; estimated savings %3 to %4</source>
+        <translation>Selected: %1 files, %2; estimated savings %3 to %4</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Start recompression</source>
+        <translation>Start recompression</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Stopped: a file changed during recompression. Run a new analysis.</source>
+        <translation>Stopped: a file changed during recompression. Run a new analysis.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Stopped: several files of one type gave no gain. Run a new analysis.</source>
+        <translation>Stopped: several files of one type gave no gain. Run a new analysis.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Stronger (zstd:6)</source>
+        <translation>Stronger (zstd:6)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The file system is read-only.</source>
+        <translation>The file system is read-only.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The game is being updated; try again when the launcher is done.</source>
+        <translation>The game is being updated; try again when the launcher is done.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The game is not on Btrfs.</source>
+        <translation>The game is not on Btrfs.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The local btrfs-progs cannot recompress files with a per-file shared-extent check.</source>
+        <translation>The local btrfs-progs cannot recompress files with a per-file shared-extent check.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The operation could not be completed: %1</source>
+        <translation>The operation could not be completed: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>unavailable: the local btrfs-progs does not document how to restore the previous property</source>
+        <translation>unavailable: the local btrfs-progs does not document how to restore the previous property</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Zstd levels %1</source>
+        <translation>Zstd levels %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>compsize from the compression summary</source>
+        <translation>compsize from the compression summary</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>existing compression analysis</source>
+        <translation>existing compression analysis</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>no exact measurement</source>
+        <translation>no exact measurement</translation>
+    </message>
+</context>
 </TS>
