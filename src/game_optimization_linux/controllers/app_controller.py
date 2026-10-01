@@ -157,6 +157,8 @@ from .library_controller import LibraryController
 from .library_scanner import LibraryScanner
 from .mangohud_controller import MangoHudController
 from .deep_optimization_controller import DeepOptimizationController
+from .deep_cleanup_controller import DeepCleanupController
+from ..services.deep_cleanup import CleanupJournal, DeepCleanupExecutor
 from ..services.deep_optimization import DeepAnalysisRepository, DeepOptimizationAnalyzer
 from .narrator_controller import NarratorController
 from .narrator_region_selector import NarratorRegionSelectorCoordinator
@@ -315,6 +317,7 @@ class AppController(QObject):
     mangoHudLivePreviewChanged = Signal("QVariantMap")
     gamescopeTestChanged = Signal("QVariantMap")
     deepAnalysisChanged = Signal(str)
+    deepCleanupChanged = Signal(str)
     optiScalerChanged = Signal(str)
     # QVariantMap (not ``object``): QML must be able to read the result.
     optiScalerStatusChanged = Signal(str, "QVariantMap")
@@ -361,6 +364,7 @@ class AppController(QObject):
         mangohud_live_preview: MangoHudLivePreview | None = None,
         deep_analysis_repository: DeepAnalysisRepository | None = None,
         deep_analyzer: DeepOptimizationAnalyzer | None = None,
+        deep_cleanup_executor: DeepCleanupExecutor | None = None,
         gamescope_test_run: GamescopeTestRun | None = None,
         optimization_profile_repository: GameOptimizationProfileRepository | None = None,
         optimization_analysis_repository: OptimizationAnalysisRepository | None = None,
@@ -624,6 +628,20 @@ class AppController(QObject):
                 ),
             ),
             deep_analysis_repository or DeepAnalysisRepository(),
+        )
+        # Reversible quarantine executor: only removable groups of the latest
+        # complete plan, atomic renames on the game's filesystem, no shell.
+        self._deep_cleanup_controller = DeepCleanupController(
+            self,
+            deep_cleanup_executor or DeepCleanupExecutor(
+                CleanupJournal(),
+                running_detector=(
+                    analyzer.detect_running_processes if analyzer is not None else None
+                ),
+                update_detector=self._deep_cleanup_game_updating,
+            ),
+            self._deep_optimization_controller._repository,
+            self._deep_optimization_controller._plan,
         )
         self._game_settings_advisor = GameSettingsAdvisor()
         self._mangohud_log_parser = MangoHudLogParser()
@@ -2109,6 +2127,40 @@ class AppController(QObject):
                 return False
         return shutil.which("compsize") is not None
 
+    def _deep_cleanup_game_updating(self, game: Game) -> bool:
+        tracker = getattr(self, "_update_tracker", None)
+        if tracker is None:
+            return False
+        try:
+            record = tracker.get(game.id)
+        except Exception:
+            return False
+        return bool(record is not None and record.status == GameUpdateStatus.WAITING_FOR_LAUNCHER)
+
+    @Slot(str, result="QVariantMap")
+    def getDeepCleanup(self, game_id: str) -> dict[str, Any]:
+        return self._deep_cleanup_controller.state(game_id)
+
+    @Slot(str, "QVariantList", result="QVariantMap")
+    def startDeepQuarantine(self, game_id: str, group_ids: list[Any]) -> dict[str, Any]:
+        return self._deep_cleanup_controller.start_quarantine(
+            game_id, [str(value) for value in group_ids or []]
+        )
+
+    @Slot(str, result=bool)
+    def cancelDeepCleanup(self, game_id: str) -> bool:
+        return self._deep_cleanup_controller.cancel(game_id)
+
+    @Slot(str, str, result="QVariantMap")
+    def restoreDeepQuarantine(self, game_id: str, transaction_id: str) -> dict[str, Any]:
+        return self._deep_cleanup_controller.restore(game_id, transaction_id)
+
+    @Slot(str, str, str, result="QVariantMap")
+    def finalizeDeepQuarantine(
+        self, game_id: str, transaction_id: str, confirmation: str
+    ) -> dict[str, Any]:
+        return self._deep_cleanup_controller.finalize(game_id, transaction_id, confirmation)
+
     @Slot(str, result="QVariantMap")
     def startDeepAnalysis(self, game_id: str) -> dict[str, Any]:
         return self._deep_optimization_controller.start(game_id)
@@ -2446,6 +2498,12 @@ class AppController(QObject):
             self._gamepad_service.stop()
         if hasattr(self, "_ui_sound_service"):
             self._ui_sound_service.shutdown()
+        cleanup_controller = getattr(self, "_deep_cleanup_controller", None)
+        if cleanup_controller is not None:
+            try:
+                cleanup_controller.shutdown()
+            except Exception:
+                logger.exception("Could not stop the deep cleanup")
         deep_controller = getattr(self, "_deep_optimization_controller", None)
         if deep_controller is not None:
             try:

@@ -3284,6 +3284,164 @@ def probe_deep_analysis(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+def probe_deep_cleanup(application: QGuiApplication) -> dict[str, Any]:
+    """Quarantine UI: selection, sums, disabled roles, restart, restore, finalize."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.models import Launcher
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import GamepadService, SettingsStore
+    from game_optimization_linux.services.deep_cleanup import CleanupJournal, DeepCleanupExecutor
+    from game_optimization_linux.services.deep_optimization import (
+        DeepAnalysisRepository,
+        DeepOptimizationAnalyzer,
+    )
+    from game_optimization_linux.services.game_analysis import GameAnalyzer
+    from game_optimization_linux.services.game_executable import GameExecutableResolver
+
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-deep-cleanup-qml-"))
+    library = temporary_root / "SteamLibrary"
+    game_root = library / "steamapps" / "common" / "Game"
+    files = {
+        "loc/strings_de.txt": b"de", "loc/strings_pl.txt": b"pl", "audio/en_US/vo.pck": b"v" * 8,
+        "common/music.pck": b"m", "Logs/old.log": b"log", "Crashes/a.dmp": b"dump",
+        "_CommonRedist/vc.exe": b"MZ", "Game.exe": b"MZ",
+    }
+    for relative, data in files.items():
+        path = game_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    for relative in ("Logs/old.log", "Crashes/a.dmp"):
+        os.utime(game_root / relative, (1_000_000_000, 1_000_000_000))
+    (library / "steamapps" / "appmanifest_4242.acf").write_text('"AppState" {}', encoding="utf-8")
+    (library / "steamapps/shadercache/999").mkdir(parents=True)
+    (library / "steamapps/shadercache/999/a.foz").write_bytes(b"g")
+    game = replace(demo_games()[0], id="steam-4242", install_path=game_root, library_path=library,
+                   steam_app_id="4242", launcher=Launcher.STEAM)
+    data_root = temporary_root / "data"
+    launches: list[str] = []
+
+    def make_controller() -> Any:
+        controller = AppController(
+            parent=application,
+            ui_sound_service=NoOpUiSoundService(),
+            game_provider=DemoGameProvider((game,)),
+            settings_store=SettingsStore(temporary_root / "settings.json"),
+            gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+            deep_analysis_repository=DeepAnalysisRepository(data_root / "deep-analysis"),
+            deep_analyzer=DeepOptimizationAnalyzer(
+                engine_detector=GameAnalyzer(GameExecutableResolver()).detect_engine,
+                system_language=lambda: "pl", running_detector=lambda _root: (),
+                allow_native_btrfs_du=False,
+            ),
+            deep_cleanup_executor=DeepCleanupExecutor(
+                CleanupJournal(data_root / "deep-cleanup"), running_detector=lambda _root: ()
+            ),
+            auto_refresh=False,
+        )
+        controller.launchGame = lambda game_id: launches.append(str(game_id)) or True  # type: ignore[method-assign]
+        return controller
+
+    controller = make_controller()
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 6000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", game.id)
+    _settle(application, 6)
+
+    def wait_until(predicate, timeout: float = 6.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and not predicate():
+            QTest.qWait(50)
+        _settle(application, 8)
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        if not item.isVisible() or not item.property("enabled"):
+            raise AssertionError(f"Cleanup control {name} is not clickable")
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    def checkbox(group_id: str) -> QQuickItem:
+        return _item(root, "deepSelect_" + group_id.replace("/", "_").replace(":", "_"))
+
+    def active_state() -> str:
+        return str((_variant(root.property("activeTransaction")) or {}).get("state", ""))
+
+    def settled(state: str) -> bool:
+        return active_state() == state and root.property("cleanupBusy") is False
+
+    _invoke_qml(root, "start")
+    wait_until(lambda: str(root.property("status")) == "completed")
+    result: dict[str, Any] = {
+        "notice": str(_item(root, "deepQuarantineNotice").property("text")),
+        "nothing_selected": dict(_variant(root.property("selectedGroups")) or {}) == {},
+        "quarantine_disabled_initially": not bool(_item(root, "deepQuarantineButton").property("enabled")),
+        "target_enabled": bool(checkbox("languages/lang:pl").property("enabled")),
+        "fallback_enabled": bool(checkbox("audio/lang:en").property("enabled")),
+        "shared_enabled": bool(checkbox("audio/shared").property("enabled")),
+        "global_checkboxes": sum(
+            1 for item in _descendants(_item(root, "deepGlobalLeftovers"))
+            if item.objectName().startswith("deepSelect_") and isinstance(item, QQuickItem) and item.isVisible()
+        ),
+    }
+    click("deepSelectAllSafe")
+    selected = sorted(dict(_variant(root.property("selectedGroups")) or {}))
+    result["safe_selection"] = selected
+    click(checkbox("languages/lang:de").objectName())
+    summary = dict(_variant(root.property("selectionSummary")) or {})
+    result["summary"] = {key: summary[key] for key in ("files", "bytes", "safe", "review")}
+    result["summary_languages"] = list(summary["languages"])
+    result["freed_text"] = str(_item(root, "deepPotentialFreed").property("text"))
+    click("deepQuarantineButton")
+    wait_until(lambda: settled("quarantined"))
+    result["after_quarantine_state"] = str(_item(root, "deepActiveState").property("text"))
+    result["files_moved"] = not (game_root / "Logs/old.log").exists() and not (game_root / "loc/strings_de.txt").exists()
+    click("deepLaunchGame")
+    result["launched"] = launches == [game.id]
+
+    view.close()
+    controller.shutdown()
+    controller = make_controller()
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 6000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", game.id)
+    _settle(application, 10)
+    result["active_after_restart"] = active_state()
+    click("deepRestoreButton")
+    wait_until(lambda: settled(""))
+    result["restored_files"] = (game_root / "Logs/old.log").exists() and (game_root / "loc/strings_de.txt").exists()
+    _invoke_qml(root, "refresh")
+    _settle(application, 6)
+    click("deepSelectAllSafe")
+    click("deepQuarantineButton")
+    wait_until(lambda: settled("quarantined"))
+    _invoke_qml(root, "openFinalize")
+    _settle(application, 6)
+    confirm = _item(root, "deepFinalizeConfirm")
+    root.setProperty("finalizeTyped", "delete")
+    _settle(application, 4)
+    result["confirm_enabled_wrong_word"] = bool(confirm.property("enabled"))
+    root.setProperty("finalizeTyped", "DELETE")
+    _settle(application, 4)
+    result["confirm_enabled_right_word"] = bool(confirm.property("enabled"))
+    result["finalize_size_text"] = str(_item(root, "deepFinalizeSize").property("text"))
+    _invoke_qml(root, "confirmFinalize", "DELETE")
+    wait_until(lambda: settled(""))
+    result["steam_hint"] = _item(root, "deepSteamVerifyHint").isVisible()
+    history = list((_variant(root.property("cleanup")) or {}).get("history", []))
+    result["history_states"] = [item["state"] for item in history]
+    result["history_private"] = str(temporary_root) in json.dumps(history)
+    result["finalized_gone"] = not (game_root / "Crashes/a.dmp").exists() and (game_root / "loc/strings_de.txt").exists()
+    view.close()
+    controller.shutdown()
+    return result
+
+
 DEEP_ENGLISH_LABELS = (
     "Analyze deeply", "Export JSON report", "Apply plan", "Engine", "File system",
     "Logical size", "Target language", "Safe", "Review", "Unsupported", "Why detected",
@@ -4892,6 +5050,7 @@ def main() -> int:
             "gamescope",
             "deep",
             "deep_polish",
+            "deep_cleanup",
             "couch",
             "couch_settings",
             "updates",
@@ -4937,6 +5096,8 @@ def main() -> int:
         result = probe_deep_analysis(application)
     elif args.mode == "deep_polish":
         result = probe_deep_analysis_polish(application)
+    elif args.mode == "deep_cleanup":
+        result = probe_deep_cleanup(application)
     elif args.mode == "couch":
         result = probe_couch(application, args.width, args.height, args.scenario, args.theme)
     elif args.mode == "couch_settings":

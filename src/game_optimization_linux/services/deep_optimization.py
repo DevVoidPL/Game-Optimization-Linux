@@ -33,9 +33,11 @@ from game_optimization_linux.models.deep_optimization import (
     DEEP_PLAN_SCHEMA_VERSION,
     MAX_SAMPLE_PATHS,
     STEAM_LIBRARY_PLACEHOLDER,
+    EXECUTABLE_CATEGORIES,
     DeepBtrfsInfo,
     DeepEvidence,
     DeepGroup,
+    DeepItem,
     DeepOptimizationPlan,
     DeepSizes,
 )
@@ -143,6 +145,7 @@ class _GroupState:
     confidence: float = 1.0
     evidence: dict[tuple[str, str], None] = field(default_factory=dict)
     warnings: dict[str, None] = field(default_factory=dict)
+    items: list[DeepItem] = field(default_factory=list)
 
     def add(self, relative: str, size: int, decision: FileDecision) -> None:
         self.files += 1
@@ -336,6 +339,16 @@ class DeepOptimizationAnalyzer:
         if state.hardlinked_files:
             warnings.append(f"hardlinks_counted_once|{state.hardlinked_files}")
         groups = (*self._groups(state, btrfs, complete=complete), *steam_groups)
+        items = {
+            f"{category}/{key}": tuple(group_state.items)
+            for (category, key, owner), group_state in state.groups.items()
+            if not owner and group_state.items
+        }
+        try:
+            root_stat = os.lstat(root)
+            root_identity = (os.path.realpath(root), root_stat.st_dev, root_stat.st_ino)
+        except OSError:
+            root_identity = ("", 0, 0)
         languages: dict[str, int] = {}
         for group in groups:
             if group.language and group.scope == "game":
@@ -360,6 +373,10 @@ class DeepOptimizationAnalyzer:
             warnings=tuple(warnings),
             blockers=tuple(blockers),
             complete=complete,
+            items=items,
+            root_real=root_identity[0],
+            root_device=root_identity[1],
+            root_inode=root_identity[2],
         )
         return apply_target_language(plan, target)
 
@@ -489,6 +506,17 @@ class DeepOptimizationAnalyzer:
                         if group is None:
                             group = state.groups[key] = _GroupState(decision, scope=scope, owner=owner)
                         group.add(display, size, decision)
+                        # The executor may only act on files inside the game
+                        # root, so only that walk records full item lists.
+                        if (
+                            decide is None
+                            and decision.action == "remove_candidate"
+                            and decision.category in EXECUTABLE_CATEGORIES
+                        ):
+                            group.items.append(DeepItem(
+                                child_relative, size, entry_stat.st_mtime_ns,
+                                entry_stat.st_dev, entry_stat.st_ino,
+                            ))
                     # Each file is counted in at most one savings view: a
                     # removal candidate is not also counted as compressible.
                     if decide is None and (decision is None or decision.action != "remove_candidate"):
@@ -821,6 +849,7 @@ def plan_from_dict(raw: Mapping[str, Any]) -> DeepOptimizationPlan:
         warnings=tuple(raw.get("warnings", ())), blockers=tuple(raw.get("blockers", ())),
         notes=tuple(raw.get("notes", ())),
         complete=bool(raw.get("complete", False)),
+        stale=bool(raw.get("stale", False)),
         created_at=datetime.fromisoformat(str(raw["createdAt"])) if raw.get("createdAt") else datetime.now(UTC),
     )
 
@@ -840,10 +869,35 @@ class DeepAnalysisRepository:
         digest = hashlib.sha256(str(game_id).encode("utf-8")).hexdigest()[:32]
         return self.root / f"{digest}.json"
 
+    def items_path(self, game_id: str) -> Path:
+        return self.path(game_id).with_suffix(".items.json")
+
+    @staticmethod
+    def fingerprint(plan: DeepOptimizationPlan) -> str:
+        """Identity of exactly this plan, its roles and its file list."""
+
+        digest = hashlib.sha256()
+        public = plan.to_dict()
+        public.pop("stale", None)
+        digest.update(json.dumps(public, sort_keys=True, ensure_ascii=False).encode("utf-8"))
+        for group_id in sorted(plan.items):
+            digest.update(group_id.encode("utf-8"))
+            for item in plan.items[group_id]:
+                digest.update(json.dumps(item.to_list()).encode("utf-8"))
+        return digest.hexdigest()
+
     def save(self, plan: DeepOptimizationPlan) -> Path:
         if plan.status != "completed":
             raise ValueError("only completed deep analyses are stored")
         path = self.path(plan.game_id)
+        items = self.items_path(plan.game_id)
+        # The private manifest (absolute root, every file) never leaves the
+        # application data directory and is never exported.
+        _atomic_write(items, json.dumps({
+            "schemaVersion": 1,
+            "rootReal": plan.root_real, "rootDevice": plan.root_device, "rootInode": plan.root_inode,
+            "groups": {group_id: [item.to_list() for item in values] for group_id, values in plan.items.items()},
+        }) + "\n")
         _atomic_write(path, json.dumps(plan.to_dict(), ensure_ascii=False, indent=2) + "\n")
         self._merge_global(plan)
         return path
@@ -853,9 +907,31 @@ class DeepAnalysisRepository:
         try:
             if path.stat().st_size > 64 * 1024 * 1024:
                 return None
-            return plan_from_dict(json.loads(path.read_text(encoding="utf-8")))
+            plan = plan_from_dict(json.loads(path.read_text(encoding="utf-8")))
         except (OSError, ValueError, KeyError, TypeError):
             return None
+        try:
+            raw = json.loads(self.items_path(game_id).read_text(encoding="utf-8"))
+            items = {
+                str(group_id): tuple(
+                    DeepItem(str(value[0]), int(value[1]), int(value[2]), int(value[3]), int(value[4]))
+                    for value in values
+                )
+                for group_id, values in (raw.get("groups") or {}).items()
+            }
+            return replace(plan, items=items, root_real=str(raw.get("rootReal", "")),
+                           root_device=int(raw.get("rootDevice", 0)), root_inode=int(raw.get("rootInode", 0)))
+        except (OSError, ValueError, KeyError, TypeError, IndexError):
+            # Without its private manifest a plan can be shown but never executed.
+            return replace(plan, items={})
+
+    def mark_stale(self, game_id: str) -> DeepOptimizationPlan | None:
+        plan = self.load(game_id)
+        if plan is None:
+            return None
+        stale = replace(plan, stale=True)
+        _atomic_write(self.path(game_id), json.dumps(stale.to_dict(), ensure_ascii=False, indent=2) + "\n")
+        return stale
 
     def global_leftovers(self) -> list[dict[str, Any]]:
         try:

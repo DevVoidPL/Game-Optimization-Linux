@@ -20,6 +20,36 @@ SurfaceCard {
     property var expandedGroups: ({})
     property var pathLimits: ({})
     property string exportMessage: ""
+    // Reversible quarantine (stage 1 executor).  Nothing is preselected.
+    property var cleanup: ({})
+    property var selectedGroups: ({})
+    property string finalizeTyped: ""
+    property bool steamVerifyHint: false
+    readonly property var activeTransaction: cleanup.active || ({})
+    readonly property bool hasActive: Boolean(activeTransaction.transactionId)
+    readonly property bool cleanupBusy: Boolean(cleanup.busy)
+    readonly property bool planStale: Boolean(cleanup.planStale) || Boolean(summary.stale)
+    readonly property var selectableIds: cleanup.selectable || []
+    readonly property var allGameGroups: {
+        var list = []
+        var categories = analysis.allCategories || analysis.categories || []
+        for (var c = 0; c < categories.length; ++c)
+            list = list.concat(categories[c].groups || [])
+        return list
+    }
+    readonly property var selectionSummary: {
+        var result = { "files": 0, "bytes": 0, "safe": 0, "review": 0, "languages": [] }
+        for (var index = 0; index < allGameGroups.length; ++index) {
+            var group = allGameGroups[index]
+            if (!selectedGroups[group.groupId]) continue
+            result.files += Number(group.fileCount || 0)
+            result.bytes += Number(group.bytes || 0)
+            if (group.safety === "safe") result.safe += 1
+            else result.review += 1
+            if (group.language && result.languages.indexOf(group.language) < 0) result.languages.push(group.language)
+        }
+        return result
+    }
     readonly property string status: String(analysis.status || "idle")
     readonly property bool running: status === "running"
     readonly property var summary: analysis.summary || ({})
@@ -38,9 +68,114 @@ SurfaceCard {
     function refresh() {
         if (!controller || typeof controller.getDeepAnalysis !== "function" || !gameId) {
             analysis = ({})
+            cleanup = ({})
             return
         }
         analysis = controller.getDeepAnalysis(gameId, safetyFilter) || ({})
+        refreshCleanup()
+    }
+    function refreshCleanup() {
+        if (!controller || typeof controller.getDeepCleanup !== "function" || !gameId) {
+            cleanup = ({})
+            return
+        }
+        cleanup = controller.getDeepCleanup(gameId) || ({})
+        var result = cleanup.result || ({})
+        if (result.operation === "finalize" && result.success) steamVerifyHint = true
+        // A selection never survives a plan change or a started transaction.
+        var next = ({})
+        var allowed = selectableIds
+        for (var key in selectedGroups)
+            if (selectedGroups[key] && allowed.indexOf(key) >= 0 && !hasActive) next[key] = true
+        selectedGroups = next
+    }
+    function isSelectable(group) {
+        return Boolean(group.removable) && selectableIds.indexOf(String(group.groupId)) >= 0
+               && !hasActive && !cleanupBusy && !planStale
+    }
+    function setSelected(groupId, value) {
+        var next = Object.assign({}, selectedGroups)
+        if (value) next[groupId] = true
+        else delete next[groupId]
+        selectedGroups = next
+    }
+    function selectAllSafe() {
+        var next = Object.assign({}, selectedGroups)
+        for (var index = 0; index < allGameGroups.length; ++index) {
+            var group = allGameGroups[index]
+            if (group.safety === "safe" && group.scope === "game" && isSelectable(group)) next[group.groupId] = true
+        }
+        selectedGroups = next
+    }
+    function notSelectableReason(group) {
+        var role = String(group.role || "")
+        if (role === "target") return qsTr("target language")
+        if (role === "fallback") return qsTr("fallback language")
+        if (role === "shared" || group.key === "shared" || group.key === "wwise_shared") return qsTr("shared audio")
+        if (group.safety === "unsupported") return qsTr("unsupported")
+        return qsTr("not handled in this stage")
+    }
+    function startQuarantine() {
+        if (!controller || typeof controller.startDeepQuarantine !== "function") return
+        var ids = Object.keys(selectedGroups).filter(function(key) { return selectedGroups[key] })
+        if (ids.length === 0) return
+        steamVerifyHint = false
+        controller.startDeepQuarantine(gameId, ids)
+        refreshCleanup()
+    }
+    function restoreQuarantine() {
+        if (controller && typeof controller.restoreDeepQuarantine === "function" && hasActive)
+            controller.restoreDeepQuarantine(gameId, String(activeTransaction.transactionId))
+        refreshCleanup()
+    }
+    function openFinalize() {
+        finalizeTyped = ""
+        finalizeDialog.open()
+    }
+    function confirmFinalize(typed) {
+        if (controller && typeof controller.finalizeDeepQuarantine === "function" && hasActive)
+            controller.finalizeDeepQuarantine(gameId, String(activeTransaction.transactionId), String(typed))
+        finalizeDialog.close()
+        refreshCleanup()
+    }
+    function launchGame() {
+        if (controller && typeof controller.launchGame === "function") controller.launchGame(gameId)
+    }
+    function transactionStateText(state) {
+        if (state === "quarantined") return qsTr("Ready for a game test")
+        if (state === "partial" || state === "failed") return qsTr("Needs attention")
+        if (state === "restored") return qsTr("Restored")
+        if (state === "finalized") return qsTr("Quarantine removed")
+        return qsTr("In progress")
+    }
+    function cleanupResultText(result) {
+        var code = String(result.code || "")
+        if (!result.operation) return ""
+        if (result.success) {
+            if (result.operation === "quarantine") return qsTr("Files moved to quarantine. Start the game and check it.")
+            if (result.operation === "restore") return qsTr("All files were restored.")
+            return qsTr("The quarantine was removed and the space was freed.")
+        }
+        if (code === "plan_stale" || code === "game_root_changed" || code === "unsafe_path")
+            return qsTr("Game files changed since the analysis. Run the analysis again")
+        if (code === "game_running") return qsTr("Close the game first.")
+        if (code === "game_updating") return qsTr("The game is being updated; try again when the launcher is done.")
+        if (code === "not_selectable") return qsTr("A selected item cannot be handled by the quarantine.")
+        if (code === "quarantine_other_device") return qsTr("The quarantine cannot be created on the game's file system; nothing was moved.")
+        if (code === "quarantine_insecure" || code === "quarantine_not_writable" || code === "quarantine_missing")
+            return qsTr("The quarantine folder is not safe or not writable; nothing was moved.")
+        if (code === "not_enough_space") return qsTr("Not enough free space to create the quarantine folder.")
+        if (code === "confirmation_required") return qsTr("Type the confirmation word to remove the quarantine.")
+        var counts = result.counts || ({})
+        if (result.state === "failed")
+            return qsTr("The operation failed and every moved file was restored.")
+        if (result.state === "partial")
+            return qsTr("Needs attention: %1 restored, %2 still in quarantine, %3 conflicts, %4 errors.")
+                    .arg(Number(counts.restored || 0)).arg(Number(counts.quarantined || 0))
+                    .arg(Number(counts.conflict || 0)).arg(Number(counts.error || 0) + Number(counts.missing || 0))
+        if (result.state === "restored" && result.note === "cancelled")
+            return qsTr("Cancelled; every moved file was restored.")
+        return qsTr("The operation could not be completed: %1").arg(code || String(result.state || ""))
     }
     function start() {
         if (controller && typeof controller.startDeepAnalysis === "function" && gameId)
@@ -266,6 +401,38 @@ SurfaceCard {
         function onDeepAnalysisChanged(changedGameId) {
             if (String(changedGameId) === section.gameId) section.refresh()
         }
+        function onDeepCleanupChanged(changedGameId) {
+            if (String(changedGameId) === section.gameId) section.refreshCleanup()
+        }
+    }
+
+    Popup {
+        id: finalizeDialog
+        objectName: "deepFinalizeDialog"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(520, parent ? parent.width - 40 : 520)
+        modal: true
+        focus: true
+        closePolicy: Popup.CloseOnEscape
+        padding: 20
+        background: Rectangle { radius: App.Theme.radiusLarge; color: App.Theme.surface; border.width: 1; border.color: App.Theme.borderStrong }
+        contentItem: ColumnLayout {
+            spacing: 8
+            Label { text: qsTr("Delete quarantine of %1").arg(String(section.activeTransaction.gameName || "")); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            Label { Layout.fillWidth: true; text: qsTr("Categories: %1").arg((section.activeTransaction.categories || []).map(function(item) { return section.categoryTitle(item) }).join(", ")); color: App.Theme.textSecondary; wrapMode: Text.WordWrap }
+            Label { Layout.fillWidth: true; visible: (section.activeTransaction.languages || []).length > 0; text: qsTr("Languages: %1").arg((section.activeTransaction.languages || []).map(function(code) { return section.languageName(code) }).join(", ")); color: App.Theme.textSecondary; wrapMode: Text.WordWrap }
+            Label { objectName: "deepFinalizeSize"; Layout.fillWidth: true; text: qsTr("%1 files, %2 (%3 bytes)").arg(Number(section.activeTransaction.quarantinedFiles || 0)).arg(section.formatBytes(section.activeTransaction.quarantinedBytes)).arg(Number(section.activeTransaction.quarantinedBytes || 0)); color: App.Theme.text }
+            Label { Layout.fillWidth: true; text: qsTr("This cannot be undone from the application. Steam file verification can download missing files again. Start and check the game first."); color: App.Theme.warning; wrapMode: Text.WordWrap }
+            Label { Layout.fillWidth: true; text: qsTr("Type %1 to confirm.").arg(qsTr("DELETE")); color: App.Theme.textSecondary }
+            AppTextField { objectName: "deepFinalizeInput"; Layout.fillWidth: true; text: section.finalizeTyped; onTextEdited: section.finalizeTyped = text }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                AppButton { text: qsTr("Cancel"); kind: "secondary"; onClicked: finalizeDialog.close() }
+                AppButton { objectName: "deepFinalizeConfirm"; text: qsTr("Delete permanently"); kind: "danger"; enabled: section.finalizeTyped === qsTr("DELETE"); onClicked: section.confirmFinalize(section.finalizeTyped) }
+            }
+        }
     }
 
     FileDialog {
@@ -282,6 +449,7 @@ SurfaceCard {
         id: groupRow
         required property var group
         required property string identifier
+        property bool showSelection: true
         readonly property bool expanded: Boolean(section.expandedGroups[identifier])
         readonly property var samples: group.samplePaths || []
         readonly property int limit: section.pathLimit(identifier, group)
@@ -291,11 +459,27 @@ SurfaceCard {
         RowLayout {
             Layout.fillWidth: true
             spacing: 8
+            CheckBox {
+                objectName: "deepSelect_" + String(groupRow.group.groupId).replace("/", "_").replace(":", "_")
+                visible: groupRow.showSelection && Boolean(section.analysis.hasPlan)
+                enabled: section.isSelectable(groupRow.group)
+                checked: Boolean(section.selectedGroups[groupRow.group.groupId])
+                onToggled: section.setSelected(String(groupRow.group.groupId), checked)
+                ToolTip.visible: hovered && !enabled
+                ToolTip.text: qsTr("Not selectable: %1").arg(section.notSelectableReason(groupRow.group))
+            }
             Label { Layout.fillWidth: true; text: section.groupTitle(groupRow.group); color: App.Theme.text; elide: Text.ElideRight }
             Label { text: section.formatBytes(groupRow.group.bytes) + (groupRow.group.sizeExact ? "" : qsTr(" (estimated)")); color: App.Theme.textSecondary }
             Label { text: qsTr("%1%").arg(Math.round(Number(groupRow.group.confidence || 0) * 100)); color: App.Theme.textMuted }
             StatusBadge { text: section.safetyLabel(String(groupRow.group.safety)); status: section.safetyTone(String(groupRow.group.safety)) }
             AppButton { compact: true; kind: "ghost"; text: (groupRow.expanded ? "\u25BE " : "\u25B8 ") + qsTr("Why detected"); onClicked: section.toggleGroup(groupRow.identifier) }
+        }
+        Label {
+            visible: groupRow.showSelection && Boolean(section.analysis.hasPlan) && !groupRow.group.removable
+                     && (String(groupRow.group.role || "") !== "" || groupRow.group.key === "shared" || groupRow.group.key === "wwise_shared")
+            Layout.leftMargin: 36
+            text: qsTr("Not selectable: %1").arg(section.notSelectableReason(groupRow.group))
+            color: App.Theme.textMuted; font.pixelSize: App.Theme.fontCaption
         }
         ColumnLayout {
             visible: groupRow.expanded
@@ -528,6 +712,122 @@ SurfaceCard {
         }
 
         SurfaceCard {
+            objectName: "deepCleanupPanel"
+            visible: Boolean(section.analysis.hasPlan) || section.hasActive
+            Layout.fillWidth: true
+            padding: 14
+            contentItem: ColumnLayout {
+                spacing: 6
+                Label { text: qsTr("Quarantine"); color: App.Theme.text; font.weight: Font.Bold }
+                Label {
+                    objectName: "deepQuarantineNotice"
+                    Layout.fillWidth: true
+                    text: qsTr("The quarantine is reversible, but it does not free disk space yet.")
+                    color: App.Theme.warning; wrapMode: Text.WordWrap
+                }
+                Label {
+                    objectName: "deepPlanStale"
+                    visible: section.planStale
+                    Layout.fillWidth: true
+                    text: qsTr("Game files changed since the analysis. Run the analysis again")
+                    color: App.Theme.danger; wrapMode: Text.WordWrap
+                }
+                RowLayout {
+                    visible: !section.hasActive
+                    spacing: 8
+                    AppButton { objectName: "deepSelectAllSafe"; compact: true; kind: "secondary"; text: qsTr("Select all safe"); enabled: !section.cleanupBusy && !section.planStale; onClicked: section.selectAllSafe() }
+                    AppButton { compact: true; kind: "ghost"; text: qsTr("Clear selection"); enabled: Object.keys(section.selectedGroups).length > 0; onClicked: section.selectedGroups = ({}) }
+                }
+                Label {
+                    objectName: "deepSelectionSummary"
+                    visible: !section.hasActive
+                    Layout.fillWidth: true
+                    text: qsTr("Selected: %1 files, %2 (%3 Safe, %4 Review)").arg(section.selectionSummary.files)
+                          .arg(section.formatBytes(section.selectionSummary.bytes)).arg(section.selectionSummary.safe)
+                          .arg(section.selectionSummary.review)
+                          + (section.selectionSummary.languages.length
+                             ? " - " + qsTr("languages: %1").arg(section.selectionSummary.languages.map(function(code) { return section.languageName(code) }).join(", ")) : "")
+                    color: App.Theme.textSecondary; wrapMode: Text.WordWrap
+                }
+                Label {
+                    objectName: "deepPotentialFreed"
+                    visible: !section.hasActive
+                    Layout.fillWidth: true
+                    text: qsTr("Potentially freed after finalization: %1").arg(section.formatBytes(section.selectionSummary.bytes))
+                    color: App.Theme.textSecondary
+                }
+                RowLayout {
+                    visible: !section.hasActive
+                    spacing: 8
+                    AppButton {
+                        objectName: "deepQuarantineButton"
+                        kind: "primary"
+                        text: qsTr("Move to quarantine")
+                        enabled: section.selectionSummary.files > 0 && !section.cleanupBusy && !section.planStale && !section.running
+                        onClicked: section.startQuarantine()
+                    }
+                    AppButton { objectName: "deepCleanupCancel"; visible: section.cleanupBusy && String(section.cleanup.operation) === "quarantine"; kind: "secondary"; text: qsTr("Cancel"); onClicked: if (section.controller) section.controller.cancelDeepCleanup(section.gameId) }
+                }
+                AppProgressBar {
+                    objectName: "deepCleanupProgress"
+                    visible: section.cleanupBusy
+                    Layout.fillWidth: true
+                    from: 0; to: Math.max(1, Number((section.cleanup.progress || {}).totalFiles || 1))
+                    value: Number((section.cleanup.progress || {}).files || 0)
+                }
+                ColumnLayout {
+                    objectName: "deepActiveTransaction"
+                    visible: section.hasActive
+                    Layout.fillWidth: true
+                    spacing: 4
+                    Label { objectName: "deepActiveState"; text: section.transactionStateText(String(section.activeTransaction.state)); color: section.activeTransaction.needsAttention ? App.Theme.danger : App.Theme.success; font.weight: Font.Bold }
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("%1 files (%2) in quarantine, %3 conflicts").arg(Number(section.activeTransaction.quarantinedFiles || 0))
+                              .arg(section.formatBytes(section.activeTransaction.quarantinedBytes)).arg(Number(section.activeTransaction.conflicts || 0))
+                        color: App.Theme.textSecondary; wrapMode: Text.WordWrap
+                    }
+                    Label {
+                        visible: Number(section.activeTransaction.conflicts || 0) > 0
+                        Layout.fillWidth: true
+                        text: qsTr("Steam already restored some files. The Steam version was kept; the quarantine copy stays until you remove it after checking the game.")
+                        color: App.Theme.warning; wrapMode: Text.WordWrap; font.pixelSize: App.Theme.fontCaption
+                    }
+                    RowLayout {
+                        spacing: 8
+                        AppButton { objectName: "deepLaunchGame"; kind: "secondary"; text: qsTr("Start the game and check"); enabled: !section.cleanupBusy && section.activeTransaction.canFinalize === true; onClicked: section.launchGame() }
+                        AppButton { objectName: "deepRestoreButton"; kind: "secondary"; text: qsTr("Restore"); enabled: !section.cleanupBusy && section.activeTransaction.canRestore === true; onClicked: section.restoreQuarantine() }
+                        AppButton { objectName: "deepFinalizeButton"; kind: "danger"; text: qsTr("Delete quarantine and free space"); enabled: !section.cleanupBusy && section.activeTransaction.canFinalize === true; onClicked: section.openFinalize() }
+                    }
+                }
+                Label { objectName: "deepCleanupResult"; visible: text.length > 0; Layout.fillWidth: true; text: section.cleanupResultText(section.cleanup.result || ({})); color: (section.cleanup.result || {}).success ? App.Theme.success : App.Theme.warning; wrapMode: Text.WordWrap }
+                Label {
+                    objectName: "deepSteamVerifyHint"
+                    visible: section.steamVerifyHint
+                    Layout.fillWidth: true
+                    text: qsTr("If the game stopped working, use Steam > Properties > Installed Files > Verify integrity of game files.")
+                    color: App.Theme.textSecondary; wrapMode: Text.WordWrap
+                }
+                Label { visible: (section.cleanup.history || []).length > 0; text: qsTr("Recent quarantine transactions"); color: App.Theme.textMuted; font.weight: Font.DemiBold }
+                Repeater {
+                    objectName: "deepHistory"
+                    model: section.cleanup.history || []
+                    delegate: Label {
+                        required property var modelData
+                        objectName: "deepHistoryEntry"
+                        Layout.fillWidth: true
+                        text: String(modelData.createdAt || "").slice(0, 16).replace("T", " ") + " - "
+                              + (modelData.categories || []).map(function(item) { return section.categoryTitle(item) }).join(", ")
+                              + " - " + qsTr("%1 files, %2").arg(Number(modelData.fileCount || 0)).arg(section.formatBytes(modelData.bytes))
+                              + " - " + section.transactionStateText(String(modelData.state))
+                              + (Number(modelData.conflicts || 0) > 0 ? " - " + qsTr("%1 conflicts").arg(Number(modelData.conflicts)) : "")
+                        color: App.Theme.textSecondary; font.pixelSize: App.Theme.fontCaption; wrapMode: Text.WordWrap
+                    }
+                }
+            }
+        }
+
+        SurfaceCard {
             objectName: "deepGlobalLeftovers"
             visible: Boolean(section.analysis.hasPlan) && section.globalGroups.length > 0
             Layout.fillWidth: true
@@ -546,6 +846,7 @@ SurfaceCard {
                         required property var modelData
                         group: modelData
                         identifier: "global/" + String(modelData.owner)
+                        showSelection: false
                     }
                 }
                 AppButton { objectName: "deepOpenSystemPage"; compact: true; kind: "secondary"; text: qsTr("Open system storage overview"); onClicked: section.openSystemPage() }

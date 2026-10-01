@@ -326,6 +326,32 @@ def test_mangohud_desktop_editor_renders_and_saves_appid_profile(tmp_path: Path)
     assert result["reset_preset"] == "disabled"
 
 
+def test_deep_cleanup_ui_selection_quarantine_restart_restore_finalize(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "deep_cleanup")
+    result = payload["result"]
+    assert result["notice"] == "The quarantine is reversible, but it does not free disk space yet."
+    assert result["nothing_selected"] is True
+    assert result["quarantine_disabled_initially"] is True
+    assert (result["target_enabled"], result["fallback_enabled"], result["shared_enabled"]) == (False, False, False)
+    assert result["global_checkboxes"] == 0
+    assert result["safe_selection"] == ["cache/crash_dumps", "cache/logs_old"]
+    assert result["summary"] == {"files": 3, "bytes": 9, "safe": 2, "review": 1}
+    assert result["summary_languages"] == ["de"]
+    assert result["freed_text"] == "Potentially freed after finalization: 9 B"
+    assert result["after_quarantine_state"] == "Ready for a game test"
+    assert result["files_moved"] is True
+    assert result["launched"] is True
+    assert result["active_after_restart"] == "quarantined"
+    assert result["restored_files"] is True
+    assert result["confirm_enabled_wrong_word"] is False
+    assert result["confirm_enabled_right_word"] is True
+    assert result["finalize_size_text"].startswith("2 files")
+    assert result["steam_hint"] is True
+    assert result["history_states"] == ["finalized", "restored"]
+    assert result["history_private"] is False
+    assert result["finalized_gone"] is True
+
+
 def test_deep_analysis_polish_ui_and_long_groups_collapse(tmp_path: Path) -> None:
     payload = _run_probe(tmp_path, "deep_polish")
     result = payload["result"]

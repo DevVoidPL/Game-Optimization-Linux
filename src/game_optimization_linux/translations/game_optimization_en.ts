@@ -16897,5 +16897,255 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <source>Wwise SoundbanksInfo: shared (SFX)</source>
         <translation>Wwise SoundbanksInfo: shared (SFX)</translation>
     </message>
+    <message>
+        <location line="+0" />
+        <source>%1 conflicts</source>
+        <translation>%1 conflicts</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 files, %2 (%3 bytes)</source>
+        <translation>%1 files, %2 (%3 bytes)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 files (%2) in quarantine, %3 conflicts</source>
+        <translation>%1 files (%2) in quarantine, %3 conflicts</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>A selected item cannot be handled by the quarantine.</source>
+        <translation>A selected item cannot be handled by the quarantine.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>All files were restored.</source>
+        <translation>All files were restored.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Cancelled; every moved file was restored.</source>
+        <translation>Cancelled; every moved file was restored.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Categories: %1</source>
+        <translation>Categories: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Clear selection</source>
+        <translation>Clear selection</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Close the game first.</source>
+        <translation>Close the game first.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>DELETE</source>
+        <translation>DELETE</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Delete permanently</source>
+        <translation>Delete permanently</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Delete quarantine and free space</source>
+        <translation>Delete quarantine and free space</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Delete quarantine of %1</source>
+        <translation>Delete quarantine of %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>fallback language</source>
+        <translation>fallback language</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Files moved to quarantine. Start the game and check it.</source>
+        <translation>Files moved to quarantine. Start the game and check it.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Game files changed since the analysis. Run the analysis again</source>
+        <translation>Game files changed since the analysis. Run the analysis again</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>If the game stopped working, use Steam &gt; Properties &gt; Installed Files &gt; Verify integrity of game files.</source>
+        <translation>If the game stopped working, use Steam &gt; Properties &gt; Installed Files &gt; Verify integrity of game files.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>In progress</source>
+        <translation>In progress</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>languages: %1</source>
+        <translation>languages: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Languages: %1</source>
+        <translation>Languages: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Move to quarantine</source>
+        <translation>Move to quarantine</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Needs attention</source>
+        <translation>Needs attention</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Needs attention: %1 restored, %2 still in quarantine, %3 conflicts, %4 errors.</source>
+        <translation>Needs attention: %1 restored, %2 still in quarantine, %3 conflicts, %4 errors.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Not enough free space to create the quarantine folder.</source>
+        <translation>Not enough free space to create the quarantine folder.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>not handled in this stage</source>
+        <translation>not handled in this stage</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Not selectable: %1</source>
+        <translation>Not selectable: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Potentially freed after finalization: %1</source>
+        <translation>Potentially freed after finalization: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Quarantine</source>
+        <translation>Quarantine</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Quarantine removed</source>
+        <translation>Quarantine removed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Ready for a game test</source>
+        <translation>Ready for a game test</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recent quarantine transactions</source>
+        <translation>Recent quarantine transactions</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Restore</source>
+        <translation>Restore</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Restored</source>
+        <translation>Restored</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Select all safe</source>
+        <translation>Select all safe</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Selected: %1 files, %2 (%3 Safe, %4 Review)</source>
+        <translation>Selected: %1 files, %2 (%3 Safe, %4 Review)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>shared audio</source>
+        <translation>shared audio</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Start the game and check</source>
+        <translation>Start the game and check</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam already restored some files. The Steam version was kept; the quarantine copy stays until you remove it after checking the game.</source>
+        <translation>Steam already restored some files. The Steam version was kept; the quarantine copy stays until you remove it after checking the game.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>target language</source>
+        <translation>target language</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The game is being updated; try again when the launcher is done.</source>
+        <translation>The game is being updated; try again when the launcher is done.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The operation could not be completed: %1</source>
+        <translation>The operation could not be completed: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The operation failed and every moved file was restored.</source>
+        <translation>The operation failed and every moved file was restored.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The quarantine cannot be created on the game's file system; nothing was moved.</source>
+        <translation>The quarantine cannot be created on the game's file system; nothing was moved.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The quarantine folder is not safe or not writable; nothing was moved.</source>
+        <translation>The quarantine folder is not safe or not writable; nothing was moved.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The quarantine is reversible, but it does not free disk space yet.</source>
+        <translation>The quarantine is reversible, but it does not free disk space yet.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The quarantine was removed and the space was freed.</source>
+        <translation>The quarantine was removed and the space was freed.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>This cannot be undone from the application. Steam file verification can download missing files again. Start and check the game first.</source>
+        <translation>This cannot be undone from the application. Steam file verification can download missing files again. Start and check the game first.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Type %1 to confirm.</source>
+        <translation>Type %1 to confirm.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Type the confirmation word to remove the quarantine.</source>
+        <translation>Type the confirmation word to remove the quarantine.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>unsupported</source>
+        <translation>unsupported</translation>
+    </message>
 </context>
 </TS>

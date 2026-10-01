@@ -125,6 +125,7 @@ class DeepOptimizationController:
             "hasPlan": plan is not None,
             "summary": self._summary(plan) if plan is not None else {},
             "categories": self._categories(plan, safety_filter) if plan is not None else [],
+            "allCategories": self._categories(plan, "all") if plan is not None else [],
             "counts": self._counts(plan) if plan is not None else {},
             "savings": plan.savings_summary() if plan is not None else {},
             "globalLeftovers": self._repository.global_leftovers(),
@@ -173,6 +174,11 @@ class DeepOptimizationController:
             job.cancel.set()
         self._timer.stop()
         self._executor.shutdown(wait=False, cancel_futures=True)
+
+    def forget(self, game_id: str) -> None:
+        """Drop the cached plan so the stored (e.g. stale) version is reloaded."""
+
+        self._plans.pop(game_id, None)
 
     # -- internals ---------------------------------------------------------------
 

@@ -16864,5 +16864,255 @@ Solo se procesarán los archivos incluidos en el plan verificado.</translation>
         <source>Wwise SoundbanksInfo: shared (SFX)</source>
         <translation>Wwise SoundbanksInfo: compartido (SFX)</translation>
     </message>
+    <message>
+        <location line="+0"/>
+        <source>%1 conflicts</source>
+        <translation>%1 conflictos</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>%1 files, %2 (%3 bytes)</source>
+        <translation>%1 archivos, %2 (%3 bytes)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>%1 files (%2) in quarantine, %3 conflicts</source>
+        <translation>%1 archivos (%2) en cuarentena, %3 conflictos</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>A selected item cannot be handled by the quarantine.</source>
+        <translation>Un elemento seleccionado no puede ir a la cuarentena.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>All files were restored.</source>
+        <translation>Se restauraron todos los archivos.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Cancelled; every moved file was restored.</source>
+        <translation>Cancelado; se restauró cada archivo movido.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Categories: %1</source>
+        <translation>Categorías: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Clear selection</source>
+        <translation>Borrar selección</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Close the game first.</source>
+        <translation>Cierra primero el juego.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>DELETE</source>
+        <translation>ELIMINAR</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Delete permanently</source>
+        <translation>Eliminar definitivamente</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Delete quarantine and free space</source>
+        <translation>Eliminar la cuarentena y liberar espacio</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Delete quarantine of %1</source>
+        <translation>Eliminar la cuarentena de %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>fallback language</source>
+        <translation>idioma de respaldo</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Files moved to quarantine. Start the game and check it.</source>
+        <translation>Archivos movidos a la cuarentena. Inicia el juego y compruébalo.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Game files changed since the analysis. Run the analysis again</source>
+        <translation>Los archivos del juego cambiaron desde el análisis. Vuelve a ejecutar el análisis</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>If the game stopped working, use Steam &gt; Properties &gt; Installed Files &gt; Verify integrity of game files.</source>
+        <translation>Si el juego dejó de funcionar, usa Steam &gt; Propiedades &gt; Archivos instalados &gt; Verificar la integridad de los archivos.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>In progress</source>
+        <translation>En curso</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>languages: %1</source>
+        <translation>idiomas: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Languages: %1</source>
+        <translation>Idiomas: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Move to quarantine</source>
+        <translation>Mover a la cuarentena</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Needs attention</source>
+        <translation>Requiere atención</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Needs attention: %1 restored, %2 still in quarantine, %3 conflicts, %4 errors.</source>
+        <translation>Requiere atención: %1 restaurados, %2 aún en cuarentena, %3 conflictos, %4 errores.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Not enough free space to create the quarantine folder.</source>
+        <translation>No hay espacio libre suficiente para crear la carpeta de cuarentena.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>not handled in this stage</source>
+        <translation>no se gestiona en esta etapa</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Not selectable: %1</source>
+        <translation>No seleccionable: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Potentially freed after finalization: %1</source>
+        <translation>Potencialmente liberado tras finalizar: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Quarantine</source>
+        <translation>Cuarentena</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Quarantine removed</source>
+        <translation>Cuarentena eliminada</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Ready for a game test</source>
+        <translation>Listo para probar el juego</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Recent quarantine transactions</source>
+        <translation>Transacciones recientes de cuarentena</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Restore</source>
+        <translation>Restaurar</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Restored</source>
+        <translation>Restaurado</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Select all safe</source>
+        <translation>Seleccionar todo lo seguro</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Selected: %1 files, %2 (%3 Safe, %4 Review)</source>
+        <translation>Seleccionado: %1 archivos, %2 (%3 seguros, %4 por revisar)</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>shared audio</source>
+        <translation>audio compartido</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Start the game and check</source>
+        <translation>Iniciar el juego y comprobar</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Steam already restored some files. The Steam version was kept; the quarantine copy stays until you remove it after checking the game.</source>
+        <translation>Steam ya restauró algunos archivos. Se conservó la versión de Steam; la copia en cuarentena se queda hasta que la elimines tras comprobar el juego.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>target language</source>
+        <translation>idioma objetivo</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The game is being updated; try again when the launcher is done.</source>
+        <translation>El juego se está actualizando; inténtalo cuando el lanzador termine.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The operation could not be completed: %1</source>
+        <translation>No se pudo completar la operación: %1</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The operation failed and every moved file was restored.</source>
+        <translation>La operación falló y se restauró cada archivo movido.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The quarantine cannot be created on the game's file system; nothing was moved.</source>
+        <translation>No se puede crear la cuarentena en el sistema de archivos del juego; no se movió nada.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The quarantine folder is not safe or not writable; nothing was moved.</source>
+        <translation>La carpeta de cuarentena no es segura o no admite escritura; no se movió nada.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The quarantine is reversible, but it does not free disk space yet.</source>
+        <translation>La cuarentena es reversible, pero todavía no libera espacio en disco.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>The quarantine was removed and the space was freed.</source>
+        <translation>Se eliminó la cuarentena y se liberó el espacio.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>This cannot be undone from the application. Steam file verification can download missing files again. Start and check the game first.</source>
+        <translation>Esto no se puede deshacer desde la aplicación. La verificación de archivos de Steam puede volver a descargar los que falten. Inicia y comprueba primero el juego.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Type %1 to confirm.</source>
+        <translation>Escribe %1 para confirmar.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>Type the confirmation word to remove the quarantine.</source>
+        <translation>Escribe la palabra de confirmación para eliminar la cuarentena.</translation>
+    </message>
+    <message>
+        <location line="+0"/>
+        <source>unsupported</source>
+        <translation>no compatible</translation>
+    </message>
 </context>
 </TS>

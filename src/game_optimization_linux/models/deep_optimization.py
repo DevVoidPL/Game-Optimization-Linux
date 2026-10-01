@@ -22,6 +22,30 @@ MAX_SAMPLE_PATHS = 100
 DEEP_SCOPES = ("game", "global")
 LANGUAGE_ROLES = ("", "target", "fallback", "other", "shared")
 MEASUREMENT_STATES = ("exact", "estimated", "unavailable")
+# The first executor only moves these game-root categories to quarantine.
+EXECUTABLE_CATEGORIES = frozenset({"languages", "audio", "cache", "residues"})
+# Never executable, whatever their safety: outside the game root, user data,
+# shared/neutral audio or engine core data.
+NON_EXECUTABLE_KEYS = frozenset({
+    "steam_shadercache_installed", "steam_shadercache_uninstalled",
+    "compatdata_active", "compatdata_uninstalled", "shared", "wwise_shared",
+    "protected_backups", "packages_opaque", "texture_files", "hd_texture_pack",
+})
+PROTECTED_ROLES = frozenset({"target", "fallback", "shared"})
+
+
+@dataclass(frozen=True, slots=True)
+class DeepItem:
+    """One file of a selectable group, as observed by the scan (private)."""
+
+    relative_path: str
+    size: int
+    mtime_ns: int
+    device: int
+    inode: int
+
+    def to_list(self) -> list[Any]:
+        return [self.relative_path, self.size, self.mtime_ns, self.device, self.inode]
 GAME_ROOT_PLACEHOLDER = "$GAME_ROOT"
 STEAM_LIBRARY_PLACEHOLDER = "$STEAM_LIBRARY"
 
@@ -89,6 +113,23 @@ class DeepGroup:
     def is_savings(self) -> bool:
         return self.action in {"remove_candidate", "compress_candidate"}
 
+    @property
+    def group_id(self) -> str:
+        return f"{self.category}/{self.key}"
+
+    @property
+    def removable(self) -> bool:
+        """Whether the quarantine executor may ever touch this group."""
+
+        return (
+            self.scope == "game"
+            and self.action == "remove_candidate"
+            and self.safety in {"safe", "review"}
+            and self.category in EXECUTABLE_CATEGORIES
+            and self.key not in NON_EXECUTABLE_KEYS
+            and self.role not in PROTECTED_ROLES
+        )
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "category": self.category,
@@ -96,6 +137,8 @@ class DeepGroup:
             "scope": self.scope,
             "role": self.role,
             "owner": self.owner,
+            "groupId": self.group_id,
+            "removable": self.removable,
             "language": self.language,
             "safety": self.safety,
             "action": self.action,
@@ -222,6 +265,14 @@ class DeepOptimizationPlan:
     notes: tuple[str, ...] = ()
     created_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     schema_version: int = DEEP_PLAN_SCHEMA_VERSION
+    # Set when the game files no longer match the analysis; never executable.
+    stale: bool = False
+    # Private, never exported: every file of each selectable group and the
+    # identity of the canonical game root at scan time.
+    items: Mapping[str, tuple[DeepItem, ...]] = field(default_factory=dict, compare=False, repr=False)
+    root_real: str = field(default="", compare=False, repr=False)
+    root_device: int = field(default=0, compare=False, repr=False)
+    root_inode: int = field(default=0, compare=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.status not in {"completed", "cancelled", "failed"}:
@@ -286,6 +337,7 @@ class DeepOptimizationPlan:
             "installRoot": GAME_ROOT_PLACEHOLDER,
             "status": self.status,
             "complete": self.complete,
+            "stale": self.stale,
             "engine": {
                 "value": self.engine,
                 "version": self.engine_version,
@@ -316,7 +368,11 @@ __all__ = [
     "DEEP_SCOPES",
     "LANGUAGE_ROLES",
     "DeepBtrfsInfo",
+    "DeepItem",
     "DeepSizes",
+    "EXECUTABLE_CATEGORIES",
+    "NON_EXECUTABLE_KEYS",
+    "PROTECTED_ROLES",
     "savings_paths_disjoint",
     "DeepEvidence",
     "DeepGroup",
