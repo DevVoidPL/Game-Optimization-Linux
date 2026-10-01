@@ -179,7 +179,7 @@ def test_c_target_language_from_steam_manifest(tmp_path: Path) -> None:
         '"AppState"\n{\n\t"UserConfig"\n\t{\n\t\t"language"\t\t"polish"\n\t}\n}\n', encoding="utf-8"
     )
     plan = _analyzer(system_language=lambda: "de").analyze(_game(root, library=library))
-    assert (plan.target_language, plan.target_language_source) == ("pl", "Steam app manifest")
+    assert (plan.target_language, plan.target_language_source) == ("pl", "steam_manifest")
     assert language_from_locale("pl_PL.UTF-8") == "pl" and language_from_locale("C.UTF-8") == ""
 
 
@@ -193,6 +193,7 @@ def test_d_wwise_metadata_separates_language_and_shared_banks(tmp_path: Path, fm
         "Audio/GeneratedSoundBanks/Windows/Music.bnk": b"m" * 4,
         "Audio/GeneratedSoundBanks/Windows/Polish(Poland)/VO_Main.bnk": b"v" * 6,
         "Audio/GeneratedSoundBanks/Windows/Polish(Poland)/1234.wem": b"w" * 7,
+        "Audio/GeneratedSoundBanks/Windows/English(US)/VO_Main.bnk": b"n" * 5,
     }
     if fmt == "xml":
         files["Audio/GeneratedSoundBanks/Windows/SoundbanksInfo.xml"] = (
@@ -200,6 +201,7 @@ def test_d_wwise_metadata_separates_language_and_shared_banks(tmp_path: Path, fm
             '<SoundBank Id="1" Language="SFX"><ShortName>Init</ShortName><Path>Init.bnk</Path></SoundBank>'
             '<SoundBank Id="2" Language="SFX"><ShortName>Music</ShortName><Path>Music.bnk</Path></SoundBank>'
             '<SoundBank Id="3" Language="Polish(Poland)"><Path>Polish(Poland)\\VO_Main.bnk</Path></SoundBank>'
+            '<SoundBank Id="4" Language="English(US)"><Path>English(US)\\VO_Main.bnk</Path></SoundBank>'
             '</SoundBanks><StreamedFiles><File Id="1234" Language="Polish(Poland)"><Path>Polish(Poland)\\1234.wem</Path></File>'
             '</StreamedFiles></SoundBanksInfo>'
         )
@@ -208,6 +210,7 @@ def test_d_wwise_metadata_separates_language_and_shared_banks(tmp_path: Path, fm
             "SoundBanks": [
                 {"Language": "SFX", "Path": "Init.bnk"}, {"Language": "SFX", "Path": "Music.bnk"},
                 {"Language": "Polish(Poland)", "Path": "Polish(Poland)/VO_Main.bnk"},
+                {"Language": "English(US)", "Path": "English(US)/VO_Main.bnk"},
             ],
             "StreamedFiles": [{"Language": "Polish(Poland)", "Path": "Polish(Poland)/1234.wem"}],
         }})
@@ -217,6 +220,8 @@ def test_d_wwise_metadata_separates_language_and_shared_banks(tmp_path: Path, fm
     assert shared.file_count == 2 and shared.action == "keep"
     polish = groups[("audio", "lang:pl")]
     assert polish.file_count == 2 and polish.confidence >= 0.9 and polish.safety == "review"
+    assert polish.role == "other"
+    assert groups[("audio", "lang:en")].role == "target"
 
 
 def test_d_wwise_xml_with_entities_is_ignored() -> None:
@@ -299,7 +304,7 @@ def test_g_symlinks_outside_the_game_are_not_followed(tmp_path: Path) -> None:
     plan = _analyzer().analyze(_game(root))
     assert plan.file_count == 1 and plan.logical_bytes == 2
     assert not any("secret" in path or "linked" in path for group in plan.groups for path in group.sample_paths)
-    assert any("symbolic link" in warning for warning in plan.warnings)
+    assert "symlinks_skipped|2" in plan.warnings
 
 
 def test_g_mount_points_inside_the_game_are_skipped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -335,7 +340,7 @@ def test_g_mount_points_inside_the_game_are_skipped(tmp_path: Path, monkeypatch:
     monkeypatch.setattr(deep_optimization.os, "scandir", Wrapper)
     plan = _analyzer().analyze(_game(root))
     assert plan.file_count == 1
-    assert any("mount point" in warning and "mounted" in warning for warning in plan.warnings)
+    assert any(warning.startswith("mount_points_skipped|1|") and "mounted" in warning for warning in plan.warnings)
 
 
 def test_g_scan_can_be_cancelled_and_reports_progress(tmp_path: Path) -> None:
@@ -436,7 +441,7 @@ def test_i_btrfs_uses_existing_integration_and_only_read_only_commands(tmp_path:
                    for word in ("defragment", "property set", "balance", "compress"))
     groups = _groups(plan)
     assert groups[("btrfs", "compressible")].safety == "review"  # shared extents -> never safe
-    assert any("defragmentation can break sharing" in warning for warning in groups[("btrfs", "compressible")].warnings)
+    assert "btrfs_shared" in groups[("btrfs", "compressible")].warnings
     precompressed = groups[("btrfs", "precompressed")]
     assert precompressed.potential_savings_bytes == 0 and precompressed.action == "info"
 
@@ -444,6 +449,6 @@ def test_i_btrfs_uses_existing_integration_and_only_read_only_commands(tmp_path:
 def test_i_non_btrfs_shows_capability_message(tmp_path: Path) -> None:
     root = _tree(tmp_path / "G", {"Game.exe": b"MZ"})
     plan = _analyzer(filesystem_provider=_Filesystem(FilesystemType.EXT4)).analyze(_game(root))
-    assert not plan.btrfs.is_btrfs and plan.btrfs.message == NON_BTRFS_MESSAGE
+    assert not plan.btrfs.is_btrfs and plan.btrfs.message == "non_btrfs"
     assert all(group.safety == "unsupported" for group in plan.groups if group.category == "btrfs")
     assert NON_BTRFS_MESSAGE == "Deep analysis is available; transparent compression requires Btrfs"

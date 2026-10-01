@@ -162,6 +162,7 @@ class GameAnalyzer:
             self._unreal(root, files, folded),
             self._unity(files, folded),
             self._redengine(files, folded),
+            self._rage(files, folded),
         ]
         matches = sorted(matches, key=lambda item: item.confidence, reverse=True)
         first = matches[0]
@@ -340,6 +341,40 @@ class GameAnalyzer:
         confidence = min(0.98, sum(item.weight for item in evidence))
         version = "4" if r6 and archive else "3" if content and bin_x64 else ""
         return _EngineMatch("REDengine", confidence, tuple(evidence), version)
+
+    @staticmethod
+    def _rage(
+        files: Sequence[tuple[str, Path]], folded: Mapping[str, Path]
+    ) -> _EngineMatch:
+        """Rockstar RAGE: needs several independent layout signatures.
+
+        A lone ``.rpf`` archive is not evidence of the engine.
+        """
+
+        del folded
+        lower = [relative.casefold() for relative, _path in files]
+        root_files = {value for value in lower if "/" not in value}
+        evidence: list[DetectionEvidence] = []
+        main_archives = sorted(value for value in root_files if re.fullmatch(r"x64[a-z]\.rpf", value))
+        if len(main_archives) >= 3:
+            evidence.append(DetectionEvidence(
+                main_archives[0], f"{len(main_archives)} RAGE x64?.rpf main archives", 0.35
+            ))
+        if "update/update.rpf" in lower:
+            evidence.append(DetectionEvidence("update/update.rpf", "RAGE update archive", 0.25))
+        if "common.rpf" in root_files:
+            evidence.append(DetectionEvidence("common.rpf", "RAGE common archive", 0.12))
+        x64_data = next((value for value in lower if value.startswith("x64/") and value.endswith(".rpf")), "")
+        if x64_data:
+            evidence.append(DetectionEvidence(x64_data, "RAGE x64/ data archives", 0.15))
+        dlc = next((value for value in lower if "/dlcpacks/" in f"/{value}" and value.endswith(".rpf")), "")
+        if dlc:
+            evidence.append(DetectionEvidence(dlc, "RAGE dlcpacks archive", 0.13))
+        total = sum(item.weight for item in evidence)
+        # Fewer than three independent signatures stays below the detector
+        # threshold, so an arbitrary archive never makes a game "RAGE".
+        confidence = min(0.97, total) if len(evidence) >= 3 else min(0.4, total)
+        return _EngineMatch("RAGE", confidence, tuple(evidence))
 
     @staticmethod
     def _read_text(path: Path) -> str:

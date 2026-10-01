@@ -16089,11 +16089,6 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
     <name>DeepAnalysisSection</name>
     <message>
         <location line="+0" />
-        <source> (allocated blocks, approximate)</source>
-        <translation> (allocated blocks, approximate)</translation>
-    </message>
-    <message>
-        <location line="+0" />
         <source> (confidence %1%)</source>
         <translation> (confidence %1%)</translation>
     </message>
@@ -16106,11 +16101,6 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <location line="+0" />
         <source> in %1 files</source>
         <translation> in %1 files</translation>
-    </message>
-    <message>
-        <location line="+0" />
-        <source> (measured with compsize)</source>
-        <translation> (measured with compsize)</translation>
     </message>
     <message>
         <location line="+0" />
@@ -16334,11 +16324,6 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
     </message>
     <message>
         <location line="+0" />
-        <source>Physical size</source>
-        <translation>Physical size</translation>
-    </message>
-    <message>
-        <location line="+0" />
         <source>Polish</source>
         <translation>Polish</translation>
     </message>
@@ -16346,11 +16331,6 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <location line="+0" />
         <source>Portuguese</source>
         <translation>Portuguese</translation>
-    </message>
-    <message>
-        <location line="+0" />
-        <source>Proton prefixes of uninstalled games</source>
-        <translation>Proton prefixes of uninstalled games</translation>
     </message>
     <message>
         <location line="+0" />
@@ -16424,11 +16404,6 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
     </message>
     <message>
         <location line="+0" />
-        <source>Steam shader cache of uninstalled games</source>
-        <translation>Steam shader cache of uninstalled games</translation>
-    </message>
-    <message>
-        <location line="+0" />
         <source>Target language</source>
         <translation>Target language</translation>
     </message>
@@ -16476,6 +16451,451 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <location line="+0" />
         <source>Why detected</source>
         <translation>Why detected</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 eligible; savings depend on the data</source>
+        <translation>%1 eligible; savings depend on the data</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 hard-linked file(s) were counted once</source>
+        <translation>%1 hard-linked file(s) were counted once</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 (measured: %2)</source>
+        <translation>%1 (measured: %2)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 mount point(s) inside the game were not scanned: %2</source>
+        <translation>%1 mount point(s) inside the game were not scanned: %2</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 (not guaranteed)</source>
+        <translation>%1 (not guaranteed)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 symbolic link(s) were not followed</source>
+        <translation>%1 symbolic link(s) were not followed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>%1 unreadable entries and %2 vanished files were skipped</source>
+        <translation>%1 unreadable entries and %2 vanished files were skipped</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Active Proton prefix; it can contain saves and settings.</source>
+        <translation>Active Proton prefix; it can contain saves and settings.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Actual compressed size</source>
+        <translation>Actual compressed size</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Allocated blocks (estimate)</source>
+        <translation>Allocated blocks (estimate)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Already compressed formats; no Btrfs savings are promised.</source>
+        <translation>Already compressed formats; no Btrfs savings are promised.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Audio without a language marker is treated as shared/neutral and is never removed.</source>
+        <translation>Audio without a language marker is treated as shared/neutral and is never removed.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Backup copies inside save/config folders may be the only copy of user data.</source>
+        <translation>Backup copies inside save/config folders may be the only copy of user data.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Backup copies of files that still exist next to them.</source>
+        <translation>Backup copies of files that still exist next to them.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Btrfs compression potential</source>
+        <translation>Btrfs compression potential</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>btrfs filesystem du</source>
+        <translation>btrfs filesystem du</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Check for save games before removing a Proton prefix</source>
+        <translation>Check for save games before removing a Proton prefix</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Classified by file type</source>
+        <translation>Classified by file type</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Collapse</source>
+        <translation>Collapse</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Crash dumps and crash reports are only used to debug a past crash.</source>
+        <translation>Crash dumps and crash reports are only used to debug a past crash.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>default</source>
+        <translation>default</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Default/fallback language for the target; always kept.</source>
+        <translation>Default/fallback language for the target; always kept.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Deleting it causes shader-compilation stutter until it is rebuilt</source>
+        <translation>Deleting it causes shader-compilation stutter until it is rebuilt</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Detection detail: %1</source>
+        <translation>Detection detail: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Engine derived-data cache; it is regenerated when needed.</source>
+        <translation>Engine derived-data cache; it is regenerated when needed.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Exclusive / shared</source>
+        <translation>Exclusive / shared</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>fallback</source>
+        <translation>fallback</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>File type: %1</source>
+        <translation>File type: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Global Steam leftovers</source>
+        <translation>Global Steam leftovers</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Hard-linked files exist; rewriting them can break the link</source>
+        <translation>Hard-linked files exist; rewriting them can break the link</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Language code in the file name: %1</source>
+        <translation>Language code in the file name: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Language directory: %1</source>
+        <translation>Language directory: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Language directory in a localization folder: %1</source>
+        <translation>Language directory in a localization folder: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Language directory next to other languages: %1</source>
+        <translation>Language directory next to other languages: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Language name in the file name: %1</source>
+        <translation>Language name in the file name: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Language-specific data for a language other than the target.</source>
+        <translation>Language-specific data for a language other than the target.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Leftovers of other, uninstalled games in this Steam library. They are not counted in this game's savings and cannot be removed through this game's plan.</source>
+        <translation>Leftovers of other, uninstalled games in this Steam library. They are not counted in this game's savings and cannot be removed through this game's plan.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Locale in the file name: %1</source>
+        <translation>Locale in the file name: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Measured Btrfs savings</source>
+        <translation>Measured Btrfs savings</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Needs confirmation</source>
+        <translation>Needs confirmation</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>No language segment in the path</source>
+        <translation>No language segment in the path</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>no measurement</source>
+        <translation>no measurement</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>No separate Polish voice-over; the default English voice was kept</source>
+        <translation>No separate Polish voice-over; the default English voice was kept</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>No separate voice-over in the target language (%1); no audio language is removable</source>
+        <translation>No separate voice-over in the target language (%1); no audio language is removable</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>No separate voice-over in the target language (%1); the default voice was kept: %2</source>
+        <translation>No separate voice-over in the target language (%1); the default voice was kept: %2</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>not measured</source>
+        <translation>not measured</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Old log files in a log folder.</source>
+        <translation>Old log files in a log folder.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Opaque engine archives (core data); never opened or modified.</source>
+        <translation>Opaque engine archives (core data); never opened or modified.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Open system storage overview</source>
+        <translation>Open system storage overview</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Optional DLC content; never removed automatically</source>
+        <translation>Optional DLC content; never removed automatically</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Original file is present: %1</source>
+        <translation>Original file is present: %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>other</source>
+        <translation>other</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Potential savings for this game</source>
+        <translation>Potential savings for this game</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Protected / unsupported</source>
+        <translation>Protected / unsupported</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Proton prefix of an uninstalled game</source>
+        <translation>Proton prefix of an uninstalled game</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Proton prefix of an uninstalled game; it may still contain saves.</source>
+        <translation>Proton prefix of an uninstalled game; it may still contain saves.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Recent or unconfirmed log files; the game may still write them.</source>
+        <translation>Recent or unconfirmed log files; the game may still write them.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Redistributable installers shipped with the game.</source>
+        <translation>Redistributable installers shipped with the game.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Safe now</source>
+        <translation>Safe now</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Selected target language; always kept.</source>
+        <translation>Selected target language; always kept.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Separate HD texture pack; remove it only through the launcher or DLC settings.</source>
+        <translation>Separate HD texture pack; remove it only through the launcher or DLC settings.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Shader cache of an installed game; it is rebuilt while playing.</source>
+        <translation>Shader cache of an installed game; it is rebuilt while playing.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>shared</source>
+        <translation>shared</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Shared extents were not measured: a future executor must check each file and skip shared ones</source>
+        <translation>Shared extents were not measured: a future executor must check each file and skip shared ones</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Shared extents/reflinks were detected: a future executor must skip shared files, because defragmentation can break sharing and increase disk usage</source>
+        <translation>Shared extents/reflinks were detected: a future executor must skip shared files, because defragmentation can break sharing and increase disk usage</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Show more (%1)</source>
+        <translation>Show more (%1)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Some launchers run these installers again on the next start</source>
+        <translation>Some launchers run these installers again on the next start</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam app manifest</source>
+        <translation>Steam app manifest</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam AppID %1 is installed</source>
+        <translation>Steam AppID %1 is installed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam AppID %1: no app manifest, not in the game list</source>
+        <translation>Steam AppID %1: no app manifest, not in the game list</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam shader cache left by a game that is no longer installed.</source>
+        <translation>Steam shader cache left by a game that is no longer installed.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam shader cache of an uninstalled game</source>
+        <translation>Steam shader cache of an uninstalled game</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Steam shader cache of this installed game.</source>
+        <translation>Steam shader cache of this installed game.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>system language</source>
+        <translation>system language</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>target</source>
+        <translation>target</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Temporary files in a temp folder.</source>
+        <translation>Temporary files in a temp folder.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Text, executables, libraries and uncompressed audio usually compress well.</source>
+        <translation>Text, executables, libraries and uncompressed audio usually compress well.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Texture data required by the game, including mipmaps and lower quality levels.</source>
+        <translation>Texture data required by the game, including mipmaps and lower quality levels.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>the existing compression analysis (compsize/btrfs du)</source>
+        <translation>the existing compression analysis (compsize/btrfs du)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The game directory is missing or is not a real directory</source>
+        <translation>The game directory is missing or is not a real directory</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The game is running; files may change until it is closed</source>
+        <translation>The game is running; files may change until it is closed</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The next start may be slower while the cache is rebuilt</source>
+        <translation>The next start may be slower while the cache is rebuilt</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>the same compsize measurement as the compression summary</source>
+        <translation>the same compsize measurement as the compression summary</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>The scan was not complete; a later stage must rescan before acting</source>
+        <translation>The scan was not complete; a later stage must rescan before acting</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Total other languages</source>
+        <translation>Total other languages</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Unknown binary format; measure a sample before compressing.</source>
+        <translation>Unknown binary format; measure a sample before compressing.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Wwise metadata marks these banks as shared (SFX); never removed.</source>
+        <translation>Wwise metadata marks these banks as shared (SFX); never removed.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Wwise SoundbanksInfo: language %1</source>
+        <translation>Wwise SoundbanksInfo: language %1</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Wwise SoundbanksInfo: shared (SFX)</source>
+        <translation>Wwise SoundbanksInfo: shared (SFX)</translation>
     </message>
 </context>
 </TS>

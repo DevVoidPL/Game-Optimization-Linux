@@ -3284,6 +3284,111 @@ def probe_deep_analysis(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+DEEP_ENGLISH_LABELS = (
+    "Analyze deeply", "Export JSON report", "Apply plan", "Engine", "File system",
+    "Logical size", "Target language", "Safe", "Review", "Unsupported", "Why detected",
+    "Languages", "Cache and logs", "Leftovers", "Textures and packages",
+    "Already compressed formats", "Likely worth compressing", "Unknown compressibility",
+)
+
+
+def probe_deep_analysis_polish(application: QGuiApplication) -> dict[str, Any]:
+    """Polish UI of the deep analysis plus long-group path collapsing."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import GamepadService, SettingsStore
+    from game_optimization_linux.services.deep_optimization import (
+        DeepAnalysisRepository,
+        DeepOptimizationAnalyzer,
+    )
+    from game_optimization_linux.services.game_analysis import GameAnalyzer
+    from game_optimization_linux.services.game_executable import GameExecutableResolver
+    from game_optimization_linux.translations import TranslationManager
+
+    translations = TranslationManager(application)
+    if not translations.set_language("pl"):
+        raise AssertionError("Polish catalog could not be installed")
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-deep-pl-"))
+    game_root = temporary_root / "game"
+    files: dict[str, bytes] = {
+        "audio/en_US/vo.pck": b"e" * 20, "loc/strings_pl.txt": b"p", "loc/strings_de.txt": b"d",
+        "Game.exe": b"MZ", "data/level.xyz": b"?", "Crashes/a.dmp": b"d",
+        "_CommonRedist/vcredist.exe": b"MZ",
+    }
+    files.update({f"Logs/run{index:03}.log": b"l" for index in range(150)})
+    files.update({f"Paks/chunk{index:02}.pak": b"k" for index in range(30)})
+    for relative, data in files.items():
+        path = game_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    game = replace(demo_games()[0], install_path=game_root, library_path=None, steam_app_id="4242")
+    controller = AppController(
+        parent=application,
+        ui_sound_service=NoOpUiSoundService(),
+        game_provider=DemoGameProvider((game,)),
+        settings_store=SettingsStore(temporary_root / "settings.json"),
+        gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        deep_analysis_repository=DeepAnalysisRepository(temporary_root / "data"),
+        deep_analyzer=DeepOptimizationAnalyzer(
+            engine_detector=GameAnalyzer(GameExecutableResolver()).detect_engine,
+            system_language=lambda: "pl", running_detector=lambda _root: (),
+        ),
+        auto_refresh=False,
+    )
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 6000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", controller.games[0]["id"])
+    _settle(application, 6)
+    _invoke_qml(root, "start")
+    deadline = time.monotonic() + 6.0
+    while time.monotonic() < deadline and str(root.property("status")) != "completed":
+        QTest.qWait(50)
+    _settle(application, 10)
+    texts = [
+        str(item.property("text")) for item in _descendants(root)
+        if isinstance(item, QQuickItem) and item.isVisible() and item.property("text") is not None
+    ]
+    english = sorted({
+        text for text in texts for label in DEEP_ENGLISH_LABELS
+        if text == label or text.startswith(label + " (") or (len(label) > 12 and label in text)
+    })
+
+    def group_paths(name: str) -> int:
+        group = _item(root, name)
+        return sum(1 for item in _descendants(group) if item.objectName() == "deepPath"
+                   and isinstance(item, QQuickItem) and item.isVisible())
+
+    def click_in(name: str, button: str) -> None:
+        group = _item(root, name)
+        target = next(item for item in _descendants(group) if item.objectName() == button)
+        center = target.mapToScene(QPointF(target.width() / 2, target.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    logs = "deepGroup_cache_logs_recent"
+    result = {
+        "status": str(root.property("status")),
+        "english_labels": english,
+        "has_polish_analyze": "Analizuj głęboko" in texts,
+        "fallback_notice": any("Brak osobnego polskiego dubbingu; zachowano domyślny głos angielski" in text for text in texts),
+        "logs_default_paths": group_paths(logs),
+        "translator_language": translations.currentLanguage,
+        "packages_default_paths": group_paths("deepGroup_textures_packages_opaque"),
+    }
+    click_in(logs, "deepShowMore")
+    result["logs_expanded_paths"] = group_paths(logs)
+    click_in(logs, "deepCollapse")
+    result["logs_collapsed_paths"] = group_paths(logs)
+    view.close()
+    controller.shutdown()
+    return result
+
+
 GAMESCOPE_PROBE_OPTIONS = (
     "-W", "-H", "-w", "-h", "-r", "--framerate-limit", "-f", "-b", "-S", "-F",
     "--display-index", "--sharpness", "--fsr-sharpness", "--adaptive-sync", "-g",
@@ -4786,6 +4891,7 @@ def main() -> int:
             "optimization",
             "gamescope",
             "deep",
+            "deep_polish",
             "couch",
             "couch_settings",
             "updates",
@@ -4829,6 +4935,8 @@ def main() -> int:
         result = probe_gamescope_editor(application)
     elif args.mode == "deep":
         result = probe_deep_analysis(application)
+    elif args.mode == "deep_polish":
+        result = probe_deep_analysis_polish(application)
     elif args.mode == "couch":
         result = probe_couch(application, args.width, args.height, args.scenario, args.theme)
     elif args.mode == "couch_settings":

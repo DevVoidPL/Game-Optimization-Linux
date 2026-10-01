@@ -326,6 +326,22 @@ def test_mangohud_desktop_editor_renders_and_saves_appid_profile(tmp_path: Path)
     assert result["reset_preset"] == "disabled"
 
 
+def test_deep_analysis_polish_ui_and_long_groups_collapse(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "deep_polish")
+    result = payload["result"]
+    assert result["status"] == "completed"
+    # G. No English labels remain in the Polish UI.
+    assert result["english_labels"] == []
+    assert result["has_polish_analyze"] is True
+    assert result["fallback_notice"] is True
+    # H. Long groups show 10 paths, expand to at most 100 and collapse again;
+    # big core/opaque groups start fully collapsed.
+    assert result["logs_default_paths"] == 10
+    assert result["logs_expanded_paths"] == 100
+    assert result["logs_collapsed_paths"] == 10
+    assert result["packages_default_paths"] == 0
+
+
 def test_deep_analysis_ui_starts_cancels_filters_and_exports(tmp_path: Path) -> None:
     payload = _run_probe(tmp_path, "deep")
     result = payload["result"]

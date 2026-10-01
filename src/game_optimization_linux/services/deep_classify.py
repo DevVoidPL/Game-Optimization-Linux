@@ -124,23 +124,23 @@ def segment_language(segment: str) -> tuple[str, str] | None:
     return None
 
 
-def file_name_language(name: str, *, localized_context: bool) -> tuple[str, float, str] | None:
+def file_name_language(name: str, *, localized_context: bool) -> tuple[str, float, str, str] | None:
     """Language from whole file-name tokens, never from substrings."""
 
     stem = name.rsplit(".", 1)[0] if "." in name[1:] else name
     tokens = [token for token in _TOKEN_SPLIT.split(stem.casefold()) if token]
     for index, token in enumerate(tokens):
         if len(token) >= 4 and token in LANGUAGE_NAMES:
-            return LANGUAGE_NAMES[token], 0.85, f"file name token '{token}'"
+            return LANGUAGE_NAMES[token], 0.85, "language_token", token
         if index + 1 < len(tokens):
             pair = f"{token}_{tokens[index + 1]}"
             region = _REGION.fullmatch(pair)
             if region and region.group(1) in LANGUAGE_CODES:
-                return region.group(1), 0.85, f"file name locale '{pair}'"
+                return region.group(1), 0.85, "language_locale", pair
     if len(tokens) >= 2:
         last = tokens[-1]
         if last in LANGUAGE_CODES and (last not in AMBIGUOUS_CODES or localized_context):
-            return last, 0.75 if localized_context else 0.7, f"file name language code '{last}'"
+            return last, 0.75 if localized_context else 0.7, "language_code", last
     return None
 
 
@@ -214,7 +214,7 @@ def parse_wwise_metadata(data: bytes, name: str, base: str) -> WwiseIndex | None
 class DirectoryContext:
     language: str = ""
     language_confidence: float = 0.0
-    language_evidence: str = ""
+    language_evidence: tuple[str, str] = ("", "")
     localization: bool = False
     audio: bool = False
     protected: bool = False
@@ -277,11 +277,11 @@ def child_context(
             context = parent.localization or parent.audio or bool(changes.get("audio"))
             if kind in {"name", "region"}:
                 changes.update(language=code, language_confidence=0.9,
-                               language_evidence=f"language directory '{name}'")
+                               language_evidence=("language_directory", name))
             elif (context or other_languages >= 2) and (code not in AMBIGUOUS_CODES or context):
                 changes.update(language=code, language_confidence=0.85,
-                               language_evidence=f"language directory '{name}' next to other languages"
-                               if other_languages >= 2 else f"language directory '{name}' in a localization folder")
+                               language_evidence=("language_directory_siblings" if other_languages >= 2
+                                                  else "language_directory_localized", name))
     return replace(parent, **changes) if changes else parent
 
 
@@ -295,7 +295,9 @@ class FileDecision:
     reversible: bool
     reason: str
     language: str = ""
-    evidence: str = ""
+    # (code, detail): QML translates the code; detail is a relative path,
+    # a directory/file token, an extension or an AppID.
+    evidence: tuple[str, str] = ("", "")
     warning: str = ""
 
 
@@ -336,23 +338,23 @@ def classify_file(
         if folded.endswith(BACKUP_SUFFIXES):
             return FileDecision("residues", "protected_backups", "unsupported", "keep", 0.9, False,
                                 "Backup copy inside a save/config folder; it may be the only copy of user data",
-                                evidence=relative)
+                                evidence=("path", relative))
         return None
     if context.wwise is not None and extension in AUDIO_EXTENSIONS:
         language = context.wwise.lookup(relative, name)
         if language == "":
             return FileDecision("audio", "wwise_shared", "unsupported", "keep", 0.95, False,
                                 "Wwise metadata marks this bank as shared (SFX); never remove",
-                                evidence="SoundbanksInfo: Language=SFX")
+                                evidence=("wwise_shared", "SFX"))
         if language and language != "?":
             return FileDecision("audio", f"lang:{language}", "review", "remove_candidate", 0.95,
                                 launcher_restores, "Wwise metadata assigns this bank to one language",
-                                language=language, evidence=f"SoundbanksInfo: language {language}")
+                                language=language, evidence=("wwise_language", language))
     if context.cache_kind == "crash" or extension in CRASH_EXTENSIONS:
         return FileDecision("cache", "crash_dumps", "safe" if age_seconds >= 24 * 3600 else "review",
                             "remove_candidate", 0.9, False,
                             "Crash dump or crash report; only used for debugging a past crash",
-                            evidence=relative)
+                            evidence=("path", relative))
     if context.cache_kind in {"logs", "unreal_logs"} or extension == ".log":
         in_log_directory = context.cache_kind in {"logs", "unreal_logs"}
         if extension in {".log", ".txt"} and in_log_directory and old:
@@ -360,64 +362,65 @@ def classify_file(
             return FileDecision("cache", "logs_old", "safe", "remove_candidate", confidence, False,
                                 "Old log file in a log folder" + (
                                     " (Unreal Saved/Logs)" if context.cache_kind == "unreal_logs" else ""),
-                                evidence=relative)
+                                evidence=("path", relative))
         return FileDecision("cache", "logs_recent", "review", "remove_candidate", 0.6, False,
                             "Recent or unconfirmed log file; the game may still write it",
-                            evidence=relative)
+                            evidence=("path", relative))
     if context.cache_kind == "shader" or extension in SHADER_CACHE_EXTENSIONS:
         return FileDecision("cache", "shader_cache_installed", "review", "remove_candidate", 0.85, True,
                             "Shader cache of an installed game; it is rebuilt while playing",
-                            evidence=relative,
-                            warning="Deleting it causes shader-compilation stutter until it is rebuilt")
+                            evidence=("path", relative),
+                            warning="shader_stutter")
     if context.cache_kind == "engine_cache":
         return FileDecision("cache", "engine_cache", "review", "remove_candidate", 0.75, True,
                             "Engine derived-data cache; it is regenerated when needed",
-                            evidence=relative, warning="The next start may be slower while the cache is rebuilt")
+                            evidence=("path", relative), warning="engine_cache_rebuild")
     if context.redist:
         return FileDecision("residues", "redistributables", "review", "remove_candidate", 0.85,
                             launcher_restores, "Redistributable installer shipped with the game",
-                            evidence=relative,
-                            warning="Some launchers run these installers again on the next start")
+                            evidence=("path", relative),
+                            warning="redist_reinstall")
     if context.hd_texture_pack or is_hd_texture_pack(name):
         return FileDecision("textures", "hd_texture_pack", "review", "remove_candidate", 0.75,
                             launcher_restores, "Separate HD texture pack; remove only through the launcher/DLC settings",
-                            evidence=relative, warning="Optional DLC content; never removed automatically")
+                            evidence=("path", relative), warning="hd_dlc")
     language = context.language
     confidence = context.language_confidence
     evidence = context.language_evidence
     if not language:
         found = file_name_language(name, localized_context=context.localization or context.audio)
         if found is not None:
-            language, confidence, evidence = found
+            language, confidence, code, detail = found
+            evidence = (code, detail)
     if language:
         category = "audio" if extension in AUDIO_EXTENSIONS or context.audio else "languages"
         package = " (package kept closed; the whole file is language-specific by name)" if (
             extension in PACKAGE_EXTENSIONS) else ""
         return FileDecision(category, f"lang:{language}", "review", "remove_candidate", confidence,
-                            launcher_restores, f"Language-specific data: {evidence}{package}",
+                            launcher_restores, f"Language-specific data ({evidence[0]}: {evidence[1]}){package}",
                             language=language, evidence=evidence)
     if extension in AUDIO_EXTENSIONS:
         return FileDecision("audio", "shared", "unsupported", "keep", 0.8, False,
                             "Audio without a language marker is treated as shared/neutral; never remove",
-                            evidence="no language segment")
+                            evidence=("no_language_marker", ""))
     if folded.endswith(BACKUP_SUFFIXES):
         original = next((folded[: -len(suffix)] for suffix in BACKUP_SUFFIXES if folded.endswith(suffix)), "")
         if original and original in sibling_names:
             return FileDecision("residues", "backup_copies", "review", "remove_candidate", 0.7, False,
                                 "Backup copy of a file that still exists next to it",
-                                evidence=f"original '{original}' is present")
+                                evidence=("original_present", original))
         return None
     if extension == ".tmp" and context.temp:
         return FileDecision("residues", "temporary_files", "review", "remove_candidate", 0.6, False,
-                            "Temporary file in a temp folder", evidence=relative)
+                            "Temporary file in a temp folder", evidence=("path", relative))
     if extension in PACKAGE_EXTENSIONS or folded in PACKAGE_NAMES:
         return FileDecision("textures", "packages_opaque", "unsupported", "keep", 0.95, False,
                             "Opaque engine archive (core data); it is never opened or modified",
-                            evidence=f"extension {extension or folded}")
+                            evidence=("extension", extension or folded))
     if extension in TEXTURE_EXTENSIONS:
         return FileDecision("textures", "texture_files", "unsupported", "info", 0.9, False,
                             "Texture data required by the game, including mipmaps and lower quality levels",
-                            evidence=f"extension {extension}")
+                            evidence=("extension", extension))
     return None
 
 

@@ -18,6 +18,8 @@ from ..services.deep_optimization import (
     DeepScanCancelled,
     DeepScanProgress,
     apply_target_language,
+    measurement_from_analysis_report,
+    measurement_from_compression_result,
 )
 
 if TYPE_CHECKING:
@@ -71,7 +73,13 @@ class DeepOptimizationController:
                 with job.lock:
                     job.progress = value.to_dict()
 
-        future = self._executor.submit(self._analyzer.analyze, game, cancel_event=cancel, progress_callback=progress)
+        # Snapshot (on the Qt thread) the same measurement the compression
+        # header shows, so both screens report one physical size.
+        measurement = self.measurement_for(game_id)
+        future = self._executor.submit(
+            self._analyzer.analyze, game, cancel_event=cancel,
+            progress_callback=progress, measurement=measurement,
+        )
         job = _Job(future, cancel)
         job_holder["job"] = job
         self._jobs[game_id] = job
@@ -80,6 +88,18 @@ class DeepOptimizationController:
             self._timer.start()
         self._app.deepAnalysisChanged.emit(game_id)
         return {"success": True, "status": "running"}
+
+    def measurement_for(self, game_id: str):
+        authoritative = getattr(self._app, "_current_authoritative_compsize", None)
+        if callable(authoritative):
+            try:
+                found = measurement_from_compression_result(authoritative(game_id))
+            except Exception:
+                found = None
+            if found is not None:
+                return found
+        report = getattr(self._app, "_analysis_reports", {}).get(game_id)
+        return measurement_from_analysis_report(report) if isinstance(report, dict) else None
 
     def cancel(self, game_id: str) -> bool:
         job = self._jobs.get(game_id)
@@ -106,6 +126,11 @@ class DeepOptimizationController:
             "summary": self._summary(plan) if plan is not None else {},
             "categories": self._categories(plan, safety_filter) if plan is not None else [],
             "counts": self._counts(plan) if plan is not None else {},
+            "savings": plan.savings_summary() if plan is not None else {},
+            "globalLeftovers": self._repository.global_leftovers(),
+            "globalGroups": [
+                group.to_dict() for group in plan.groups if group.scope == "global"
+            ] if plan is not None else [],
             "filter": safety_filter if safety_filter in SAFETY_LEVELS else "all",
         }
 
@@ -198,8 +223,7 @@ class DeepOptimizationController:
             "filesystem": plan.filesystem,
             "isBtrfs": plan.btrfs.is_btrfs,
             "btrfs": data["btrfs"],
-            "logicalBytes": plan.logical_bytes,
-            "allocatedBytes": plan.allocated_bytes,
+            "sizes": data["sizes"],
             "fileCount": plan.file_count,
             "languages": [
                 {"code": code, "bytes": size}
@@ -209,6 +233,7 @@ class DeepOptimizationController:
             "targetLanguageSource": plan.target_language_source,
             "warnings": list(plan.warnings),
             "blockers": list(plan.blockers),
+            "notes": list(plan.notes),
             "complete": plan.complete,
             "createdAt": data["createdAt"],
         }
@@ -217,7 +242,8 @@ class DeepOptimizationController:
     def _categories(plan: DeepOptimizationPlan, safety_filter: str) -> list[dict[str, Any]]:
         result = []
         for category in DEEP_CATEGORIES:
-            groups = [group for group in plan.groups if group.category == category]
+            # Global leftovers of other games are shown in their own section.
+            groups = [group for group in plan.groups if group.category == category and group.scope == "game"]
             shown = [
                 group.to_dict() for group in groups
                 if safety_filter not in SAFETY_LEVELS or group.safety == safety_filter
@@ -232,7 +258,10 @@ class DeepOptimizationController:
 
     @staticmethod
     def _counts(plan: DeepOptimizationPlan) -> dict[str, int]:
-        return {level: sum(1 for group in plan.groups if group.safety == level) for level in SAFETY_LEVELS}
+        return {
+            level: sum(1 for group in plan.groups if group.safety == level and group.scope == "game")
+            for level in SAFETY_LEVELS
+        }
 
 
 __all__ = ["DeepOptimizationController"]
