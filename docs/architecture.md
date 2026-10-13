@@ -3,6 +3,10 @@
 Game Optimization Linux uses QML for presentation and Python for application
 state, platform integration and file operations.
 
+This describes the development checkout, which may include unfinished work
+beyond the public 1.8 Alpha. See [development status](../ROADMAP.md); the
+announced 2.0 Beta is not yet available for download.
+
 ## Application layers
 
 - `qml/` contains the Desktop and Couch shells, pages and shared controls. QML
@@ -38,6 +42,24 @@ per-game profiles -> OptimizationLaunchPlanner -> LaunchPlan
 The plan keeps the executable, arguments, wrappers and environment separate.
 The runner executes argv directly and writes a short launch report. Steam keeps
 one stable Launch Options command; profile changes do not edit Steam VDF files.
+
+In the development checkout, Heroic/Lutris profiles can be applied through
+managed environment/wrapper entries in the selected game's launcher
+configuration, with a backup and restore workflow. This is a separate path
+from the Steam runner; measured FPS sessions remain tied to the Steam runner.
+Custom/Manual launch configuration does not use the full optimization pipeline.
+
+## Narrator flow
+
+The local Narrator uses portal-authorized screen capture, PipeWire/GStreamer,
+a selected subtitle region, Tesseract OCR, text filtering and consensus,
+subtitle-episode deduplication, optional English-to-Polish translation, and
+Piper speech output. The Polish subtitle mode bypasses translation.
+
+OCR quality and episode decisions are separate verification targets: avoiding
+a second reading does not establish that the first reading was accurate.
+Component details are in [narrator-components.md](narrator-components.md),
+and testing guidance is in [../TESTING.md](../TESTING.md).
 
 ## Flatpak and host integration
 
