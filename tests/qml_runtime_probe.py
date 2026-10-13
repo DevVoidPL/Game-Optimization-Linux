@@ -2957,6 +2957,90 @@ def probe_tasks_lifecycle(application: QGuiApplication) -> dict[str, Any]:
     return result
 
 
+def _mangohud_control_interactions(
+    application: QGuiApplication,
+    view: QQuickView,
+    root: QQuickItem,
+    repository: Any,
+) -> dict[str, Any]:
+    """Drive real MangoHud controls with mouse and keyboard, then save/reload."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        if not item.isVisible():
+            raise AssertionError(f"MangoHud control {name} is not visible")
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(
+            view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y()))
+        )
+        _settle(application, 6)
+
+    def wait_preview() -> None:
+        QTest.qWait(260)
+        _settle(application, 6)
+
+    def layout() -> dict[str, Any]:
+        return dict(_variant(root.property("previewLayout")) or {})
+
+    result: dict[str, Any] = {}
+    root.setProperty("categoryIndex", 2)
+    _settle(application, 8)
+    click("mangoHudFrameTimingGraph")
+    result["graph_dirty"] = root.property("dirty") is True
+    wait_preview()
+    result["graph_in_preview"] = bool(layout().get("frameTimingGraph")) and _item(
+        root, "mangoHudPreviewGraph"
+    ).isVisible()
+    click("mangoHudMetric_gpu_power")
+    result["manual_metric_preset"] = str(root.property("preset"))
+    click("mangoHudMetric_gpu_power")
+    result["restored_metric_preset"] = str(root.property("preset"))
+
+    root.setProperty("categoryIndex", 1)
+    _settle(application, 8)
+    click("mangoHudColor_gpuColor")
+    QTest.keyClick(view, Qt.Key_A, Qt.ControlModifier)
+    for character in "ff0000":
+        QTest.keyClick(view, character)
+    _settle(application, 6)
+    result["color_value"] = str(root.property("gpuColor"))
+    wait_preview()
+    cells = layout().get("cells") or []
+    result["preview_gpu_label_color"] = str(cells[0].get("color", "")) if cells else ""
+    click("mangoHudHorizontal")
+    wait_preview()
+    result["horizontal_preview"] = (
+        _item(root, "mangoHudPreviewRow").isVisible()
+        and not _item(root, "mangoHudPreviewGrid").isVisible()
+    )
+    result["unsaved_before_save"] = root.property("dirty") is True
+
+    click("saveMangoHudProfileButton")
+    _settle(application, 10)
+    saved = repository.load(str(root.property("appId")))
+    config = repository.config_path(saved.app_id).read_text(encoding="utf-8").splitlines()
+    result["saved_clean"] = root.property("dirty") is False
+    result["saved_fields"] = [saved.frame_timing_graph, saved.gpu_color, saved.horizontal]
+    result["saved_keys"] = [
+        "frame_timing" in config, "gpu_color=FF0000" in config, "horizontal" in config
+    ]
+
+    _invoke_qml(root, "loadProfile")
+    _settle(application, 10)
+    result["reloaded_color_text"] = str(_item(root, "mangoHudColor_gpuColor").property("text"))
+    result["reloaded_graph"] = root.property("frameTimingGraph") is True
+
+    click("resetMangoHudProfileButton")
+    _settle(application, 10)
+    result["reset_color_text"] = str(_item(root, "mangoHudColor_gpuColor").property("text"))
+    result["reset_horizontal_switch"] = bool(_item(root, "mangoHudHorizontal").property("checked"))
+    result["reset_preset"] = str(root.property("preset"))
+    return result
+
+
 def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     """Exercise the rendered Desktop editor against an isolated real controller."""
 
@@ -3069,6 +3153,670 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
         "save_button_inside": True,
         "screenshot_size": screenshot.stat().st_size,
     }
+    # Runs after the base result: its final reset removes the saved config.
+    result.update(_mangohud_control_interactions(application, view, root, repository))
+    view.close()
+    controller.shutdown()
+    return result
+
+
+def probe_deep_analysis(application: QGuiApplication) -> dict[str, Any]:
+    """Read-only deep analysis UI: start, progress, cancel, filter and export."""
+
+    import threading
+
+    from PySide6.QtCore import QPoint, QPointF, QUrl
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import GamepadService, SettingsStore
+    from game_optimization_linux.services.deep_optimization import (
+        DeepAnalysisRepository,
+        DeepOptimizationAnalyzer,
+    )
+    from game_optimization_linux.services.game_analysis import GameAnalyzer
+    from game_optimization_linux.services.game_executable import GameExecutableResolver
+
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-deep-qml-"))
+    game_root = temporary_root / "game"
+    for relative, data in {
+        "audio/pl_PL/dialogue.pck": b"p" * 10, "audio/en_US/dialogue.pck": b"e" * 20,
+        "common/dialogue.pck": b"c" * 5, "Logs/old.log": b"l", "Game.exe": b"MZ",
+        "Textures/rock_low.dds": b"t", "data/level.pak": b"k" * 8,
+    }.items():
+        path = game_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    os.utime(game_root / "Logs/old.log", (1_000_000_000, 1_000_000_000))
+    before = {
+        str(path.relative_to(game_root)): (path.stat().st_mtime_ns, path.read_bytes())
+        for path in game_root.rglob("*") if path.is_file()
+    }
+    game = replace(demo_games()[0], install_path=game_root, library_path=None, steam_app_id="4242")
+    release = threading.Event()
+    detector = GameAnalyzer(GameExecutableResolver())
+
+    def gated_engine(root: Path):
+        release.wait(5.0)
+        return detector.detect_engine(root)
+
+    repository = DeepAnalysisRepository(temporary_root / "data" / "deep-analysis")
+    controller = AppController(
+        parent=application,
+        ui_sound_service=NoOpUiSoundService(),
+        game_provider=DemoGameProvider((game,)),
+        settings_store=SettingsStore(temporary_root / "settings.json"),
+        gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        deep_analysis_repository=repository,
+        deep_analyzer=DeepOptimizationAnalyzer(
+            engine_detector=gated_engine, system_language=lambda: "pl",
+            running_detector=lambda _root: (),
+        ),
+        auto_refresh=False,
+    )
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 2400)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", controller.games[0]["id"])
+    _settle(application, 10)
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        if not item.isVisible() or not item.property("enabled"):
+            raise AssertionError(f"Deep analysis control {name} is not clickable")
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    def wait_status(expected: str) -> None:
+        deadline = time.monotonic() + 6.0
+        while time.monotonic() < deadline and str(root.property("status")) != expected:
+            QTest.qWait(50)
+        _settle(application, 6)
+
+    result: dict[str, Any] = {
+        "notice": str(_item(root, "deepAnalysisReadOnlyNotice").property("text")),
+        "apply_enabled": bool(_item(root, "deepApplyButton").property("enabled")),
+        "initial_status": str(root.property("status")),
+    }
+    click("deepAnalyzeButton")
+    QTest.qWait(300)
+    _settle(application, 6)
+    result["running_status"] = str(root.property("status"))
+    result["progress_visible"] = _item(root, "deepAnalysisProgress").isVisible()
+    result["cancel_visible"] = _item(root, "deepCancelButton").isVisible()
+    result["analyze_disabled_while_running"] = not bool(_item(root, "deepAnalyzeButton").property("enabled"))
+    click("deepCancelButton")
+    release.set()
+    wait_status("cancelled")
+    result["cancelled_status"] = str(root.property("status"))
+    result["cancelled_saved"] = repository.path(game.id).exists()
+
+    click("deepAnalyzeButton")
+    wait_status("completed")
+    result["completed_status"] = str(root.property("status"))
+    analysis = dict(_variant(root.property("analysis")) or {})
+    result["categories"] = [item["id"] for item in analysis.get("categories", [])]
+    result["audio_rendered"] = bool(_named(root, "deepCategory_audio"))
+    result["engine_label"] = str(_item(root, "deepEngineLabel").property("text"))
+    click("deepFilter_review")
+    filtered = dict(_variant(root.property("analysis")) or {})
+    result["filter"] = filtered.get("filter")
+    result["filtered_safeties"] = sorted({
+        group["safety"] for category in filtered.get("categories", []) for group in category["groups"]
+    })
+    click("deepFilter_all")
+    export_path = temporary_root / "exports" / "report.json"
+    _invoke_qml(root, "exportReport", QUrl.fromLocalFile(str(export_path)).toString())
+    _settle(application, 4)
+    text = export_path.read_text(encoding="utf-8")
+    result["export_schema"] = json.loads(text)["schemaVersion"]
+    result["export_private"] = str(temporary_root) in text
+    result["export_message"] = str(_item(root, "deepExportMessage").property("text"))
+    after = {
+        str(path.relative_to(game_root)): (path.stat().st_mtime_ns, path.read_bytes())
+        for path in game_root.rglob("*") if path.is_file()
+    }
+    result["game_unchanged"] = before == after
+    view.close()
+    controller.shutdown()
+    return result
+
+
+def probe_deep_cleanup(application: QGuiApplication) -> dict[str, Any]:
+    """Quarantine UI: selection, sums, disabled roles, restart, restore, finalize."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.models import Launcher
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import GamepadService, SettingsStore
+    from game_optimization_linux.services.deep_cleanup import CleanupJournal, DeepCleanupExecutor
+    from game_optimization_linux.services.deep_optimization import (
+        DeepAnalysisRepository,
+        DeepOptimizationAnalyzer,
+    )
+    from game_optimization_linux.services.game_analysis import GameAnalyzer
+    from game_optimization_linux.services.game_executable import GameExecutableResolver
+
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-deep-cleanup-qml-"))
+    library = temporary_root / "SteamLibrary"
+    game_root = library / "steamapps" / "common" / "Game"
+    files = {
+        "loc/strings_de.txt": b"de", "loc/strings_pl.txt": b"pl", "audio/en_US/vo.pck": b"v" * 8,
+        "common/music.pck": b"m", "Logs/old.log": b"log", "Crashes/a.dmp": b"dump",
+        "_CommonRedist/vc.exe": b"MZ", "Game.exe": b"MZ",
+    }
+    for relative, data in files.items():
+        path = game_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    for relative in ("Logs/old.log", "Crashes/a.dmp"):
+        os.utime(game_root / relative, (1_000_000_000, 1_000_000_000))
+    (library / "steamapps" / "appmanifest_4242.acf").write_text('"AppState" {}', encoding="utf-8")
+    (library / "steamapps/shadercache/999").mkdir(parents=True)
+    (library / "steamapps/shadercache/999/a.foz").write_bytes(b"g")
+    (library / "steamapps/shadercache/4242").mkdir(parents=True)
+    (library / "steamapps/shadercache/4242/own.foz").write_bytes(b"s" * 50)
+    game = replace(demo_games()[0], id="steam-4242", install_path=game_root, library_path=library,
+                   steam_app_id="4242", launcher=Launcher.STEAM)
+    data_root = temporary_root / "data"
+    launches: list[str] = []
+
+    def make_controller() -> Any:
+        controller = AppController(
+            parent=application,
+            ui_sound_service=NoOpUiSoundService(),
+            game_provider=DemoGameProvider((game,)),
+            settings_store=SettingsStore(temporary_root / "settings.json"),
+            gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+            deep_analysis_repository=DeepAnalysisRepository(data_root / "deep-analysis"),
+            deep_analyzer=DeepOptimizationAnalyzer(
+                engine_detector=GameAnalyzer(GameExecutableResolver()).detect_engine,
+                system_language=lambda: "pl", running_detector=lambda _root: (),
+                allow_native_btrfs_du=False,
+            ),
+            deep_cleanup_executor=DeepCleanupExecutor(
+                CleanupJournal(data_root / "deep-cleanup"), running_detector=lambda _root: ()
+            ),
+            auto_refresh=False,
+        )
+        controller.launchGame = lambda game_id: launches.append(str(game_id)) or True  # type: ignore[method-assign]
+        return controller
+
+    controller = make_controller()
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 6000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", game.id)
+    _settle(application, 6)
+
+    def wait_until(predicate, timeout: float = 6.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and not predicate():
+            QTest.qWait(50)
+        _settle(application, 8)
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        if not item.isVisible() or not item.property("enabled"):
+            raise AssertionError(f"Cleanup control {name} is not clickable")
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    def checkbox(group_id: str) -> QQuickItem:
+        return _item(root, "deepSelect_" + group_id.replace("/", "_").replace(":", "_"))
+
+    def active_state() -> str:
+        return str((_variant(root.property("activeTransaction")) or {}).get("state", ""))
+
+    def settled(state: str) -> bool:
+        return active_state() == state and root.property("cleanupBusy") is False
+
+    _invoke_qml(root, "start")
+    wait_until(lambda: str(root.property("status")) == "completed")
+    result: dict[str, Any] = {
+        "notice": str(_item(root, "deepQuarantineNotice").property("text")),
+        "nothing_selected": dict(_variant(root.property("selectedGroups")) or {}) == {},
+        "quarantine_disabled_initially": not bool(_item(root, "deepQuarantineButton").property("enabled")),
+        "target_enabled": bool(checkbox("languages/lang:pl").property("enabled")),
+        "fallback_enabled": bool(checkbox("audio/lang:en").property("enabled")),
+        "shared_enabled": bool(checkbox("audio/shared").property("enabled")),
+        "review_selectable_checkbox": checkbox("languages/lang:de").isVisible(),
+        "external_checkbox": checkbox("cache/steam_shadercache_installed").isVisible(),
+        "external_lock": _item(root, "deepLock_cache_steam_shadercache_installed").isVisible(),
+        "target_lock": _item(root, "deepLock_languages_lang_pl").isVisible(),
+        "external_badge": str(next(
+            item.property("text") for item in _descendants(_item(root, "deepGroup_cache_steam_shadercache_installed"))
+            if item.objectName() == "deepBadge"
+        )),
+        "selectable_bytes": str(_item(root, "deepSelectableBytes").property("text")),
+        "global_checkboxes": sum(
+            1 for item in _descendants(_item(root, "deepGlobalLeftovers"))
+            if item.objectName().startswith("deepSelect_") and isinstance(item, QQuickItem) and item.isVisible()
+        ),
+    }
+    click("deepSelectAllSafe")
+    selected = sorted(dict(_variant(root.property("selectedGroups")) or {}))
+    result["safe_selection"] = selected
+    click(checkbox("languages/lang:de").objectName())
+    summary = dict(_variant(root.property("selectionSummary")) or {})
+    result["summary"] = {key: summary[key] for key in ("files", "bytes", "safe", "review")}
+    result["summary_languages"] = list(summary["languages"])
+    result["freed_text"] = str(_item(root, "deepPotentialFreed").property("text"))
+    click("deepQuarantineButton")
+    wait_until(lambda: settled("quarantined"))
+    result["after_quarantine_state"] = str(_item(root, "deepActiveState").property("text"))
+    result["files_moved"] = not (game_root / "Logs/old.log").exists() and not (game_root / "loc/strings_de.txt").exists()
+    click("deepLaunchGame")
+    result["launched"] = launches == [game.id]
+
+    view.close()
+    controller.shutdown()
+    controller = make_controller()
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 6000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", game.id)
+    _settle(application, 10)
+    result["active_after_restart"] = active_state()
+    click("deepRestoreButton")
+    wait_until(lambda: settled(""))
+    result["restored_files"] = (game_root / "Logs/old.log").exists() and (game_root / "loc/strings_de.txt").exists()
+    _invoke_qml(root, "refresh")
+    _settle(application, 6)
+    click("deepSelectAllSafe")
+    click("deepQuarantineButton")
+    wait_until(lambda: settled("quarantined"))
+    _invoke_qml(root, "openFinalize")
+    _settle(application, 6)
+    confirm = _item(root, "deepFinalizeConfirm")
+    root.setProperty("finalizeTyped", "delete")
+    _settle(application, 4)
+    result["confirm_enabled_wrong_word"] = bool(confirm.property("enabled"))
+    root.setProperty("finalizeTyped", "DELETE")
+    _settle(application, 4)
+    result["confirm_enabled_right_word"] = bool(confirm.property("enabled"))
+    result["finalize_size_text"] = str(_item(root, "deepFinalizeSize").property("text"))
+    _invoke_qml(root, "confirmFinalize", "DELETE")
+    wait_until(lambda: settled(""))
+    result["steam_hint"] = _item(root, "deepSteamVerifyHint").isVisible()
+    history = list((_variant(root.property("cleanup")) or {}).get("history", []))
+    result["history_states"] = [item["state"] for item in history]
+    result["history_private"] = str(temporary_root) in json.dumps(history)
+    result["finalized_gone"] = not (game_root / "Crashes/a.dmp").exists() and (game_root / "loc/strings_de.txt").exists()
+    view.close()
+    controller.shutdown()
+    return result
+
+
+def probe_deep_recompression(application: QGuiApplication) -> dict[str, Any]:
+    """Stage 2B UI with a mocked Btrfs provider: no real btrfs command runs."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.services import GamepadService, SettingsStore
+    from test_btrfs_recompression import _setup
+
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-recompression-qml-"))
+    game, root_path, _deep, repository, provider, planner = _setup(temporary_root)
+    controller = AppController(
+        parent=application,
+        ui_sound_service=NoOpUiSoundService(),
+        game_provider=DemoGameProvider((game,)),
+        settings_store=SettingsStore(temporary_root / "settings.json"),
+        gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        deep_analysis_repository=repository,
+        deep_recompression_planner=planner,
+        auto_refresh=False,
+    )
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 6000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", game.id)
+    _settle(application, 10)
+    panel = _item(root, "deepRecompressionPanel")
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        if not item.isVisible() or not item.property("enabled"):
+            raise AssertionError(f"Recompression control {name} is not clickable")
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    def recompression() -> dict[str, Any]:
+        return dict(_variant(panel.property("recompression")) or {})
+
+    def wait_until(predicate, timeout: float = 6.0) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline and not predicate():
+            QTest.qWait(50)
+        _settle(application, 8)
+
+    result: dict[str, Any] = {
+        "panel_visible": panel.isVisible(),
+        "capabilities_text": str(_item(root, "deepRecompressionCapabilities").property("text")),
+        "future_enabled": bool(_item(root, "deepFutureCompression").property("enabled")),
+    }
+    click("deepRecompressionAnalyze")
+    wait_until(lambda: bool(recompression().get("plan", {}).get("planId")) and not recompression().get("busy"))
+    result["nothing_selected"] = dict(_variant(panel.property("selectedTypes")) or {}) == {}
+    result["start_disabled"] = not bool(_item(root, "deepRecompressionStart").property("enabled"))
+    result["list_collapsed"] = not any(item.objectName().startswith("deepRecompressionType_") for item in _descendants(panel))
+    result["estimate"] = str(_item(root, "deepRecompressionEstimate").property("text"))
+    click("deepRecompressionRecommended")
+    result["selected"] = sorted(dict(_variant(panel.property("selectedTypes")) or {}))
+    result["selection_text"] = str(_item(root, "deepRecompressionSelection").property("text"))
+    click("deepRecompressionToggleList")
+    result["type_rows"] = sorted(item.objectName() for item in _descendants(panel)
+                                 if item.objectName().startswith("deepRecompressionType_"))
+    click("deepRecompressionStart")
+    result["confirm_text"] = str(_item(root, "deepRecompressionWarning").property("text"))
+    click("deepRecompressionConfirmButton")
+    wait_until(lambda: not recompression().get("busy") and bool(recompression().get("result")))
+    result["result_text"] = str(_item(root, "deepRecompressionResult").property("text"))
+    result["history"] = [entry["state"] for entry in recompression().get("history", [])]
+    result["history_text"] = [str(item.property("text")) for item in _descendants(panel)
+                              if item.objectName() == "deepRecompressionHistoryEntry"]
+    result["defragments"] = len(provider.defragments())
+
+    # Second run, cancelled while the first file is processed.  The mocked
+    # extents are reset so the files are candidates again (as new data).
+    provider.encoded.clear()
+    click("deepRecompressionAnalyze")
+    wait_until(lambda: bool(recompression().get("plan", {}).get("planId")) and not recompression().get("busy"))
+    provider.on_defragment = lambda _path: time.sleep(0.6)
+    click("deepRecompressionRecommended")
+    click("deepRecompressionStart")
+    click("deepRecompressionConfirmButton")
+    wait_until(lambda: bool(recompression().get("busy")) and _item(root, "deepRecompressionCancel").isVisible())
+    result["progress_visible"] = _item(root, "deepRecompressionProgress").isVisible()
+    click("deepRecompressionCancel")
+    wait_until(lambda: not recompression().get("busy") and bool(recompression().get("result")))
+    result["cancel_text"] = str(_item(root, "deepRecompressionResult").property("text"))
+    result["history_after_cancel"] = [entry["state"] for entry in recompression().get("history", [])]
+    view.close()
+    controller.shutdown()
+    return result
+
+
+DEEP_ENGLISH_LABELS = (
+    "Safe - can be moved", "Review - can be moved", "Protected - cannot be removed",
+    "Outside the scope of this plan", "No safe rule - cannot be removed",
+    "Can be moved to quarantine", "Protected by the program", "No safe rule",
+    "Analyze deeply", "Export JSON report", "Apply plan", "Engine", "File system",
+    "Logical size", "Target language", "Safe", "Review", "Unsupported", "Why detected",
+    "Languages", "Cache and logs", "Leftovers", "Textures and packages",
+    "Already compressed formats", "Likely worth compressing", "Unknown compressibility",
+)
+
+
+def probe_deep_analysis_polish(application: QGuiApplication) -> dict[str, Any]:
+    """Polish UI of the deep analysis plus long-group path collapsing."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import GamepadService, SettingsStore
+    from game_optimization_linux.services.deep_optimization import (
+        DeepAnalysisRepository,
+        DeepOptimizationAnalyzer,
+    )
+    from game_optimization_linux.services.game_analysis import GameAnalyzer
+    from game_optimization_linux.services.game_executable import GameExecutableResolver
+    from game_optimization_linux.translations import TranslationManager
+
+    translations = TranslationManager(application)
+    if not translations.set_language("pl"):
+        raise AssertionError("Polish catalog could not be installed")
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-deep-pl-"))
+    library = temporary_root / "SteamLibrary"
+    game_root = library / "steamapps" / "common" / "game"
+    files: dict[str, bytes] = {
+        "audio/en_US/vo.pck": b"e" * 20, "loc/strings_pl.txt": b"p", "loc/strings_de.txt": b"d",
+        "Game.exe": b"MZ", "data/level.xyz": b"?", "Crashes/a.dmp": b"d",
+        "_CommonRedist/vcredist.exe": b"MZ",
+    }
+    files.update({f"Logs/run{index:03}.log": b"l" for index in range(150)})
+    files.update({f"Paks/chunk{index:02}.pak": b"k" for index in range(30)})
+    for relative, data in files.items():
+        path = game_root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(data)
+    os.utime(game_root / "Crashes/a.dmp", (1_000_000_000, 1_000_000_000))
+    (library / "steamapps" / "appmanifest_4242.acf").write_text('"AppState" {}', encoding="utf-8")
+    (library / "steamapps/shadercache/4242").mkdir(parents=True)
+    (library / "steamapps/shadercache/4242/own.foz").write_bytes(b"s")
+    game = replace(demo_games()[0], install_path=game_root, library_path=library, steam_app_id="4242")
+    controller = AppController(
+        parent=application,
+        ui_sound_service=NoOpUiSoundService(),
+        game_provider=DemoGameProvider((game,)),
+        settings_store=SettingsStore(temporary_root / "settings.json"),
+        gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        deep_analysis_repository=DeepAnalysisRepository(temporary_root / "data"),
+        deep_analyzer=DeepOptimizationAnalyzer(
+            engine_detector=GameAnalyzer(GameExecutableResolver()).detect_engine,
+            system_language=lambda: "pl", running_detector=lambda _root: (),
+        ),
+        auto_refresh=False,
+    )
+    view, root = _view(application, "pages/details/DeepAnalysisSection.qml", 1400, 6000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameId", controller.games[0]["id"])
+    _settle(application, 6)
+    _invoke_qml(root, "start")
+    deadline = time.monotonic() + 6.0
+    while time.monotonic() < deadline and str(root.property("status")) != "completed":
+        QTest.qWait(50)
+    _settle(application, 10)
+    texts = [
+        str(item.property("text")) for item in _descendants(root)
+        if isinstance(item, QQuickItem) and item.isVisible() and item.property("text") is not None
+    ]
+    english = sorted({
+        text for text in texts for label in DEEP_ENGLISH_LABELS
+        if text == label or text.startswith(label + " (") or (len(label) > 12 and label in text)
+    })
+
+    def group_paths(name: str) -> int:
+        group = _item(root, name)
+        return sum(1 for item in _descendants(group) if item.objectName() == "deepPath"
+                   and isinstance(item, QQuickItem) and item.isVisible())
+
+    def click_in(name: str, button: str) -> None:
+        group = _item(root, name)
+        target = next(item for item in _descendants(group) if item.objectName() == button)
+        center = target.mapToScene(QPointF(target.width() / 2, target.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    logs = "deepGroup_cache_logs_recent"
+    badges = sorted({
+        str(item.property("text")) for item in _descendants(root)
+        if item.objectName() == "deepBadge" and isinstance(item, QQuickItem) and item.isVisible()
+    })
+    result = {
+        "badges": badges,
+        "status": str(root.property("status")),
+        "english_labels": english,
+        "has_polish_analyze": "Analizuj głęboko" in texts,
+        "fallback_notice": any("Brak osobnego polskiego dubbingu; zachowano domyślny głos angielski" in text for text in texts),
+        "logs_default_paths": group_paths(logs),
+        "translator_language": translations.currentLanguage,
+        "packages_default_paths": group_paths("deepGroup_textures_packages_opaque"),
+    }
+    click_in(logs, "deepShowMore")
+    result["logs_expanded_paths"] = group_paths(logs)
+    click_in(logs, "deepCollapse")
+    result["logs_collapsed_paths"] = group_paths(logs)
+    view.close()
+    controller.shutdown()
+    return result
+
+
+GAMESCOPE_PROBE_OPTIONS = (
+    "-W", "-H", "-w", "-h", "-r", "--framerate-limit", "-f", "-b", "-S", "-F",
+    "--display-index", "--sharpness", "--fsr-sharpness", "--adaptive-sync", "-g",
+    "--hdr-enabled", "--mangoapp", "-m", "-o", "--backend", "--force-windows-fullscreen",
+    "--hdr-sdr-content-nits", "--sdr-gamut-wideness", "--hdr-itm-enabled",
+    "--hdr-itm-sdr-nits", "--hdr-itm-target-nits", "--force-grab-cursor", "-C", "-s",
+    "--expose-wayland", "-e",
+)
+
+
+def probe_gamescope_editor(application: QGuiApplication) -> dict[str, Any]:
+    """Desktop Gamescope sections: capabilities, real clicks, save, reload, reset."""
+
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtTest import QTest
+
+    from game_optimization_linux.controllers import AppController
+    from game_optimization_linux.models import GameOptimizationProfile
+    from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
+    from game_optimization_linux.providers.demo import demo_games
+    from game_optimization_linux.services import (
+        GameOptimizationProfileRepository,
+        GamepadService,
+        RunnerIntegration,
+        RuntimeToolAvailability,
+        SettingsStore,
+    )
+
+    temporary_root = Path(tempfile.mkdtemp(prefix="game-optimization-gamescope-qml-"))
+    game = replace(demo_games()[0], steam_app_id="224760")
+    repository = GameOptimizationProfileRepository(temporary_root / "config" / "games")
+    repository.save(replace(
+        GameOptimizationProfile.default("224760"),
+        preset="custom", gamescope_enabled=True, gamescope_mode="native",
+        manual_overrides={"gamescope": True},
+    ))
+
+    class ToolDetector:
+        full = True
+
+        def detect(self, *, refresh: bool = False) -> tuple[RuntimeToolAvailability, RuntimeToolAvailability]:
+            del refresh
+            return (
+                RuntimeToolAvailability("GameMode", False),
+                RuntimeToolAvailability(
+                    "Gamescope", True, "/usr/bin/gamescope", "3.16.30",
+                    GAMESCOPE_PROBE_OPTIONS if self.full else (),
+                    supported_filters=("linear", "nearest", "fsr", "nis", "pixel", "sgsr") if self.full else (),
+                    supported_scalers=("auto", "integer", "fit", "fill", "stretch") if self.full else (),
+                    supported_backends=("auto", "drm", "sdl", "wayland") if self.full else (),
+                ),
+            )
+
+    detector = ToolDetector()
+    controller = AppController(
+        parent=application,
+        ui_sound_service=NoOpUiSoundService(),
+        game_provider=DemoGameProvider((game,)),
+        settings_store=SettingsStore(temporary_root / "settings.json"),
+        gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        optimization_profile_repository=repository,
+        runner_integration=RunnerIntegration(temporary_root / "bin" / "game-optimization-run"),
+        runtime_tool_detector=detector,  # type: ignore[arg-type]
+        auto_refresh=False,
+    )
+    view, root = _view(application, "pages/details/OptimizationTab.qml", 1600, 1000)
+    root.setProperty("controller", controller)
+    root.setProperty("gameData", controller.games[0])
+    _settle(application, 20)
+    QTest.qWait(80)
+    _settle(application, 10)
+    if str(root.property("appId")) != "224760":
+        raise AssertionError(f"Optimization profile did not load: {root.property('errorMessage')!r}")
+
+    def visible(name: str) -> bool:
+        items = _named(root, name)
+        return bool(items) and isinstance(items[0], QQuickItem) and items[0].isVisible()
+
+    def row_visible(name: str) -> bool:
+        # The row (SettingRow) hosting a control decides its visibility.
+        item = _item(root, name)
+        return item.isVisible()
+
+    def click(name: str) -> None:
+        item = _item(root, name)
+        scroll = _item(root, "optimizationScroll")
+        flickable = scroll.property("contentItem")
+        target = item.mapToItem(flickable.property("contentItem"), QPointF(0, 0)) if flickable else None
+        if flickable is not None and target is not None:
+            flickable.setProperty("contentY", max(0.0, target.y() - 200))
+            _settle(application, 6)
+        center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
+        QTest.mouseClick(view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y())))
+        _settle(application, 6)
+
+    for section in ("gamescopeSectionHdr", "gamescopeSectionInput", "gamescopeSectionDiagnostics"):
+        _item(root, section).setProperty("expanded", True)
+    _settle(application, 8)
+    result: dict[str, Any] = {
+        "full_hdr_section": visible("gamescopeSectionHdr"),
+        "full_display_index": row_visible("gamescopeDisplayIndex"),
+        "full_force_grab": row_visible("gamescopeForceGrabCursor"),
+        "full_advanced_warning": visible("gamescopeAdvancedUnavailable"),
+        "full_filters": list(_variant(root.property("filterValues")) or []),
+        "full_backends": list(_variant(root.property("backendValues")) or []),
+        "version_badge": str(_item(root, "gamescopeAvailabilityBadge").property("text")),
+    }
+
+    click("gamescopeAdaptiveSync")
+    result["dirty_after_click"] = root.property("dirty") is True
+    click("gamescopeForceWindowsFullscreen")
+    # The preview is debounced (150 ms); under load wait for its result
+    # instead of a fixed delay, so the save button is really enabled.
+    deadline = time.monotonic() + 3.0
+    while time.monotonic() < deadline and not (
+        "--force-windows-fullscreen" in list(_variant(root.property("gamescopeArguments")) or [])
+        and bool(_item(root, "saveOptimizationProfileButton").property("enabled"))
+    ):
+        QTest.qWait(50)
+    _settle(application, 8)
+    arguments = list(_variant(root.property("gamescopeArguments")) or [])
+    result["preview_arguments"] = arguments
+    result["steam_options"] = str(root.property("gamescopeSteamLaunchOptions"))
+    click("saveOptimizationProfileButton")
+    _settle(application, 10)
+    saved = repository.load("224760")
+    result["saved_flags"] = [saved.gamescope_adaptive_sync, saved.gamescope_force_windows_fullscreen]
+    result["clean_after_save"] = root.property("dirty") is False
+
+    _invoke_qml(root, "loadProfile")
+    _settle(application, 10)
+    result["reloaded_switches"] = [
+        bool(_item(root, "gamescopeAdaptiveSync").property("checked")),
+        bool(_item(root, "gamescopeForceWindowsFullscreen").property("checked")),
+    ]
+
+    click("resetGamescopeSettings")
+    _settle(application, 10)
+    reset = repository.load("224760")
+    result["reset_profile"] = [reset.gamescope_enabled, reset.gamescope_adaptive_sync,
+                               reset.gamescope_force_windows_fullscreen, reset.preset]
+    result["reset_switch"] = bool(_item(root, "gamescopeAdaptiveSync").property("checked"))
+
+    detector.full = False
+    _invoke_qml(root, "loadProfile")
+    _settle(application, 10)
+    result.update({
+        "basic_advanced_warning": visible("gamescopeAdvancedUnavailable"),
+        "basic_hdr_section": visible("gamescopeSectionHdr"),
+        "basic_force_grab": row_visible("gamescopeForceGrabCursor"),
+        "basic_display_index": row_visible("gamescopeDisplayIndex"),
+        "basic_filters": list(_variant(root.property("filterValues")) or []),
+    })
     view.close()
     controller.shutdown()
     return result
@@ -3828,6 +4576,10 @@ def probe_couch(
         fixture_games = base_games
     home.setProperty("games", fixture_games)
     _settle(application, 20)
+    home_tiles = _variant(home.property("homeTiles")) or []
+    if any(isinstance(tile, dict) and str(tile.get("id", "")) == "narrator"
+           for tile in home_tiles):
+        raise AssertionError("Couch home navigation still exposes a Narrator entry")
     strip = _qt_side_item(root, "couchGameStrip")
     home_title = _qt_side_item(root, "couchHomeHeroTitle")
     home_navigation = _qt_side_item(root, "couchHomeNavigation")
@@ -3884,7 +4636,7 @@ def probe_couch(
         {"id": "storage", "title": "Storage"},
         {"id": "optimization", "title": "Optimization"},
         {"id": "optiscaler", "title": "OptiScaler"},
-        {"id": "narrator", "title": "Narrator"},
+        {"id": "narrator", "title": "Lektor"},
     ]
     if not isinstance(tabs, list):
         raise AssertionError(f"Couch details exposed an invalid tabs model: {tabs!r}")
@@ -3921,6 +4673,7 @@ def probe_couch(
     tab_ids = [tab["id"] for tab in actual_tabs]
     details.setProperty("selectedTab", tab_ids.index("optimization"))
     details.setProperty("selectedAction", 0)
+    details.setProperty("focusArea", 2)  # tab action row
     previous_profile = str(details.property("optimizationProfile"))
     _invoke_qml(root, "handleAction", "Confirm")
     _settle(application, 8)
@@ -3937,7 +4690,7 @@ def probe_couch(
         raise AssertionError("Back saved an uncommitted Couch optimization change")
     _invoke_qml(root, "handleAction", "Confirm")
     _invoke_qml(root, "handleAction", "NavigateRight")
-    for _ in range(6):
+    for _ in range(4):  # profile menu: Save is row 4
         _invoke_qml(root, "handleAction", "NavigateDown")
     _invoke_qml(root, "handleAction", "Confirm")
     _settle(application, 8)
@@ -3947,6 +4700,7 @@ def probe_couch(
     # The per-game MangoHud editor is a true modal layer. Back cancels without
     # saving and returns focus to the tile that opened it.
     details.setProperty("selectedAction", 3)
+    details.setProperty("focusArea", 2)  # tab action row
     _invoke_qml(root, "handleAction", "Confirm")
     _settle(application, 8)
     if not bool(details.property("mangoHudOverlayOpen")):
@@ -3964,10 +4718,13 @@ def probe_couch(
     mangohud_back_focus = True
 
     # Saving from Couch changes the same AppID profile used by Desktop Mode.
-    _invoke_qml(root, "handleAction", "Confirm")
-    _invoke_qml(root, "handleAction", "NavigateRight")
-    for _ in range(6):
-        _invoke_qml(root, "handleAction", "NavigateDown")
+    # Rows: Use MangoHud, Preset, Position, Size, FPS limit, Save, Cancel.
+    _invoke_qml(root, "handleAction", "Confirm")          # opens the menu (tab action)
+    _invoke_qml(root, "handleAction", "Confirm")          # Use MangoHud -> on (preset basic)
+    _invoke_qml(root, "handleAction", "NavigateDown")     # Preset
+    _invoke_qml(root, "handleAction", "NavigateLeft")     # basic -> fps_only
+    for _ in range(4):
+        _invoke_qml(root, "handleAction", "NavigateDown")  # -> Save
     _invoke_qml(root, "handleAction", "Confirm")
     _settle(application, 12)
     if bool(details.property("mangoHudOverlayOpen")):
@@ -3988,24 +4745,21 @@ def probe_couch(
         raise AssertionError(f"Couch MangoHud profile was not saved: {saved_profile!r}")
     details.setProperty("selectedTab", 0)
 
-    # Details always returns to Library and restores the same stable game ID,
-    # even when the details page was opened from Home.
+    # Back returns to the screen Details was opened from (Home here) and keeps
+    # the same stable game selected and focused in the carousel.
     _invoke_qml(root, "handleAction", "Back")
     _settle(application, 12)
-    library = _qt_side_item(root, "couchLibrary")
-    library_grid = _qt_side_item(root, "couchLibraryGrid")
-    if str(root.property("section")) != "library":
-        raise AssertionError("Back from Couch details did not return to Library")
-    filtered_games = _variant(library.property("filteredGames")) or []
-    selected_library_index = int(library_grid.property("currentIndex"))
-    selected_library_id = (
-        str(filtered_games[selected_library_index].get("id", ""))
-        if 0 <= selected_library_index < len(filtered_games)
-        else ""
-    )
-    if selected_library_id != "dying-light":
+    if str(root.property("section")) != "home":
+        raise AssertionError("Back from Couch details did not return to Home")
+    home_selected = _variant(home.property("selectedGame")) or {}
+    # Home keeps the opened game when its carousel contains it; the one and
+    # disconnected fixtures do not, so Home keeps its own valid selection.
+    home_ids = {str(game.get("id", "")) for game in fixture_games}
+    expected_home = "dying-light" if "dying-light" in home_ids else str(home_selected.get("id", ""))
+    if (str(home_selected.get("id", "")) != expected_home or expected_home not in home_ids
+            or int(home.property("focusZone")) != 0):
         raise AssertionError(
-            f"Back from details restored {selected_library_id!r}, not dying-light"
+            f"Back from details restored {home_selected.get('id')!r} (zone {home.property('focusZone')!r}), not dying-light"
         )
 
     focused_after_details = application.focusObject()
@@ -4055,27 +4809,46 @@ def probe_couch(
 
     _invoke_qml(root, "setSection", "library", "dying-light")
     _settle(application, 20)
-    _assert_inside(library_grid, library)
+    library = _qt_side_item(root, "couchLibrary")
+    library_grid = _qt_side_item(root, "couchLibraryGrid")
+    _assert_inside(_qt_side_item(root, "couchLibraryGridFrame"), library)
     if library_grid.width() <= 0 or library_grid.height() <= 0:
         raise AssertionError("Couch library grid has invalid geometry")
-    initial_library_index = int(library_grid.property("currentIndex"))
+    if int(_qt_side_item(root, "couchLibraryNavigation").property("count")) != 4:
+        raise AssertionError("Couch library bottom navigation must have four entries")
+
+    # Confirm opens Details for the selected card; Back returns to that card.
+    selected_library_id = str(library.property("retainedGameId"))
+    _invoke_qml(root, "handleAction", "Confirm")
+    _settle(application, 20)
+    if str(root.property("section")) != "details":
+        raise AssertionError("Confirm on a Library card did not open game details")
+    _invoke_qml(root, "handleAction", "Back")
+    _settle(application, 20)
+    if (str(root.property("section")) != "library"
+            or str(library.property("retainedGameId")) != selected_library_id
+            or int(library.property("focusZone")) != 1):
+        raise AssertionError("Returning from details did not restore the Library card")
+
+    initial_library_index = int(library.property("selectedIndex"))
     _invoke_qml(library, "handleAction", "NavigateRight")
     _settle(application, 5)
-    moved_library_index = int(library_grid.property("currentIndex"))
+    moved_library_index = int(library.property("selectedIndex"))
     if library_grid.property("count") and moved_library_index < initial_library_index:
         raise AssertionError("Couch library directional navigation moved backwards")
 
+    # Search uses the existing on-screen keyboard as an exclusive modal layer.
     _invoke_qml(library, "handleAction", "ContextMenu")
     _settle(application, 3)
-    if not bool(library.property("filterBarFocused")):
-        raise AssertionError("Library filter overlay did not open")
+    if not bool(library.property("keyboardOpen")):
+        raise AssertionError("Library search keyboard did not open")
     _invoke_qml(root, "handleAction", "OpenSystemMenu")
     if system_menu.isVisible():
-        raise AssertionError("System menu opened on top of the Library filter overlay")
+        raise AssertionError("System menu opened on top of the Library search keyboard")
     _invoke_qml(root, "handleAction", "Back")
     _settle(application, 3)
-    if bool(library.property("filterBarFocused")):
-        raise AssertionError("Back did not close only the Library filter overlay")
+    if bool(library.property("keyboardOpen")):
+        raise AssertionError("Back did not close only the Library search keyboard")
     tv_metrics.update({
         "libraryColumns": int(library_grid.property("columnCount")),
         "libraryCellWidth": float(library_grid.property("cellWidth")),
@@ -4102,6 +4875,9 @@ def probe_couch(
     # Settings uses shared history and returns to the page that opened it.
     _invoke_qml(root, "setSection", "tasks", "")
     _invoke_qml(root, "setSection", "settings", "")
+    # First Back moves focus from the settings rows to the categories; the
+    # second one leaves the screen.
+    _invoke_qml(root, "handleAction", "Back")
     _invoke_qml(root, "handleAction", "Back")
     _settle(application, 5)
     if str(root.property("section")) != "tasks":
@@ -4395,6 +5171,11 @@ def main() -> int:
             "tasks",
             "mangohud",
             "optimization",
+            "gamescope",
+            "deep",
+            "deep_polish",
+            "deep_cleanup",
+            "deep_recompression",
             "couch",
             "couch_settings",
             "updates",
@@ -4434,6 +5215,16 @@ def main() -> int:
         result = probe_mangohud_editor(application)
     elif args.mode == "optimization":
         result = probe_optimization_editor(application)
+    elif args.mode == "gamescope":
+        result = probe_gamescope_editor(application)
+    elif args.mode == "deep":
+        result = probe_deep_analysis(application)
+    elif args.mode == "deep_polish":
+        result = probe_deep_analysis_polish(application)
+    elif args.mode == "deep_cleanup":
+        result = probe_deep_cleanup(application)
+    elif args.mode == "deep_recompression":
+        result = probe_deep_recompression(application)
     elif args.mode == "couch":
         result = probe_couch(application, args.width, args.height, args.scenario, args.theme)
     elif args.mode == "couch_settings":

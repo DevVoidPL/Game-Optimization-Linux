@@ -582,3 +582,82 @@ def test_new_couch_audio_settings_recover_from_malformed_values() -> None:
     assert restored.couch_menu_sounds_volume == 100
     assert restored.couch_music_enabled is True
     assert restored.couch_music_volume == 0
+
+
+def _fake_sdl(queue: list[tuple[int, int, int]]):
+    """Minimal SDL3 stand-in: (event type, instance id, button) tuples."""
+
+    import ctypes
+    from types import SimpleNamespace
+
+    def ids(values: tuple[int, ...]):
+        def call(count_ref):
+            count_ref._obj.value = len(values)
+            return (ctypes.c_uint32 * max(1, len(values)))(*values)
+        return call
+
+    def poll(event_ref) -> bool:
+        if not queue:
+            return False
+        kind, which, button = queue.pop(0)
+        event = event_ref._obj
+        if kind in (0x651, 0x652):
+            event.gbutton.type, event.gbutton.which, event.gbutton.button = kind, which, button
+            event.gbutton.down = kind == 0x651
+        else:
+            event.gdevice.type, event.gdevice.which = kind, which
+        return True
+
+    functions = {
+        "SDL_InitSubSystem": lambda _flags: True, "SDL_QuitSubSystem": lambda _flags: None,
+        "SDL_GetGamepads": ids(()), "SDL_GetJoysticks": ids(()),
+        "SDL_OpenGamepad": lambda _id: 1234, "SDL_CloseGamepad": lambda _handle: None,
+        "SDL_GetGamepadName": lambda _handle: b"Steam Virtual Gamepad",
+        "SDL_GetGamepadType": lambda _handle: 1, "SDL_GetGamepadMapping": lambda _handle: 0,
+        "SDL_PollEvent": poll, "SDL_GetGamepadPowerInfo": lambda _handle, _battery: -1,
+        "SDL_free": lambda _pointer: None, "SDL_GetError": lambda: b"",
+        "SDL_SetHint": lambda _name, _value: True,
+        "SDL_GetGamepadVendorForID": lambda _id: 0x28DE,
+        "SDL_GetGamepadProductForID": lambda _id: 0x11FF,
+    }
+    library = SimpleNamespace()
+    for name, function in functions.items():
+        def wrapper(*args, _function=function):
+            return _function(*args)
+        setattr(library, name, wrapper)
+    return library
+
+
+def test_sdl_provider_logs_pad_identity_and_select_y_without_changing_events(caplog) -> None:
+    from game_optimization_linux.providers.gamepad import SDL3GamepadProvider
+
+    queue = [
+        (0x653, 7, 0),                    # gamepad added
+        (0x651, 7, 4), (0x651, 7, 3),     # back down, north down
+        (0x652, 7, 3), (0x652, 7, 4),     # north up, back up
+        (0x651, 7, 3), (0x652, 7, 3),     # north alone
+        (0x654, 7, 0),                    # gamepad removed
+    ]
+    provider = SDL3GamepadProvider(library=_fake_sdl(queue))
+    with caplog.at_level("INFO", logger="game_optimization_linux.providers.gamepad"):
+        provider.start()
+        events = provider.poll_events()
+    info = [r.getMessage() for r in caplog.records if r.levelname == "INFO"]
+    assert [(e.kind, e.control, e.pressed) for e in events] == [
+        ("connected", "", False),
+        ("button", "back", True), ("button", "north", True),
+        ("button", "north", False), ("button", "back", False),
+        ("button", "north", True), ("button", "north", False),
+        ("disconnected", "", False),
+    ]
+    assert any("connected" in m and "vid:pid=28de:11ff" in m and "instance=7" in m
+               and "steam_virtual=True" in m and "Steam Virtual Gamepad" in m for m in info)
+    assert any("disconnected" in m and "steam_virtual=True" in m for m in info)
+    raw = [m for m in info if "raw button" in m]
+    assert raw == [
+        "Gamepad raw button: device=7 control=back pressed=True",
+        "Gamepad raw button: device=7 control=north pressed=True (Select held)",
+        "Gamepad raw button: device=7 control=north pressed=False (Select held)",
+        "Gamepad raw button: device=7 control=back pressed=False",
+    ]                                     # north without Select stays at DEBUG
+    provider.close()

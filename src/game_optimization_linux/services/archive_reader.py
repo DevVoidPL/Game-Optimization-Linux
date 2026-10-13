@@ -20,6 +20,10 @@ MAX_ARCHIVE_FILES: Final = 4096
 MAX_ARCHIVE_BYTES: Final = 4 * 1024**3
 MAX_MEMBER_BYTES: Final = 1024**3
 BUNDLED_7ZIP_HELPER: Final = Path("/app/libexec/game-optimization-7zz")
+# Only for source (.venv) runs, where the Flatpak helper does not exist: a
+# system 7-Zip with BCJ2 support. Executed without a shell; its output goes
+# through the same staging validation as every other extractor.
+SYSTEM_7ZIP_CANDIDATES: Final = ("7zz", "7z")
 SEVENZIP_EXTRACTION_TIMEOUT_SECONDS: Final = 300
 
 
@@ -247,9 +251,20 @@ class SevenZipArchiveReader(ArchiveReader):
         except (py7zr.Bad7zFile, OSError, ValueError) as error:
             raise ArchiveReadError("OptiScaler archive is not a valid 7z file") from error
 
-    def _extract_with_bundled_helper(self, destination: Path) -> None:
+    @staticmethod
+    def _sevenzip_executable() -> Path | None:
         helper = BUNDLED_7ZIP_HELPER
-        if not helper.is_file() or not os.access(helper, os.X_OK):
+        if helper.is_file() and os.access(helper, os.X_OK):
+            return helper
+        for name in SYSTEM_7ZIP_CANDIDATES:
+            found = shutil.which(name)
+            if found:
+                return Path(found)
+        return None
+
+    def _extract_with_bundled_helper(self, destination: Path) -> None:
+        helper = self._sevenzip_executable()
+        if helper is None:
             raise ArchiveReadError(
                 "this 7z archive uses BCJ2 and the bundled extractor is unavailable"
             )
@@ -262,6 +277,7 @@ class SevenZipArchiveReader(ArchiveReader):
                     "-bb0",
                     "-bd",
                     f"-o{destination}",
+                    "--",
                     str(self.path),
                 ],
                 stdin=subprocess.DEVNULL,
@@ -273,7 +289,7 @@ class SevenZipArchiveReader(ArchiveReader):
                 timeout=SEVENZIP_EXTRACTION_TIMEOUT_SECONDS,
                 check=False,
                 shell=False,
-                env={"LANG": "C.UTF-8", "LC_ALL": "C.UTF-8"},
+                env={"LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "PATH": "/usr/bin:/bin"},
             )
         except (OSError, subprocess.TimeoutExpired) as error:
             raise ArchiveReadError("bundled 7z extraction failed") from error
@@ -323,6 +339,7 @@ __all__ = [
     "ArchiveReadError",
     "ArchiveReader",
     "BUNDLED_7ZIP_HELPER",
+    "SYSTEM_7ZIP_CANDIDATES",
     "SevenZipArchiveReader",
     "ZipArchiveReader",
     "open_archive",

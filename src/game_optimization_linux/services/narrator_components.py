@@ -275,6 +275,41 @@ DEFAULT_NARRATOR_COMPONENTS = (
         ),
     ),
     NarratorComponentDefinition(
+        component_id="tts.polish-darkman",
+        kind=NarratorComponentKind.TTS,
+        name="Piper Polish voice - Darkman",
+        license_id="MIT / CC0 source data",
+        runtime_license_id="GPL-3.0-or-later",
+        artifact_license_id="MIT; source dataset CC0",
+        version="piper-voices-c10ece1",
+        download_size_bytes=63_206_110,
+        attribution="pl_PL-darkman-medium from rhasspy/piper-voices",
+        install_ready=True,
+        message="Verified 60.3 MiB Polish male Piper voice for local CPU speech",
+        artifacts=(
+            NarratorComponentArtifact(
+                source_url=(
+                    "https://huggingface.co/rhasspy/piper-voices/resolve/"
+                    "c10ece1aade47bb51c153c893d14e5bf8e5b7117/pl/pl_PL/"
+                    "darkman/medium/pl_PL-darkman-medium.onnx"
+                ),
+                sha256="db505438a5364e8e2e0242c4324130a873ed660dfbe8d9689cef428ffb1b645f",
+                size_bytes=63_201_294,
+                target_relative_path="voices/pl_PL-darkman-medium.onnx",
+            ),
+            NarratorComponentArtifact(
+                source_url=(
+                    "https://huggingface.co/rhasspy/piper-voices/resolve/"
+                    "c10ece1aade47bb51c153c893d14e5bf8e5b7117/pl/pl_PL/"
+                    "darkman/medium/pl_PL-darkman-medium.onnx.json"
+                ),
+                sha256="70f999f11fa8ad13d3ef779041ee93c9f38be5abdbacdfad42449712fe91c81b",
+                size_bytes=4_816,
+                target_relative_path="voices/pl_PL-darkman-medium.onnx.json",
+            ),
+        ),
+    ),
+    NarratorComponentDefinition(
         component_id="audio.qt-pcm",
         kind=NarratorComponentKind.AUDIO,
         name="Qt PCM audio output",

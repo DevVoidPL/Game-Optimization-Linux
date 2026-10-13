@@ -792,7 +792,11 @@ def test_old_narrator_settings_default_to_english_translation_mode() -> None:
         settings.subtitle_language_mode
         is NarratorSubtitleLanguageMode.ENGLISH_TO_POLISH
     )
-    assert settings.to_dict()["subtitle_language_mode"] == "english_to_polish"
+    serialized = settings.to_dict()
+    assert serialized["schema_version"] == 1
+    assert serialized["subtitle_language_mode"] == "english_to_polish"
+    assert settings.subtitle_region_source == "default"
+    assert "subtitle_region_source" not in serialized
 
 
 def test_translation_cache_is_scoped_by_provider_and_profile(tmp_path: Path) -> None:
@@ -864,7 +868,9 @@ def test_portal_capture_falls_back_to_monitor_and_retries_invalid_restore_token(
     backend.state_callbacks[0](CaptureState.RESTORE_FAILED, "expired")
     assert len(backend.requests) == 2
     assert backend.requests[1].restore_token == ""
-    assert grants.load_token("292030") == ""
+    # A failed restore must not delete the saved consent; it is kept until a
+    # later successful start returns a replacement token.
+    assert grants.load_token("292030") == "old-single-use-token"
     assert states[-2][0] is CaptureState.SELECTING_SOURCE
     backend.started_callbacks[0](
         CaptureSessionInfo(
@@ -874,7 +880,9 @@ def test_portal_capture_falls_back_to_monitor_and_retries_invalid_restore_token(
             restore_token="stale-token",
         )
     )
-    assert grants.load_token("292030") == ""
+    # The first session's started callback is stale (superseded by the retry),
+    # so it neither activates nor overwrites the preserved consent.
+    assert grants.load_token("292030") == "old-single-use-token"
     backend.started_callbacks[-1](
         CaptureSessionInfo(
             session_id="session-a",
@@ -1638,9 +1646,14 @@ def test_disappearance_and_unchanged_subtitle_do_not_repeat_narration(
     assert pipeline.snapshot.last_ocr_rejection_reason == "duplicate"
     assert pipeline.snapshot.last_accepted_ocr_text == "Run!"
     assert pipeline.snapshot.last_ocr_observation_credible is True
-    assert pipeline.snapshot.last_ocr_gate_decision == "rejected_duplicate"
-    assert pipeline.snapshot.ocr_candidate_observation_count == 2
+    assert pipeline.snapshot.last_ocr_gate_decision == "duplicate_accepted_phrase"
+    last_decision = pipeline.snapshot.ocr_decision_history[-1]
+    assert last_decision.reason_code == "active_episode_variant"
+    assert last_decision.canonical_text == "Run!"
+    assert last_decision.tts_submitted is False
+    assert pipeline.snapshot.ocr_candidate_observation_count == 0
     assert pipeline.snapshot.ocr_candidate_required_observations == 2
+    assert last_decision.candidate_id == 0
 
 
 def test_pipeline_ignores_inference_completion_after_stop(tmp_path: Path) -> None:

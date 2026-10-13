@@ -532,7 +532,11 @@ def main(
         plan = OptimizationLaunchPlanner().build(
             profile, game_argv, gamemode=gamemode, gamescope=gamescope,
             mangohud_fps_limit=(
-                None if baseline_session is not None else mangohud_profile.fps_limit
+                None
+                if baseline_session is not None
+                or (profile.gamescope_enabled and profile.gamescope_mode != "disabled"
+                    and profile.target_fps_mode != "unlimited")
+                else mangohud_profile.fps_limit
             ),
             optiscaler_override=optiscaler_override,
             existing_wine_overrides=steam_environment.get("WINEDLLOVERRIDES", ""),
@@ -542,6 +546,13 @@ def main(
                 "measurement_session" if baseline_session else mangohud_activation_owner
             ),
             measurement_environment=measurement_environment,
+            # With --mangoapp the generated per-game MangoHud profile is still
+            # the configuration MangoHud reads.
+            mangohud_config_path=(
+                mango_profiles.config_path(app_id)
+                if mangohud_profile.enabled and mango_profiles.config_path(app_id).is_file()
+                else ""
+            ),
         )
         print(
             f"game-optimization-run: LaunchPlan AppID={app_id} Steam command: "

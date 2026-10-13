@@ -1749,7 +1749,7 @@ class BtrfsCompressionAnalyzer:
 
         self._check_cancel(cancel_event)
         command_argv = [os.fspath(argument) for argument in command]
-        logger.info("Starting read-only analysis helper argv=%r", command_argv)
+        logger.debug("Starting read-only analysis helper argv=%r", command_argv)
         now = self._clock()
         remaining = min(
             self._limits.command_timeout_seconds,

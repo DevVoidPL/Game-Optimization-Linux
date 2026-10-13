@@ -90,6 +90,12 @@
     "default_color": "#4fd7c6"
   },
   {
+    "filename": "sidebar-donate.svg",
+    "semantic_name": "Donate",
+    "category": "sidebar",
+    "default_color": "#4fd7c6"
+  },
+  {
     "filename": "sidebar-settings.svg",
     "semantic_name": "Settings",
     "category": "sidebar",

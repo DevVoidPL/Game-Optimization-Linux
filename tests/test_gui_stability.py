@@ -231,6 +231,7 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
     assert "updateColumn" not in sidebar
     for name, property_name in (
         ("games", "sidebarGames"),
+        ("narrator", "sidebarNarrator"),
         ("updates", "sidebarUpdates"),
         ("tasks", "sidebarTasks"),
         ("system", "sidebarSystem"),
@@ -239,9 +240,7 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
         assert f"App.UiIcons.{property_name}" in sidebar
         assert f'assets/ui-icons/sidebar-{name}.svg' in ui_icons
         assert (qml_root.parent / "assets" / "ui-icons" / f"sidebar-{name}.svg").is_file()
-    # The global "Narrator" sidebar destination was removed (Narrator is now a
-    # per-game tab); the icon asset itself stays registered for Couch's use.
-    assert '"page": "narrator"' not in sidebar
+    assert '"page": "narrator"' in sidebar
     assert "assets/ui-icons/sidebar-narrator.svg" in ui_icons
     assert (qml_root.parent / "assets" / "ui-icons" / "sidebar-narrator.svg").is_file()
 
@@ -308,6 +307,158 @@ def test_mangohud_desktop_editor_renders_and_saves_appid_profile(tmp_path: Path)
     assert result["application_config"].endswith("/MangoHud/wine-Spelunky.conf")
     assert result["application_config_managed"] is True
     assert result["save_button_inside"] is True
+    # Real clicks/typing: dirty, save, exact MangoHud keys, reload and reset.
+    assert result["graph_dirty"] is True
+    assert result["graph_in_preview"] is True
+    assert result["manual_metric_preset"] == "custom"
+    assert result["restored_metric_preset"] == "basic"
+    assert result["color_value"] == "FF0000"
+    assert result["preview_gpu_label_color"].upper() == "#FF0000"
+    assert result["horizontal_preview"] is True
+    assert result["unsaved_before_save"] is True
+    assert result["saved_clean"] is True
+    assert result["saved_fields"] == [True, "FF0000", True]
+    assert result["saved_keys"] == [True, True, True]
+    assert result["reloaded_color_text"] == "FF0000"
+    assert result["reloaded_graph"] is True
+    assert result["reset_color_text"] == "2E9762"
+    assert result["reset_horizontal_switch"] is False
+    assert result["reset_preset"] == "disabled"
+
+
+def test_deep_recompression_ui_selection_confirmation_progress_cancel_history(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "deep_recompression")
+    result = payload["result"]
+    assert result["panel_visible"] is True
+    assert "per-file shared-extent check" in result["capabilities_text"]
+    assert result["future_enabled"] is False  # restore of the property is not documented locally
+    assert result["nothing_selected"] is True and result["start_disabled"] is True
+    assert result["list_collapsed"] is True
+    assert "zlib estimate, not a Zstd result" in result["estimate"]
+    assert result["selected"] == [".csv", ".dll", ".txt"]
+    assert result["selection_text"].startswith("Selected: 3 files")
+    assert len(result["type_rows"]) == 3
+    assert result["confirm_text"].startswith("Recompression does not change the logical content of files")
+    assert "cannot be undone" in result["confirm_text"] and "Shared extents are skipped" in result["confirm_text"]
+    assert result["result_text"] == "Recompression finished."
+    assert result["history"] == ["completed"]
+    assert "not measured" in result["history_text"][0] and "3 recompressed" in result["history_text"][0]
+    assert result["defragments"] == 3
+    assert result["progress_visible"] is True
+    assert result["cancel_text"].startswith("Cancelled after the current file")
+    assert result["history_after_cancel"] == ["cancelled", "completed"]
+
+
+def test_deep_cleanup_ui_selection_quarantine_restart_restore_finalize(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "deep_cleanup")
+    result = payload["result"]
+    assert result["notice"] == "The quarantine is reversible, but it does not free disk space yet."
+    assert result["nothing_selected"] is True
+    assert result["quarantine_disabled_initially"] is True
+    assert (result["target_enabled"], result["fallback_enabled"], result["shared_enabled"]) == (False, False, False)
+    # Review + selectable has a checkbox; Review + external only a lock.
+    assert result["review_selectable_checkbox"] is True
+    assert (result["external_checkbox"], result["external_lock"], result["target_lock"]) == (False, True, True)
+    assert result["external_badge"] == "Outside the scope of this plan"
+    # Crash dump, old log, German text and redist (11 B); the 50 B own shader
+    # cache is external and never counted.
+    assert result["selectable_bytes"] == "11 B"
+    assert result["global_checkboxes"] == 0
+    assert result["safe_selection"] == ["cache/crash_dumps", "cache/logs_old"]
+    assert result["summary"] == {"files": 3, "bytes": 9, "safe": 2, "review": 1}
+    assert result["summary_languages"] == ["de"]
+    assert result["freed_text"] == "Potentially freed after finalization: 9 B"
+    assert result["after_quarantine_state"] == "Ready for a game test"
+    assert result["files_moved"] is True
+    assert result["launched"] is True
+    assert result["active_after_restart"] == "quarantined"
+    assert result["restored_files"] is True
+    assert result["confirm_enabled_wrong_word"] is False
+    assert result["confirm_enabled_right_word"] is True
+    assert result["finalize_size_text"].startswith("2 files")
+    assert result["steam_hint"] is True
+    assert result["history_states"] == ["finalized", "restored"]
+    assert result["history_private"] is False
+    assert result["finalized_gone"] is True
+
+
+def test_deep_analysis_polish_ui_and_long_groups_collapse(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "deep_polish")
+    result = payload["result"]
+    assert result["status"] == "completed"
+    # G. No English labels remain in the Polish UI.
+    assert result["english_labels"] == []
+    assert result["badges"] == sorted([
+        "Bezpieczne - można przenieść",
+        "Do sprawdzenia - można przenieść",
+        "Chronione - nie można usunąć",
+        "Poza zakresem tego planu",
+        "Brak bezpiecznej reguły - nie można usunąć",
+    ])
+    assert result["has_polish_analyze"] is True
+    assert result["fallback_notice"] is True
+    # H. Long groups show 10 paths, expand to at most 100 and collapse again;
+    # big core/opaque groups start fully collapsed.
+    assert result["logs_default_paths"] == 10
+    assert result["logs_expanded_paths"] == 100
+    assert result["logs_collapsed_paths"] == 10
+    assert result["packages_default_paths"] == 0
+
+
+def test_deep_analysis_ui_starts_cancels_filters_and_exports(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "deep")
+    result = payload["result"]
+    assert result["notice"] == (
+        "The analysis does not change game files. Review items require manual "
+        "confirmation in the next stage."
+    )
+    assert result["apply_enabled"] is False
+    assert result["initial_status"] == "idle"
+    assert result["running_status"] == "running"
+    assert result["progress_visible"] is True and result["cancel_visible"] is True
+    assert result["analyze_disabled_while_running"] is True
+    assert result["cancelled_status"] == "cancelled"
+    assert result["cancelled_saved"] is False
+    assert result["completed_status"] == "completed"
+    assert result["categories"] == ["languages", "audio", "cache", "residues", "textures", "btrfs"]
+    assert result["audio_rendered"] is True
+    assert "confidence" in result["engine_label"]
+    assert result["filter"] == "review"
+    assert result["filtered_safeties"] == ["review"]
+    assert result["export_schema"] == 1
+    assert result["export_private"] is False
+    assert result["export_message"].startswith("Report exported")
+    assert result["game_unchanged"] is True
+
+
+def test_gamescope_desktop_sections_follow_capabilities_and_persist(tmp_path: Path) -> None:
+    payload = _run_probe(tmp_path, "gamescope")
+    result = payload["result"]
+    # Full local --help: advanced sections and options are offered.
+    assert result["full_hdr_section"] is True
+    assert result["full_display_index"] is True
+    assert result["full_force_grab"] is True
+    assert result["full_advanced_warning"] is False
+    assert result["full_filters"] == ["linear", "nearest", "fsr", "nis", "pixel", "sgsr"]
+    assert result["full_backends"] == ["auto", "wayland", "sdl"]
+    # Real clicks mark the draft dirty and reach the generated argv.
+    assert result["dirty_after_click"] is True
+    assert "--adaptive-sync" in result["preview_arguments"]
+    assert "--force-windows-fullscreen" in result["preview_arguments"]
+    assert result["steam_options"].startswith("gamescope ")
+    assert result["steam_options"].endswith(" -- %command%")
+    assert result["saved_flags"] == [True, True]
+    assert result["clean_after_save"] is True
+    assert result["reloaded_switches"] == [True, True]
+    # Restore resets only Gamescope fields to program defaults.
+    assert result["reset_profile"] == [False, False, False, "custom"]
+    assert result["reset_switch"] is False
+    # Unreadable --help: basic integration only, advanced options hidden.
+    assert result["basic_advanced_warning"] is True
+    assert result["basic_hdr_section"] is False
+    assert result["basic_force_grab"] is False
+    assert result["basic_display_index"] is False
+    assert result["basic_filters"] == ["linear"]
 
 
 def test_optimization_desktop_editor_saves_real_appid_profile(tmp_path: Path) -> None:

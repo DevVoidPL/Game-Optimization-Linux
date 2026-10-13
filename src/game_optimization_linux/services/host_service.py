@@ -58,6 +58,7 @@ _HOST_EXECUTABLES = frozenset(
         "gamemoded",
         "mangohud",
         "vulkaninfo",
+        "vkcube",
         "btrfs",
         "compsize",
         "bottles",
@@ -68,6 +69,8 @@ _HOST_EXECUTABLES = frozenset(
         "xrandr",
         "pkexec",
         "true",
+        # Read-only process list for "is the game running" (Narrator autostart).
+        "ps",
     }
 )
 _TOOL_SPECS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
@@ -88,6 +91,11 @@ _TOOL_SPECS: dict[str, tuple[tuple[str, ...], tuple[str, ...]]] = {
         ("com.heroicgameslauncher.hgl",),
     ),
     "lutris": (("lutris",), ("net.lutris.Lutris",)),
+}
+_LIVE_PREVIEW_PROBES: dict[str, tuple[str, ...]] = {
+    "gamescope": ("--version",),
+    "mangohud": ("--version",),
+    "vkcube": ("--help",),
 }
 _VERSION_ARGUMENTS: dict[str, tuple[str, ...]] = {
     "flatpak": ("--version",),
@@ -265,6 +273,9 @@ class HostServiceClient:
             version = flatpak_version
 
         supported_options: tuple[str, ...] = ()
+        supported_filters: tuple[str, ...] = ()
+        supported_scalers: tuple[str, ...] = ()
+        supported_backends: tuple[str, ...] = ()
         runtime_available = bool(selected or flatpak_id)
         if normalized == "gamescope" and selected:
             help_result = self._run_fixed(selected, ("--help",), timeout=8.0)
@@ -274,14 +285,13 @@ class HostServiceClient:
                 probe_error = "gamescope --help could not be executed"
             else:
                 help_text = f"{help_result.stdout or ''}\n{help_result.stderr or ''}"
-                supported_options = tuple(
-                    option
-                    for option in (
-                        "-W", "-H", "-w", "-h", "-r", "--framerate-limit",
-                        "-f", "-b", "-S", "-F", "--display-index",
-                    )
-                    if option in help_text
+                from .optimization_runtime import (
+                    parse_gamescope_backends,
+                    parse_gamescope_help,
                 )
+
+                supported_options, supported_filters, supported_scalers = parse_gamescope_help(help_text)
+                supported_backends = parse_gamescope_backends(help_text)
         elif normalized == "gamemode" and selected:
             runtime_available = bool(result is not None and result.returncode == 0)
             daemon_version = self._run_fixed("gamemoded", ("--version",), timeout=8.0)
@@ -322,6 +332,9 @@ class HostServiceClient:
             "diagnostic_message": message,
             "runtime_available": runtime_available,
             "supported_options": list(supported_options),
+            "supported_filters": list(supported_filters),
+            "supported_scalers": list(supported_scalers),
+            "supported_backends": list(supported_backends),
         }
         if normalized == "mangohud":
             payload.update(
@@ -332,6 +345,29 @@ class HostServiceClient:
             )
         self._tool_cache[normalized] = dict(payload)
         return payload
+
+    def host_command_available(self, command: str) -> bool:
+        """Whether a MangoHud live-preview command exists on the host PATH.
+
+        Only the two fixed preview programs are accepted.  ``vkcube --help``
+        prints usage and exits without opening a window.
+        """
+
+        arguments = _LIVE_PREVIEW_PROBES.get(str(command))
+        if arguments is None:
+            raise HostServiceError("Unsupported host preview command")
+        result = self._run_fixed(str(command), arguments, timeout=8.0)
+        return result is not None and not self._missing_command(result)
+
+    def host_command_help(self, command: str) -> str:
+        """``--help`` text of a fixed preview program (currently only vkcube)."""
+
+        if str(command) != "vkcube":
+            raise HostServiceError("Unsupported host preview command")
+        result = self._run_fixed("vkcube", ("--help",), timeout=8.0)
+        if result is None or self._missing_command(result):
+            return ""
+        return f"{result.stdout or ''}\n{result.stderr or ''}"
 
     def _steam_info(self) -> dict[str, Any]:
         """Detect Steam without starting the client or any compatibility probe."""
@@ -422,6 +458,21 @@ class HostServiceClient:
                 or "The optional host component returned an incomplete compsize measurement"
             )
         return measurement
+
+    def host_process_commands(self) -> tuple[str, ...] | None:
+        """Command lines of host processes (read-only ``ps``); None if unknown.
+
+        Used only to recognise a running game from the sandbox: Steam's
+        ``reaper SteamLaunch AppId=<id>`` wrapper, or the game's own path.
+        """
+
+        try:
+            result = self._run_fixed("ps", ("-eo", "args=", "--width", "512"), timeout=3.0)
+        except HostServiceError:
+            return None
+        if result is None or result.returncode != 0:
+            return None
+        return tuple(line.strip() for line in result.stdout.splitlines() if line.strip())
 
     def cancel_all(self) -> None:
         with self._measurement_processes_lock:

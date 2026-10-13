@@ -108,6 +108,10 @@ class PortalScreenCaptureProvider:
         self._state_callback: StateCallback | None = None
         self._restore_retry_used = False
         self._attempt = 0
+        # Games whose saved window choice could not be restored, and games
+        # whose window was just chosen (the UI asks to check the preview).
+        self.stale_grants: set[str] = set()
+        self.fresh_selections: set[str] = set()
 
     def capabilities(self) -> CaptureCapabilities:
         if self._backend is None:
@@ -185,6 +189,11 @@ class PortalScreenCaptureProvider:
                 else ""
             )
         )
+        logger.info(
+            "Narrator capture: start for %s, saved window token=%s",
+            request.game_key,
+            "yes" if restore_token else "no",
+        )
         self._request = CaptureRequest(
             session_id=request.session_id,
             game_key=request.game_key,
@@ -250,11 +259,29 @@ class PortalScreenCaptureProvider:
             or info.session_id != request.session_id
         ):
             return
+        self.stale_grants.discard(request.game_key)
+        if not request.restore_token:
+            self.fresh_selections.add(request.game_key)
+        logger.info(
+            "Narrator capture: session active for %s, restored saved window=%s",
+            request.game_key,
+            "yes" if request.restore_token else "no (fresh selection)",
+        )
         if info.restore_token:
             try:
                 self._grants.save_token(request.game_key, info.restore_token)
+                logger.info(
+                    "Narrator capture: saved new window token for %s",
+                    request.game_key,
+                )
             except Exception as error:
                 logger.warning("Could not save narrator portal restore token: %s", error)
+        else:
+            logger.info(
+                "Narrator capture: portal returned no new token for %s; "
+                "keeping the previously saved window choice",
+                request.game_key,
+            )
         callback(CaptureState.ACTIVE, "")
 
     def _on_state(self, state: CaptureState, message: str, attempt: int) -> None:
@@ -268,10 +295,14 @@ class PortalScreenCaptureProvider:
             and not self._restore_retry_used
         ):
             self._restore_retry_used = True
-            try:
-                self._grants.save_token(request.game_key, "")
-            except Exception as error:
-                logger.warning("Could not clear narrator portal restore token: %s", error)
+            self.stale_grants.add(request.game_key)
+            # Keep the saved consent: a failed restore must not erase or
+            # overwrite it. Only a later *successful* start writes a new token.
+            logger.info(
+                "Narrator capture: saved window could not be restored for %s; "
+                "keeping the saved choice and asking for a source once",
+                request.game_key,
+            )
             if self._backend is not None:
                 self._backend.stop()
             retry = CaptureRequest(

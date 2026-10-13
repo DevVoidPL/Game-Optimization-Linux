@@ -102,6 +102,8 @@ class SettingsController:
                 self._app._set_interface_mode("desktop")
             elif converted_value is ControllerMode.COUCH_ONLY:
                 self._app._set_interface_mode("couch")
+        elif field_name == "couch_show_system_usage":
+            self._app._system_usage.set_enabled(bool(converted_value))
         elif field_name == "interface_sounds":
             self._app._ui_sound_service.set_enabled(bool(converted_value))
         elif field_name in {
@@ -170,12 +172,14 @@ class SettingsController:
             "navigationRepeatRateMs": "navigation_repeat_rate_ms",
             "hideCursorInCouchMode": "hide_cursor_in_couch_mode",
             "startCouchModeFullscreen": "start_couch_mode_fullscreen",
+            "couchShowSystemUsage": "couch_show_system_usage",
             "postLaunchBehavior": "post_launch_behavior",
             "interfaceSounds": "interface_sounds",
             "couchMenuSoundsEnabled": "couch_menu_sounds_enabled",
             "couchMenuSoundsVolume": "couch_menu_sounds_volume",
             "couchMusicEnabled": "couch_music_enabled",
             "couchMusicVolume": "couch_music_volume",
+            "couchMotionMode": "couch_motion_mode",
         }
         requested = aliases.get(key, key)
         if not is_dataclass(self._app._settings_model):

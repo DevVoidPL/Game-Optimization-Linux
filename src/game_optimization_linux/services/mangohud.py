@@ -14,7 +14,13 @@ import tempfile
 from typing import Any
 
 from game_optimization_linux.config import GAMES_CONFIG_DIR, MANGOHUD_LOG_DIR
-from game_optimization_linux.models import Game, MangoHudProfile, validate_game_key
+from game_optimization_linux.models import (
+    MANGOHUD_DEFAULT_COLORS,
+    PRESET_METRICS,
+    Game,
+    MangoHudProfile,
+    validate_game_key,
+)
 
 from .game_executable import ExecutableResolution, GameExecutableResolver
 from .host_bootstrap import host_home_directory
@@ -73,9 +79,170 @@ KNOWN_CONFIG_KEYS = frozenset(
         "permit_upload",
         "frame_timing",
         "throttling_status",
+        *MANGOHUD_DEFAULT_COLORS,
         *METRIC_CONFIG_KEYS.values(),
     }
 )
+
+# MangoHud's default (legacy) layout draws elements in a fixed order that does
+# not depend on the file.  One row per element: (row id, label, colour field of
+# the label, metrics).  The first metric of GPU/CPU/FPS is the anchor: without
+# it MangoHud does not draw that row, so its other values stay hidden too.
+HUD_ROWS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
+    ("gpu", "GPU", "gpu_color", ("gpu_usage", "gpu_temperature", "gpu_clock", "gpu_power")),
+    ("cpu", "CPU", "cpu_color", ("cpu_usage", "cpu_temperature", "cpu_clock", "cpu_power")),
+    ("vram", "VRAM", "vram_color", ("vram",)),
+    ("ram", "RAM", "ram_color", ("ram",)),
+    ("process_memory", "PROC", "ram_color", ("process_memory",)),
+    ("process_vram", "PROC", "vram_color", ("process_vram",)),
+    ("battery", "BATT", "text_color", ("battery",)),
+    ("fps", "VULKAN", "", ("fps", "frametime")),
+    ("wine", "", "", ("wine_proton",)),
+    ("gamemode", "GAMEMODE", "text_color", ("gamemode",)),
+    ("resolution", "RES", "text_color", ("resolution",)),
+    ("network", "NET", "text_color", ("network",)),
+)
+_ANCHORED_ROWS = frozenset({"gpu", "cpu", "fps"})
+# Fixed MangoHud 0.8.4 colours that Game Optimization does not configure.
+_ENGINE_COLOR = "EB5B5B"
+_WINE_COLOR = "EB5B5B"
+HUD_SAMPLE_VALUES: dict[str, str] = {
+    "fps": "60",
+    "frametime": "16.7 ms",
+    "gpu_usage": "78%",
+    "gpu_temperature": "64\N{DEGREE SIGN}C",
+    "gpu_clock": "1850 MHz",
+    "gpu_power": "142 W",
+    "vram": "5.2 GiB",
+    "cpu_usage": "42%",
+    "cpu_temperature": "58\N{DEGREE SIGN}C",
+    "cpu_clock": "4200 MHz",
+    "cpu_power": "65 W",
+    "ram": "12.4 GiB",
+    "process_memory": "3.1 GiB",
+    "process_vram": "4.0 GiB",
+    "resolution": "2560x1440",
+    "wine_proton": "Proton 9.0",
+    "gamemode": "ON",
+    "battery": "86%",
+    "network": "1.2 MiB/s",
+}
+_ALWAYS_WRITTEN_METRIC_KEYS = ("fps", "frametime", "gpu_stats", "cpu_stats")
+
+
+def hud_metrics(
+    profile: MangoHudProfile, supported_keys: Iterable[str] = KNOWN_CONFIG_KEYS
+) -> tuple[str, ...]:
+    """Selected metrics MangoHud can show, in HUD order; shared by writer and preview."""
+
+    supported = frozenset(supported_keys)
+    selected = set(profile.metrics)
+    return tuple(
+        metric
+        for _row, _label, _color, metrics in HUD_ROWS
+        for metric in metrics
+        if metric in selected and METRIC_CONFIG_KEYS[metric] in supported
+    )
+
+
+def hud_layout(
+    profile: MangoHudProfile, supported_keys: Iterable[str] = KNOWN_CONFIG_KEYS
+) -> dict[str, Any]:
+    """Describe the HUD the generated config produces, with sample values.
+
+    This is a layout approximation of MangoHud's default layout, not a
+    pixel-perfect rendering and never a live measurement.
+    """
+
+    supported = frozenset(supported_keys).intersection(KNOWN_CONFIG_KEYS)
+    shown = hud_metrics(profile, supported)
+    columns = max(1, int(profile.table_columns))
+
+    def color(name: str) -> str:
+        value = getattr(profile, name) if name in supported else MANGOHUD_DEFAULT_COLORS[name]
+        return f"#{value}"
+
+    rows: list[dict[str, Any]] = []
+    hidden: list[dict[str, str]] = []
+    for row_id, label, label_color, metrics in HUD_ROWS:
+        present = [metric for metric in metrics if metric in shown]
+        if not present:
+            continue
+        if row_id in _ANCHORED_ROWS and metrics[0] not in present:
+            hidden.extend({"metric": metric, "requires": metrics[0]} for metric in present)
+            continue
+        if row_id == "fps":
+            label_hex = f"#{_ENGINE_COLOR}"
+        elif row_id == "wine":
+            label_hex = f"#{_WINE_COLOR}"
+        else:
+            label_hex = color(label_color)
+        values = [
+            {
+                "metric": metric,
+                "text": HUD_SAMPLE_VALUES[metric],
+                "color": f"#{_WINE_COLOR}" if metric == "wine_proton" else color("text_color"),
+            }
+            for metric in present
+        ]
+        rows.append({"id": row_id, "label": label, "color": label_hex, "values": values})
+
+    # Vertical layout: MangoHud fills a table of ``table_columns`` cells per
+    # line and starts each element on a new line.
+    cells: list[dict[str, Any]] = []
+    inline_cells: list[dict[str, Any]] = []
+    for row in rows:
+        row_cells = []
+        if row["label"]:
+            row_cells.append({"text": row["label"], "color": row["color"], "label": True})
+        row_cells.extend(
+            {"text": value["text"], "color": value["color"], "label": False}
+            for value in row["values"]
+        )
+        inline_cells.extend(row_cells)
+        cells.extend(row_cells)
+        remainder = len(row_cells) % columns
+        if remainder:
+            cells.extend(
+                {"text": "", "color": "", "label": False, "pad": True}
+                for _ in range(columns - remainder)
+            )
+    graph = bool(profile.frame_timing_graph and "frame_timing" in supported)
+    return {
+        "position": profile.position,
+        "horizontal": profile.horizontal,
+        "compact": profile.compact,
+        "tableColumns": columns,
+        "fontSize": profile.font_size,
+        "roundCorners": profile.round_corners,
+        "backgroundAlpha": profile.background_alpha,
+        "backgroundColor": color("background_color"),
+        "textColor": color("text_color"),
+        "frametimeColor": color("frametime_color"),
+        "frameTimingGraph": graph,
+        "metrics": [metric for row in rows for metric in (v["metric"] for v in row["values"])],
+        "hiddenMetrics": hidden,
+        "rows": rows,
+        "cells": cells,
+        "inlineCells": inline_cells,
+        "empty": not rows and not graph,
+    }
+
+
+def display_config_text(text: str, home: Path | str | None = None) -> str:
+    """Config text for display/copy: the private home directory becomes ``~``."""
+
+    home_text = str(home if home is not None else Path.home()).rstrip("/")
+    if not home_text or home_text == "/":
+        return text
+    pattern = re.compile(re.escape(home_text) + r"(?=/|$)", re.MULTILINE)
+    return pattern.sub("~", text)
+
+
+def preset_metric_sets() -> dict[str, list[str]]:
+    """Preset metric sets for QML, from the single model definition."""
+
+    return {preset: list(metrics) for preset, metrics in PRESET_METRICS.items()}
 
 _EXAMPLE_KEY = re.compile(r"^\s*#?\s*([a-z][a-z0-9_]*)\s*(?:=|$)")
 
@@ -208,23 +375,31 @@ class MangoHudConfigWriter:
             add("vsync", profile.vsync)
         add("toggle_hud", profile.toggle_hud_key)
 
-        selected_keys = {METRIC_CONFIG_KEYS[metric] for metric in profile.metrics}
+        for name, default in MANGOHUD_DEFAULT_COLORS.items():
+            value = getattr(profile, name)
+            if value != default:
+                add(name, value)
+
+        metrics = hud_metrics(profile, self.supported_keys)
+        selected_keys = {METRIC_CONFIG_KEYS[metric] for metric in metrics}
         # These are enabled by default in MangoHud. Explicit zeroes make a
         # custom profile faithfully reflect the user's metric selection.
-        for key in ("fps", "frametime", "gpu_stats", "cpu_stats"):
+        for key in _ALWAYS_WRITTEN_METRIC_KEYS:
             add(key, None if key in selected_keys else 0)
-        add("frame_timing", 0)
+        add("frame_timing", None if profile.frame_timing_graph else 0)
         add("throttling_status", 0)
-        for metric in profile.metrics:
+        for metric in metrics:
             key = METRIC_CONFIG_KEYS[metric]
-            if key not in {"fps", "frametime", "gpu_stats", "cpu_stats"}:
+            if key not in _ALWAYS_WRITTEN_METRIC_KEYS:
                 add(key)
 
         add("permit_upload", 0)
         if profile.logging_enabled:
             add("output_folder", profile.output_folder)
             add("log_duration", profile.log_duration)
-            add("log_interval", self._alpha(profile.log_interval))
+            # MangoHud reads log_interval as whole milliseconds (the measurement
+            # session writes log_interval=100); the profile stores seconds.
+            add("log_interval", round(profile.log_interval * 1000))
             add("toggle_logging", profile.toggle_logging_key)
 
         lines = [

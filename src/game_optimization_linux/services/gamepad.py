@@ -100,6 +100,13 @@ class GamepadInputMapper:
         }
         self._view_holds.pop(instance_id, None)
 
+    def suppress_view_release(self, instance_id: int) -> None:
+        """The View/Select button was part of a shortcut: no action on release."""
+
+        hold = self._view_holds.get(instance_id)
+        if hold is not None:
+            self._view_holds[instance_id] = (hold[0], True)
+
     @staticmethod
     def _button_action(control: str) -> GamepadAction | None:
         return {
@@ -290,6 +297,12 @@ class GamepadService(QObject):
     controllerDisconnected = Signal(str)
     mappingChanged = Signal(object)
     inputActivity = Signal(str)
+    # Global shortcut (also while a game has focus): with Select/View held,
+    # press Y. Fires on the Y press; no hold needed.
+    shortcutTriggered = Signal(str)
+    SHORTCUT_MODIFIER = "back"
+    SHORTCUT_TRIGGER = "north"
+    SHORTCUT_COOLDOWN_SECONDS = 1.5
 
     def __init__(
         self,
@@ -305,6 +318,8 @@ class GamepadService(QObject):
         self._devices: list[GamepadDevice] = []
         self._active_id: int | None = None
         self._mapper = GamepadInputMapper()
+        self._held_buttons: dict[int, set[str]] = {}
+        self._shortcut_last = float("-inf")
         self._started = False
         self._stopped = False
         self._timer = QTimer(self)
@@ -419,6 +434,23 @@ class GamepadService(QObject):
                         self.activeControllerChanged.emit()
                 elif event.kind == "remapped" and current:
                     self.mappingChanged.emit(current.to_dict())
+            if event.kind == "button":
+                held = self._held_buttons.setdefault(event.instance_id, set())
+                if (
+                    event.pressed
+                    and event.control == self.SHORTCUT_TRIGGER
+                    and self.SHORTCUT_MODIFIER in held
+                ):
+                    # Select + Y: the Y press is the shortcut, not "More actions".
+                    held.add(event.control)
+                    self._fire_shortcut(event.instance_id, time.monotonic())
+                    continue
+                if event.pressed and event.control == self.SHORTCUT_MODIFIER:
+                    logger.info(
+                        "Gamepad shortcut: Select held on device %s (press Y for the Narrator)",
+                        event.instance_id,
+                    )
+                (held.add if event.pressed else held.discard)(event.control)
             meaningful = self._mapper.is_meaningful(event)
             actions = self._mapper.process(event)
             if meaningful:
@@ -436,6 +468,19 @@ class GamepadService(QObject):
             self.actionTriggered.emit(action.value)
         if devices_changed:
             self.controllersChanged.emit()
+
+    def _fire_shortcut(self, instance_id: int, now: float) -> None:
+        # Select stays pressed through the combination; its release must not
+        # trigger its own short-press action.
+        self._mapper.suppress_view_release(instance_id)
+        if now - self._shortcut_last < self.SHORTCUT_COOLDOWN_SECONDS:
+            logger.debug(
+                "Gamepad shortcut: Select+Y on device %s ignored (cooldown)", instance_id
+            )
+            return
+        self._shortcut_last = now
+        logger.info("Gamepad shortcut: Select+Y fired on device %s (narrator_toggle)", instance_id)
+        self.shortcutTriggered.emit("narrator_toggle")
 
     def _device(self, identifier: int | None) -> GamepadDevice | None:
         if identifier is None:

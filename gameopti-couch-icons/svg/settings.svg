@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Ustawienia">
+  <title>Ustawienia</title>
+  <path d="M27.26 9.87L26.32 5.14L21.68 5.14L20.74 9.87A14.5 14.5 0 0 0 13.4 14.11L8.83 12.57L6.51 16.58L10.13 19.76A14.5 14.5 0 0 0 10.13 28.24L6.51 31.42L8.83 35.43L13.4 33.89A14.5 14.5 0 0 0 20.74 38.13L21.68 42.86L26.32 42.86L27.26 38.13A14.5 14.5 0 0 0 34.6 33.89L39.17 35.43L41.49 31.42L37.87 28.24A14.5 14.5 0 0 0 37.87 19.76L41.49 16.58L39.17 12.57L34.6 14.11A14.5 14.5 0 0 0 27.26 9.87Z" stroke="#E6ECEF"/>
+  <circle cx="24" cy="24" r="5.5" stroke="#45D0B5"/>
+</svg>

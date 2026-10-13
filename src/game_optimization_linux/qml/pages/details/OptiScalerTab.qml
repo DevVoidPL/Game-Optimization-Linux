@@ -29,7 +29,7 @@ Item {
             }
             Label {
                 Layout.fillWidth: true
-                text: qsTr("Install and configure OptiScaler for this game. Advanced injection and backend controls stay hidden until requested.")
+                text: qsTr("Zainstaluj i skonfiguruj OptiScaler dla tej gry. Zaawansowane ustawienia wstrzykiwania i backendu pozostają ukryte, dopóki nie zostaną wywołane.")
                 color: App.Theme.textSecondary
                 wrapMode: Text.WordWrap
             }

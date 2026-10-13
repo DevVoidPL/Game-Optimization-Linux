@@ -6,6 +6,50 @@ QtObject {
         return String(value === undefined || value === null ? "" : value)
     }
 
+    // Presentation name for a stable launcher id / backend launcher value.
+    // Ids stay "steam" | "heroic" | "lutris" | "custom" (backend "Manual").
+    function launcherName(value) {
+        switch (text(value).trim().toLowerCase()) {
+        case "steam": return "Steam"
+        case "heroic": return "Heroic Games Launcher"
+        case "lutris": return "Lutris"
+        case "manual":
+        // Distinct text from the profile "Custom": shown as "Własne" in Polish.
+        case "custom": return qsTr("Custom games", "launcher source")
+        default: return text(value)
+        }
+    }
+
+    // Honest Narrator state for a game, from session.cardState (backend):
+    // disabled | waiting_for_game | manual | missing | running | error.
+    function narratorMissingLabel(kind) {
+        switch (text(kind)) {
+        case "capture": return qsTr("screen capture")
+        case "ocr": return qsTr("subtitle OCR")
+        case "translation": return qsTr("translation")
+        case "tts": return qsTr("voice")
+        case "audio": return qsTr("audio output")
+        default: return text(kind)
+        }
+    }
+    function narratorState(session) {
+        var data = session || ({})
+        var state = text(data.cardState)
+        if (state === "running")
+            return { "tone": "success", "text": qsTr("Running") }
+        if (state === "error")
+            return { "tone": "danger", "text": qsTr("Error: %1").arg(message(text(data.message)) || qsTr("Unknown")) }
+        if (state === "missing") {
+            var labels = (data.missingRequirements || []).map(function(kind) { return narratorMissingLabel(kind) })
+            return { "tone": "warning", "text": qsTr("On · missing: %1").arg(labels.join(", ")) }
+        }
+        if (state === "waiting_for_game")
+            return { "tone": "success", "text": qsTr("On · starts with the game") }
+        if (state === "manual")
+            return { "tone": "info", "text": qsTr("On · start the Narrator manually") }
+        return { "tone": "neutral", "text": qsTr("Off") }
+    }
+
     function profile(value) {
         switch (text(value)) {
         case "Fast": return qsTr("Fast")
@@ -344,6 +388,8 @@ QtObject {
             return qsTr("The demo task queue could not be updated")
         case "The task list could not be updated":
             return qsTr("The task list could not be updated")
+        case "Exact compsize measurement was not requested; savings are not measured":
+            return qsTr("Exact compsize measurement was not requested; savings are not measured")
         case "Waiting for authorization to measure compression":
             return qsTr("Waiting for authorization to measure compression")
         case "unknown provider error":
@@ -522,9 +568,79 @@ QtObject {
             return qsTr("Screen capture permission was cancelled")
         case "Screen capture stopped":
             return qsTr("Screen capture stopped")
+        case "Could not reach GitHub. Check the internet connection and try again":
+            return qsTr("Could not reach GitHub. Check the internet connection and try again")
+        case "Confirm replacing the listed files to continue":
+            return qsTr("Confirm replacing the listed files to continue")
+        case "The game was moved to another Steam library. Confirm the new location before changing OptiScaler files":
+            return qsTr("The game was moved to another Steam library. Confirm the new location before changing OptiScaler files")
+        case "The OptiScaler installation is inconsistent: the recorded files were not found in the current game directory. Nothing was changed":
+            return qsTr("The OptiScaler installation is inconsistent: the recorded files were not found in the current game directory. Nothing was changed")
+        case "The game was moved to another Steam library; confirm the new location":
+            return qsTr("The game was moved to another Steam library; confirm the new location")
+        case "Inconsistent installation: recorded files are missing in the current game directory":
+            return qsTr("Inconsistent installation: recorded files are missing in the current game directory")
+        case "The game directory is not writable. In Flatpak, grant access to this Steam library, then try again":
+            return qsTr("The game directory is not writable. In Flatpak, grant access to this Steam library, then try again")
+        case "game directory is unavailable":
+            return qsTr("game directory is unavailable")
+        case "A game file or directory is not accessible":
+            return qsTr("A game file or directory is not accessible")
+        case "The portal capture session closed":
+            return qsTr("The capture session was closed (the chosen window disappeared or the choice was cancelled)")
+        case "Check the preview - it should show the game":
+            return qsTr("Check the preview - it should show the game")
+        case "Narrator started with the game":
+            return qsTr("Narrator started with the game")
+        case "Narrator started with the game. Choose the game window once; the choice is remembered":
+            return qsTr("Narrator started with the game. Choose the game window once; the choice is remembered")
+        case "Checking OptiScaler took too long":
+            return qsTr("Checking OptiScaler took too long")
+        case "The installation can only be relocated when every recorded file matches in the new game directory":
+            return qsTr("The installation can only be relocated when every recorded file matches in the new game directory")
+        case "conflicting files require confirmation":
+            return qsTr("conflicting files require confirmation")
+        case "select a local OptiScaler archive":
+            return qsTr("select a local OptiScaler archive")
+        case "this 7z archive uses BCJ2 and the bundled extractor is unavailable":
+            return qsTr("this 7z archive uses BCJ2 and the bundled extractor is unavailable")
+        case "Check the official OptiScaler release before creating an installation plan":
+            return qsTr("Check the official OptiScaler release before creating an installation plan")
+        case "Check the official OptiScaler release before installation":
+            return qsTr("Check the official OptiScaler release before installation")
+        case "Select an available Steam game first":
+            return qsTr("Select an available Steam game first")
+        case "OptiScaler is not installed":
+            return qsTr("OptiScaler is not installed")
+        case "A Steam update is currently active":
+            return qsTr("A Steam update is currently active")
+        case "OptiScaler operation cancelled":
+            return qsTr("OptiScaler operation cancelled")
+        case "OptiScaler is not installed for this game":
+            return qsTr("OptiScaler is not installed for this game")
+        case "OptiScaler operation was cancelled":
+            return qsTr("OptiScaler operation was cancelled")
+        case "An OptiScaler task for this game is already active":
+            return qsTr("An OptiScaler task for this game is already active")
         default:
             break
         }
+        // OptiScaler (backend reasons with a variable part).
+        match = original.match(/^GitHub API rate limit reached; try again in ([0-9]+) min$/)
+        if (match)
+            return qsTr("GitHub API rate limit reached; try again in %1 min").arg(match[1])
+        match = original.match(/^Downloading the official OptiScaler release failed: (.+)$/)
+        if (match)
+            return qsTr("Downloading the official OptiScaler release failed: %1").arg(match[1])
+        match = original.match(/^A game file or directory is not accessible: (.+)$/)
+        if (match)
+            return qsTr("A game file or directory is not accessible: %1").arg(match[1])
+        match = original.match(/^OptiScaler operation failed: (.+)$/)
+        if (match)
+            return qsTr("OptiScaler operation failed: %1").arg(message(match[1]))
+        match = original.match(/^Failed to refresh OptiScaler status: (.+)$/)
+        if (match)
+            return qsTr("Failed to refresh OptiScaler status: %1").arg(message(match[1]))
         match = original.match(/^Narrator components are unavailable: (.+)$/)
         if (match)
             return qsTr("Narrator components are unavailable: %1").arg(match[1])

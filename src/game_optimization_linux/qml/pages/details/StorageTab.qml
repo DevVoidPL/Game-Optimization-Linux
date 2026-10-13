@@ -2046,32 +2046,9 @@ Item {
                 }
             }
 
-            SurfaceCard {
-                Layout.fillWidth: true
-                padding: 20
-                elevated: true
-
-                contentItem: RowLayout {
-                    spacing: 12
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 3
-                        Label {
-                            text: qsTr("Deep Optimize")
-                            color: App.Theme.text
-                            font.pixelSize: 18
-                            font.weight: Font.Bold
-                        }
-                        Label {
-                            Layout.fillWidth: true
-                            text: qsTr("Recursive directory defragmentation remains disabled. Game Optimization processes verified files individually and requires manual confirmation when snapshots or reflinks make data shared.")
-                            color: App.Theme.textSecondary
-                            font.pixelSize: App.Theme.fontCaption
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-                    StatusBadge { text: qsTr("Planned"); status: "paused" }
-                }
+            DeepAnalysisSection {
+                controller: tab.controller
+                gameId: tab.gameId
             }
 
             Item { Layout.preferredHeight: 12 }

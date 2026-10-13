@@ -562,7 +562,8 @@ def test_game_exit_cancels_in_flight_tts_and_rejects_stale_audio(
         ),
         ({"translation_profile_id": "unknown"}, "translation profile"),
         ({"tts_provider_id": "different-tts"}, "selected speech provider"),
-        ({"voice_id": "unknown"}, "Polish voice"),
+        # An unknown or uninstalled voice is not rejected any more: the first
+        # installed voice is used (test_narrator_autostart.py).
     ),
 )
 def test_pipeline_rejects_unavailable_selected_provider_profile_or_voice(

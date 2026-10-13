@@ -36,6 +36,41 @@ Item {
     property bool gamescopeFullscreen: true
     property string gamescopeScaler: "auto"
     property string gamescopeFilter: "linear"
+    // Desktop nested Gamescope options; neutral values emit nothing.
+    property string gamescopeWindowMode: "fullscreen"
+    property int gamescopeSharpnessPercent: -1
+    property bool gamescopeAdaptiveSync: false
+    property bool gamescopeGrabKeyboard: false
+    property bool gamescopeHdr: false
+    property bool inputAuto: false
+    property bool outputAuto: false
+    property bool inputCustom: false
+    property bool outputCustom: false
+    property int displayIndex: -1
+    property bool forceWindowsFullscreen: false
+    property string gamescopeBackend: "auto"
+    property real maxScale: 0
+    property int nestedRefresh: 0
+    property int framerateLimit: 0
+    property bool framerateCustom: false
+    property int unfocusedRefresh: 0
+    property bool unfocusedCustom: false
+    property int hdrSdrContentNits: 0
+    property real sdrGamutWideness: -1
+    property bool hdrItm: false
+    property int hdrItmSdrNits: 0
+    property int hdrItmTargetNits: 0
+    property bool forceGrabCursor: false
+    property int hideCursorDelay: 0
+    property real mouseSensitivity: 0
+    property bool exposeWayland: false
+    property bool steamIntegration: false
+    property var gamescopeArguments: []
+    property string gamescopeSteamLaunchOptions: ""
+    property var hdrReadiness: ({})
+    property bool gamescopeArgumentsExpanded: false
+    property bool gamescopeTestRunning: false
+    property string gamescopeTestMessage: ""
     property var manualOverrides: ({})
     property var displays: []
     property var recommendation: ({})
@@ -76,7 +111,39 @@ Item {
         "gamescopeOutputWidth": outputWidth, "gamescopeOutputHeight": outputHeight,
         "gamescopeRefreshRate": refreshRate, "gamescopeFullscreen": gamescopeFullscreen,
         "gamescopeScaler": gamescopeScaler, "gamescopeFilter": gamescopeFilter,
+        "gamescopeWindowMode": gamescopeWindowMode,
+        "gamescopeSharpnessPercent": gamescopeSharpnessPercent,
+        "gamescopeAdaptiveSync": gamescopeAdaptiveSync,
+        "gamescopeGrabKeyboard": gamescopeGrabKeyboard, "gamescopeHdr": gamescopeHdr,
+        "gamescopeInputAuto": inputAuto, "gamescopeOutputAuto": outputAuto,
+        "gamescopeDisplayIndex": displayIndex,
+        "gamescopeForceWindowsFullscreen": forceWindowsFullscreen,
+        "gamescopeBackend": gamescopeBackend, "gamescopeMaxScale": maxScale,
+        "gamescopeNestedRefresh": nestedRefresh, "gamescopeFramerateLimit": framerateLimit,
+        "gamescopeUnfocusedRefresh": unfocusedRefresh,
+        "gamescopeHdrSdrContentNits": hdrSdrContentNits,
+        "gamescopeSdrGamutWideness": sdrGamutWideness, "gamescopeHdrItm": hdrItm,
+        "gamescopeHdrItmSdrNits": hdrItmSdrNits, "gamescopeHdrItmTargetNits": hdrItmTargetNits,
+        "gamescopeForceGrabCursor": forceGrabCursor, "gamescopeHideCursorDelay": hideCursorDelay,
+        "gamescopeMouseSensitivity": mouseSensitivity, "gamescopeExposeWayland": exposeWayland,
+        "gamescopeSteamIntegration": steamIntegration,
         "manualOverrides": manualOverrides
+    })
+    readonly property var resolutionValues: ["auto", "1280x720", "1600x900", "1920x1080", "2560x1440", "3440x1440", "3840x2160", "custom"]
+    readonly property var framerateValues: [0, 30, 40, 45, 60, 90, 120, 144, 165, 240, -1]
+    readonly property var unfocusedValues: [0, 15, 30, 60, -1]
+    readonly property bool gsAdvanced: Boolean(gamescopeStatus.helpVerified)
+    readonly property bool gsHdrActive: gamescopeHdr && gsSupports("--hdr-enabled")
+    readonly property bool gsItmActive: gsHdrActive && hdrItm && (gsSupports("--hdr-itm-enabled") || gsSupports("--hdr-itm-enable"))
+    readonly property var backendValues: ["auto"].concat(["wayland", "sdl"].filter(function(item) {
+        return (gamescopeStatus.supportedBackends || []).indexOf(item) >= 0
+    }))
+    readonly property var filterValues: ["linear", "nearest", "fsr", "nis", "pixel", "sgsr"].filter(function(item) {
+        return item === "linear" || (gamescopeStatus.supportedFilters || []).indexOf(item) >= 0
+    })
+    readonly property var scalerValues: ["auto", "fit", "fill", "stretch", "integer"].filter(function(item) {
+        var listed = gamescopeStatus.supportedScalers || []
+        return item === "auto" || listed.length === 0 || listed.indexOf(item) >= 0
     })
 
     function indexOf(values, wanted, fallback) {
@@ -158,6 +225,141 @@ Item {
         outputHeight = Number(display.height || outputHeight)
         refreshRate = Math.round(Number(display.refreshRate || refreshRate))
     }
+    // An option is offered only when the local `gamescope --help` lists it.
+    function gsSupports(option) {
+        return (gamescopeStatus.supportedOptions || []).indexOf(option) >= 0
+    }
+    function gsChanged() {
+        if (loading) return
+        preset = "custom"
+        changed("gamescope")
+    }
+    function resolutionIndex(auto, custom, width, height) {
+        if (auto) return 0
+        var index = resolutionValues.indexOf(width + "x" + height)
+        return custom || index < 0 ? resolutionValues.length - 1 : index
+    }
+    function chooseResolution(target, value) {
+        var parts = String(value).split("x")
+        if (target === "input") {
+            inputAuto = value === "auto"
+            inputCustom = value === "custom"
+            if (parts.length === 2) { inputWidth = Number(parts[0]); inputHeight = Number(parts[1]) }
+        } else {
+            outputAuto = value === "auto"
+            outputCustom = value === "custom"
+            if (parts.length === 2) { outputWidth = Number(parts[0]); outputHeight = Number(parts[1]) }
+        }
+        gsChanged()
+    }
+    function rateIndex(values, value, custom) {
+        var index = values.indexOf(value)
+        return custom || index < 0 ? values.length - 1 : index
+    }
+    function sharpnessApplies() {
+        return (gamescopeFilter === "fsr" || gamescopeFilter === "nis")
+                && (gsSupports("--sharpness") || gsSupports("--fsr-sharpness"))
+    }
+    function sameRenderAndOutput() {
+        return (inputAuto && outputAuto) || (!inputAuto && !outputAuto
+                && inputWidth === outputWidth && inputHeight === outputHeight)
+    }
+    function filterHint(value) {
+        if (value === "fsr") return qsTr("FSR: good general-purpose upscaling.")
+        if (value === "nis") return qsTr("NIS: an alternative sharpening upscaler.")
+        if (value === "nearest" || value === "pixel") return qsTr("Nearest / Pixel: best for pixel-art games.")
+        if (value === "sgsr") return qsTr("SGSR: Snapdragon Game Super Resolution with sharpening.")
+        return qsTr("Linear: smooth default filtering.")
+    }
+    function scalerHint(value) {
+        if (value === "fit") return qsTr("Fit keeps the aspect ratio and may add black bars.")
+        if (value === "fill") return qsTr("Fill keeps the aspect ratio and crops the edges.")
+        if (value === "stretch") return qsTr("Stretch fills the screen and changes the aspect ratio.")
+        if (value === "integer") return qsTr("Integer scales by whole numbers; best for pixel-art games.")
+        return qsTr("Auto lets Gamescope choose.")
+    }
+    function hdrNote(code) {
+        if (code === "wayland_session") return qsTr("Wayland session: the basic requirement is met.")
+        if (code === "not_wayland_session") return qsTr("Not a Wayland session: HDR may not work.")
+        if (code === "hdr_flag_missing") return qsTr("The installed Gamescope has no --hdr-enabled: HDR is unavailable.")
+        if (code === "nvidia_modeset") return qsTr("NVIDIA: HDR requires working DRM kernel modesetting (nvidia-drm.modeset=1).")
+        if (code === "wsi_detected") return qsTr("Gamescope WSI layer detected; its variable is set only while HDR is on.")
+        if (code === "wsi_checked_at_launch") return qsTr("The Gamescope WSI layer is checked on the host when the game starts.")
+        if (code === "wsi_missing") return qsTr("Gamescope WSI layer not found: HDR games may be shown as SDR.")
+        return code
+    }
+    function refreshGamescope() {
+        if (!controller || !controller.refreshGamescopeDetection) return
+        var result = controller.refreshGamescopeDetection() || ({})
+        gamescopeStatus = result
+        hdrReadiness = result.hdrReadiness || ({})
+        previewTimer.restart()
+    }
+    function resetGamescope() {
+        if (controller && controller.resetGamescopeSettings && gameId) {
+            var result = controller.resetGamescopeSettings(gameId)
+            if (result && result.success) applyResult(result)
+            else errorMessage = String(result && result.error || "")
+        }
+    }
+    function startGamescopeTest(withHdr) {
+        gamescopeTestMessage = ""
+        if (!controller || !controller.startGamescopeTest || !gameId) return
+        var result = controller.startGamescopeTest(gameId, draft, Boolean(withHdr)) || ({})
+        gamescopeTestRunning = Boolean(result.running)
+        if (!result.success) gamescopeTestMessage = gamescopeTestError(result)
+    }
+    function gamescopeTestError(result) {
+        var code = String(result && result.code || "")
+        if (code === "vkcube_missing") return qsTr("The Gamescope test requires the vulkan-tools package")
+        if (code === "gamescope_missing") return qsTr("Gamescope is not installed")
+        if (code === "already_running") return qsTr("A Gamescope test is already running")
+        if (code === "process_failed") return qsTr("The Gamescope test ended with an error: %1").arg(String(result.message || ""))
+        return qsTr("Could not start the Gamescope test: %1").arg(String(result && result.message || ""))
+    }
+    function copyGamescopeLaunchOptions() {
+        gamescopeLaunchOptionsText.selectAll()
+        gamescopeLaunchOptionsText.copy()
+        gamescopeLaunchOptionsText.deselect()
+        toastRequested(qsTr("Steam launch options copied"), "success")
+    }
+    function applyGamescopeResult(result) {
+        gamescopeWindowMode = String(result.gamescopeWindowMode || (result.gamescopeFullscreen ? "fullscreen" : "borderless"))
+        gamescopeSharpnessPercent = Number(result.gamescopeSharpnessPercent !== undefined ? result.gamescopeSharpnessPercent : -1)
+        gamescopeAdaptiveSync = Boolean(result.gamescopeAdaptiveSync)
+        gamescopeGrabKeyboard = Boolean(result.gamescopeGrabKeyboard)
+        gamescopeHdr = Boolean(result.gamescopeHdr)
+        inputAuto = Boolean(result.gamescopeInputAuto)
+        outputAuto = Boolean(result.gamescopeOutputAuto)
+        inputCustom = !inputAuto && resolutionValues.indexOf(inputWidth + "x" + inputHeight) < 0
+        outputCustom = !outputAuto && resolutionValues.indexOf(outputWidth + "x" + outputHeight) < 0
+        displayIndex = Number(result.gamescopeDisplayIndex !== undefined ? result.gamescopeDisplayIndex : -1)
+        forceWindowsFullscreen = Boolean(result.gamescopeForceWindowsFullscreen)
+        gamescopeBackend = String(result.gamescopeBackend || "auto")
+        maxScale = Number(result.gamescopeMaxScale || 0)
+        nestedRefresh = Number(result.gamescopeNestedRefresh || 0)
+        framerateLimit = Number(result.gamescopeFramerateLimit || 0)
+        framerateCustom = framerateValues.indexOf(framerateLimit) < 0
+        unfocusedRefresh = Number(result.gamescopeUnfocusedRefresh || 0)
+        unfocusedCustom = unfocusedValues.indexOf(unfocusedRefresh) < 0
+        hdrSdrContentNits = Number(result.gamescopeHdrSdrContentNits || 0)
+        sdrGamutWideness = Number(result.gamescopeSdrGamutWideness !== undefined ? result.gamescopeSdrGamutWideness : -1)
+        hdrItm = Boolean(result.gamescopeHdrItm)
+        hdrItmSdrNits = Number(result.gamescopeHdrItmSdrNits || 0)
+        hdrItmTargetNits = Number(result.gamescopeHdrItmTargetNits || 0)
+        forceGrabCursor = Boolean(result.gamescopeForceGrabCursor)
+        hideCursorDelay = Number(result.gamescopeHideCursorDelay || 0)
+        mouseSensitivity = Number(result.gamescopeMouseSensitivity || 0)
+        exposeWayland = Boolean(result.gamescopeExposeWayland)
+        steamIntegration = Boolean(result.gamescopeSteamIntegration)
+        applyGamescopePreview(result)
+    }
+    function applyGamescopePreview(result) {
+        gamescopeArguments = result.gamescopeArguments ? Array.from(result.gamescopeArguments) : []
+        gamescopeSteamLaunchOptions = String(result.gamescopeSteamLaunchOptions || "")
+        hdrReadiness = result.gamescopeHdrReadiness || ({})
+        gamescopeTestRunning = Boolean(result.gamescopeTestRunning)
+    }
     function applyGamescopeMode(value) {
         gamescopeMode = value
         gamescopeEnabled = value !== "disabled"
@@ -190,6 +392,7 @@ Item {
         refreshRate = Number(result.gamescopeRefreshRate || 60)
         gamescopeFullscreen = Boolean(result.gamescopeFullscreen)
         gamescopeScaler = String(result.gamescopeScaler || "auto"); gamescopeFilter = String(result.gamescopeFilter || "linear")
+        applyGamescopeResult(result)
         manualOverrides = result.manualOverrides || ({})
         displays = result.displays ? Array.from(result.displays) : []
         if (!targetDisplayId && displays.length) {
@@ -235,6 +438,8 @@ Item {
             renderingSummary = String(result.renderingSummary || "")
             fpsLimitOwner = String(result.fpsLimitOwner || "none")
             protonOverrides = result.protonOverrides ? Array.from(result.protonOverrides) : []
+            applyGamescopePreview(result)
+            errorMessage = ""
             recommendationAnalyzed = true
             loading = false
         } else errorMessage = String(result && result.error || qsTr("Invalid optimization profile"))
@@ -1656,19 +1861,175 @@ Item {
                     SettingRow { Layout.fillWidth: true; title: qsTr("Gamescope mode"); description: tab.renderingSummary
                         AppComboBox { Layout.preferredWidth: 220; enabled: Boolean(tab.gamescopeStatus.available); model: tab.gamescopeModeLabels; currentIndex: tab.indexOf(tab.gamescopeModeValues, tab.gamescopeMode, 0); onActivated: function(index) { tab.applyGamescopeMode(tab.gamescopeModeValues[index]) } }
                     }
-                    GridLayout {
-                        Layout.fillWidth: true; columns: 4; columnSpacing: 8
-                        AppTextField { placeholderText: qsTr("Render width"); text: String(tab.inputWidth); validator: IntValidator { bottom: 320; top: 16384 } onTextEdited: { tab.inputWidth = Number(text); tab.changed("resolution") } }
-                        AppTextField { placeholderText: qsTr("Render height"); text: String(tab.inputHeight); validator: IntValidator { bottom: 320; top: 16384 } onTextEdited: { tab.inputHeight = Number(text); tab.changed("resolution") } }
-                        AppTextField { placeholderText: qsTr("Output width"); text: String(tab.outputWidth); validator: IntValidator { bottom: 320; top: 16384 } onTextEdited: { tab.outputWidth = Number(text); tab.changed("resolution") } }
-                        AppTextField { placeholderText: qsTr("Output height"); text: String(tab.outputHeight); validator: IntValidator { bottom: 320; top: 16384 } onTextEdited: { tab.outputHeight = Number(text); tab.changed("resolution") } }
+                    Label {
+                        objectName: "gamescopeAdvancedUnavailable"
+                        Layout.fillWidth: true
+                        visible: Boolean(tab.gamescopeStatus.available) && !tab.gsAdvanced
+                        text: qsTr("Gamescope --help could not be read. Only the basic options are available; advanced options are disabled.")
+                        color: App.Theme.warning; wrapMode: Text.WordWrap; font.pixelSize: App.Theme.fontCaption
                     }
-                    RowLayout {
-                        AppComboBox { property var values: ["auto", "fit", "fill", "stretch", "integer"]; model: values; currentIndex: tab.indexOf(values, tab.gamescopeScaler, 0); onActivated: function(index) { tab.gamescopeScaler = values[index]; tab.changed("gamescope") } }
-                        AppComboBox { property var values: ["linear", "nearest", "fsr", "nis", "pixel"]; model: values; currentIndex: tab.indexOf(values, tab.gamescopeFilter, 0); onActivated: function(index) { tab.gamescopeFilter = values[index]; tab.changed("gamescope") } }
-                        AppTextField { Layout.preferredWidth: 100; placeholderText: qsTr("Refresh Hz"); text: String(tab.refreshRate); validator: IntValidator { bottom: 15; top: 1000 } onTextEdited: { tab.refreshRate = Number(text); tab.changed("refresh") } }
-                        AppSwitch { checked: tab.gamescopeFullscreen; onToggled: { tab.gamescopeFullscreen = checked; tab.changed("gamescope") } }
-                        Label { text: qsTr("Fullscreen"); color: App.Theme.textSecondary }
+
+                    GsSection {
+                        objectName: "gamescopeSectionWindow"
+                        title: qsTr("Window mode and resolution")
+                        expanded: true
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Window mode"); description: qsTr("Only one mode is used at a time")
+                            AppComboBox { objectName: "gamescopeWindowModeCombo"; Layout.preferredWidth: 220; property var values: ["windowed", "borderless", "fullscreen"]; model: [qsTr("Window"), qsTr("Borderless"), qsTr("Fullscreen")]; currentIndex: tab.indexOf(values, tab.gamescopeWindowMode, 2); onActivated: function(index) { tab.gamescopeWindowMode = values[index]; tab.gamescopeFullscreen = values[index] === "fullscreen"; tab.gsChanged() } }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Game render resolution"); description: qsTr("-w / -h: the size the game renders at")
+                            RowLayout {
+                                AppComboBox { objectName: "gamescopeInputResolution"; Layout.preferredWidth: 160; model: [qsTr("Automatic")].concat(tab.resolutionValues.slice(1, -1)).concat([qsTr("Custom")]); currentIndex: tab.resolutionIndex(tab.inputAuto, tab.inputCustom, tab.inputWidth, tab.inputHeight); onActivated: function(index) { tab.chooseResolution("input", tab.resolutionValues[index]) } }
+                                AppTextField { visible: tab.inputCustom; Layout.preferredWidth: 80; placeholderText: qsTr("Width"); text: String(tab.inputWidth); validator: IntValidator { bottom: 320; top: 16384 } onTextEdited: { if (acceptableInput) { tab.inputWidth = Number(text); tab.gsChanged() } } }
+                                AppTextField { visible: tab.inputCustom; Layout.preferredWidth: 80; placeholderText: qsTr("Height"); text: String(tab.inputHeight); validator: IntValidator { bottom: 320; top: 16384 } onTextEdited: { if (acceptableInput) { tab.inputHeight = Number(text); tab.gsChanged() } } }
+                            }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Gamescope output resolution"); description: qsTr("-W / -H: the size of the Gamescope window or screen")
+                            RowLayout {
+                                AppComboBox { objectName: "gamescopeOutputResolution"; Layout.preferredWidth: 160; model: [qsTr("Native / automatic")].concat(tab.resolutionValues.slice(1, -1)).concat([qsTr("Custom")]); currentIndex: tab.resolutionIndex(tab.outputAuto, tab.outputCustom, tab.outputWidth, tab.outputHeight); onActivated: function(index) { tab.chooseResolution("output", tab.resolutionValues[index]) } }
+                                AppTextField { visible: tab.outputCustom; Layout.preferredWidth: 80; placeholderText: qsTr("Width"); text: String(tab.outputWidth); validator: IntValidator { bottom: 320; top: 16384 } onTextEdited: { if (acceptableInput) { tab.outputWidth = Number(text); tab.gsChanged() } } }
+                                AppTextField { visible: tab.outputCustom; Layout.preferredWidth: 80; placeholderText: qsTr("Height"); text: String(tab.outputHeight); validator: IntValidator { bottom: 320; top: 16384 } onTextEdited: { if (acceptableInput) { tab.outputHeight = Number(text); tab.gsChanged() } } }
+                            }
+                        }
+                        SettingRow { visible: tab.gsSupports("--display-index"); Layout.fillWidth: true; title: qsTr("Monitor"); description: qsTr("--display-index; Gamescope's numbering may differ from the list of screens")
+                            AppComboBox { objectName: "gamescopeDisplayIndex"; Layout.preferredWidth: 260; model: [qsTr("Automatic")].concat(tab.displayLabels.map(function(label, index) { return index + ": " + label })); currentIndex: Math.max(0, tab.displayIndex + 1); onActivated: function(index) { tab.displayIndex = index - 1; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--force-windows-fullscreen"); Layout.fillWidth: true; title: qsTr("Force full-size game window inside Gamescope"); description: "--force-windows-fullscreen"
+                            AppSwitch { objectName: "gamescopeForceWindowsFullscreen"; checked: tab.forceWindowsFullscreen; onToggled: { tab.forceWindowsFullscreen = checked; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--backend") && tab.backendValues.length > 1; Layout.fillWidth: true; title: qsTr("Backend"); description: qsTr("Only nested desktop backends listed by the local Gamescope")
+                            AppComboBox { objectName: "gamescopeBackend"; Layout.preferredWidth: 220; model: tab.backendValues.map(function(item) { return item === "auto" ? qsTr("Automatic (recommended)") : item === "wayland" ? "Wayland" : "SDL" }); currentIndex: tab.indexOf(tab.backendValues, tab.gamescopeBackend, 0); onActivated: function(index) { tab.gamescopeBackend = tab.backendValues[index]; tab.gsChanged() } }
+                        }
+                    }
+
+                    GsSection {
+                        objectName: "gamescopeSectionScaling"
+                        title: qsTr("Image scaling")
+                        expanded: true
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Fit method"); description: tab.scalerHint(tab.gamescopeScaler)
+                            AppComboBox { objectName: "gamescopeScalerCombo"; Layout.preferredWidth: 220; model: tab.scalerValues.map(function(item) { return item === "auto" ? qsTr("Auto") : item === "fit" ? qsTr("Fit / keep aspect ratio") : item === "fill" ? qsTr("Fill / crop") : item === "stretch" ? qsTr("Stretch") : qsTr("Integer scaling") }); currentIndex: tab.indexOf(tab.scalerValues, tab.gamescopeScaler, 0); onActivated: function(index) { tab.gamescopeScaler = tab.scalerValues[index]; tab.gsChanged() } }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Filter"); description: tab.filterHint(tab.gamescopeFilter)
+                            AppComboBox { objectName: "gamescopeFilterCombo"; Layout.preferredWidth: 220; model: tab.filterValues.map(function(item) { return item === "linear" ? "Linear" : item === "nearest" ? "Nearest" : item.toUpperCase() === "PIXEL" ? "Pixel" : item.toUpperCase() }); currentIndex: tab.indexOf(tab.filterValues, tab.gamescopeFilter, 0); onActivated: function(index) { tab.gamescopeFilter = tab.filterValues[index]; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("-m"); Layout.fillWidth: true; title: qsTr("Maximum scale"); description: "-m / --max-scale"
+                            GsOptionalSlider { objectName: "gamescopeMaxScale"; from: 1; to: 8; stepSize: 0.5; decimals: 1; defaultValue: 2; unit: "x"; value: tab.maxScale; onEdited: function(value) { tab.maxScale = value < 0 ? 0 : value; tab.gsChanged() } }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Sharpness"); description: tab.sharpnessApplies() ? qsTr("0% = least, 100% = most sharpening") : qsTr("Used only by the FSR and NIS filters")
+                            GsOptionalSlider { objectName: "gamescopeSharpness"; enabled: tab.sharpnessApplies(); from: 0; to: 100; stepSize: 5; defaultValue: 50; unit: "%"; value: tab.gamescopeSharpnessPercent; onEdited: function(value) { tab.gamescopeSharpnessPercent = Math.round(value); tab.gsChanged() } }
+                        }
+                        Label { Layout.fillWidth: true; visible: tab.gamescopeEnabled && tab.sameRenderAndOutput(); text: qsTr("Render and output sizes are equal: the filter only changes the image, it does not increase FPS."); color: App.Theme.textMuted; font.pixelSize: App.Theme.fontCaption; wrapMode: Text.WordWrap }
+                    }
+
+                    GsSection {
+                        objectName: "gamescopeSectionFps"
+                        title: qsTr("Smoothness and frame limit")
+                        expanded: true
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Virtual refresh rate"); description: qsTr("-r: empty uses the FPS target of this profile")
+                            AppTextField { objectName: "gamescopeNestedRefresh"; Layout.preferredWidth: 100; placeholderText: qsTr("Automatic"); text: tab.nestedRefresh > 0 ? String(tab.nestedRefresh) : ""; validator: IntValidator { bottom: 1; top: 1000 } onTextEdited: { if (text === "" || acceptableInput) { tab.nestedRefresh = text === "" ? 0 : Number(text); tab.gsChanged() } } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--framerate-limit"); Layout.fillWidth: true; title: qsTr("Gamescope FPS limit"); description: qsTr("Gamescope may round the limit to a divisor of the refresh rate")
+                            RowLayout {
+                                AppComboBox { objectName: "gamescopeFramerateLimit"; Layout.preferredWidth: 140; model: tab.framerateValues.map(function(item) { return item === 0 ? qsTr("Off") : item < 0 ? qsTr("Custom") : String(item) }); currentIndex: tab.rateIndex(tab.framerateValues, tab.framerateLimit, tab.framerateCustom); onActivated: function(index) { var value = tab.framerateValues[index]; tab.framerateCustom = value < 0; if (value >= 0) tab.framerateLimit = value; tab.gsChanged() } }
+                                AppTextField { visible: tab.framerateCustom; Layout.preferredWidth: 80; text: tab.framerateLimit > 0 ? String(tab.framerateLimit) : ""; validator: IntValidator { bottom: 1; top: 1000 } onTextEdited: { if (acceptableInput) { tab.framerateLimit = Number(text); tab.gsChanged() } } }
+                            }
+                        }
+                        SettingRow { visible: tab.gsSupports("-o"); Layout.fillWidth: true; title: qsTr("Limit when unfocused"); description: "-o / --nested-unfocused-refresh"
+                            RowLayout {
+                                AppComboBox { objectName: "gamescopeUnfocusedRefresh"; Layout.preferredWidth: 140; model: tab.unfocusedValues.map(function(item) { return item === 0 ? qsTr("Off") : item < 0 ? qsTr("Custom") : String(item) }); currentIndex: tab.rateIndex(tab.unfocusedValues, tab.unfocusedRefresh, tab.unfocusedCustom); onActivated: function(index) { var value = tab.unfocusedValues[index]; tab.unfocusedCustom = value < 0; if (value >= 0) tab.unfocusedRefresh = value; tab.gsChanged() } }
+                                AppTextField { visible: tab.unfocusedCustom; Layout.preferredWidth: 80; text: tab.unfocusedRefresh > 0 ? String(tab.unfocusedRefresh) : ""; validator: IntValidator { bottom: 1; top: 1000 } onTextEdited: { if (acceptableInput) { tab.unfocusedRefresh = Number(text); tab.gsChanged() } } }
+                            }
+                        }
+                        SettingRow { visible: tab.gsSupports("--adaptive-sync"); Layout.fillWidth: true; title: qsTr("Adaptive Sync / VRR"); description: qsTr("Requires VRR support in the monitor, the driver and the current session")
+                            AppSwitch { objectName: "gamescopeAdaptiveSync"; checked: tab.gamescopeAdaptiveSync; onToggled: { tab.gamescopeAdaptiveSync = checked; tab.gsChanged() } }
+                        }
+                    }
+
+                    GsSection {
+                        objectName: "gamescopeSectionHdr"
+                        title: qsTr("HDR and colors")
+                        badge: qsTr("Experimental")
+                        visible: tab.gsAdvanced
+                        Label { Layout.fillWidth: true; text: qsTr("HDR in Gamescope also depends on the Wayland desktop, the monitor, the driver and the game. If colors look washed out, turn HDR/ITM off."); color: App.Theme.warning; wrapMode: Text.WordWrap; font.pixelSize: App.Theme.fontCaption }
+                        Repeater {
+                            model: tab.hdrReadiness.notes || []
+                            delegate: Label { required property string modelData; Layout.fillWidth: true; text: "\u2022 " + tab.hdrNote(modelData); color: App.Theme.textSecondary; wrapMode: Text.WordWrap; font.pixelSize: App.Theme.fontCaption }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Enable HDR"); description: "--hdr-enabled"
+                            AppSwitch { objectName: "gamescopeHdr"; enabled: tab.gsSupports("--hdr-enabled"); checked: tab.gamescopeHdr; onToggled: { tab.gamescopeHdr = checked; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--hdr-sdr-content-nits"); Layout.fillWidth: true; title: qsTr("SDR content brightness in HDR"); description: "--hdr-sdr-content-nits"
+                            GsOptionalSlider { objectName: "gamescopeHdrSdrContentNits"; enabled: tab.gsHdrActive; from: 80; to: 1000; stepSize: 10; defaultValue: 400; unit: " nits"; value: tab.hdrSdrContentNits; onEdited: function(value) { tab.hdrSdrContentNits = value < 0 ? 0 : Math.round(value); tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--sdr-gamut-wideness"); Layout.fillWidth: true; title: qsTr("SDR gamut wideness"); description: "--sdr-gamut-wideness"
+                            GsOptionalSlider { objectName: "gamescopeSdrGamutWideness"; enabled: tab.gsHdrActive; from: 0; to: 1; stepSize: 0.05; decimals: 2; defaultValue: 0.5; value: tab.sdrGamutWideness; onEdited: function(value) { tab.sdrGamutWideness = value; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--hdr-itm-enabled") || tab.gsSupports("--hdr-itm-enable"); Layout.fillWidth: true; title: qsTr("Convert SDR games to HDR (inverse tone mapping)"); description: qsTr("Only for SDR games; never applied to native HDR automatically")
+                            AppSwitch { objectName: "gamescopeHdrItm"; enabled: tab.gsHdrActive; checked: tab.hdrItm; onToggled: { tab.hdrItm = checked; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--hdr-itm-sdr-nits"); Layout.fillWidth: true; title: qsTr("SDR source brightness"); description: "--hdr-itm-sdr-nits"
+                            GsOptionalSlider { objectName: "gamescopeHdrItmSdrNits"; enabled: tab.gsItmActive; from: 80; to: 1000; stepSize: 10; defaultValue: 100; unit: " nits"; value: tab.hdrItmSdrNits; onEdited: function(value) { tab.hdrItmSdrNits = value < 0 ? 0 : Math.round(value); tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--hdr-itm-target-nits"); Layout.fillWidth: true; title: qsTr("Target HDR brightness"); description: "--hdr-itm-target-nits"
+                            GsOptionalSlider { objectName: "gamescopeHdrItmTargetNits"; enabled: tab.gsItmActive; from: 200; to: 10000; stepSize: 50; defaultValue: 1000; unit: " nits"; value: tab.hdrItmTargetNits; onEdited: function(value) { tab.hdrItmTargetNits = value < 0 ? 0 : Math.round(value); tab.gsChanged() } }
+                        }
+                    }
+
+                    GsSection {
+                        objectName: "gamescopeSectionInput"
+                        title: qsTr("Input and window behavior")
+                        SettingRow { visible: tab.gsSupports("-g"); Layout.fillWidth: true; title: qsTr("Grab the keyboard"); description: "-g / --grab"
+                            AppSwitch { objectName: "gamescopeGrabKeyboard"; checked: tab.gamescopeGrabKeyboard; onToggled: { tab.gamescopeGrabKeyboard = checked; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--force-grab-cursor"); Layout.fillWidth: true; title: qsTr("Always grab the cursor"); description: qsTr("You may need Super+G to release the grab")
+                            AppSwitch { objectName: "gamescopeForceGrabCursor"; checked: tab.forceGrabCursor; onToggled: { tab.forceGrabCursor = checked; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("-C"); Layout.fillWidth: true; title: qsTr("Hide the cursor after a delay"); description: "-C / --hide-cursor-delay"
+                            GsOptionalSlider { objectName: "gamescopeHideCursorDelay"; from: 100; to: 60000; stepSize: 100; defaultValue: 3000; unit: " ms"; value: tab.hideCursorDelay; onEdited: function(value) { tab.hideCursorDelay = value < 0 ? 0 : Math.round(value); tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("-s"); Layout.fillWidth: true; title: qsTr("Mouse sensitivity"); description: "-s / --mouse-sensitivity"
+                            GsOptionalSlider { objectName: "gamescopeMouseSensitivity"; from: 0.1; to: 10; stepSize: 0.1; decimals: 1; defaultValue: 1; unit: "x"; value: tab.mouseSensitivity; onEdited: function(value) { tab.mouseSensitivity = value < 0 ? 0 : value; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("--expose-wayland"); Layout.fillWidth: true; title: qsTr("Native Wayland clients"); description: "--expose-wayland"
+                            AppSwitch { objectName: "gamescopeExposeWayland"; checked: tab.exposeWayland; onToggled: { tab.exposeWayland = checked; tab.gsChanged() } }
+                        }
+                        SettingRow { visible: tab.gsSupports("-e"); Layout.fillWidth: true; title: qsTr("Steam integration (advanced)"); description: qsTr("-e / --steam; never enabled automatically, intended for Steam games")
+                            AppSwitch { objectName: "gamescopeSteamIntegration"; checked: tab.steamIntegration; onToggled: { tab.steamIntegration = checked; tab.gsChanged() } }
+                        }
+                    }
+
+                    GsSection {
+                        objectName: "gamescopeSectionDiagnostics"
+                        title: qsTr("Integrations and diagnostics")
+                        RowLayout {
+                            Layout.fillWidth: true
+                            Label { Layout.fillWidth: true; text: qsTr("Gamescope %1").arg(String(tab.gamescopeStatus.version || "-")); color: App.Theme.textSecondary }
+                            StatusBadge { objectName: "gamescopeAvailabilityBadge"; text: tab.gamescopeStatus.available ? qsTr("Available") : qsTr("Missing"); status: tab.gamescopeStatus.available ? "available" : "warning" }
+                            AppButton { objectName: "refreshGamescopeDetection"; compact: true; kind: "secondary"; text: qsTr("Refresh detection"); onClicked: tab.refreshGamescope() }
+                        }
+                        Label { Layout.fillWidth: true; visible: String(tab.launchPlan.mangoHudActivationOwner || "") === "mangoapp"; text: qsTr("MangoHud is drawn by Gamescope (--mangoapp) with this game's MangoHud profile; the game gets no second overlay."); color: App.Theme.textSecondary; wrapMode: Text.WordWrap; font.pixelSize: App.Theme.fontCaption }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            AppButton { objectName: "gamescopeArgumentsToggle"; Layout.fillWidth: true; compact: true; kind: "secondary"; text: (tab.gamescopeArgumentsExpanded ? "\u25BE " : "\u25B8 ") + qsTr("Generated Gamescope arguments"); onClicked: tab.gamescopeArgumentsExpanded = !tab.gamescopeArgumentsExpanded }
+                            AppButton { objectName: "copyGamescopeLaunchOptions"; compact: true; kind: "secondary"; enabled: tab.gamescopeSteamLaunchOptions.length > 0; text: qsTr("Copy Steam launch options"); onClicked: tab.copyGamescopeLaunchOptions() }
+                        }
+                        Rectangle {
+                            visible: tab.gamescopeArgumentsExpanded
+                            Layout.fillWidth: true; Layout.preferredHeight: 96; radius: App.Theme.radiusMedium; color: App.Theme.input; clip: true
+                            ScrollView { anchors.fill: parent; anchors.margins: 10; contentWidth: availableWidth
+                                TextEdit { id: gamescopeLaunchOptionsText; objectName: "gamescopeArgumentsText"; width: parent.width; readOnly: true; selectByMouse: true; text: tab.gamescopeSteamLaunchOptions; color: App.Theme.text; font.family: "monospace"; wrapMode: TextEdit.WrapAnywhere }
+                            }
+                        }
+                        Label { Layout.fillWidth: true; visible: tab.gamescopeArgumentsExpanded; text: qsTr("Display only. Game launches always use a safe argument list, never this text."); color: App.Theme.textMuted; wrapMode: Text.WordWrap; font.pixelSize: App.Theme.fontCaption }
+                        RowLayout {
+                            Layout.fillWidth: true
+                            AppButton { objectName: "startGamescopeTest"; kind: "secondary"; text: qsTr("Test Gamescope"); enabled: Boolean(tab.gamescopeStatus.available) && !tab.gamescopeTestRunning; onClicked: tab.startGamescopeTest(false) }
+                            AppButton { objectName: "startGamescopeHdrTest"; visible: tab.gsHdrActive; kind: "secondary"; text: qsTr("Test with HDR"); enabled: Boolean(tab.gamescopeStatus.available) && !tab.gamescopeTestRunning; onClicked: tab.startGamescopeTest(true) }
+                            AppButton { objectName: "stopGamescopeTest"; visible: tab.gamescopeTestRunning; kind: "secondary"; text: qsTr("Close test"); onClicked: if (tab.controller && tab.controller.stopGamescopeTest) tab.controller.stopGamescopeTest() }
+                            Item { Layout.fillWidth: true }
+                            AppButton { objectName: "resetGamescopeSettings"; kind: "secondary"; text: qsTr("Restore Gamescope settings"); onClicked: tab.resetGamescope() }
+                        }
+                        Label { Layout.fillWidth: true; text: qsTr("Runs gamescope with the current settings and vkcube. Nothing is saved; HDR is used only in the HDR test."); color: App.Theme.textMuted; wrapMode: Text.WordWrap; font.pixelSize: App.Theme.fontCaption }
+                        Label { objectName: "gamescopeTestMessage"; Layout.fillWidth: true; visible: tab.gamescopeTestMessage.length > 0; text: tab.gamescopeTestMessage; color: App.Theme.danger; wrapMode: Text.WordWrap }
                     }
                 }
             }
@@ -1722,6 +2083,48 @@ Item {
         }
     }
 
+    component GsSection: ColumnLayout {
+        id: section
+        property string title: ""
+        property string badge: ""
+        property bool expanded: false
+        default property alias body: sectionBody.data
+        Layout.fillWidth: true
+        spacing: 6
+        AppButton {
+            Layout.fillWidth: true
+            kind: "ghost"
+            compact: true
+            text: (section.expanded ? "\u25BE " : "\u25B8 ") + section.title + (section.badge.length ? " (" + section.badge + ")" : "")
+            onClicked: section.expanded = !section.expanded
+        }
+        ColumnLayout {
+            id: sectionBody
+            visible: section.expanded
+            Layout.fillWidth: true
+            Layout.leftMargin: 8
+            spacing: 6
+        }
+    }
+
+    // A value below ``from`` means "not set": Gamescope keeps its default.
+    component GsOptionalSlider: RowLayout {
+        id: optionalSlider
+        property real from: 0
+        property real to: 1
+        property real stepSize: 1
+        property real value: -1
+        property real defaultValue: from
+        property int decimals: 0
+        property string unit: ""
+        readonly property bool overridden: value >= from
+        signal edited(real value)
+        spacing: 8
+        AppSwitch { checked: optionalSlider.overridden; enabled: optionalSlider.enabled; onToggled: optionalSlider.edited(checked ? optionalSlider.defaultValue : -1) }
+        AppSlider { Layout.preferredWidth: 170; enabled: optionalSlider.enabled && optionalSlider.overridden; from: optionalSlider.from; to: optionalSlider.to; stepSize: optionalSlider.stepSize; value: optionalSlider.overridden ? optionalSlider.value : optionalSlider.defaultValue; onMoved: optionalSlider.edited(Number(value.toFixed(optionalSlider.decimals))) }
+        Label { Layout.preferredWidth: 96; text: optionalSlider.overridden ? Number(optionalSlider.value).toFixed(optionalSlider.decimals) + optionalSlider.unit : qsTr("Default"); color: App.Theme.textSecondary }
+    }
+
     function scheduleProfileLoad() {
         profileLoadTimer.restart()
     }
@@ -1762,6 +2165,10 @@ Item {
         function onProtonTweaksChanged(appId) {
             if (String(appId) === tab.appId)
                 tab.loadProfile()
+        }
+        function onGamescopeTestChanged(result) {
+            tab.gamescopeTestRunning = Boolean(result && result.running)
+            tab.gamescopeTestMessage = result && !result.success ? tab.gamescopeTestError(result) : ""
         }
         function onOptimizationAnalysisChanged(changedGameId) {
             if (String(changedGameId) === tab.gameId)

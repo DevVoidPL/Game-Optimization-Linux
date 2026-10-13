@@ -1,0 +1,13 @@
+usage: btrfs filesystem du [options] <path> [<path>..]
+
+Summarize disk usage of each file.
+
+-s, --summarize           display only a total for each argument
+--raw                     raw numbers in bytes
+--human-readable          human friendly numbers, base 1024 (default)
+--iec                     use 1024 as a base (KiB, MiB, GiB, TiB)
+--si                      use 1000 as a base (kB, MB, GB, TB)
+--kbytes                  show sizes in KiB, or kB with --si
+--mbytes                  show sizes in MiB, or MB with --si
+--gbytes                  show sizes in GiB, or GB with --si
+--tbytes                  show sizes in TiB, or TB with --si

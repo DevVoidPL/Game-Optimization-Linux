@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import os
+import shutil
 from pathlib import Path
 from queue import SimpleQueue
 from threading import Event
@@ -113,6 +114,8 @@ from ..services import (
     MangoHudDetector,
     MangoHudLaunchIntegration,
     MangoHudProfileRepository,
+    MangoHudLivePreview,
+    GamescopeTestRun,
     ManualGameStore,
     NarratorComponentManager,
     NarratorGameActivityDetector,
@@ -120,6 +123,7 @@ from ..services import (
     NarratorSettingsRepository,
     ArgosCTranslate2TranslationProvider,
     PIPER_BASS_VOICE_ID,
+    PIPER_DARKMAN_VOICE_ID,
     PIPER_VOICE_ID,
     TESSERACT_POLISH_COMPONENT_ID,
     PiperPolishTtsProvider,
@@ -140,6 +144,7 @@ from ..services import (
     uses_flatpak_steam,
 )
 from ..services.library_cache import LibraryCache
+from ..services.system_usage import SystemUsageMonitor, format_memory
 from ..services.optiscaler_online import (
     CachedOptiScalerArchive,
     OptiScalerRelease,
@@ -151,6 +156,17 @@ from .games_model import GamesListModel
 from .library_controller import LibraryController
 from .library_scanner import LibraryScanner
 from .mangohud_controller import MangoHudController
+from .deep_optimization_controller import DeepOptimizationController
+from .deep_cleanup_controller import DeepCleanupController
+from .deep_recompression_controller import DeepRecompressionController
+from ..providers.btrfs_compression import BtrfsCompressionProvider
+from ..services.btrfs_recompression import (
+    BtrfsRecompressionExecutor,
+    BtrfsRecompressionPlanner,
+    RecompressionGuards,
+)
+from ..services.deep_cleanup import CleanupJournal, DeepCleanupExecutor
+from ..services.deep_optimization import DeepAnalysisRepository, DeepOptimizationAnalyzer
 from .narrator_controller import NarratorController
 from .narrator_region_selector import NarratorRegionSelectorCoordinator
 from .optimization_controller import OptimizationController
@@ -177,6 +193,7 @@ _VALID_PAGES = {
     "updates",
     "tasks",
     "narrator",
+    "donate",
     "system",
     "settings",
     "gameDetails",
@@ -230,6 +247,7 @@ class TaskServiceLike(Protocol):
         *,
         confirmed: bool,
         automatic_authorized: bool = False,
+        interactive_measurement: bool = True,
     ) -> Task: ...
 
     def list_tasks(self) -> Sequence[Task]: ...
@@ -301,16 +319,23 @@ class AppController(QObject):
     controllersChanged = Signal()
     activeControllerChanged = Signal()
     interfaceModeChanged = Signal()
+    systemUsageChanged = Signal()
     mangoHudProfileChanged = Signal(str)
+    mangoHudLivePreviewChanged = Signal("QVariantMap")
+    gamescopeTestChanged = Signal("QVariantMap")
+    deepAnalysisChanged = Signal(str)
+    deepCleanupChanged = Signal(str)
+    deepRecompressionChanged = Signal(str)
     optiScalerChanged = Signal(str)
-    optiScalerStatusChanged = Signal(str, object)
+    # QVariantMap (not ``object``): QML must be able to read the result.
+    optiScalerStatusChanged = Signal(str, "QVariantMap")
     protonTweaksChanged = Signal(str)
     optimizationAnalysisChanged = Signal(str)
     narratorChanged = Signal(str)
     narratorComponentsChanged = Signal()
-    narratorRegionPreviewChanged = Signal(str, object)
+    narratorRegionPreviewChanged = Signal(str, "QVariantMap")
     narratorRegionPreviewStopRequested = Signal(str, int)
-    narratorRegionSelectionChanged = Signal(str, object)
+    narratorRegionSelectionChanged = Signal(str, "QVariantMap")
 
     toastRequested = Signal(str, str)
     toastDismissRequested = Signal(str)
@@ -344,6 +369,12 @@ class AppController(QObject):
         mangohud_repository: MangoHudProfileRepository | None = None,
         mangohud_detector: MangoHudDetector | None = None,
         mangohud_launch_integration: MangoHudLaunchIntegration | None = None,
+        mangohud_live_preview: MangoHudLivePreview | None = None,
+        deep_analysis_repository: DeepAnalysisRepository | None = None,
+        deep_analyzer: DeepOptimizationAnalyzer | None = None,
+        deep_cleanup_executor: DeepCleanupExecutor | None = None,
+        deep_recompression_planner: BtrfsRecompressionPlanner | None = None,
+        gamescope_test_run: GamescopeTestRun | None = None,
         optimization_profile_repository: GameOptimizationProfileRepository | None = None,
         optimization_analysis_repository: OptimizationAnalysisRepository | None = None,
         automatic_optimization_repository: AutomaticOptimizationRepository | None = None,
@@ -442,10 +473,15 @@ class AppController(QObject):
             host_service = HostServiceClient()
         self._host_service = host_service
         analyzer: BtrfsCompressionAnalyzer | None = None
+        deep_report_loader = None
         if not self._demo_mode and task_service is None:
             analyzer = BtrfsCompressionAnalyzer(
                 filesystem_provider=self._filesystem_provider,
                 host_service=host_service,
+            )
+            deep_cache = AnalysisCache(ANALYSIS_CACHE_FILE)
+            deep_report_loader = lambda game, cancel: deep_cache.load(  # noqa: E731
+                game, cancel_event=cancel
             )
             if update_tracker is None and not explicit_provider:
                 update_tracker = GameUpdateTracker(
@@ -546,6 +582,24 @@ class AppController(QObject):
                 self._mangohud_repository, self._mangohud_detector
             )
         )
+        self._gamescope_test_run = gamescope_test_run or GamescopeTestRun(
+            host_service=host_service
+        )
+        # Called from the test watcher thread; the signal is queued to QML.
+        self._gamescope_test_run.on_finished = (
+            lambda result: self.gamescopeTestChanged.emit(
+                {**result.to_dict(), "running": False}
+            )
+        )
+        self._mangohud_live_preview = mangohud_live_preview or MangoHudLivePreview(
+            host_service=host_service
+        )
+        # Called from the preview watcher thread; the signal is queued to QML.
+        self._mangohud_live_preview.on_finished = (
+            lambda result: self.mangoHudLivePreviewChanged.emit(
+                {**result.to_dict(), "running": False}
+            )
+        )
         self._optimization_profile_repository = (
             optimization_profile_repository or GameOptimizationProfileRepository()
         )
@@ -565,6 +619,55 @@ class AppController(QObject):
         self._optimization_advisor = optimization_advisor or OptimizationAdvisor()
         self._game_analyzer = GameAnalyzer(
             self._mangohud_launch_integration.executable_resolver
+        )
+        # Read-only deep cleaning/compression analysis reuses the existing
+        # engine detector, filesystem provider and Btrfs integration.
+        self._deep_optimization_controller = DeepOptimizationController(
+            self,
+            deep_analyzer or DeepOptimizationAnalyzer(
+                engine_detector=self._game_analyzer.detect_engine,
+                filesystem_provider=self._filesystem_provider,
+                btrfs_analyzer=analyzer,
+                btrfs_report_loader=deep_report_loader,
+                compsize_available=lambda: self._deep_compsize_available(),
+                installed_app_ids=lambda: tuple(
+                    str(game.steam_app_id)
+                    for game in self._domain_games.values()
+                    if game.steam_app_id
+                ),
+            ),
+            deep_analysis_repository or DeepAnalysisRepository(),
+        )
+        # Reversible quarantine executor: only removable groups of the latest
+        # complete plan, atomic renames on the game's filesystem, no shell.
+        self._deep_cleanup_controller = DeepCleanupController(
+            self,
+            deep_cleanup_executor or DeepCleanupExecutor(
+                CleanupJournal(),
+                running_detector=(
+                    analyzer.detect_running_processes if analyzer is not None else None
+                ),
+                update_detector=self._deep_cleanup_game_updating,
+            ),
+            self._deep_optimization_controller._repository,
+            self._deep_optimization_controller._plan,
+        )
+        # Stage 2B: per-file Btrfs recompression through the existing provider.
+        provider = getattr(self._compression_service, "_provider", None)
+        recompression_planner = deep_recompression_planner or (
+            BtrfsRecompressionPlanner(provider, filesystem_provider=self._filesystem_provider)
+            if isinstance(provider, BtrfsCompressionProvider) else None
+        )
+        self._deep_recompression_controller = DeepRecompressionController(
+            self,
+            recompression_planner,
+            BtrfsRecompressionExecutor(recompression_planner, RecompressionGuards(
+                game_running=self._recompression_game_running,
+                game_updating=self._recompression_game_updating,
+                quarantine_active=self._recompression_quarantine_active,
+            )) if recompression_planner is not None else None,
+            self._deep_optimization_controller._plan,
+            self._deep_optimization_controller._repository.fingerprint,
         )
         self._game_settings_advisor = GameSettingsAdvisor()
         self._mangohud_log_parser = MangoHudLogParser()
@@ -613,7 +716,12 @@ class AppController(QObject):
                 PiperPolishTtsProvider(),
                 narrator_audio,
                 NarratorGameActivityDetector(
-                    lambda game_key: self._narrator_controller.game_for_key(game_key)
+                    lambda game_key: self._narrator_controller.game_for_key(game_key),
+                    host_processes=(
+                        host_service.host_process_commands
+                        if host_service is not None and host_service.in_flatpak
+                        else None
+                    ),
                 ),
             )
         self._narrator_pipeline = narrator_pipeline
@@ -680,6 +788,11 @@ class AppController(QObject):
             if callable(voice_available)
             else False
         )
+        darkman_available = bool(
+            voice_available(PIPER_DARKMAN_VOICE_ID)
+            if callable(voice_available)
+            else False
+        )
         self._narrator_component_manager.set_runtime_state(
             "tts.polish-voice",
             gosia_available,
@@ -699,6 +812,15 @@ class AppController(QObject):
             ),
         )
         self._narrator_component_manager.set_runtime_state(
+            "tts.polish-darkman",
+            darkman_available,
+            (
+                "The Darkman Polish voice is ready"
+                if darkman_available
+                else "The Darkman Polish voice is not installed"
+            ),
+        )
+        self._narrator_component_manager.set_runtime_state(
             "audio.qt-pcm",
             narrator_pipeline.audio.available,
             (
@@ -713,6 +835,7 @@ class AppController(QObject):
             "translation.opus-en-pl",
             "tts.polish-voice",
             "tts.polish-bass",
+            "tts.polish-darkman",
             "audio.qt-pcm",
         ):
             self._narrator_controller._refresh_component_runtime(component_id)
@@ -726,6 +849,10 @@ class AppController(QObject):
         self._ui_sound_service.set_enabled(self._settings_model.interface_sounds)
         self._configure_couch_audio()
         self._gamepad_service = gamepad_service or GamepadService(parent=self)
+        # Couch header CPU/GPU/RAM: samples only while enabled and visible.
+        self._system_usage = SystemUsageMonitor(parent=self)
+        self._system_usage.set_enabled(self._settings_model.couch_show_system_usage)
+        self._system_usage.changed.connect(self.systemUsageChanged)
         self._couch_navigation = CouchNavigationController(self)
         self._gamepad_service.availabilityChanged.connect(
             self._on_gamepad_availability_changed
@@ -744,6 +871,7 @@ class AppController(QObject):
         )
         self._gamepad_service.actionTriggered.connect(self._on_gamepad_action)
         self._gamepad_service.inputActivity.connect(self._on_gamepad_activity)
+        self._gamepad_service.shortcutTriggered.connect(self._on_gamepad_shortcut)
         self._configure_gamepad_service()
 
         self._games: list[dict[str, Any]] = []
@@ -779,6 +907,11 @@ class AppController(QObject):
         self._manual_launch_jobs: dict[str, Future[Any]] = {}
         self._shutdown_requested = False
         self._consume_gamepad_action = ""
+        # Gamepad input reaches the UI only while GameOpti's own window is
+        # active; the Select+Y narrator shortcut is handled separately so it
+        # keeps working while a game holds focus. Default active until QML
+        # reports otherwise, so headless/desktop startup is unchanged.
+        self._window_active = True
         self._last_launch_request: dict[str, float] = {}
         requested_interface_mode = str(initial_interface_mode or "").strip().casefold()
         self._interface_mode = (
@@ -1144,6 +1277,31 @@ class AppController(QObject):
     @Property(str, notify=interfaceModeChanged)
     def interfaceMode(self) -> str:
         return self._interface_mode
+
+    @Property("QVariantMap", notify=systemUsageChanged)
+    def systemUsage(self) -> dict[str, Any]:
+        """Only metrics that were really read; missing ones are absent."""
+
+        usage = self._system_usage.usage
+        values: dict[str, Any] = {}
+        if usage.cpu_percent is not None:
+            values["cpuPercent"] = usage.cpu_percent
+        if usage.gpu_percent is not None:
+            values["gpuPercent"] = usage.gpu_percent
+        if usage.memory_used_bytes is not None and usage.memory_total_bytes:
+            language = str(self._settings_model.language).casefold()
+            values["memoryText"] = format_memory(
+                usage.memory_used_bytes,
+                usage.memory_total_bytes,
+                decimal_comma=language.startswith(("pl", "pol", "es", "spa")),
+            )
+        return values
+
+    @Slot(bool)
+    def setCouchVisible(self, visible: bool) -> None:
+        """Couch UI shown on screen (not minimised); drives usage sampling."""
+
+        self._system_usage.set_visible(bool(visible))
 
     @Slot(result=bool)
     def toggleInterfaceMode(self) -> bool:
@@ -1520,6 +1678,15 @@ class AppController(QObject):
 
     @Slot(str, result=bool)
     def launchGame(self, game_id: str) -> bool:
+        launched = self._launch_game(game_id)
+        if launched and not self._demo_mode:
+            game = self._resolve_game(game_id, show_error=False)
+            if game is not None:
+                # Lets the Narrator start with the game and stop after it.
+                self._narrator_controller.game_launched(game)
+        return launched
+
+    def _launch_game(self, game_id: str) -> bool:
         game = self._resolve_game(game_id)
         if game is None:
             return False
@@ -1627,7 +1794,9 @@ class AppController(QObject):
             activation = None
             profile = self._mangohud_profile_for_game(game)
             if profile is not None and profile.enabled:
-                activation = self._mangohud_launch_integration.prepare(game, profile)
+                activation = self._mangohud_launch_integration.prepare(
+                    game, self._effective_mangohud_profile(profile)
+                )
                 if not activation.available:
                     raise SteamLaunchError(activation.message)
             command = (
@@ -1681,6 +1850,16 @@ class AppController(QObject):
     @Slot(str, result="QVariantMap")
     def resetMangoHudProfile(self, game_id: str) -> dict[str, Any]:
         return self._mangohud_controller.resetMangoHudProfile(game_id)
+
+    @Slot(str, "QVariantMap", result="QVariantMap")
+    def startMangoHudLivePreview(
+        self, game_id: str, values: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        return self._mangohud_controller.startMangoHudLivePreview(game_id, values)
+
+    @Slot(result=bool)
+    def stopMangoHudLivePreview(self) -> bool:
+        return self._mangohud_controller.stopMangoHudLivePreview()
 
     @Slot(str, result=bool)
     def openMangoHudDirectory(self, game_id: str) -> bool:
@@ -1822,8 +2001,33 @@ class AppController(QObject):
         operation: Callable[
             [Event, Callable[[str, float], None]], OptiScalerProfile
         ],
+        context: Mapping[str, Any] | None = None,
     ) -> bool:
-        return self._optiscaler_controller._start_optiscaler_operation(game, action, operation)
+        return self._optiscaler_controller._start_optiscaler_operation(
+            game, action, operation, context
+        )
+
+    @Slot(str, str, str, str, str, bool, "QVariantMap", result=bool)
+    def startOptiScalerInstall(
+        self,
+        game_id: str,
+        executable: str,
+        injection_dll: str,
+        operation_name: str,
+        confirmed_conflicts: str,
+        allow_anticheat_risk: bool,
+        configuration: Mapping[str, Any],
+    ) -> bool:
+        """The single "Install" path in Desktop and Couch (official release)."""
+
+        return self._optiscaler_controller.startOptiScalerInstall(
+            game_id, executable, injection_dll, operation_name,
+            confirmed_conflicts, allow_anticheat_risk, configuration,
+        )
+
+    @Slot(str, result="QVariantMap")
+    def confirmOptiScalerRelocation(self, game_id: str) -> dict[str, Any]:
+        return self._optiscaler_controller.confirmOptiScalerRelocation(game_id)
 
     @Slot(str, str, str, str, bool, result=bool)
     def installOptiScaler(
@@ -1901,6 +2105,7 @@ class AppController(QObject):
 
     @Slot(bool)
     def setCouchWindowActive(self, active: bool) -> None:
+        self._window_active = bool(active)
         self._ui_sound_service.set_window_active(bool(active))
 
     @Slot(bool)
@@ -1939,6 +2144,135 @@ class AppController(QObject):
         self, game_id: str, values: Mapping[str, Any]
     ) -> dict[str, Any]:
         return self._optimization_controller.saveOptimizationProfile(game_id, values)
+
+    def _deep_compsize_available(self) -> bool:
+        if self._host_service is not None:
+            try:
+                return self._host_service.tool_info("compsize").get("available") is True
+            except Exception:
+                return False
+        return shutil.which("compsize") is not None
+
+    def _recompression_game_running(self, game: Game) -> bool:
+        planner = getattr(self._deep_recompression_controller, "_planner", None)
+        provider = getattr(planner, "_provider", None)
+        checker = getattr(provider, "_is_game_running", None)
+        try:
+            return bool(checker(game)) if callable(checker) else False
+        except Exception:
+            return True  # fail closed
+
+    def _recompression_game_updating(self, game: Game) -> bool:
+        if self._deep_cleanup_game_updating(game):
+            return True
+        planner = getattr(self._deep_recompression_controller, "_planner", None)
+        provider = getattr(planner, "_provider", None)
+        checker = getattr(provider, "_steam_is_updating", None)
+        try:
+            if callable(checker) and checker(game):
+                return True
+        except Exception:
+            return True
+        active = getattr(self._compression_service, "_active_games", set())
+        return game.id in active  # another compression task writes this game
+
+    def _recompression_quarantine_active(self, game: Game) -> bool:
+        state = self._deep_cleanup_controller.state(game.id)
+        return bool(state.get("active")) or bool(state.get("busy"))
+
+    @Slot(str, result="QVariantMap")
+    def getDeepRecompression(self, game_id: str) -> dict[str, Any]:
+        return self._deep_recompression_controller.state(game_id)
+
+    @Slot(str, int, result="QVariantMap")
+    def analyzeDeepRecompression(self, game_id: str, level: int) -> dict[str, Any]:
+        return self._deep_recompression_controller.analyze(game_id, None if level < 0 else level)
+
+    @Slot(str, "QVariantList", result="QVariantMap")
+    def startDeepRecompression(self, game_id: str, types: list[Any]) -> dict[str, Any]:
+        return self._deep_recompression_controller.start(game_id, [str(item) for item in types or []])
+
+    @Slot(str, result=bool)
+    def cancelDeepRecompression(self, game_id: str) -> bool:
+        return self._deep_recompression_controller.cancel(game_id)
+
+    @Slot(str, bool, result="QVariantMap")
+    def setDeepFutureCompression(self, game_id: str, enabled: bool) -> dict[str, Any]:
+        return self._deep_recompression_controller.set_future_property(game_id, bool(enabled))
+
+    def _deep_cleanup_game_updating(self, game: Game) -> bool:
+        tracker = getattr(self, "_update_tracker", None)
+        if tracker is None:
+            return False
+        try:
+            record = tracker.get(game.id)
+        except Exception:
+            return False
+        return bool(record is not None and record.status == GameUpdateStatus.WAITING_FOR_LAUNCHER)
+
+    @Slot(str, result="QVariantMap")
+    def getDeepCleanup(self, game_id: str) -> dict[str, Any]:
+        return self._deep_cleanup_controller.state(game_id)
+
+    @Slot(str, "QVariantList", result="QVariantMap")
+    def startDeepQuarantine(self, game_id: str, group_ids: list[Any]) -> dict[str, Any]:
+        return self._deep_cleanup_controller.start_quarantine(
+            game_id, [str(value) for value in group_ids or []]
+        )
+
+    @Slot(str, result=bool)
+    def cancelDeepCleanup(self, game_id: str) -> bool:
+        return self._deep_cleanup_controller.cancel(game_id)
+
+    @Slot(str, str, result="QVariantMap")
+    def restoreDeepQuarantine(self, game_id: str, transaction_id: str) -> dict[str, Any]:
+        return self._deep_cleanup_controller.restore(game_id, transaction_id)
+
+    @Slot(str, str, str, result="QVariantMap")
+    def finalizeDeepQuarantine(
+        self, game_id: str, transaction_id: str, confirmation: str
+    ) -> dict[str, Any]:
+        return self._deep_cleanup_controller.finalize(game_id, transaction_id, confirmation)
+
+    @Slot(str, result="QVariantMap")
+    def startDeepAnalysis(self, game_id: str) -> dict[str, Any]:
+        return self._deep_optimization_controller.start(game_id)
+
+    @Slot(str, result=bool)
+    def cancelDeepAnalysis(self, game_id: str) -> bool:
+        return self._deep_optimization_controller.cancel(game_id)
+
+    @Slot(str, str, result="QVariantMap")
+    def getDeepAnalysis(self, game_id: str, safety_filter: str = "all") -> dict[str, Any]:
+        return self._deep_optimization_controller.state(game_id, safety_filter)
+
+    @Slot(str, str, result="QVariantMap")
+    def setDeepAnalysisLanguage(self, game_id: str, language: str) -> dict[str, Any]:
+        return self._deep_optimization_controller.set_language(game_id, language)
+
+    @Slot(str, str, result="QVariantMap")
+    def exportDeepAnalysis(self, game_id: str, destination: str) -> dict[str, Any]:
+        return self._deep_optimization_controller.export(game_id, destination)
+
+    @Slot(result="QVariantMap")
+    def refreshGamescopeDetection(self) -> dict[str, Any]:
+        return self._optimization_controller.refreshGamescopeDetection()
+
+    @Slot(str, result="QVariantMap")
+    def resetGamescopeSettings(self, game_id: str) -> dict[str, Any]:
+        return self._optimization_controller.resetGamescopeSettings(game_id)
+
+    @Slot(str, "QVariantMap", bool, result="QVariantMap")
+    def startGamescopeTest(
+        self, game_id: str, values: Mapping[str, Any], include_hdr: bool = False
+    ) -> dict[str, Any]:
+        return self._optimization_controller.startGamescopeTest(
+            game_id, values, bool(include_hdr)
+        )
+
+    @Slot(result=bool)
+    def stopGamescopeTest(self) -> bool:
+        return self._optimization_controller.stopGamescopeTest()
 
     @Slot(str, result="QVariantMap")
     def testGameOptimizationRunner(self, game_id: str) -> dict[str, Any]:
@@ -2044,6 +2378,10 @@ class AppController(QObject):
     ) -> bool:
         return self._narrator_controller.save_settings(game_id, values)
 
+    @Slot(str, result=bool)
+    def clearNarratorGameOverrides(self, game_id: str) -> bool:
+        return self._narrator_controller.clear_overrides(game_id)
+
     @Slot(str, result="QVariantMap")
     def getNarratorSessionState(self, game_id: str) -> dict[str, Any]:
         return self._narrator_controller.session_state(game_id)
@@ -2055,6 +2393,10 @@ class AppController(QObject):
     @Slot(result=bool)
     def stopNarrator(self) -> bool:
         return self._narrator_controller.stop()
+
+    @Slot(str, result=bool)
+    def chooseNarratorWindowAgain(self, game_id: str) -> bool:
+        return self._narrator_controller.choose_window_again(game_id)
 
     @Slot(str, result=bool)
     def requestNarratorRegionPreview(self, game_id: str) -> bool:
@@ -2101,7 +2443,7 @@ class AppController(QObject):
             game_id, generation
         )
 
-    @Slot(str, object)
+    @Slot(str, "QVariantMap")
     def _handleNarratorRegionPreviewForSelector(
         self,
         game_id: str,
@@ -2150,7 +2492,11 @@ class AppController(QObject):
                 "The subtitle area could not be saved"
             )
             return
-        values = dict(region)
+        # The native selector owns only the UI window; finish the capture
+        # preview explicitly after persistence so its lifecycle cannot remain
+        # active when the selector closes.
+        self._narrator_controller.cancel_region_preview(str(game_id))
+        values = self._narrator_controller.get_settings(str(game_id))["subtitleRegion"]
         self._narrator_region_selector.complete_selection()
         self.narratorRegionSelectionChanged.emit(str(game_id), values)
 
@@ -2176,6 +2522,34 @@ class AppController(QObject):
     def removeNarratorComponent(self, component_id: str) -> bool:
         return self._narrator_controller.remove_component(component_id)
 
+    @Slot(str, bool, result="QVariantMap")
+    def importNarratorCustomVoice(
+        self, model_file: str, allow_other_language: bool = False
+    ) -> dict[str, Any]:
+        text = str(model_file or "").strip()
+        url = QUrl(text)
+        if url.scheme():
+            if not url.isLocalFile():
+                return {
+                    "success": False,
+                    "errorCode": "not_local",
+                    "error": "Only local voice files are supported",
+                }
+            text = url.toLocalFile()
+        if not text:
+            return {
+                "success": False,
+                "errorCode": "not_onnx",
+                "error": "Choose a Piper voice model file (.onnx)",
+            }
+        return self._narrator_controller.import_custom_voice(
+            Path(text).expanduser(), bool(allow_other_language)
+        )
+
+    @Slot(str, result=bool)
+    def removeNarratorCustomVoice(self, voice_id: str) -> bool:
+        return self._narrator_controller.remove_custom_voice(voice_id)
+
     @Slot(str)
     @Slot(str, str)
     def showToast(self, message: str, level: str = "info") -> None:
@@ -2186,6 +2560,7 @@ class AppController(QObject):
         if self._shutdown_requested:
             return
         self._shutdown_requested = True
+        self._system_usage.stop()
         if hasattr(self, "_task_timer") and self._task_timer.isActive():
             self._task_timer.stop()
         for timer_name in ("_scan_debounce_timer", "_ignored_scan_event_timer"):
@@ -2196,6 +2571,36 @@ class AppController(QObject):
             self._gamepad_service.stop()
         if hasattr(self, "_ui_sound_service"):
             self._ui_sound_service.shutdown()
+        recompression_controller = getattr(self, "_deep_recompression_controller", None)
+        if recompression_controller is not None:
+            try:
+                recompression_controller.shutdown()
+            except Exception:
+                logger.exception("Could not stop the deep recompression")
+        cleanup_controller = getattr(self, "_deep_cleanup_controller", None)
+        if cleanup_controller is not None:
+            try:
+                cleanup_controller.shutdown()
+            except Exception:
+                logger.exception("Could not stop the deep cleanup")
+        deep_controller = getattr(self, "_deep_optimization_controller", None)
+        if deep_controller is not None:
+            try:
+                deep_controller.shutdown()
+            except Exception:
+                logger.exception("Could not stop the deep analysis")
+        gamescope_test = getattr(self, "_gamescope_test_run", None)
+        if gamescope_test is not None:
+            try:
+                gamescope_test.shutdown()
+            except Exception:
+                logger.exception("Could not stop the Gamescope test")
+        live_preview = getattr(self, "_mangohud_live_preview", None)
+        if live_preview is not None:
+            try:
+                live_preview.shutdown()
+            except Exception:
+                logger.exception("Could not stop the MangoHud live preview")
         narrator_controller = getattr(self, "_narrator_controller", None)
         narrator_region_selector = getattr(
             self, "_narrator_region_selector", None
@@ -2386,12 +2791,26 @@ class AppController(QObject):
         if (
             self._settings_model.controller_mode is ControllerMode.AUTOMATIC
             and self._interface_mode == "desktop"
+            and self._narrator_region_selector.active_window is None
         ):
             self._set_interface_mode("couch")
             self._consume_gamepad_action = str(action)
 
     @Slot(str)
+    def _on_gamepad_shortcut(self, shortcut: str) -> None:
+        if shortcut == "narrator_toggle":
+            result = self._narrator_controller.toggle_for_running_game()
+            logger.info("Gamepad shortcut %s handled: result=%s", shortcut, bool(result))
+
     def _on_gamepad_action(self, action: str) -> None:
+        # While the native subtitle-region selector is open it owns the pad,
+        # whatever the interface mode or main-window focus (the main window is
+        # hidden behind the selector, so _window_active is False then).
+        if self._narrator_region_selector.active_window is not None:
+            normalized = normalize_gamepad_action(action)
+            if normalized is not None:
+                self._narrator_region_selector.handle_gamepad_action(normalized.value)
+            return
         if self._consume_gamepad_action and action == self._consume_gamepad_action:
             self._consume_gamepad_action = ""
             return
@@ -2399,6 +2818,12 @@ class AppController(QObject):
             self.toggleInterfaceMode()
             return
         if self._interface_mode == "desktop":
+            return
+        # Only steer GameOpti while its own window is active. When a game holds
+        # focus the window is inactive; gamepad navigation must go to the game,
+        # not to GameOpti. The Select+Y narrator shortcut is handled in
+        # _on_gamepad_shortcut and stays available regardless of focus.
+        if not self._window_active:
             return
         normalized = normalize_gamepad_action(action)
         if normalized is None:
@@ -3002,10 +3427,18 @@ class AppController(QObject):
 
     @staticmethod
     def _gamescope_owns_fps_limit(profile: GameOptimizationProfile) -> bool:
-        return bool(profile.gamescope_enabled and profile.gamescope_mode != "disabled")
+        # Gamescope owns the limit only when it really emits -r N.
+        return bool(
+            profile.gamescope_enabled
+            and profile.gamescope_mode != "disabled"
+            and profile.target_fps_mode != "unlimited"
+        )
 
-    def _clear_mangohud_fps_limit(self, game: Game) -> None:
-        return self._mangohud_controller._clear_mangohud_fps_limit(game)
+    def _sync_mangohud_fps_owner(self, game: Game) -> None:
+        return self._mangohud_controller._sync_mangohud_fps_owner(game)
+
+    def _effective_mangohud_profile(self, profile: MangoHudProfile) -> MangoHudProfile:
+        return self._mangohud_controller._effective_mangohud_profile(profile)
 
     @staticmethod
     def _mangohud_error(message: str, *, app_id: str = "") -> dict[str, Any]:
@@ -3083,6 +3516,7 @@ class AppController(QObject):
             "updates": "updates",
             "tasks": "tasks",
             "narrator": "narrator",
+            "donate": "donate",
             "system": "system",
             "settings": "settings",
             "gamedetails": "gameDetails",

@@ -127,7 +127,7 @@ FocusScope {
         anchors.margins: 52 * page.couchScale
         spacing: 18 * page.couchScale
         Label {
-            text: qsTr("Narrator")
+            text: qsTr("Lektor")
             color: App.Theme.text
             font.pixelSize: 38 * page.couchScale
             font.weight: Font.Bold

@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import replace
 from datetime import UTC, datetime
 import hashlib
 import logging
+from pathlib import Path
 import time
 from typing import TYPE_CHECKING, Any, Mapping
 
@@ -15,6 +17,10 @@ from game_optimization_linux.models.narrator import (
     CaptureState,
     NarratorGameSettings,
     NarratorSubtitleLanguageMode,
+)
+from game_optimization_linux.services.narrator_tts import (
+    CustomVoiceError,
+    CustomVoiceLanguageError,
 )
 from game_optimization_linux.services.narrator_region import (
     EncodedRegionPreview,
@@ -27,6 +33,20 @@ if TYPE_CHECKING:
 
 
 logger = logging.getLogger(__name__)
+
+# Autostart waits this long after the game's own process is detected.
+AUTOSTART_DELAY_SECONDS = 15.0
+# A session that lasts this long counts as "on the real game window".
+LASTING_SESSION_SECONDS = 90.0
+# After "capture session closed": wait, re-check the process, then decide.
+CAPTURE_CLOSED_RECHECK_SECONDS = 8.0
+# No capture frame this long after the session became active: restart once.
+FRAME_WATCHDOG_SECONDS = 10.0
+# Consecutive negative process reads (each on a fresh list) before "ended".
+ENDED_CONFIRMATIONS = 2
+WATCH_REFRESH_SECONDS = 15.0
+# How often the autostart watcher logs a liveness heartbeat.
+HEARTBEAT_SECONDS = 30.0
 
 
 class NarratorController:
@@ -41,6 +61,270 @@ class NarratorController:
         )
         self._preview_generations: dict[str, int] = {}
         self._preview_jobs: set[Future[object]] = set()
+        # game_key -> deadline (monotonic) while waiting for a launched game.
+        self._watched: dict[str, Game] = {}
+        self._watch_refresh_at = 0.0
+        self._seen_since: dict[str, float] = {}
+        self._autostart_done: set[str] = set()
+        self._last_decision: dict[str, str] = {}
+        # Autostart watcher heartbeat: an INFO line roughly every 30 s so the
+        # log shows the watcher is alive even when nothing changes.
+        self._heartbeat_at = 0.0
+        # One automatic capture retry after the portal session is closed
+        # (SOURCE_LOST), tracked per game so it fires at most once until the
+        # session recovers to a healthy state.
+        self._capture_retry_session: set[str] = set()
+        # game_key -> monotonic time when "capture session closed" must be
+        # re-checked (the game may be switching from a splash window).
+        self._capture_closed_pending: dict[str, float] = {}
+        # game_key -> (session start time, started automatically).
+        self._session_started: dict[str, tuple[float, bool]] = {}
+        # Frame watchdog for the current session: (game_key, deadline, frames
+        # at arming) once capture is active; one silent restart per game.
+        self._frame_watchdog: tuple[str, float, int] | None = None
+        self._watchdog_restarted: set[str] = set()
+        # "Ended" needs consecutive negative reads on distinct process lists.
+        self._negative_reads: dict[str, int] = {}
+        self._last_probe: dict[str, object] = {}
+        self._clock = time.monotonic
+
+    # -- voice ------------------------------------------------------------------
+    def effective_voice_id(self, settings: NarratorGameSettings | None) -> str:
+        """The voice really used: the saved one if installed, else the first
+        installed voice. A specific voice is never required."""
+
+        tts = self._app._narrator_pipeline.tts
+        available = tuple(str(value) for value in getattr(tts, "available_voice_ids", ()))
+        saved = settings.voice_id if settings is not None else ""
+        if saved and saved in available:
+            return saved
+        if available:
+            return available[0]
+        return saved or str(getattr(tts, "default_voice_id", ""))
+
+    def _voice_name(self, voice_id: str) -> str:
+        for voice in tuple(getattr(self._app._narrator_pipeline.tts, "voices", ())):
+            if isinstance(voice, Mapping):
+                if str(voice.get("id", "")) == voice_id:
+                    return str(voice.get("name", voice_id))
+            elif str(getattr(voice, "voice_id", getattr(voice, "id", ""))) == voice_id:
+                return str(getattr(voice, "name", voice_id))
+        return voice_id
+
+    def _with_effective_voice(self, settings: NarratorGameSettings) -> NarratorGameSettings:
+        voice_id = self.effective_voice_id(settings)
+        return replace(settings, voice_id=voice_id) if voice_id != settings.voice_id else settings
+
+    # -- autostart --------------------------------------------------------------
+    def game_launched(self, game: Game) -> None:
+        """A game was started from GameOpti: look for it right away."""
+
+        game_key = self._game_key(game)
+        invalidate = getattr(self._app._narrator_pipeline.activity, "invalidate", None)
+        if callable(invalidate):
+            invalidate(game_key)
+        self._watch_refresh_at = 0.0
+        logger.info("Narrator autostart: %s launched from GameOpti", game_key)
+        self._app.narratorChanged.emit(game.id)
+
+    def _log_decision(self, game_key: str, message: str) -> None:
+        """Log each autostart decision once per change (not on every tick)."""
+
+        if self._last_decision.get(game_key) != message:
+            self._last_decision[game_key] = message
+            logger.info("Narrator autostart: %s: %s", game_key, message)
+
+    def _refresh_watch(self, now: float) -> None:
+        """Games with the Narrator enabled, watched wherever they are started."""
+
+        if now < self._watch_refresh_at:
+            return
+        self._watch_refresh_at = now + WATCH_REFRESH_SECONDS
+        supports = getattr(self._app._narrator_pipeline.activity, "supports", None)
+        watched: dict[str, Game] = {}
+        for game in tuple(self._app._domain_games.values()):
+            game_key = self._game_key(game)
+            try:
+                enabled = self._app._narrator_settings_repository.load(game_key).enabled
+            except Exception:
+                continue
+            if not enabled:
+                continue
+            if callable(supports) and supports(game):
+                watched[game_key] = game
+            else:
+                self._log_decision(game_key, "skipped, the game process cannot be observed; start manually")
+        self._watched = watched
+
+    def _log_heartbeat(self, now: float, pipeline: object) -> None:
+        """INFO liveness line every ~30 s with the current watcher state."""
+
+        if now < self._heartbeat_at:
+            return
+        self._heartbeat_at = now + HEARTBEAT_SECONDS
+        if getattr(pipeline, "active", False):
+            logger.info(
+                "Narrator autostart heartbeat: session active for %s",
+                getattr(pipeline.snapshot, "game_key", "") or "?",
+            )
+            return
+        logger.info(
+            "Narrator autostart heartbeat: watching %d game(s): %s",
+            len(self._watched),
+            ", ".join(sorted(self._watched)) or "none",
+        )
+
+    def _read_game_process(self, game_key: str, strict: Any) -> bool | None:
+        """True running, False ended (confirmed), None not decided yet.
+
+        A negative read (no match, empty list or unavailable list) counts only
+        when it comes from a fresh process list; ENDED_CONFIRMATIONS of them in
+        a row are needed before the game counts as ended.
+        """
+
+        activity = self._app._narrator_pipeline.activity
+        running = strict(game_key)
+        if running is True:
+            self._negative_reads.pop(game_key, None)
+            return True
+        probe = getattr(activity, "commands_generation", None)
+        fresh = probe is None or self._last_probe.get(game_key) != probe
+        self._last_probe[game_key] = probe
+        count = self._negative_reads.get(game_key, 0) + (1 if fresh else 0)
+        self._negative_reads[game_key] = count
+        return False if count >= ENDED_CONFIRMATIONS else None
+
+    def _log_ended(self, game_key: str) -> None:
+        activity = self._app._narrator_pipeline.activity
+        reason = getattr(activity, "last_reason", {}).get(game_key, "unknown")
+        matched = getattr(activity, "last_match", {}).get(game_key, "")
+        self._log_decision(
+            game_key,
+            f"game process ended after {ENDED_CONFIRMATIONS} negative reads "
+            f"(reason: {reason}; last matched line: {matched[:200] or 'none'})",
+        )
+
+    def _poll_autostart(self) -> None:
+        pipeline = self._app._narrator_pipeline
+        now = self._clock()
+        self._refresh_watch(now)
+        self._log_heartbeat(now, pipeline)
+        strict = getattr(pipeline.activity, "game_process_running", None)
+        if not callable(strict):
+            return
+        active_key = pipeline.snapshot.game_key if pipeline.active else ""
+        if active_key:
+            # A running session (manual or automatic) is not restarted after
+            # the user stops it while the game still runs.
+            self._autostart_done.add(active_key)
+        for game_key, game in tuple(self._watched.items()):
+            if active_key and game_key != active_key:
+                continue
+            running = self._read_game_process(game_key, strict)
+            if running is None:
+                continue          # not confirmed either way; keep the state
+            if running is False:
+                if game_key in self._seen_since:
+                    self._log_ended(game_key)
+                self._seen_since.pop(game_key, None)
+                self._autostart_done.discard(game_key)
+                if game_key == active_key:
+                    if self._session_started.get(game_key, (0.0, False))[1]:
+                        logger.info(
+                            "Narrator autostart: %s: stopping the automatic session, the game ended",
+                            game_key,
+                        )
+                        self.stop()
+                    else:
+                        self._log_decision(
+                            game_key,
+                            "session was started manually; keeping it",
+                        )
+                continue
+            if game_key == active_key:
+                self._seen_since.setdefault(game_key, now)
+                continue
+            since = self._seen_since.setdefault(game_key, now)
+            if since == now:
+                self._log_decision(
+                    game_key,
+                    f"game process detected, waiting {AUTOSTART_DELAY_SECONDS:.0f} s for its window",
+                )
+            if game_key in self._autostart_done or now - since < AUTOSTART_DELAY_SECONDS:
+                continue
+            self._autostart_done.add(game_key)
+            try:
+                settings = self._app._narrator_settings_repository.load(game_key)
+            except Exception as error:
+                self._log_decision(game_key, f"error, settings could not be read: {error}")
+                continue
+            missing = self._missing_requirements(settings) if settings.enabled else ()
+            if not settings.enabled or missing:
+                self._log_decision(game_key, "skipped, " + (
+                    "missing: " + ", ".join(missing) if missing else "disabled"))
+                self._app.narratorChanged.emit(game.id)
+                continue
+            first_grant = not self._has_capture_grant(game_key)
+            self._log_decision(game_key, "start" + (" (first window choice)" if first_grant else ""))
+            if self.start(game.id, automatic=True):
+                self._app._emit_toast(
+                    "Narrator started with the game. Choose the game window once; the choice is remembered"
+                    if first_grant else "Narrator started with the game",
+                    "info",
+                )
+            else:
+                self._log_decision(game_key, "error, the start was rejected")
+
+    def toggle_for_running_game(self) -> bool:
+        """Gamepad shortcut: stop the session, or start it for the running game."""
+
+        pipeline = self._app._narrator_pipeline
+        sounds = self._app._ui_sound_service
+        if pipeline.active:
+            logger.info("Narrator shortcut: stop")
+            self.stop()
+            sounds.play_feedback("close")
+            return True
+        self._refresh_watch(self._clock())
+        for game_key, game in tuple(self._watched.items()):
+            if pipeline.activity.is_active(game_key) is True:
+                logger.info("Narrator shortcut: start for %s", game_key)
+                started = self.start(game.id, automatic=True)
+                sounds.play_feedback("open" if started else "error")
+                return started
+        logger.info("Narrator shortcut: skipped, no running game with the Narrator enabled")
+        sounds.play_feedback("error")
+        return False
+
+    def choose_window_again(self, game_id: str) -> bool:
+        """Forget the saved portal choice for this game only."""
+
+        game = self._app._resolve_game(game_id, show_error=True)
+        if game is None:
+            return False
+        game_key = self._game_key(game)
+        capture = self._app._narrator_pipeline.capture
+        grants = getattr(capture, "_grants", None)
+        try:
+            if grants is not None:
+                grants.save_token(game_key, "")
+        except Exception as error:
+            logger.warning("Could not clear the narrator capture choice for %s: %s", game_key, error)
+            return False
+        getattr(capture, "stale_grants", set()).discard(game_key)
+        logger.info("Narrator capture: saved window choice cleared for %s", game_key)
+        if self._app._narrator_pipeline.active and self._app._narrator_pipeline.snapshot.game_key == game_key:
+            self.stop()
+        self._app.narratorChanged.emit(game.id)
+        return True
+
+    def _has_capture_grant(self, game_key: str) -> bool:
+        grants = getattr(self._app._narrator_pipeline.capture, "_grants", None)
+        loader = getattr(grants, "load_token", None)
+        try:
+            return bool(loader(game_key)) if callable(loader) else True
+        except Exception:
+            return False
 
     def components(self) -> list[dict[str, Any]]:
         manager = self._app._narrator_component_manager
@@ -51,6 +335,7 @@ class NarratorController:
             "translation.opus-en-pl": "translation_model_required",
             "tts.polish-voice": "polish_voice_required",
             "tts.polish-bass": "polish_voice_required",
+            "tts.polish-darkman": "polish_voice_required",
             "audio.qt-pcm": "audio_runtime",
         }
         result: list[dict[str, Any]] = []
@@ -108,6 +393,7 @@ class NarratorController:
                 "stabilizationMs": "stabilization_ms",
                 "ocrMinConfidence": "ocr_min_confidence",
                 "duplicateCooldownMs": "duplicate_cooldown_ms",
+                "readSpeakerNames": "read_speaker_names",
             }
             for source, target in aliases.items():
                 if source in values:
@@ -138,10 +424,25 @@ class NarratorController:
         game_key = self._game_key(game)
         try:
             settings = self._app._narrator_settings_repository.load(game_key)
+            raw = self._app._narrator_settings_repository.load_overrides(game_key)
         except Exception as error:
             logger.warning("Could not load narrator settings for %s: %s", game.id, error)
             return self._settings_error(str(error), game_id=game.id, game_key=game_key)
-        return self._settings_to_qml(game, settings)
+        result = self._settings_to_qml(game, settings)
+        result["overrideFields"] = [
+            field for field in (
+                "enabled", "source_mode", "capture_source",
+                "subtitle_language_mode", "subtitle_adapter_id",
+                "ocr_provider_id", "translation_provider_id",
+                "translation_profile_id", "tts_provider_id", "voice_id",
+                "volume", "speech_rate", "noise_scale", "noise_w_scale",
+                "capture_sampling_hz", "visual_change_threshold",
+                "stabilization_ms", "ocr_min_confidence",
+                "duplicate_cooldown_ms", "read_speaker_names",
+            ) if field in raw
+        ]
+        result["subtitleRegionInherited"] = False
+        return result
 
     def save_settings(self, game_id: str, values: Mapping[str, Any]) -> bool:
         game = self._app._resolve_game(game_id, show_error=True)
@@ -149,7 +450,6 @@ class NarratorController:
             return False
         game_key = self._game_key(game)
         try:
-            current = self._app._narrator_settings_repository.load(game_key).to_dict()
             aliases = {
                 "enabled": "enabled",
                 "sourceMode": "source_mode",
@@ -170,29 +470,70 @@ class NarratorController:
                 "stabilizationMs": "stabilization_ms",
                 "ocrMinConfidence": "ocr_min_confidence",
                 "duplicateCooldownMs": "duplicate_cooldown_ms",
+                "readSpeakerNames": "read_speaker_names",
             }
             for source, target in aliases.items():
                 if source in values:
-                    current[target] = values[source]
+                    values = dict(values)
+                    values[target] = values[source]
             crop = values.get("subtitleRegion")
             if isinstance(crop, Mapping):
-                current["subtitle_region"] = dict(crop)
-            current["updated_at"] = datetime.now(UTC).isoformat()
-            settings = NarratorGameSettings.from_dict(
-                current, expected_game_key=game_key
-            )
-            self._app._narrator_settings_repository.save(settings)
+                values = dict(values)
+                values["subtitle_region"] = dict(crop)
+            raw_values = {
+                key: value for key, value in dict(values).items()
+                if key in set(aliases.values()) or key == "subtitle_region"
+            }
+            raw_values["updated_at"] = datetime.now(UTC).isoformat()
+            repository = self._app._narrator_settings_repository
+            previous_region = repository.load(game_key).subtitle_region
+            repository.save_overrides(game_key, raw_values)
+            settings = repository.load(game_key)
+            pipeline = self._app._narrator_pipeline
+            if (
+                settings.subtitle_region != previous_region
+                and pipeline.active
+                and pipeline.snapshot.game_key == game_key
+            ):
+                # Running sessions hold their startup settings. Stop rather than
+                # show a saved ROI while OCR continues cropping the old region.
+                pipeline.stop()
             select_voice = getattr(
                 self._app._narrator_pipeline.tts, "select_voice", None
             )
-            if callable(select_voice):
-                select_voice(settings.voice_id)
+            effective_voice = self.effective_voice_id(settings)
+            if callable(select_voice) and effective_voice:
+                select_voice(effective_voice)
         except Exception as error:
             logger.warning("Could not save narrator settings for %s: %s", game.id, error)
             self._app._emit_toast("Narrator settings could not be saved", "error")
             return False
         self._app.narratorChanged.emit(game.id)
         self._app._emit_toast("Narrator settings saved", "success")
+        return True
+
+    def clear_overrides(self, game_id: str) -> bool:
+        game = self._app._resolve_game(game_id, show_error=True)
+        if game is None:
+            return False
+        try:
+            self._app._narrator_settings_repository.clear_overrides(
+                self._game_key(game),
+                (
+                    "enabled", "source_mode", "capture_source",
+                    "subtitle_language_mode", "subtitle_adapter_id",
+                    "ocr_provider_id", "translation_provider_id",
+                    "translation_profile_id", "tts_provider_id", "voice_id",
+                    "volume", "speech_rate", "noise_scale", "noise_w_scale",
+                    "capture_sampling_hz", "visual_change_threshold",
+                    "stabilization_ms", "ocr_min_confidence",
+                    "duplicate_cooldown_ms", "read_speaker_names",
+                ),
+            )
+        except Exception as error:
+            logger.warning("Could not clear narrator overrides for %s: %s", game.id, error)
+            return False
+        self._app.narratorChanged.emit(game.id)
         return True
 
     def session_state(self, game_id: str) -> dict[str, Any]:
@@ -264,20 +605,55 @@ class NarratorController:
             )
         missing = list(self._missing_requirements(settings))
         active = self._app._narrator_pipeline.active
-        activity = self._app._narrator_pipeline.activity.is_active(game_key)
-        can_start = not active and not missing and activity is True
+        activity_provider = self._app._narrator_pipeline.activity
+        activity = activity_provider.is_active(game_key)
+        # Unknown (e.g. Flatpak without a host process list) never blocks a
+        # manual start; only a positively "not running" game does.
+        can_start = not active and not missing and activity is not False
         reason_code = ""
         if active and snapshot.game_key != game_key:
             reason_code = "another_session_active"
         elif missing:
             reason_code = "components_missing"
-        elif activity is not True:
+        elif activity is False:
             reason_code = "game_not_running"
+        supports = getattr(activity_provider, "supports", None)
+        autostart_supported = bool(callable(supports) and supports(game))
+        enabled = bool(settings is not None and settings.enabled)
+        running_here = bool(active and snapshot.game_key == game_key)
+        if running_here:
+            card_state = "running"
+        elif snapshot_values.get("status") == "error" and snapshot.game_key == game_key:
+            card_state = "error"
+        elif not enabled:
+            card_state = "disabled"
+        elif missing:
+            card_state = "missing"
+        elif autostart_supported:
+            card_state = "waiting_for_game"
+        else:
+            card_state = "manual"
+        voice_id = self.effective_voice_id(settings)
         snapshot_values.update(
             {
                 "canStart": can_start,
                 "reasonCode": reason_code,
                 "missingRequirements": missing,
+                "cardState": card_state,
+                "gameActivity": (
+                    "running" if activity is True
+                    else "not_running" if activity is False else "unknown"
+                ),
+                "autostartSupported": autostart_supported,
+                "autostartPending": (
+                    game_key in self._seen_since and game_key not in self._autostart_done
+                ),
+                "captureGrantSaved": self._has_capture_grant(game_key),
+                "captureGrantStale": game_key in getattr(
+                    self._app._narrator_pipeline.capture, "stale_grants", ()
+                ),
+                "voiceId": voice_id,
+                "voiceName": self._voice_name(voice_id) if voice_id else "",
                 "gameId": game.id,
                 "gameKey": game_key,
                 "subtitleRegion": (
@@ -299,13 +675,15 @@ class NarratorController:
         )
         return snapshot_values
 
-    def start(self, game_id: str) -> bool:
-        game = self._app._resolve_game(game_id, show_error=True)
+    def start(self, game_id: str, *, automatic: bool = False) -> bool:
+        game = self._app._resolve_game(game_id, show_error=not automatic)
         if game is None:
             return False
         game_key = self._game_key(game)
         try:
-            settings = self._app._narrator_settings_repository.load(game_key)
+            settings = self._with_effective_voice(
+                self._app._narrator_settings_repository.load(game_key)
+            )
             missing = self._missing_requirements(settings)
             if missing:
                 raise RuntimeError(
@@ -317,6 +695,9 @@ class NarratorController:
             self._app._emit_toast(str(error), "warning")
             self._app.narratorChanged.emit(game.id)
             return False
+        now = self._clock()
+        self._session_started[game_key] = (now, bool(automatic))
+        self._frame_watchdog = None
         self._app.narratorChanged.emit(game.id)
         return True
 
@@ -328,17 +709,7 @@ class NarratorController:
             and settings.subtitle_language_mode
             is NarratorSubtitleLanguageMode.POLISH
         )
-        selected_voice = (
-            settings.voice_id
-            if settings is not None and settings.voice_id
-            else str(
-                getattr(
-                    self._app._narrator_pipeline.tts,
-                    "default_voice_id",
-                    "",
-                )
-            )
-        )
+        selected_voice = self.effective_voice_id(settings)
         voice_components = {
             str(getattr(voice, "voice_id", "")): str(
                 getattr(voice, "component_id", "")
@@ -346,6 +717,13 @@ class NarratorController:
             for voice in tuple(
                 getattr(self._app._narrator_pipeline.tts, "voices", ())
             )
+        }
+        custom_voices = {
+            str(getattr(voice, "voice_id", ""))
+            for voice in tuple(
+                getattr(self._app._narrator_pipeline.tts, "voices", ())
+            )
+            if bool(getattr(voice, "custom", False))
         }
         required_components = {
             "capture": "capture.portal-pipewire",
@@ -355,6 +733,10 @@ class NarratorController:
         }
         if not polish_mode:
             required_components["translation"] = "translation.opus-en-pl"
+        if selected_voice in custom_voices:
+            # A user-imported voice has no managed component; its availability
+            # is checked against the installed voice files below.
+            del required_components["tts"]
         component_states = {
             component.component_id: component.state.value
             for component in self._app._narrator_component_manager.list_components()
@@ -489,6 +871,9 @@ class NarratorController:
         )
         if callable(cancel):
             cancel()
+        self._emit_region_preview(
+            normalized, {"success": True, "state": "cancelled", "message": ""}
+        )
         return True
 
     def finish_region_preview_capture(self, game_id: str, generation: int) -> None:
@@ -530,16 +915,33 @@ class NarratorController:
 
     def poll(self) -> None:
         self._poll_component_jobs()
-        self._app._narrator_pipeline.poll_game_activity()
+        # Game-exit autostop is decided in _poll_autostart (confirmed "ended",
+        # automatic sessions only), not by the pipeline's single probe.
+        self._poll_autostart()
         changed: set[str] = set()
+        fresh = getattr(getattr(self._app._narrator_pipeline, "capture", None), "fresh_selections", None)
+        if fresh:
+            fresh.clear()
+            # The portal does not say which window was chosen, so ask the
+            # user to confirm that it is the game and not GameOpti itself.
+            self._app._emit_toast("Check the preview - it should show the game", "info")
         for event in self._app._narrator_pipeline.drain_events():
             game = self._game_for_key(event.game_key)
             if game is not None:
                 changed.add(game.id)
             if event.status.value == "error" and event.message:
+                if self._retry_after_capture_closed(event, game):
+                    continue
                 self._app._emit_toast(event.message, "error")
+            elif event.status.value in {"listening", "speaking"} and event.game_key:
+                # A healthy session clears the one-shot retry guard so a later,
+                # independent closure can retry once again.
+                self._capture_retry_session.discard(event.game_key)
         for game_id in changed:
             self._app.narratorChanged.emit(game_id)
+        now = self._clock()
+        self._poll_capture_closed(now)
+        self._poll_frame_watchdog(now)
         snapshot = self._app._narrator_pipeline.snapshot
         self._app._ui_sound_service.set_music_ducked(
             snapshot.status.value == "speaking"
@@ -548,6 +950,178 @@ class NarratorController:
 
     def game_for_key(self, game_key: str) -> Game | None:
         return self._game_for_key(game_key)
+
+    # Portal message emitted when the capture session is closed (the chosen
+    # window disappeared or the choice was cancelled). This is the trigger for
+    # a single automatic retry, matched before any translation.
+    _CAPTURE_CLOSED_MARKER = "capture session closed"
+
+    def _retry_after_capture_closed(self, event: object, game: Game | None) -> bool:
+        """Schedule the decision after the portal capture session closes.
+
+        The window may close because the game switches from a splash window to
+        its main window, or because the game is exiting (its window disappears
+        a few seconds before the process ends). Nothing is decided right away:
+        after CAPTURE_CLOSED_RECHECK_SECONDS the process is checked again in
+        _poll_capture_closed. Returns True when the closure was taken over (the
+        error toast is suppressed).
+        """
+
+        message = str(getattr(event, "message", ""))
+        if self._CAPTURE_CLOSED_MARKER not in message.casefold():
+            return False
+        if game is None:
+            return False
+        game_key = str(getattr(event, "game_key", ""))
+        if not game_key:
+            return False
+        now = self._clock()
+        started = self._session_started.get(game_key)
+        duration = now - started[0] if started is not None else float("inf")
+        self._capture_closed_pending[game_key] = (now + CAPTURE_CLOSED_RECHECK_SECONDS, duration)
+        logger.info(
+            "Narrator capture: session closed for %s after %.0f s; re-checking the "
+            "game process in %.0f s",
+            game_key, duration, CAPTURE_CLOSED_RECHECK_SECONDS,
+        )
+        return True
+
+    def _poll_capture_closed(self, now: float) -> None:
+        pipeline = self._app._narrator_pipeline
+        for game_key, (due, duration) in tuple(self._capture_closed_pending.items()):
+            if now < due:
+                continue
+            del self._capture_closed_pending[game_key]
+            game = self._game_for_key(game_key)
+            if game is None or (pipeline.active and pipeline.snapshot.game_key == game_key):
+                continue          # gone, or the user already restarted it
+            strict = getattr(pipeline.activity, "game_process_running", None)
+            running = strict(game_key) if callable(strict) else None
+            if (
+                running is True
+                and duration < LASTING_SESSION_SECONDS
+                and game_key not in self._capture_retry_session
+            ):
+                self._capture_retry_session.add(game_key)
+                logger.info(
+                    "Narrator capture: %s still running and the session lasted %.0f s "
+                    "(< %.0f s, window change); retrying once with the saved window",
+                    game_key, duration, LASTING_SESSION_SECONDS,
+                )
+                automatic = self._session_started.get(game_key, (0.0, True))[1]
+                if self.start(game.id, automatic=automatic):
+                    self._app._emit_toast("Capture session closed; retrying once", "info")
+                continue
+            reason = (
+                "the game has ended" if running is False
+                else "the process list is unavailable" if running is None
+                else "already retried once" if game_key in self._capture_retry_session
+                else f"the session lasted {duration:.0f} s (game exit)"
+            )
+            logger.info(
+                "Narrator capture: %s: no retry, %s; stopping silently", game_key, reason
+            )
+            self.stop()
+
+    def _poll_frame_watchdog(self, now: float) -> None:
+        """No frame FRAME_WATCHDOG_SECONDS after capture became active: restart
+        once, silently, with the saved window token."""
+
+        pipeline = self._app._narrator_pipeline
+        snapshot = pipeline.snapshot
+        capture = getattr(pipeline, "capture", None)
+        frames = getattr(capture, "frames_received", None)
+        if (
+            not pipeline.active
+            or getattr(snapshot, "capture_state", "") != "active"
+            or not isinstance(frames, int)
+        ):
+            self._frame_watchdog = None
+            return
+        game_key = snapshot.game_key
+        watchdog = self._frame_watchdog
+        if watchdog is None or watchdog[0] != game_key:
+            self._frame_watchdog = (game_key, now + FRAME_WATCHDOG_SECONDS, frames)
+            return
+        _key, deadline, baseline = watchdog
+        if frames > baseline:
+            self._watchdog_restarted.discard(game_key)   # frames flow: healthy
+            self._frame_watchdog = (game_key, float("inf"), frames)
+            return
+        if now < deadline:
+            return
+        self._frame_watchdog = (game_key, float("inf"), frames)
+        game = self._game_for_key(game_key)
+        if game is None or game_key in self._watchdog_restarted:
+            logger.info(
+                "Narrator capture: %s: no frames %.0f s after start; already restarted once",
+                game_key, FRAME_WATCHDOG_SECONDS,
+            )
+            return
+        self._watchdog_restarted.add(game_key)
+        automatic = self._session_started.get(game_key, (0.0, True))[1]
+        logger.info(
+            "Narrator capture: %s: no frames %.0f s after start; restarting once "
+            "silently with the saved window",
+            game_key, FRAME_WATCHDOG_SECONDS,
+        )
+        pipeline.stop()
+        self.start(game.id, automatic=automatic)
+
+    def import_custom_voice(
+        self, model_path: Path, allow_other_language: bool = False
+    ) -> dict[str, Any]:
+        """Import a user Piper voice; no checksum, the user owns its license."""
+
+        tts = self._app._narrator_pipeline.tts
+        importer = getattr(tts, "import_custom_voice", None)
+        if not callable(importer):
+            return {
+                "success": False,
+                "errorCode": "unsupported",
+                "error": "Custom voices are not supported",
+            }
+        if self._app._narrator_pipeline.active:
+            return {
+                "success": False,
+                "errorCode": "session_active",
+                "error": "Stop the narrator before adding a voice",
+            }
+        try:
+            voice = importer(model_path, allow_other_language=allow_other_language)
+        except CustomVoiceLanguageError as error:
+            return {
+                "success": False,
+                "needsLanguageConfirmation": True,
+                "language": error.language,
+                "errorCode": error.code,
+                "error": str(error),
+            }
+        except CustomVoiceError as error:
+            logger.info("Narrator custom voice import rejected: %s", error.code)
+            return {
+                "success": False,
+                "errorCode": error.code,
+                "errorDetail": error.detail,
+                "error": str(error),
+            }
+        logger.info("Narrator custom voice imported: %s", voice.voice_id)
+        self._app.narratorComponentsChanged.emit()
+        return {"success": True, "voiceId": voice.voice_id, "name": voice.name}
+
+    def remove_custom_voice(self, voice_id: str) -> bool:
+        tts = self._app._narrator_pipeline.tts
+        remover = getattr(tts, "remove_custom_voice", None)
+        if not callable(remover) or self._app._narrator_pipeline.active:
+            return False
+        try:
+            remover(str(voice_id))
+        except (CustomVoiceError, ValueError, OSError) as error:
+            logger.info("Narrator custom voice removal rejected: %s", error)
+            return False
+        logger.info("Narrator custom voice removed: %s", voice_id)
+        self._app.narratorComponentsChanged.emit()
+        return True
 
     def _component_action(self, action: str, component_id: str) -> bool:
         if component_id in self._component_jobs:
@@ -602,6 +1176,7 @@ class NarratorController:
             "translation.opus-en-pl": self._app._narrator_pipeline.translator,
             "tts.polish-voice": self._app._narrator_pipeline.tts,
             "tts.polish-bass": self._app._narrator_pipeline.tts,
+            "tts.polish-darkman": self._app._narrator_pipeline.tts,
             "audio.qt-pcm": self._app._narrator_pipeline.audio,
         }
         provider = providers.get(component_id)
@@ -625,6 +1200,7 @@ class NarratorController:
         voice_ids = {
             "tts.polish-voice": "pl_PL-gosia-medium",
             "tts.polish-bass": "pl_PL-bass-high",
+            "tts.polish-darkman": "pl_PL-darkman-medium",
         }
         voice_id = voice_ids.get(component_id)
         if voice_id and hasattr(provider, "voice_available"):
@@ -698,6 +1274,10 @@ class NarratorController:
         if not default_profile and profile_ids:
             default_profile = str(profile_ids[0])
         voices: list[dict[str, Any]] = []
+        components_by_id = {
+            str(component.get("componentId", "")): component
+            for component in self.components()
+        }
         for voice in tuple(getattr(tts, "voices", ())):
             if isinstance(voice, Mapping):
                 voice_id = str(voice.get("id", ""))
@@ -709,6 +1289,11 @@ class NarratorController:
                 )
                 name = str(getattr(voice, "name", voice_id))
                 component_id = str(getattr(voice, "component_id", ""))
+            custom = bool(
+                voice.get("custom", False)
+                if isinstance(voice, Mapping)
+                else getattr(voice, "custom", False)
+            )
             if voice_id:
                 installed = bool(
                     getattr(tts, "voice_installed", lambda _voice_id: False)(
@@ -720,13 +1305,38 @@ class NarratorController:
                         voice_id
                     )
                 )
+                component = components_by_id.get(component_id, {})
+                definition = getattr(
+                    self._app._narrator_component_manager, "_definitions", {}
+                ).get(component_id)
+                quality = voice_id.rsplit("-", 1)[-1] if "-" in voice_id else ""
                 voices.append(
                     {
                         "id": voice_id,
                         "name": name or voice_id,
                         "componentId": component_id,
+                        "custom": custom,
                         "installed": installed,
                         "available": available,
+                        "quality": quality if quality in {"low", "medium", "high"} else "",
+                        "componentState": str(component.get("state", "")),
+                        "managed": bool(component.get("managed", False)),
+                        "canInstall": bool(component.get("canInstall", False)),
+                        "downloadSizeBytes": (
+                            definition.download_size_bytes
+                            if definition is not None
+                            else component.get("downloadSizeBytes")
+                        ),
+                        "installedSizeBytes": component.get("installedSizeBytes"),
+                        "version": (
+                            definition.version
+                            if definition is not None
+                            else str(component.get("version", ""))
+                        ),
+                        "licenseId": str(component.get("licenseId", "")),
+                        "runtimeLicenseId": str(component.get("runtimeLicenseId", "")),
+                        "artifactLicenseId": str(component.get("artifactLicenseId", "")),
+                        "attribution": str(component.get("attribution", "")),
                     }
                 )
         default_voice = str(getattr(tts, "default_voice_id", ""))
@@ -756,7 +1366,8 @@ class NarratorController:
                 for profile_id in profile_ids
             ],
             "ttsProviderId": settings.tts_provider_id or tts.provider_id,
-            "voiceId": settings.voice_id or default_voice,
+            "voiceId": self.effective_voice_id(settings) or default_voice,
+            "voiceName": self._voice_name(self.effective_voice_id(settings) or default_voice),
             "voices": voices,
             "volume": settings.volume,
             "speechRate": settings.speech_rate,
@@ -769,6 +1380,7 @@ class NarratorController:
             "stabilizationMs": settings.stabilization_ms,
             "ocrMinConfidence": settings.ocr_min_confidence,
             "duplicateCooldownMs": settings.duplicate_cooldown_ms,
+            "readSpeakerNames": settings.read_speaker_names,
             "updatedAt": settings.updated_at.isoformat(),
         }
 

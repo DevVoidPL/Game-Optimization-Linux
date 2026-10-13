@@ -21,3 +21,7 @@ reports/compression_benchmarks/
 .flatpak-couch-probe*/
 dist/
 .venv/
+
+# Generated Couch icon/logo preview sheets (build_home_glyphs.py --sheet, build_launcher_logos.py --sheet)
+gameopti-couch-icons/couch-glyphs-contact-sheet.png
+gameopti-couch-icons/launcher-logos-sheet.png

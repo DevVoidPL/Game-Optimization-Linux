@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48" fill="none" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" role="img" aria-label="Aktualizacje">
+  <title>Aktualizacje</title>
+  <path d="M24 8V28" stroke="currentColor"/>
+  <path d="M15 20L24 29L33 20" stroke="currentColor"/>
+  <path d="M8 30V35Q8 40 13 40H35Q40 40 40 35V30" stroke="currentColor"/>
+</svg>

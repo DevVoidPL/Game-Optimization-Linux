@@ -135,6 +135,7 @@ from .library_cache import (
     LibraryCacheError,
 )
 from .manual_games import ManualGameStore, ManualGameStoreError
+from .mangohud_preview import GamescopeTestRun, LivePreviewResult, MangoHudLivePreview
 from .mangohud import (
     CONFIG_FILE_NAME as MANGOHUD_CONFIG_FILE_NAME,
     FLATPAK_MANGOHUD_PREFIX,
@@ -198,6 +199,11 @@ from .narrator_tts import (
     PIPER_BASS_MODEL_RELATIVE_PATH,
     PIPER_BASS_VOICE_ID,
     PIPER_BASS_VOICE_VERSION,
+    PIPER_DARKMAN_COMPONENT_ID,
+    PIPER_DARKMAN_CONFIG_RELATIVE_PATH,
+    PIPER_DARKMAN_MODEL_RELATIVE_PATH,
+    PIPER_DARKMAN_VOICE_ID,
+    PIPER_DARKMAN_VOICE_VERSION,
     PIPER_COMPONENT_ID,
     PIPER_CONFIG_RELATIVE_PATH,
     PIPER_MODEL_RELATIVE_PATH,
@@ -418,6 +424,11 @@ __all__ = [
     "PIPER_BASS_MODEL_RELATIVE_PATH",
     "PIPER_BASS_VOICE_ID",
     "PIPER_BASS_VOICE_VERSION",
+    "PIPER_DARKMAN_COMPONENT_ID",
+    "PIPER_DARKMAN_CONFIG_RELATIVE_PATH",
+    "PIPER_DARKMAN_MODEL_RELATIVE_PATH",
+    "PIPER_DARKMAN_VOICE_ID",
+    "PIPER_DARKMAN_VOICE_VERSION",
     "PIPER_COMPONENT_ID",
     "PIPER_CONFIG_RELATIVE_PATH",
     "PIPER_MODEL_RELATIVE_PATH",
@@ -520,6 +531,9 @@ __all__ = [
     "MangoHudLaunchActivation",
     "MangoHudLaunchIntegration",
     "MangoHudProfileRepository",
+    "LivePreviewResult",
+    "MangoHudLivePreview",
+    "GamescopeTestRun",
     "ExecutableCandidate",
     "ExecutableResolution",
     "GameExecutableResolver",

@@ -8,8 +8,10 @@ import base64
 from collections.abc import Callable
 import json
 from math import isfinite
+import os
 from pathlib import Path
 import sys
+from threading import current_thread
 import time
 from typing import Any, TextIO
 
@@ -28,14 +30,41 @@ MAX_LENGTH_SCALE = 4.0
 MIN_NOISE = 0.0
 MAX_NOISE = 2.0
 
+ONNX_INTRA_OP_THREADS = 1
+ONNX_INTER_OP_THREADS = 1
+ONNX_EXECUTION_MODE = "sequential"
+PIPER_WORKER_NICE_INCREMENT = 5
+
+
+def _session_options(onnxruntime: object) -> object:
+    """Create narrator-only ORT options without process-global environment edits."""
+
+    options = onnxruntime.SessionOptions()  # type: ignore[attr-defined]
+    options.intra_op_num_threads = ONNX_INTRA_OP_THREADS
+    options.inter_op_num_threads = ONNX_INTER_OP_THREADS
+    options.execution_mode = onnxruntime.ExecutionMode.ORT_SEQUENTIAL  # type: ignore[attr-defined]
+    add_entry = getattr(options, "add_session_config_entry", None)
+    if callable(add_entry):
+        add_entry("session.intra_op.allow_spinning", "0")
+        add_entry("session.inter_op.allow_spinning", "0")
+    return options
+
 
 def _load_voice(model_path: Path, config_path: Path) -> object:
-    from piper import PiperVoice
+    import onnxruntime
+    from piper import PiperConfig, PiperVoice
 
-    return PiperVoice.load(
+    config_values = json.loads(config_path.read_text(encoding="utf-8"))
+    if not isinstance(config_values, dict):
+        raise ValueError("Piper voice configuration must contain an object")
+    session = onnxruntime.InferenceSession(
         str(model_path),
-        config_path=str(config_path),
-        use_cuda=False,
+        sess_options=_session_options(onnxruntime),
+        providers=["CPUExecutionProvider"],
+    )
+    return PiperVoice(
+        session=session,
+        config=PiperConfig.from_dict(config_values),
     )
 
 
@@ -153,6 +182,28 @@ def _optional_noise(value: object, name: str) -> float | None:
     return number
 
 
+def _worker_metadata(process_nice: int | None) -> dict[str, object]:
+    return {
+        "worker_pid": os.getpid(),
+        "worker_thread": current_thread().name,
+        "process_nice": process_nice,
+        "onnx_intra_op_threads": ONNX_INTRA_OP_THREADS,
+        "onnx_inter_op_threads": ONNX_INTER_OP_THREADS,
+        "onnx_execution_mode": ONNX_EXECUTION_MODE,
+    }
+
+
+def _lower_process_priority(
+    increment: int = PIPER_WORKER_NICE_INCREMENT,
+) -> int | None:
+    """Lower only this worker's priority; unavailable nice is non-fatal."""
+
+    try:
+        return os.nice(increment)
+    except (AttributeError, OSError):
+        return None
+
+
 def serve(
     model_path: Path,
     config_path: Path,
@@ -160,6 +211,7 @@ def serve(
     output_stream: TextIO,
     *,
     voice_loader: Callable[[Path, Path], object] = _load_voice,
+    process_nice: int | None = None,
 ) -> int:
     initialization_started = time.monotonic()
     voice = voice_loader(model_path, config_path)
@@ -171,6 +223,7 @@ def serve(
                     0.0,
                     (time.monotonic() - initialization_started) * 1000.0,
                 ),
+                **_worker_metadata(process_nice),
             }
         )
         + "\n"
@@ -210,6 +263,7 @@ def serve(
                     noise_scale=noise_scale,
                     noise_w_scale=noise_w_scale,
                 ),
+                **_worker_metadata(process_nice),
             }
         except Exception as error:
             response = {
@@ -233,7 +287,13 @@ def main(argv: list[str] | None = None) -> int:
         print("Piper voice files are missing", file=sys.stderr)
         return 2
     try:
-        return serve(values.model, values.config, sys.stdin, sys.stdout)
+        return serve(
+            values.model,
+            values.config,
+            sys.stdin,
+            sys.stdout,
+            process_nice=_lower_process_priority(),
+        )
     except Exception as error:
         print(str(error) or error.__class__.__name__, file=sys.stderr)
         return 1

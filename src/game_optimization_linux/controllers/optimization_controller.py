@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 import hashlib
 import json
 import logging
+import math
 import os
 from pathlib import Path
 import re
@@ -33,6 +34,12 @@ from ..services import (
     SessionPerformanceData,
     uses_flatpak_steam,
 )
+from ..models.optimization_profile import (
+    GAMESCOPE_DESKTOP_FIELDS,
+    GAMESCOPE_PROFILE_FIELDS,
+    sharpness_cli_to_percent,
+    sharpness_percent_to_cli,
+)
 from ..services.performance_analysis import compare_measurements
 from ..services.performance_session import RUNNER_HEARTBEAT_STALE_SECONDS
 from ..services.automatic_optimization import verify_runtime_activation
@@ -43,10 +50,49 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
+def _camel(name: str) -> str:
+    head, *rest = name.split("_")
+    return head + "".join(part.capitalize() for part in rest)
+
+
+# QML names of the desktop nested Gamescope options, e.g. gamescopeHdrItm.
+_GAMESCOPE_DESKTOP_ALIASES = {_camel(name): name for name in GAMESCOPE_DESKTOP_FIELDS}
+
+
+def _display_path(value: str) -> str:
+    """Show the private home directory as ``~`` in previews and copied text."""
+
+    home = str(Path.home()).rstrip("/")
+    if not home or home == "/":
+        return value
+    return re.sub(re.escape(home) + r"(?=/|$)", "~", value)
+
+
 class OptimizationController:
     def __init__(self, app: AppController) -> None:
         self._app = app
         self._analysis_cache_states: dict[str, str] = {}
+
+    _INTEGER_PROFILE_FIELDS = (
+        "target_fps", "gamescope_refresh_rate", "gamescope_input_width",
+        "gamescope_input_height", "gamescope_output_width", "gamescope_output_height",
+        "gamescope_sharpness",
+    )
+
+    @staticmethod
+    def _whole_number(value: Any, name: str) -> int:
+        """Accept int, integral finite floats (QML numbers) or integer text."""
+        if isinstance(value, bool):
+            raise ValueError(f"{name} must be a whole number")
+        if isinstance(value, int):
+            return value
+        if isinstance(value, float):
+            if math.isfinite(value) and value.is_integer():
+                return int(value)
+            raise ValueError(f"{name} must be a whole number")
+        if isinstance(value, str) and re.fullmatch(r"[+-]?\d+", value.strip()):
+            return int(value.strip())
+        raise ValueError(f"{name} must be a whole number")
 
     @staticmethod
     def _profile_key(game: Game | None) -> str:
@@ -144,10 +190,40 @@ class OptimizationController:
             profile = previous_profile
             result = self._app._optimization_profile_to_qml(profile)
             result["gameAnalysis"] = self.getGameOptimizationAnalysis(game_id)
+            result["launchActivation"] = self._launch_activation(game)
             return result
         except Exception as error:
             logger.warning("Could not load optimization profile for %s: %s", game.id, error)
             return {"success": False, "error": str(error)}
+
+    def _launch_activation(self, game: Game) -> dict[str, Any]:
+        """Report whether the real launch path applies GameOpti wrappers.
+
+        Steam games only get wrappers when Steam starts them through the
+        GameOpti runner (Launch Options); local games always run through it.
+        Heroic, Lutris and manual launcher entries start without the runner.
+        """
+        if game.launcher is Launcher.MANUAL and game.data_source.casefold() == "local":
+            return {"state": "active", "message": "Local games start through the GameOpti runner"}
+        if game.launcher is not Launcher.STEAM:
+            return {
+                "state": "unsupported",
+                "message": f"{game.launcher.value} launches do not use the GameOpti runner",
+            }
+        status_method = getattr(self._app._runner_integration, "steam_launch_option_status", None)
+        status = status_method(game) if callable(status_method) else None
+        if status is None or status.configured is None:
+            return {
+                "state": "unknown",
+                "message": status.message if status is not None else "Steam launch options could not be checked",
+            }
+        if status.configured:
+            return {"state": "active", "message": "Steam starts this game through the GameOpti runner"}
+        return {
+            "state": "runner_not_configured",
+            "message": status.message,
+            "steamLaunchCommand": status.command,
+        }
 
     def previewOptimizationProfile(
         self, game_id: str, values: Mapping[str, Any]
@@ -158,7 +234,9 @@ class OptimizationController:
             return {"success": False, "error": "Optimization profiles require a supported game"}
         try:
             profile = self._app._optimization_profile_from_payload(app_id, values)
-            return self._app._optimization_profile_to_qml(profile)
+            result = self._app._optimization_profile_to_qml(profile)
+            result["launchActivation"] = self._launch_activation(game)
+            return result
         except Exception as error:
             return {"success": False, "error": str(error)}
 
@@ -199,17 +277,132 @@ class OptimizationController:
             result = self._app._optimization_profile_to_qml(profile)
             path = self._app._optimization_profile_repository.save(profile)
             try:
-                if self._app._gamescope_owns_fps_limit(profile):
-                    self._app._clear_mangohud_fps_limit(game)
+                # Rewrites MangoHud's generated config for the new limiter owner;
+                # the stored MangoHud preference itself is never erased.
+                self._app._sync_mangohud_fps_owner(game)
             except Exception:
                 self._app._optimization_profile_repository.save(previous_profile)
                 raise
-            result.update({"success": True, "profilePath": str(path)})
+            result.update({"success": True, "profilePath": str(path),
+                           "launchActivation": self._launch_activation(game)})
             self._app._emit_toast("Optimization profile saved", "success")
             return result
         except Exception as error:
             self._app._emit_toast(f"Could not save optimization profile: {error}", "error")
             return {"success": False, "error": str(error)}
+
+    def _gamescope_hdr_readiness(self, gamescope: Any) -> dict[str, Any]:
+        """Evidence-based HDR hints; the monitor's HDR support is never claimed."""
+
+        session = str(os.environ.get("XDG_SESSION_TYPE", "")).strip().casefold()
+        wayland = session == "wayland" or bool(os.environ.get("WAYLAND_DISPLAY"))
+        supported = "--hdr-enabled" in set(gamescope.effective_options)
+        vendor = str(self._app._system_info.get("gpuVendor", "")).casefold()
+        wsi = str(gamescope.to_dict().get("wsiEnvironment") or "")
+        notes = ["wayland_session" if wayland else "not_wayland_session"]
+        if not supported:
+            notes.append("hdr_flag_missing")
+        if "nvidia" in vendor:
+            notes.append("nvidia_modeset")
+        if wsi:
+            notes.append("wsi_detected")
+        elif os.environ.get("FLATPAK_ID"):
+            notes.append("wsi_checked_at_launch")
+        else:
+            notes.append("wsi_missing")
+        state = "unavailable" if not supported else "ready" if wayland else "warning"
+        return {"state": state, "notes": notes, "wsiEnvironment": wsi, "session": session}
+
+    def refreshGamescopeDetection(self) -> dict[str, Any]:
+        """Re-run ``gamescope --version`` / ``--help`` once, on user request."""
+
+        _gamemode, gamescope = self._app._runtime_tool_detector.detect(refresh=True)
+        result = gamescope.to_dict()
+        result["hdrReadiness"] = self._gamescope_hdr_readiness(gamescope)
+        return result
+
+    def resetGamescopeSettings(self, game_id: str) -> dict[str, Any]:
+        """Restore only this game's Gamescope fields to the program defaults."""
+
+        game = self._app._resolve_game(game_id, show_error=False)
+        app_id = self._profile_key(game)
+        if game is None or not app_id:
+            return {"success": False, "error": "Optimization profiles require a supported game"}
+        try:
+            previous = self._app._optimization_profile_repository.load(app_id)
+            defaults = type(previous).default(app_id)
+            profile = replace(
+                previous,
+                **{name: getattr(defaults, name) for name in GAMESCOPE_PROFILE_FIELDS},
+                updated_at=datetime.now(UTC),
+            )
+            path = self._app._optimization_profile_repository.save(profile)
+            try:
+                self._app._sync_mangohud_fps_owner(game)
+            except Exception:
+                self._app._optimization_profile_repository.save(previous)
+                raise
+        except Exception as error:
+            self._app._emit_toast(f"Could not restore Gamescope settings: {error}", "error")
+            return {"success": False, "error": str(error)}
+        result = self._app._optimization_profile_to_qml(profile)
+        result.update({"success": True, "profilePath": str(path),
+                       "launchActivation": self._launch_activation(game)})
+        self._app._emit_toast("Gamescope settings restored", "success")
+        return result
+
+    def startGamescopeTest(
+        self, game_id: str, values: Mapping[str, Any], include_hdr: bool = False
+    ) -> dict[str, Any]:
+        """Run ``gamescope [current args] -- vkcube``; nothing is saved.
+
+        HDR is dropped unless the user explicitly confirmed an HDR test.
+        """
+
+        game = self._app._resolve_game(game_id, show_error=False)
+        app_id = self._profile_key(game)
+        if game is None or not app_id:
+            return {"success": False, "code": "unsupported_game",
+                    "message": "Optimization profiles require a supported game"}
+        try:
+            profile = self._app._optimization_profile_from_payload(app_id, values)
+        except Exception as error:
+            return {"success": False, "code": "invalid", "message": str(error)}
+        _gamemode, gamescope = self._app._runtime_tool_detector.detect()
+        if not gamescope.available:
+            return {"success": False, "code": "gamescope_missing",
+                    "message": gamescope.message or "Gamescope is not installed"}
+        profile = replace(
+            profile,
+            gamescope_enabled=True,
+            gamescope_mode=profile.gamescope_mode if profile.gamescope_mode != "disabled" else "custom",
+            gamemode_enabled=False,
+            gamescope_hdr=bool(profile.gamescope_hdr and include_hdr),
+        )
+        try:
+            mangohud_profile = self._app._mangohud_repository.load(app_id)
+            owner = "steam_environment" if mangohud_profile.enabled else "none"
+            config = (
+                str(self._app._mangohud_repository.config_path(app_id))
+                if mangohud_profile.enabled else ""
+            )
+            plan = self._app._optimization_launch_planner.build(
+                profile, ["vkcube"], gamemode=_gamemode, gamescope=gamescope,
+                mangohud_activation_owner=owner, mangohud_config_path=config,
+            )
+        except Exception as error:
+            return {"success": False, "code": "invalid", "message": str(error)}
+        allowed = {"MANGOHUD_CONFIGFILE", *(gamescope.wsi_environment[:1] if gamescope.wsi_environment else ())}
+        environment = {key: value for key, value in plan.environment.items() if key in allowed}
+        result = self._app._gamescope_test_run.start(
+            gamescope.executable, list(plan.gamescope_wrapper[1:-1]), environment
+        ).to_dict()
+        result["running"] = self._app._gamescope_test_run.running
+        result["arguments"] = [_display_path(value) for value in plan.gamescope_wrapper[1:-1]]
+        return result
+
+    def stopGamescopeTest(self) -> bool:
+        return self._app._gamescope_test_run.stop()
 
     def testGameOptimizationRunner(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
@@ -1679,6 +1872,12 @@ class OptimizationController:
             "gamescopeRefreshRate": "gamescope_refresh_rate",
             "gamescopeFullscreen": "gamescope_fullscreen",
             "gamescopeScaler": "gamescope_scaler", "gamescopeFilter": "gamescope_filter",
+            "gamescopeWindowMode": "gamescope_window_mode",
+            "gamescopeSharpness": "gamescope_sharpness",
+            "gamescopeAdaptiveSync": "gamescope_adaptive_sync",
+            "gamescopeGrabKeyboard": "gamescope_grab_keyboard",
+            "gamescopeHdr": "gamescope_hdr",
+            **_GAMESCOPE_DESKTOP_ALIASES,
             "manualOverrides": "manual_overrides", "lastRecommendation": "last_recommendation",
         }
         data = base.to_dict()
@@ -1694,6 +1893,13 @@ class OptimizationController:
             "gamescopeFullscreen", "gamescope_fullscreen",
             "gamescopeScaler", "gamescope_scaler",
             "gamescopeFilter", "gamescope_filter",
+            "gamescopeWindowMode", "gamescope_window_mode",
+            "gamescopeSharpness", "gamescope_sharpness",
+            "gamescopeAdaptiveSync", "gamescope_adaptive_sync",
+            "gamescopeGrabKeyboard", "gamescope_grab_keyboard",
+            "gamescopeHdr", "gamescope_hdr",
+            "gamescopeSharpnessPercent",
+            *_GAMESCOPE_DESKTOP_ALIASES, *GAMESCOPE_DESKTOP_FIELDS,
         }
         if "preset" not in values and runtime_keys.intersection(values):
             data["preset"] = "custom"
@@ -1701,6 +1907,24 @@ class OptimizationController:
             normalized = aliases.get(str(key), str(key))
             if normalized in data and normalized not in {"schema_version", "app_id", "updated_at"}:
                 data[normalized] = value
+        # The desktop slider shows 0 % (least) .. 100 % (most); Gamescope's
+        # CLI is inverted (0 sharpest .. 20 softest).
+        if "gamescopeSharpnessPercent" in values:
+            data["gamescope_sharpness"] = sharpness_percent_to_cli(
+                values["gamescopeSharpnessPercent"]
+            )
+        # Callers that only know the legacy fullscreen boolean (Desktop Mode)
+        # keep their meaning: True -> fullscreen, False -> borderless.
+        if not {"gamescopeWindowMode", "gamescope_window_mode"}.intersection(values):
+            for key in ("gamescopeFullscreen", "gamescope_fullscreen"):
+                if key in values:
+                    data["gamescope_window_mode"] = (
+                        "fullscreen" if self._app._coerce_bool(values[key]) else "borderless"
+                    )
+        # QML numbers arrive as float (e.g. 10.0); only whole, finite numbers
+        # become the canonical integers. Everything else is rejected clearly.
+        for name in self._INTEGER_PROFILE_FIELDS:
+            data[name] = self._whole_number(data[name], name)
         data.update(
             {
                 "schema_version": base.schema_version,
@@ -1763,9 +1987,14 @@ class OptimizationController:
             system_info=self._app._system_info,
         )
         mangohud_activation_owner = "none"
+        mangohud_config_path = ""
         try:
             mangohud_profile = self._app._mangohud_repository.load(profile.app_id)
             mangohud_fps_limit = mangohud_profile.fps_limit
+            if mangohud_profile.enabled:
+                mangohud_config_path = str(
+                    self._app._mangohud_repository.config_path(profile.app_id)
+                )
             if mangohud_profile.enabled:
                 profile_game = next(
                     (
@@ -1814,6 +2043,7 @@ class OptimizationController:
             existing_environment=os.environ,
             mangohud_activation_owner=mangohud_activation_owner,
             allow_placeholder=True,
+            mangohud_config_path=mangohud_config_path,
         )
         runner = self._app._runner_integration.status()
         data = profile.to_dict()
@@ -1833,6 +2063,21 @@ class OptimizationController:
             "gamescopeFullscreen": profile.gamescope_fullscreen,
             "gamescopeScaler": profile.gamescope_scaler,
             "gamescopeFilter": profile.gamescope_filter,
+            "gamescopeWindowMode": profile.gamescope_window_mode,
+            "gamescopeSharpness": profile.gamescope_sharpness,
+            "gamescopeAdaptiveSync": profile.gamescope_adaptive_sync,
+            "gamescopeGrabKeyboard": profile.gamescope_grab_keyboard,
+            "gamescopeHdr": profile.gamescope_hdr,
+            **{_camel(name): getattr(profile, name) for name in GAMESCOPE_DESKTOP_FIELDS},
+            "gamescopeSharpnessPercent": sharpness_cli_to_percent(profile.gamescope_sharpness),
+            # Display-only: the launcher always uses the argv list of the plan.
+            "gamescopeArguments": [_display_path(value) for value in plan.gamescope_wrapper[1:-1]],
+            "gamescopeSteamLaunchOptions": (
+                _display_path(shlex.join(["gamescope", *plan.gamescope_wrapper[1:-1]])) + " -- %command%"
+                if plan.gamescope_wrapper else ""
+            ),
+            "gamescopeHdrReadiness": self._gamescope_hdr_readiness(gamescope),
+            "gamescopeTestRunning": self._app._gamescope_test_run.running,
             "manualOverrides": dict(profile.manual_overrides),
             "lastRecommendation": dict(profile.last_recommendation),
             "updatedAt": profile.updated_at.astimezone(UTC).isoformat(),
@@ -1871,7 +2116,9 @@ class OptimizationController:
             "profilePath": str(self._app._optimization_profile_repository.path(profile.app_id)),
             "protonTweaksError": proton_tweaks_error,
             "renderingSummary": (
-                f"The game will render at {profile.gamescope_input_width}×{profile.gamescope_input_height} "
+                "Gamescope chooses the render and output size automatically"
+                if profile.gamescope_input_auto and profile.gamescope_output_auto
+                else f"The game will render at {profile.gamescope_input_width}×{profile.gamescope_input_height} "
                 f"and display at {profile.gamescope_output_width}×{profile.gamescope_output_height}"
             ),
             "protonOverrides": [

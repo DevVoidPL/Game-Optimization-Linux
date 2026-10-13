@@ -691,12 +691,14 @@ def settings_to_qml(settings: AppSettings) -> dict[str, Any]:
         "navigation_repeat_rate_ms": "navigationRepeatRateMs",
         "hide_cursor_in_couch_mode": "hideCursorInCouchMode",
         "start_couch_mode_fullscreen": "startCouchModeFullscreen",
+        "couch_show_system_usage": "couchShowSystemUsage",
         "post_launch_behavior": "postLaunchBehavior",
         "interface_sounds": "interfaceSounds",
         "couch_menu_sounds_enabled": "couchMenuSoundsEnabled",
         "couch_menu_sounds_volume": "couchMenuSoundsVolume",
         "couch_music_enabled": "couchMusicEnabled",
         "couch_music_volume": "couchMusicVolume",
+        "couch_motion_mode": "couchMotionMode",
     }
     for source, target in aliases.items():
         if source in raw:

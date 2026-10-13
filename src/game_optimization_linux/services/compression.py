@@ -134,6 +134,7 @@ class CompressionService:
         automatic_authorized: bool = False,
         cancel_event: Event | None = None,
         progress_callback: Callable[[Mapping[str, Any]], None] | None = None,
+        interactive_measurement: bool = True,
     ) -> CompressionResult:
         with self._lock:
             self._ensure_open()
@@ -168,6 +169,7 @@ class CompressionService:
                 automatic_authorized=automatic_authorized,
                 cancel_event=cancel_event,
                 progress_callback=progress_callback,
+                interactive_measurement=interactive_measurement,
             )
             final_result = result
             try:

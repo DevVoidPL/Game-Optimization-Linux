@@ -67,6 +67,18 @@ class _Session:
     def wait_out_cooldown(self) -> None:
         self._now += _COOLDOWN + 1.0
 
+    @property
+    def canonical_text(self) -> str:
+        return self._deduplicator.canonical_text
+
+    @property
+    def episode_id(self) -> int:
+        return self._deduplicator.episode_id
+
+    @property
+    def last_rejection_reason(self) -> str:
+        return self._deduplicator.last_rejection_reason
+
 
 # ---------------------------------------------------------------------------
 # A. the same exact phrase three times, cooldown expiring in between
@@ -141,31 +153,28 @@ def test_garbage_variants_after_cooldown_are_still_one_episode() -> None:
 
 
 # ---------------------------------------------------------------------------
-# D. a real disappearance permits a genuine second reading
+# D. a real disappearance ends the episode but preserves phrase cooldown
 # ---------------------------------------------------------------------------
 
 
-def test_same_phrase_after_stable_disappearance_is_spoken_again() -> None:
+def test_same_phrase_after_stable_disappearance_stays_in_cooldown() -> None:
     session = _Session()
 
     session.accepted(_LINE)
     session.stable_disappearance()
-    session.accepted(_LINE)
 
-    assert session.played == [_LINE, _LINE]
+    assert session.episode_id == 0
+    assert session.canonical_text == _LINE
+    assert session.accepted(_LINE) is None
+    assert session.last_rejection_reason == "cooldown_exact"
+    assert session.played == [_LINE]
 
 
-def test_a_real_disappearance_outranks_the_cooldown() -> None:
-    """The episode is the authority, not the clock.
-
-    Once the subtitle has really gone, a later appearance is a new subtitle and
-    must be readable even if the cooldown has not elapsed. The cooldown only
-    suppresses flicker inside an episode, which the latch now covers.
-    """
-
+def test_same_phrase_after_disappearance_can_play_after_cooldown() -> None:
     session = _Session()
     session.accepted(_LINE)
     session.stable_disappearance()
+    session.wait_out_cooldown()
 
     assert session.accepted(_LINE) is not None
     assert session.played == [_LINE, _LINE]
@@ -240,8 +249,8 @@ def test_one_frame_short_of_a_disappearance_stays_blocked() -> None:
     assert session.played == [_LINE]
 
 
-def test_required_number_of_absent_frames_clears_the_latch() -> None:
-    """Probing in between would itself count as a sighting, so do not."""
+def test_required_number_of_absent_frames_ends_episode_but_keeps_cooldown() -> None:
+    """Three empty observations end visibility, not phrase cooldown."""
 
     session = _Session()
     session.accepted(_LINE)
@@ -249,6 +258,13 @@ def test_required_number_of_absent_frames_clears_the_latch() -> None:
     for _ in range(_DEDUP_EPISODE_ABSENT_FRAMES):
         session.empty_frame()
 
+    assert session.episode_id == 0
+    assert session.canonical_text == _LINE
+    assert session.accepted(_LINE) is None
+    assert session.last_rejection_reason == "cooldown_exact"
+    assert session.played == [_LINE]
+
+    session.wait_out_cooldown()
     assert session.accepted(_LINE) is not None
     assert session.played == [_LINE, _LINE]
 
