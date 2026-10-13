@@ -1,5 +1,10 @@
 # Game Optimization Linux Flatpak
 
+These instructions build the development checkout. For the current public
+**1.8 Alpha** download, use [GitHub Releases](https://github.com/DevVoidPL/Game-Optimization-Linux/releases).
+**2.0 Beta is announced and not yet available**; a local bundle's internal
+version label does not establish a public release. See [../ROADMAP.md](../ROADMAP.md).
+
 Build the development repository without installing from inside Flatpak Builder:
 
 ```bash

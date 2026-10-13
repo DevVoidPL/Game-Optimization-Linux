@@ -3,20 +3,38 @@
 Tests must not read or modify a real Steam library. Use temporary XDG roots and
 synthetic game trees for controller, runner, OptiScaler and compression tests.
 
+This guide describes the development checkout. The current public download is
+**1.8 Alpha**; **2.0 Beta is announced and not yet available**. Local development
+version labels and test results do not establish public release readiness.
+See [ROADMAP.md](ROADMAP.md) for the release/development distinction.
+
 ## Local checks
 
-Run commands from the repository root with the project interpreter:
+Run commands from the repository root with the project interpreter and
+temporary XDG roots:
 
 ```bash
+TEST_ROOT="$(mktemp -d /tmp/gameopti-tests.XXXXXX)"
+export XDG_CONFIG_HOME="$TEST_ROOT/config"
+export XDG_CACHE_HOME="$TEST_ROOT/cache"
+export XDG_STATE_HOME="$TEST_ROOT/state"
+export XDG_DATA_HOME="$TEST_ROOT/data"
+
 .venv/bin/python -m pytest
 .venv/bin/python -m compileall -q src tests
-find src/game_optimization_linux/qml -name '*.qml' -exec qmllint {} +
+find src/game_optimization_linux/qml -name '*.qml' -exec .venv/bin/pyside6-qmllint {} \;
 appstreamcli validate data/io.github.DevVoidPL.GameOptimizationLinux.metainfo.xml
+git diff --check
 ```
 
 The complete test suite includes unit tests, controller integration tests and
-offscreen QML probes. It isolates configuration, cache and state directories;
-do not replace `.venv/bin/python -m pytest` with a system `pytest` invocation.
+offscreen QML probes. CI also sets temporary XDG roots. Keep these variables in
+a dedicated test shell; run the application normally from a separate shell to
+use your regular configuration. Individual tests still need synthetic game
+trees and must not discover real libraries.
+
+Do not replace `.venv/bin/python -m pytest` with a system `pytest` invocation.
+Use the same temporary XDG roots for focused runs.
 
 `tests/conftest.py` creates one `QApplication` for the whole session and defaults
 `QT_QPA_PLATFORM` to `offscreen`, so neither needs to be set by hand any more.
@@ -51,7 +69,33 @@ Useful focused runs while changing a subsystem:
   tests/test_host_bootstrap.py \
   tests/test_btrfs_analysis.py \
   tests/test_compression_engine.py
+
+.venv/bin/python -m pytest -q \
+  tests/test_launcher_integration.py \
+  tests/test_launcher_native.py \
+  tests/test_launcher_providers.py
+
+.venv/bin/python -m pytest -q \
+  tests/test_narrator_behavior_contract.py \
+  tests/test_narrator_ocr_corpus.py \
+  tests/test_narrator_runtime_regressions.py \
+  tests/test_narrator_subtitle_episode.py \
+  tests/test_narrator_tts_text_filter.py
 ```
+
+### Narrator verification in games
+
+Text replay tests exercise the decisions made from supplied OCR results; they
+do not establish capture, cropping, preprocessing, or Tesseract accuracy in a
+real game. The committed OCR corpus contains recorded TSV results, not a full
+image/timeline replay dataset.
+
+For a real-game regression, retain the build identity, settings, complete
+observation sequence, and corresponding subtitle images. Compare the first
+text sent to speech with a manual transcription; record omissions, extra audio
+starts for one utterance, meaningful text changes, and time to the first audio.
+Evaluate both first-read quality and repetition, rather than only the number
+of accepted phrases or passing tests. Sanitize all material before sharing it.
 
 ## QML smoke probes
 
@@ -72,8 +116,13 @@ QT_QPA_PLATFORM=offscreen PYTHONPATH=src \
 
 ## Flatpak checks
 
-Builds use `flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml`. After
-building a bundle, install it into the user installation and verify both modes:
+Builds use `flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml`. Prefer
+focused source checks during development; use a development Flatpak for
+sandbox/host verification and export a complete bundle when needed for release
+validation. A locally built bundle is not a public release.
+
+After building a bundle, install it into the user installation and verify both
+modes:
 
 ```bash
 APP_VERSION="$(sed -nE 's/^APP_VERSION[[:space:]]*=[[:space:]]*"([^"[:space:]]+)"[[:space:]]*$/\1/p' src/game_optimization_linux/config.py)"
