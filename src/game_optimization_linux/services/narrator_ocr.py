@@ -46,6 +46,23 @@ OCR_EDGE_GARBAGE_MIN_CORE = 4
 OCR_MAX_PREPROCESSED_PIXELS = 4_000_000
 OCR_CONTRAST_TILE_WIDTH = 96
 OCR_CONTRAST_TILE_HEIGHT = 64
+# Experimental, opt-in preprocessing. Unset or any other value keeps the
+# default path byte-for-byte unchanged.
+OCR_PREPROCESS_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_PREPROCESS"
+OCR_PREPROCESS_DEFAULT = "default"
+OCR_PREPROCESS_BRIGHT_MASK = "bright_mask"
+# Bright-text mask: after local contrast, pixels >= threshold become white text
+# on black. Offline validation (Hogwarts Legacy, 2026-10-15) found a plateau at
+# 175-205; 190 is its middle.
+OCR_BRIGHT_MASK_THRESHOLD = 190
+# Fall back to the default image when the mask cannot represent the text:
+# almost everything is bright (light scene / dark text on light), or nothing is
+# bright on a light background (dark text). A dark, empty frame keeps the mask.
+OCR_BRIGHT_MASK_MAX_FRACTION = 0.35
+OCR_BRIGHT_MASK_MIN_FRACTION = 0.003
+OCR_BRIGHT_MASK_LIGHT_LEVEL = 128
+OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT = "too_many_bright_pixels"
+OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT = "no_bright_text_on_light_background"
 OCR_WORKER_TIMEOUT_SECONDS = 15.0
 OCR_DEBUG_CAPTURE_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_DEBUG"
 OCR_DEBUG_CAPTURE_LIMIT_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_DEBUG_LIMIT"
@@ -343,11 +360,26 @@ class TesseractOcrProvider:
         debug_capture_limit: int | None = None,
         debug_capture_root: Path = OCR_DEBUG_CAPTURE_DIR,
         clock: Callable[[], float] = time.monotonic,
+        preprocess_mode: str | None = None,
     ) -> None:
         self._component_root = Path(component_root)
         self._explicit_executable = str(executable) if executable is not None else ""
         self._runner = runner
         self._worker_factory = worker_factory
+        self._preprocess_mode = self._resolve_preprocess_mode(
+            os.environ.get(OCR_PREPROCESS_ENV, "")
+            if preprocess_mode is None
+            else preprocess_mode
+        )
+        if self._preprocess_mode != OCR_PREPROCESS_DEFAULT:
+            logger.info(
+                "Narrator OCR preprocess mode=%s threshold=%d "
+                "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
+                self._preprocess_mode,
+                OCR_BRIGHT_MASK_THRESHOLD,
+                OCR_BRIGHT_MASK_MAX_FRACTION,
+                OCR_BRIGHT_MASK_MIN_FRACTION,
+            )
         self._persistent_worker_enabled = (
             runner is subprocess.run
             if persistent_worker_enabled is None
@@ -445,7 +477,7 @@ class TesseractOcrProvider:
         started = self._clock()
         image_started = self._clock()
         roi_image = self._frame_image(frame)
-        image = self._preprocess_frame(frame)
+        image, preprocess, preprocess_fallback = self._prepare_ocr_image(frame)
         image_preprocessing_ms = max(
             0.0, (self._clock() - image_started) * 1000.0
         )
@@ -587,6 +619,8 @@ class TesseractOcrProvider:
             input_height=frame.height,
             preprocessed_width=image.width(),
             preprocessed_height=image.height(),
+            preprocess=preprocess,
+            preprocess_fallback=preprocess_fallback,
             leading_low_quality_tokens=quality["leading_low_quality_tokens"],
             trailing_low_quality_tokens=quality["trailing_low_quality_tokens"],
         )
@@ -884,6 +918,106 @@ class TesseractOcrProvider:
             Qt.AspectRatioMode.IgnoreAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
+
+    @staticmethod
+    def _resolve_preprocess_mode(value: str) -> str:
+        """Only the exact opt-in value enables the experimental path."""
+        if value.strip().casefold() == OCR_PREPROCESS_BRIGHT_MASK:
+            return OCR_PREPROCESS_BRIGHT_MASK
+        return OCR_PREPROCESS_DEFAULT
+
+    @property
+    def preprocess_mode(self) -> str:
+        return self._preprocess_mode
+
+    def _prepare_ocr_image(self, frame: CaptureFrame) -> tuple[QImage, str, str]:
+        """Return (image, used preprocessing, fallback reason)."""
+        if self._preprocess_mode != OCR_PREPROCESS_BRIGHT_MASK:
+            return self._preprocess_frame(frame), OCR_PREPROCESS_DEFAULT, ""
+        image, fallback = self._preprocess_bright_mask(frame)
+        if fallback:
+            return image, OCR_PREPROCESS_DEFAULT, fallback
+        return image, OCR_PREPROCESS_BRIGHT_MASK, ""
+
+    @classmethod
+    def _preprocess_bright_mask(cls, frame: CaptureFrame) -> tuple[QImage, str]:
+        """Bright subtitle glyphs as white on black, or the default image.
+
+        Uses the same grayscale and local-contrast steps as the default path,
+        then thresholds once. The fallback decision is made before OCR, so a
+        frame is still recognized exactly once.
+        """
+        grayscale = cls._frame_image(frame).convertToFormat(
+            QImage.Format.Format_Grayscale8
+        )
+        contrasted = cls._improve_local_contrast(grayscale)
+        width = contrasted.width()
+        height = contrasted.height()
+        pixels = cls._grayscale_bytes(contrasted)
+        fallback = cls._bright_mask_fallback(pixels)
+        if fallback:
+            return cls._preprocess_frame(frame), fallback
+        mask_table = bytes(
+            255 if value >= OCR_BRIGHT_MASK_THRESHOLD else 0 for value in range(256)
+        )
+        masked = QImage(
+            pixels.translate(mask_table),
+            width,
+            height,
+            width,
+            QImage.Format.Format_Grayscale8,
+        ).copy()
+        source_pixels = max(1, width * height)
+        bounded_factor = min(
+            OCR_UPSCALE_FACTOR,
+            sqrt(OCR_MAX_PREPROCESSED_PIXELS / source_pixels),
+        )
+        if bounded_factor <= 1.05:
+            return masked, ""
+        return (
+            masked.scaled(
+                max(1, round(width * bounded_factor)),
+                max(1, round(height * bounded_factor)),
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            ),
+            "",
+        )
+
+    @staticmethod
+    def _grayscale_bytes(image: QImage) -> bytes:
+        """Tightly packed 8-bit rows, independent of QImage line padding."""
+        width = image.width()
+        height = image.height()
+        stride = image.bytesPerLine()
+        source = bytes(image.constBits())
+        if stride == width:
+            return source[: width * height]
+        return b"".join(
+            source[row * stride : row * stride + width] for row in range(height)
+        )
+
+    @staticmethod
+    def _bright_mask_fallback(pixels: bytes) -> str:
+        """Reason to keep the default image, or "" when the mask applies."""
+        count = len(pixels)
+        if count == 0:
+            return OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT
+        bright_table = bytes(
+            1 if value >= OCR_BRIGHT_MASK_THRESHOLD else 0 for value in range(256)
+        )
+        bright = pixels.translate(bright_table).count(1)
+        if bright > count * OCR_BRIGHT_MASK_MAX_FRACTION:
+            return OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT
+        if bright < count * OCR_BRIGHT_MASK_MIN_FRACTION:
+            light_table = bytes(
+                1 if value >= OCR_BRIGHT_MASK_LIGHT_LEVEL else 0
+                for value in range(256)
+            )
+            # Median >= light level <=> at least half of the pixels are light.
+            if pixels.translate(light_table).count(1) * 2 >= count:
+                return OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT
+        return ""
 
     @staticmethod
     def _improve_local_contrast(image: QImage) -> QImage:

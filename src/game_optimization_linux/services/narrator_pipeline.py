@@ -2597,6 +2597,15 @@ def _region_pixel_rect(
     return x, y, width, height
 
 
+def _preprocess_log_suffix(result: object) -> str:
+    """Log fields for an opt-in OCR preprocessing; empty for the default path."""
+    preprocess = str(getattr(result, "preprocess", "default") or "default")
+    fallback = str(getattr(result, "preprocess_fallback", "") or "")
+    if preprocess == "default" and not fallback:
+        return ""
+    return f" preprocess={preprocess} preprocess_fallback={fallback or 'none'}"
+
+
 def crop_frame(frame: CaptureFrame, region: object) -> CaptureFrame:
     channels_by_format = {
         "rgba8888": 4,
@@ -3794,7 +3803,7 @@ class NarratorPipeline:
                 "raw=%r normalized=%r confidence=%s credible=%s decision=%s "
                 "rejection=%s candidate=%r observations=%d/%d similarity=%s "
                 "match=%s accepted=%r recognition=%.1fms complete=%.1fms "
-                "debug_capture=%s",
+                "debug_capture=%s%s",
                 request_id,
                 result.backend or "unknown",
                 result.fallback_reason or "none",
@@ -3821,6 +3830,7 @@ class NarratorPipeline:
                 result.recognition_ms or 0.0,
                 result.elapsed_ms,
                 result.debug_capture_path or "none",
+                _preprocess_log_suffix(result),
             )
 
             # Gate and episode latch consume the same raw-text presence signal.
@@ -3891,7 +3901,7 @@ class NarratorPipeline:
                 "Narrator OCR: raw=%r cleaned=%r similarity=%s decision=%s "
                 "confidence=%s quality=%s line_confidence=%s episode_id=%d "
                 "candidate_id=%d strong_votes=%d required_votes=%d canonical=%r "
-                "char_similarity=%s token_similarity=%s reason=%s",
+                "char_similarity=%s token_similarity=%s reason=%s%s",
                 observation.raw_text,
                 observation.filtered_text,
                 f"{line_similarity:.3f}" if line_similarity is not None else "none",
@@ -3927,6 +3937,7 @@ class NarratorPipeline:
                     else "none"
                 ),
                 reason_code,
+                _preprocess_log_suffix(result),
             )
             # Loss funnel. Every observation is counted exactly once under the
             # decision the pipeline already assigned it, so no new vocabulary is

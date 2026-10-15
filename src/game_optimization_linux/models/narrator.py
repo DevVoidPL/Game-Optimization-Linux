@@ -484,6 +484,10 @@ class OcrResult:
     input_height: int = 0
     preprocessed_width: int = 0
     preprocessed_height: int = 0
+    # Image preparation actually used ("default" or "bright_mask") and, when an
+    # opt-in mode fell back to the default image, the reason.
+    preprocess: str = "default"
+    preprocess_fallback: str = ""
     leading_low_quality_tokens: tuple[str, ...] = ()
     trailing_low_quality_tokens: tuple[str, ...] = ()
 
