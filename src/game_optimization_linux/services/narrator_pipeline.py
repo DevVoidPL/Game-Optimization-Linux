@@ -223,23 +223,86 @@ def sanitize_tts_text(text: str) -> str:
     return value
 
 
-def strip_speaker_label(text: str) -> str:
-    """Remove a leading ``Name:`` speaker label of at most three words."""
+# Words that make a "Xxx yyy:" prefix a sentence ("Udaj się do: …") rather
+# than a character name ("Goblin bankier: …").  Only lower-case words are
+# checked against it; a capitalised word is always a possible name part.
+_SPEAKER_LABEL_FUNCTION_WORDS = frozenset(
+    {
+        # Polish prepositions, conjunctions, particles and pronouns
+        "a", "aby", "albo", "ale", "bez", "by", "ci", "cię", "co", "czy", "dla",
+        "do", "go", "i", "ich", "jak", "jej", "jest", "już", "ku", "lub", "ma",
+        "mi", "mnie", "mu", "na", "nad", "nie", "o", "od", "oraz", "po", "pod",
+        "przed", "przez", "przy", "się", "są", "ta", "tak", "tam", "te", "ten",
+        "to", "tu", "tylko", "u", "w", "we", "z", "za", "ze", "że", "żeby",
+        # English
+        "and", "are", "at", "for", "from", "in", "is", "it", "my", "of", "on",
+        "or", "the", "this", "to", "with", "you", "your",
+    }
+)
+# A label after the end of an earlier sentence in the same OCR text: two
+# subtitle lines read as one ("Przepraszam? Goblin bankier: (chrapanie)").
+_TTS_INNER_SPEAKER_LABEL = re.compile(
+    r"(?<=[.!?…])([\"')]?\s+)"
+    r"([^\W\d_][^\s\d:]*(?:\s+[^\W\d_][^\s\d:]*){0,2}):\s+(?=\S)"
+)
 
-    match = _TTS_SPEAKER_LABEL.match(text)
-    if match is None:
-        return text
-    label, remainder = match.group(1), match.group(2).strip()
-    if not all(word[:1].isupper() for word in label.split()):
-        return text
+
+def _speaker_label_words(label: str) -> bool:
+    """Whether ``label`` can only be a character name / speaker label."""
+
+    words = label.split()
+    if not words or not words[0][:1].isupper():
+        return False
+    for word in words:
+        # "Dr." is a name part; "Tak," or "Hej!" is speech.
+        if any(character in ",;!?…\"()" for character in word):
+            return False
+        if word[:1].islower() and word.casefold() in _SPEAKER_LABEL_FUNCTION_WORDS:
+            return False
+    return True
+
+
+def _speech_after_label(remainder: str) -> bool:
+    """What follows a label starts a spoken line: a capital or ``(stage cue)``."""
+
+    stripped = remainder.lstrip("\"'„“ ")
+    if stripped.startswith("("):
+        return any(character.isalpha() for character in stripped)
     first_letter = next(
-        (character for character in remainder if character.isalpha()), ""
+        (character for character in stripped if character.isalpha()), ""
     )
-    if not first_letter.isupper():
-        return text
-    if sum(character.isalpha() for character in remainder) < 2:
-        return text
-    return remainder
+    return first_letter.isupper() and sum(character.isalpha() for character in stripped) >= 2
+
+
+def strip_speaker_label(text: str) -> str:
+    """Remove ``Name:`` speaker labels (at most three words) from speech.
+
+    Only a label at the start of the line, or right after the end of a
+    previous sentence in the same OCR text, is removed - never "everything
+    before the first colon".  A prefix with sentence words ("Udaj się do:")
+    or a lower-case continuation ("Jedź do punktu: bankowego.") is kept.
+    When unsure, the whole text is kept.
+    """
+
+    value = text
+    match = _TTS_SPEAKER_LABEL.match(value)
+    if match is not None:
+        label, remainder = match.group(1), match.group(2).strip()
+        if _speaker_label_words(label) and _speech_after_label(remainder):
+            value = remainder
+
+    def inner(found: re.Match[str]) -> str:
+        label = found.group(2)
+        before = value[: found.start()].split()
+        previous_word = before[-1] if before else ""
+        # "… Dr. Harry:" - a short word before the dot may be an abbreviation.
+        if len(previous_word.rstrip(".!?…\"')")) <= 3 and previous_word.endswith("."):
+            return found.group(0)
+        if not _speaker_label_words(label) or not _speech_after_label(value[found.end():]):
+            return found.group(0)
+        return found.group(1)
+
+    return _TTS_INNER_SPEAKER_LABEL.sub(inner, value)
 
 
 def _trim_symbolic_edges(text: str) -> str:
@@ -491,6 +554,17 @@ def _only_ocr_like_changes(first_text: str, second_text: str) -> bool:
                 and (changed[0].isdigit() or len(changed[0]) == 1)
             ):
                 continue
+            # OCR read one word twice ("Profesor.Fig Fig:" / "Profesor Fig:").
+            if strong_core and len(changed) == 1:
+                words = first if tag == "delete" else second
+                start = first_start if tag == "delete" else second_start
+                end = first_end if tag == "delete" else second_end
+                neighbours = (
+                    words[start - 1] if start > 0 else "",
+                    words[end] if end < len(words) else "",
+                )
+                if changed[0] in neighbours:
+                    continue
             return False
         left_joined = "".join(left)
         right_joined = "".join(right)
@@ -515,12 +589,42 @@ def _only_ocr_like_changes(first_text: str, second_text: str) -> bool:
         if (
             weak_budget
             and len(left) == len(right) == 1
-            and (ratio >= 0.60 or max(len(left[0]), len(right[0])) <= 2)
+            and (
+                ratio >= 0.60
+                or max(len(left[0]), len(right[0])) <= 2
+                # One word smeared into a glyph that is not a word at all
+                # ("prawdziwa" -> "M"): damage, not a different sentence.
+                or _ocr_glyph_scrap(left[0])
+                or _ocr_glyph_scrap(right[0])
+            )
         ):
             weak_budget -= 1
             continue
         return False
     return True
+
+
+# Real one- or two-letter words; any other token that short is a stray glyph.
+_SHORT_REAL_WORDS = frozenset(
+    {
+        "a", "i", "o", "u", "w", "z",
+        "by", "ci", "co", "do", "go", "ja", "ju", "ku", "mi", "mu", "my",
+        "na", "no", "od", "on", "po", "se", "si", "ta", "te", "to", "tu",
+        "ty", "we", "wy", "za", "ze",
+        "am", "an", "as", "at", "be", "he", "if", "in", "is", "it", "me",
+        "of", "or", "so", "up", "us",
+    }
+)
+
+
+def _ocr_glyph_scrap(word: str) -> bool:
+    """A one/two-character non-numeric token that is not a real word."""
+
+    return (
+        0 < len(word) <= 2
+        and not word.isdigit()
+        and word not in _SHORT_REAL_WORDS
+    )
 
 
 def _meaningful_lines(text: str) -> list[str]:
@@ -608,6 +712,13 @@ def _same_episode_variant(first_text: str, second_text: str) -> bool:
             and metrics.token_similarity >= 0.65
             and metrics.common_core_words >= 3
             and metrics.common_core_ratio >= 0.75
+        )
+        # Nearly the same characters, but OCR glued and split words
+        # ("przycisk i" / "przyciski"), which lowers the token score only.
+        or (
+            metrics.char_similarity >= 0.95
+            and metrics.common_core_words >= 6
+            and metrics.common_core_ratio >= 0.60
         )
         or (
             metrics.char_similarity >= 0.86
@@ -1955,6 +2066,353 @@ def _dedup_is_split_merge_variant(candidate: str, spoken: str) -> bool:
     )
 
 
+_FRAGMENT_MIN_WORDS = 4
+_FRAGMENT_MIN_RATIO = 0.35
+
+
+def _contained_fragment(fragment_text: str, whole_text: str) -> bool:
+    """``fragment_text`` is a cut-off piece of ``whole_text``, not a new line.
+
+    OCR sometimes returns only the tail or head of a long subtitle that is
+    still on screen.  That piece must not open a new episode: once it replaces
+    the episode text, the full line seen again counts as "new" and is read a
+    second time.  Only an exact, contiguous run of comparison words counts, it
+    must be long enough to be unambiguous, and the dropped words must not
+    carry a negation ("Nie jedź do domu" -> "jedź do domu" is a new meaning).
+    """
+
+    part = _comparison_words(subtitle_identity(fragment_text))
+    whole = _comparison_words(subtitle_identity(whole_text))
+    size = len(part)
+    if size < _FRAGMENT_MIN_WORDS or size >= len(whole):
+        return False
+    if size / len(whole) < _FRAGMENT_MIN_RATIO:
+        return False
+    for start in range(len(whole) - size + 1):
+        if whole[start:start + size] == part:
+            dropped = (*whole[:start], *whole[start + size:])
+            return not any(word in _NEGATION_WORDS for word in dropped)
+    return False
+
+
+# A piece with holes (OCR lost words inside the line) must still carry most of
+# the line; a contiguous piece keeps the looser _FRAGMENT_MIN_RATIO.
+_GAPPED_FRAGMENT_MIN_RATIO = 0.60
+# A fuller reading that extends an earlier piece is suppressed (its new words
+# are not read), so that piece must already be at least half of the line.
+_EXTENSION_MIN_RATIO = 0.50
+# Words an extension may add after the part seen first (one OCR-lost edge word).
+_EXTENSION_MAX_TRAILING_WORDS = 1
+# Bounded memory of one visible subtitle episode (canonical + recent variants).
+_EPISODE_MAX_VARIANTS = 6
+
+
+def _fragment_words(text: str) -> list[str]:
+    """Comparison words without stray single-glyph OCR scraps (``pojazd v``).
+
+    Only lone characters that are not real words are dropped; ``w``, ``z`` and
+    every two-letter word (``ma``) stay, so no real word is lost.
+    """
+
+    return [
+        word
+        for word in _comparison_words(subtitle_identity(text))
+        if not (len(word) == 1 and _ocr_glyph_scrap(word))
+    ]
+
+
+def _ordered_word_match(part: list[str], whole: list[str]) -> list[int] | None:
+    """Indices of ``whole`` matched, in order, by every word of ``part``.
+
+    A word may also match two glued/split neighbours (``nato`` / ``na to``).
+    ``None`` when any word of ``part`` has no counterpart: a word only the
+    shorter text has (``102`` against ``101``) means a different line.
+    """
+
+    matched: list[int] = []
+    part_index = 0
+    whole_start = 0
+    while part_index < len(part):
+        word = part[part_index]
+        for whole_index in range(whole_start, len(whole)):
+            candidate = whole[whole_index]
+            if candidate == word:
+                matched.append(whole_index)
+                whole_start = whole_index + 1
+                part_index += 1
+                break
+            if (
+                whole_index + 1 < len(whole)
+                and candidate + whole[whole_index + 1] == word
+            ):
+                matched.extend((whole_index, whole_index + 1))
+                whole_start = whole_index + 2
+                part_index += 1
+                break
+            if (
+                part_index + 1 < len(part)
+                and word + part[part_index + 1] == candidate
+            ):
+                matched.append(whole_index)
+                whole_start = whole_index + 1
+                part_index += 2
+                break
+        else:
+            return None
+    return matched
+
+
+def _episode_fragment(
+    fragment_text: str,
+    whole_text: str,
+    *,
+    min_ratio: float = _FRAGMENT_MIN_RATIO,
+    max_trailing_extra: int | None = None,
+) -> bool:
+    """``fragment_text`` is a cut or degraded reading of ``whole_text``.
+
+    Used only inside a still-visible episode. Unlike ``_contained_fragment``
+    it tolerates stray glyphs, glued/split words and words lost inside the
+    line, but every word of the fragment must exist in the whole line in the
+    same order, and the words it lacks must not carry a negation.
+    """
+
+    part = _fragment_words(fragment_text)
+    whole = _fragment_words(whole_text)
+    if len(part) < _FRAGMENT_MIN_WORDS:
+        return False
+    matched = _ordered_word_match(part, whole)
+    if matched is None or len(matched) >= len(whole):
+        return False
+    contiguous = matched[-1] - matched[0] + 1 == len(matched)
+    minimum_ratio = (
+        min_ratio if contiguous else max(min_ratio, _GAPPED_FRAGMENT_MIN_RATIO)
+    )
+    if len(matched) / len(whole) < minimum_ratio:
+        return False
+    if (
+        max_trailing_extra is not None
+        and len(whole) - 1 - matched[-1] > max_trailing_extra
+    ):
+        return False
+    kept = set(matched)
+    return not any(
+        word in _NEGATION_WORDS
+        for index, word in enumerate(whole)
+        if index not in kept
+    )
+
+
+# A reading of a still-visible subtitle this close to a remembered reading is
+# the same line damaged by OCR, provided every difference looks like damage.
+# Local to the visible episode; no global similarity threshold is changed.
+_VISIBLE_EPISODE_MIN_SIMILARITY = 0.80
+_VISIBLE_EPISODE_MIN_CORE_WORDS = 4
+# Real words one OCR-garbage run may stand in for ("pozbędziemy" -> "pr y").
+_VISIBLE_DAMAGE_MAX_REAL_WORDS = 2
+# The last word of a line cut by the subtitle area, cut differently twice.
+_VISIBLE_CUT_TAIL_MIN_RATIO = 0.60
+# One word misread by OCR ("czarowi" / "czarow").
+_VISIBLE_WORD_SLIP_MIN_RATIO = 0.72
+_SENTENCE_END = ".!?…\"'”»)"
+
+
+def _visible_noise_word(word: str, surface_core: str, mixed_case_line: bool) -> bool:
+    """Whether one comparison word is OCR noise rather than a real word.
+
+    Besides scraps and vowel-less tokens, a word with upper-case letters after
+    its first character inside a normally written line (``"ŚWI``, ``raSP"E``)
+    or a vowel-only run (``aaa``) is OCR noise.
+    """
+
+    if _looks_like_edge_scrap(word) or _dedup_looks_like_garbage(word):
+        return True
+    letters = [character for character in word if character.isalpha()]
+    if len(letters) >= 2 and all(character in _DEDUP_VOWELS for character in letters):
+        return True
+    return bool(
+        mixed_case_line
+        and any(character.isupper() for character in surface_core[1:])
+    )
+
+
+def _visible_words(text: str) -> tuple[list[str], list[bool]]:
+    """Comparison words of ``text`` with an OCR-noise flag for each."""
+
+    normalized = normalize_subtitle(text)
+    mixed_case_line = any(character.islower() for character in normalized)
+    words: list[str] = []
+    noise: list[bool] = []
+    for token in normalized.split():
+        core = _split_token(token)[1]
+        for word in _comparison_words(subtitle_identity(token)):
+            words.append(word)
+            noise.append(_visible_noise_word(word, core, mixed_case_line))
+    return words, noise
+
+
+def _glued_negation(
+    left: list[str], right: list[str], *, left_at_end: bool, right_at_end: bool
+) -> bool:
+    """A negation only one side has is glued to the next word on the other.
+
+    ``nie`` cut at the end of the line and read whole as ``niesśniłaś``: the
+    side holding the bare negation ends the text, and the other side has a
+    longer word starting with it. ``nie wiem`` / ``wiem`` is never glued.
+    """
+
+    for first, second, first_at_end in (
+        (left, right, left_at_end),
+        (right, left, right_at_end),
+    ):
+        extra = [word for word in first if word in _NEGATION_WORDS and word not in second]
+        if not extra:
+            continue
+        if not first_at_end or first[-1] not in _NEGATION_WORDS:
+            return False
+        if not any(
+            word.startswith(first[-1]) and len(word) > len(first[-1])
+            for word in second
+        ):
+            return False
+    return True
+
+
+def _visible_damage_block(
+    left: list[str],
+    left_noise: list[bool],
+    right: list[str],
+    right_noise: list[bool],
+    *,
+    left_at_end: bool,
+    right_at_end: bool,
+    open_ended: bool = False,
+) -> bool:
+    """One differing word run of two readings is OCR damage, not new dialogue.
+
+    ``open_ended`` means neither reading ends with sentence punctuation, so
+    both lines are cut by the subtitle area and their last word may be cut too.
+    """
+
+    left_real = [word for word, noisy in zip(left, left_noise) if not noisy]
+    right_real = [word for word, noisy in zip(right, right_noise) if not noisy]
+    if set(left_real) & _NEGATION_WORDS != set(right_real) & _NEGATION_WORDS:
+        # Only a negation glued to the next word survives ("nie" / "niesśniłaś").
+        return _glued_negation(
+            left_real, right_real, left_at_end=left_at_end, right_at_end=right_at_end
+        )
+    if not left_real and not right_real:
+        return True  # only garbage changed
+    if not left_real or not right_real:
+        # A real word replaced by garbage in the same place is damage; real
+        # words added or dropped without any garbage are new dialogue.
+        garbage_side = left if not left_real else right
+        real_side = right_real if not left_real else left_real
+        return bool(garbage_side) and len(real_side) <= _VISIBLE_DAMAGE_MAX_REAL_WORDS
+    joined_left = "".join(left_real)
+    joined_right = "".join(right_real)
+    # "możliwe" / "niemożliwe": a negating prefix is a new meaning, not a slip.
+    for short, long in ((joined_left, joined_right), (joined_right, joined_left)):
+        if len(short) >= 3 and any(
+            long == prefix + short or long.startswith(prefix + short)
+            for prefix in ("nie", "un", "non", "dis")
+        ):
+            return False
+    # Glued / split words or an OCR slip inside one word.
+    if SequenceMatcher(None, joined_left, joined_right, autojunk=False).ratio() >= 0.72:
+        return True
+    # The last word cut at the end of one reading, read whole in the other.
+    for short, long, short_at_end in (
+        (joined_left, joined_right, left_at_end),
+        (joined_right, joined_left, right_at_end),
+    ):
+        if short_at_end and len(short) >= 3 and long.startswith(short):
+            return True
+    # The last word cut differently in two readings of a cut-off line
+    # ("osie" / "postę" for "postępy").
+    if (
+        open_ended
+        and left_at_end
+        and right_at_end
+        and len(left_real) == len(right_real) == 1
+        and min(len(joined_left), len(joined_right)) >= 4
+        and SequenceMatcher(None, joined_left, joined_right, autojunk=False).ratio()
+        >= _VISIBLE_CUT_TAIL_MIN_RATIO
+    ):
+        return True
+    # One word inside the line lost by OCR, its neighbour misread
+    # ("czarowi." / "Czarów, zaklęć,"). Only inside the line: a word added at
+    # the end is a continuation, i.e. new dialogue.
+    if not left_at_end and not right_at_end and abs(len(left_real) - len(right_real)) == 1:
+        shorter, longer = sorted((left_real, right_real), key=len)
+        if shorter and _words_align_with_one_extra(shorter, longer):
+            return True
+    return False
+
+
+def _words_align_with_one_extra(shorter: list[str], longer: list[str]) -> bool:
+    """``longer`` is ``shorter`` with exactly one word inserted, OCR slips allowed."""
+
+    for skipped in range(len(longer)):
+        rest = longer[:skipped] + longer[skipped + 1:]
+        if all(
+            SequenceMatcher(None, first, second, autojunk=False).ratio()
+            >= _VISIBLE_WORD_SLIP_MIN_RATIO
+            for first, second in zip(shorter, rest)
+        ):
+            return True
+    return False
+
+
+def _visible_ocr_variant(text: str, reading: str) -> bool:
+    """``text`` is ``reading`` damaged by OCR while the subtitle stayed visible.
+
+    Needs high character similarity, a shared core, the same numbers, and
+    every differing word run proven to be OCR damage. A real word swapped for
+    another real word, real words added or dropped, or a lone negation keeps
+    the readings apart ("Jedź"/"Nie jedź", "Pokój 101"/"Pokój 102").
+    """
+
+    metrics = _phrase_metrics(text, reading)
+    if metrics.char_similarity < _VISIBLE_EPISODE_MIN_SIMILARITY:
+        return False
+    if metrics.common_core_words < _VISIBLE_EPISODE_MIN_CORE_WORDS:
+        return False
+    if not metrics.numbers_match or _has_polarity_prefix_conflict(
+        _comparison_words(subtitle_identity(text)),
+        _comparison_words(subtitle_identity(reading)),
+    ):
+        return False
+    first, first_noise = _visible_words(text)
+    second, second_noise = _visible_words(reading)
+    open_ended = not any(
+        normalize_subtitle(value).rstrip().endswith(tuple(_SENTENCE_END))
+        for value in (text, reading)
+    )
+    matcher = SequenceMatcher(None, first, second, autojunk=False)
+    for tag, first_start, first_end, second_start, second_end in matcher.get_opcodes():
+        if tag == "equal":
+            continue
+        if not _visible_damage_block(
+            first[first_start:first_end],
+            first_noise[first_start:first_end],
+            second[second_start:second_end],
+            second_noise[second_start:second_end],
+            left_at_end=first_end == len(first),
+            right_at_end=second_end == len(second),
+            open_ended=open_ended,
+        ):
+            return False
+    return True
+
+
+@dataclass(slots=True)
+class _EpisodeVariant:
+    text: str
+    identity: str
+    quality: float | None
+
+
 class PhraseDeduplicator:
     """Speak each subtitle once until a shared, confirmed disappearance."""
 
@@ -1963,6 +2421,8 @@ class PhraseDeduplicator:
         self._spoken_at: dict[str, float] = {}
         self._episode_identity = ""
         self._canonical_text = ""
+        # Readings of the episode on screen; index 0 is always the canonical.
+        self._episode_variants: list[_EpisodeVariant] = []
         self._absent_streak = 0
         self._next_episode_id = 0
         self._active_episode_id = 0
@@ -1985,6 +2445,7 @@ class PhraseDeduplicator:
         now: float,
         cooldown_seconds: float,
         frame_had_text: bool | None = None,
+        quality: float | None = None,
     ) -> str | None:
         normalized = _drop_proven_noise_tokens(_trim_symbolic_edges(text))
         identity = subtitle_identity(normalized)
@@ -2000,14 +2461,20 @@ class PhraseDeduplicator:
                 if self._absent_streak >= SUBTITLE_DISAPPEARANCE_OBSERVATIONS:
                     self._episode_identity = ""
                     self._active_episode_id = 0
+                    self._episode_variants = []
             return None
         self._absent_streak = 0
         if self._episode_identity:
             metrics = _phrase_metrics(normalized, self._canonical_text)
             self.last_char_similarity = metrics.char_similarity
             self.last_token_similarity = metrics.token_similarity
-            if _same_episode_variant(normalized, self._canonical_text):
-                self.last_rejection_reason = "active_episode_duplicate"
+            # The subtitle never disappeared: compare against every reading of
+            # this episode, not only the last one, so full -> cut -> full or
+            # full -> misread -> full cannot open a second episode.
+            reason = self._episode_match(normalized)
+            if reason:
+                self._remember_variant(normalized, identity, quality)
+                self.last_rejection_reason = reason
                 return None
         if identity == self._visible_phrase:
             self.last_rejection_reason = "visible_duplicate"
@@ -2027,12 +2494,86 @@ class PhraseDeduplicator:
             if _same_episode_variant(identity, spoken_identity):
                 self.last_rejection_reason = "cooldown_variant"
                 return None
+            if _contained_fragment(identity, spoken_identity):
+                self.last_rejection_reason = "cooldown_fragment"
+                return None
         self._visible_phrase = identity
         self._next_episode_id += 1
         self._active_episode_id = self._next_episode_id
         self._episode_identity = identity
         self._canonical_text = normalized
+        self._episode_variants = [_EpisodeVariant(normalized, identity, quality)]
         return normalized
+
+    def _episode_match(self, text: str) -> str:
+        """Why ``text`` belongs to the visible episode, or ``""`` if it does not."""
+
+        for variant in self._episode_variants:
+            if _same_episode_variant(text, variant.text):
+                return "active_episode_duplicate"
+        for variant in self._episode_variants:
+            # A cut-off or degraded piece of a reading already on screen.
+            if _contained_fragment(text, variant.text) or _episode_fragment(
+                text, variant.text
+            ):
+                return "active_episode_fragment"
+            # A fuller reading of a line first seen only in part. Its extra
+            # words are not read, so the part seen first must carry at least
+            # half of the line. Words may be recovered at the start (a head cut
+            # by the ROI edge, "Bluszcz:" -> "Trujący Bluszcz:") or inside, but
+            # at most one at the end: a continuation appended to the line
+            # ("… gier i odbierz nagrodę", "… Idź dalej.") is new dialogue.
+            if _episode_fragment(
+                variant.text,
+                text,
+                min_ratio=_EXTENSION_MIN_RATIO,
+                max_trailing_extra=_EXTENSION_MAX_TRAILING_WORDS,
+            ):
+                return "active_episode_extension"
+        for variant in self._episode_variants:
+            # Same line, damaged differently by OCR (high similarity, every
+            # difference proven to be OCR damage, numbers and negations kept).
+            if _visible_ocr_variant(text, variant.text):
+                return "active_episode_ocr_variant"
+        return ""
+
+    def _remember_variant(
+        self, text: str, identity: str, quality: float | None
+    ) -> None:
+        """Keep a bounded set of readings; the canonical is the best of them.
+
+        When both OCR qualities are known, the canonical is replaced only by a
+        reading of higher quality: a fuller reading of the line, or the same
+        line read better (including an OCR-damaged variant). A fragment never
+        replaces it. Without quality, a fuller reading replaces it as before.
+        """
+
+        if any(variant.identity == identity for variant in self._episode_variants):
+            return
+        new = _EpisodeVariant(text, identity, quality)
+        canonical = self._episode_variants[0]
+        qualities_known = quality is not None and canonical.quality is not None
+        higher_quality = bool(qualities_known and quality > canonical.quality)
+        fuller = _episode_fragment(canonical.text, text) and (
+            higher_quality or not qualities_known
+        )
+        better = bool(
+            higher_quality
+            and not _episode_fragment(text, canonical.text)
+            and (
+                _same_episode_variant(text, canonical.text)
+                or _visible_ocr_variant(text, canonical.text)
+            )
+        )
+        if fuller or better:
+            self._episode_variants.insert(0, new)
+            self._episode_identity = identity
+            self._canonical_text = text
+        else:
+            self._episode_variants.append(new)
+        # Bounded state: the canonical (index 0) plus the most recent readings.
+        if len(self._episode_variants) > _EPISODE_MAX_VARIANTS:
+            del self._episode_variants[1:len(self._episode_variants) - _EPISODE_MAX_VARIANTS + 1]
 
     def mark_spoken(self, text: str, *, now: float) -> None:
         identity = subtitle_identity(text)
@@ -3301,6 +3842,7 @@ class NarratorPipeline:
                     observation.accepted_text,
                     now=self._clock(),
                     cooldown_seconds=settings.duplicate_cooldown_ms / 1000.0,
+                    quality=observation.quality_score,
                 )
                 if observation.accepted_text
                 else None
