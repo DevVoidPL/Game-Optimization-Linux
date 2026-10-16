@@ -2603,7 +2603,19 @@ def _preprocess_log_suffix(result: object) -> str:
     fallback = str(getattr(result, "preprocess_fallback", "") or "")
     if preprocess == "default" and not fallback:
         return ""
-    return f" preprocess={preprocess} preprocess_fallback={fallback or 'none'}"
+    suffix = f" preprocess={preprocess} preprocess_fallback={fallback or 'none'}"
+    bright_fraction = getattr(result, "preprocess_bright_fraction", None)
+    if isinstance(bright_fraction, (int, float)):
+        # Outline modes: background bright share (fallback signal), threshold
+        # used (0 = fallback image) and, for the adaptive mode, the switch.
+        suffix += (
+            f" preprocess_bright_fraction={float(bright_fraction):.3f}"
+            f" preprocess_threshold={int(getattr(result, 'preprocess_threshold', 0) or 0)}"
+        )
+        switched = str(getattr(result, "preprocess_switched", "") or "")
+        if switched:
+            suffix += f" preprocess_switched={switched}"
+    return suffix
 
 
 def crop_frame(frame: CaptureFrame, region: object) -> CaptureFrame:

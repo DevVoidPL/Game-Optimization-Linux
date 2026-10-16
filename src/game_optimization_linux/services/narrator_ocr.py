@@ -15,7 +15,7 @@ import subprocess
 import sys
 from threading import Lock, RLock, Thread
 import time
-from typing import Callable, Protocol, TextIO
+from typing import Callable, NamedTuple, Protocol, TextIO
 import unicodedata
 from uuid import uuid4
 
@@ -63,6 +63,25 @@ OCR_BRIGHT_MASK_MIN_FRACTION = 0.003
 OCR_BRIGHT_MASK_LIGHT_LEVEL = 128
 OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT = "too_many_bright_pixels"
 OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT = "no_bright_text_on_light_background"
+# Outline mask: a text pixel is bright (>= threshold) AND has a dark (<= dark
+# level) pixel within a square of the given radius, i.e. the subtitle outline.
+# Bright background without an outline (sand, sky, road) is dropped. Offline
+# sweep (GTA V / Batman AK / Hogwarts, 2026-10-16): T190 D110 r2 is the safe
+# setting; T220 helps on bright backgrounds but erases coloured labels, so the
+# adaptive mode uses it only when the bright-pixel fraction is above 0.15.
+# The fallback rule is the same as for the bright mask.
+OCR_PREPROCESS_OUTLINE = "outline"
+OCR_PREPROCESS_OUTLINE_ADAPTIVE = "outline_adaptive"
+OCR_OUTLINE_THRESHOLD = 190
+OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD = 220
+OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION = 0.15
+OCR_OUTLINE_DARK_LEVEL = 110
+OCR_OUTLINE_RADIUS = 2
+_OCR_OPT_IN_PREPROCESS_MODES = (
+    OCR_PREPROCESS_BRIGHT_MASK,
+    OCR_PREPROCESS_OUTLINE,
+    OCR_PREPROCESS_OUTLINE_ADAPTIVE,
+)
 OCR_WORKER_TIMEOUT_SECONDS = 15.0
 OCR_DEBUG_CAPTURE_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_DEBUG"
 OCR_DEBUG_CAPTURE_LIMIT_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_DEBUG_LIMIT"
@@ -93,6 +112,19 @@ _WORKER_BOOTSTRAP = (
 
 
 logger = logging.getLogger(__name__)
+
+
+class _PreparedOcrImage(NamedTuple):
+    """Image sent to OCR plus how it was prepared (for the OCR log line)."""
+
+    image: QImage
+    preprocess: str
+    fallback: str
+    bright_fraction: float | None = None
+    threshold: int = 0
+    # Adaptive outline only: "yes" when the bright-background threshold was
+    # used, "no" otherwise; "" for every other mode.
+    switched: str = ""
 
 
 class OcrWorker(Protocol):
@@ -371,12 +403,32 @@ class TesseractOcrProvider:
             if preprocess_mode is None
             else preprocess_mode
         )
-        if self._preprocess_mode != OCR_PREPROCESS_DEFAULT:
+        if self._preprocess_mode == OCR_PREPROCESS_BRIGHT_MASK:
             logger.info(
                 "Narrator OCR preprocess mode=%s threshold=%d "
                 "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
                 self._preprocess_mode,
                 OCR_BRIGHT_MASK_THRESHOLD,
+                OCR_BRIGHT_MASK_MAX_FRACTION,
+                OCR_BRIGHT_MASK_MIN_FRACTION,
+            )
+        elif self._preprocess_mode != OCR_PREPROCESS_DEFAULT:
+            adaptive = self._preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE
+            logger.info(
+                "Narrator OCR preprocess mode=%s threshold=%d dark_level=%d "
+                "radius=%d bright_background_threshold=%s "
+                "bright_background_fraction=%s "
+                "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
+                self._preprocess_mode,
+                OCR_OUTLINE_THRESHOLD,
+                OCR_OUTLINE_DARK_LEVEL,
+                OCR_OUTLINE_RADIUS,
+                OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD if adaptive else "none",
+                (
+                    f"{OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION:.3f}"
+                    if adaptive
+                    else "none"
+                ),
                 OCR_BRIGHT_MASK_MAX_FRACTION,
                 OCR_BRIGHT_MASK_MIN_FRACTION,
             )
@@ -477,7 +529,10 @@ class TesseractOcrProvider:
         started = self._clock()
         image_started = self._clock()
         roi_image = self._frame_image(frame)
-        image, preprocess, preprocess_fallback = self._prepare_ocr_image(frame)
+        prepared = self._prepare_ocr_image_details(frame)
+        image = prepared.image
+        preprocess = prepared.preprocess
+        preprocess_fallback = prepared.fallback
         image_preprocessing_ms = max(
             0.0, (self._clock() - image_started) * 1000.0
         )
@@ -621,6 +676,9 @@ class TesseractOcrProvider:
             preprocessed_height=image.height(),
             preprocess=preprocess,
             preprocess_fallback=preprocess_fallback,
+            preprocess_bright_fraction=prepared.bright_fraction,
+            preprocess_threshold=prepared.threshold,
+            preprocess_switched=prepared.switched,
             leading_low_quality_tokens=quality["leading_low_quality_tokens"],
             trailing_low_quality_tokens=quality["trailing_low_quality_tokens"],
         )
@@ -921,9 +979,10 @@ class TesseractOcrProvider:
 
     @staticmethod
     def _resolve_preprocess_mode(value: str) -> str:
-        """Only the exact opt-in value enables the experimental path."""
-        if value.strip().casefold() == OCR_PREPROCESS_BRIGHT_MASK:
-            return OCR_PREPROCESS_BRIGHT_MASK
+        """Only an exact opt-in value enables an experimental path."""
+        normalized = value.strip().casefold()
+        if normalized in _OCR_OPT_IN_PREPROCESS_MODES:
+            return normalized
         return OCR_PREPROCESS_DEFAULT
 
     @property
@@ -932,12 +991,166 @@ class TesseractOcrProvider:
 
     def _prepare_ocr_image(self, frame: CaptureFrame) -> tuple[QImage, str, str]:
         """Return (image, used preprocessing, fallback reason)."""
-        if self._preprocess_mode != OCR_PREPROCESS_BRIGHT_MASK:
-            return self._preprocess_frame(frame), OCR_PREPROCESS_DEFAULT, ""
-        image, fallback = self._preprocess_bright_mask(frame)
+        prepared = self._prepare_ocr_image_details(frame)
+        return prepared.image, prepared.preprocess, prepared.fallback
+
+    def _prepare_ocr_image_details(self, frame: CaptureFrame) -> _PreparedOcrImage:
+        if self._preprocess_mode == OCR_PREPROCESS_BRIGHT_MASK:
+            image, fallback = self._preprocess_bright_mask(frame)
+            if fallback:
+                return _PreparedOcrImage(image, OCR_PREPROCESS_DEFAULT, fallback)
+            return _PreparedOcrImage(image, OCR_PREPROCESS_BRIGHT_MASK, "")
+        if self._preprocess_mode in (
+            OCR_PREPROCESS_OUTLINE,
+            OCR_PREPROCESS_OUTLINE_ADAPTIVE,
+        ):
+            return self._preprocess_outline(
+                frame,
+                adaptive=self._preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE,
+            )
+        return _PreparedOcrImage(
+            self._preprocess_frame(frame), OCR_PREPROCESS_DEFAULT, ""
+        )
+
+    @classmethod
+    def _preprocess_outline(
+        cls, frame: CaptureFrame, *, adaptive: bool
+    ) -> _PreparedOcrImage:
+        """Bright glyphs next to a dark outline as white on black.
+
+        Same grayscale and local-contrast steps as the default path and the
+        same pre-OCR fallback rule as the bright mask; one OCR pass per frame.
+        """
+        grayscale = cls._frame_image(frame).convertToFormat(
+            QImage.Format.Format_Grayscale8
+        )
+        contrasted = cls._improve_local_contrast(grayscale)
+        width = contrasted.width()
+        height = contrasted.height()
+        pixels = cls._grayscale_bytes(contrasted)
+        bright_fraction = cls._bright_fraction(pixels)
+        switched_label = "no" if adaptive else ""
+        fallback = cls._bright_mask_fallback(pixels)
         if fallback:
-            return image, OCR_PREPROCESS_DEFAULT, fallback
-        return image, OCR_PREPROCESS_BRIGHT_MASK, ""
+            return _PreparedOcrImage(
+                cls._preprocess_frame(frame),
+                OCR_PREPROCESS_DEFAULT,
+                fallback,
+                bright_fraction,
+                0,
+                switched_label,
+            )
+        threshold = OCR_OUTLINE_THRESHOLD
+        if adaptive and bright_fraction > OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION:
+            threshold = OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD
+            switched_label = "yes"
+        masked = QImage(
+            cls._outline_mask(
+                pixels,
+                width,
+                height,
+                threshold=threshold,
+                dark_level=OCR_OUTLINE_DARK_LEVEL,
+                radius=OCR_OUTLINE_RADIUS,
+            ),
+            width,
+            height,
+            width,
+            QImage.Format.Format_Grayscale8,
+        ).copy()
+        return _PreparedOcrImage(
+            cls._bounded_upscale(masked),
+            OCR_PREPROCESS_OUTLINE_ADAPTIVE if adaptive else OCR_PREPROCESS_OUTLINE,
+            "",
+            bright_fraction,
+            threshold,
+            switched_label,
+        )
+
+    @staticmethod
+    def _bright_fraction(pixels: bytes) -> float:
+        """Share of pixels at or above the bright-mask threshold (190)."""
+        if not pixels:
+            return 0.0
+        table = bytes(
+            1 if value >= OCR_BRIGHT_MASK_THRESHOLD else 0 for value in range(256)
+        )
+        return pixels.translate(table).count(1) / len(pixels)
+
+    @staticmethod
+    def _outline_mask(
+        pixels: bytes,
+        width: int,
+        height: int,
+        *,
+        threshold: int,
+        dark_level: int,
+        radius: int,
+    ) -> bytes:
+        """255 where pixel >= threshold and a pixel <= dark_level lies within
+        the (2*radius+1)^2 square around it, else 0.
+
+        Pure Python without numpy: each pixel becomes one 0/1 byte of a big
+        integer, so the square dilation of the dark map is a few byte shifts
+        and ORs (horizontal, then vertical). Rows are padded with ``radius``
+        zero bytes on both sides so horizontal shifts never cross into the
+        neighbouring row.
+        """
+        if width <= 0 or height <= 0:
+            return b""
+        radius = max(0, radius)
+        padded_width = width + 2 * radius
+        total = padded_width * height
+        full = (1 << (8 * total)) - 1
+        pad = bytes(radius)
+        dark = pixels.translate(
+            bytes(1 if value <= dark_level else 0 for value in range(256))
+        )
+        dark_value = int.from_bytes(
+            b"".join(
+                pad + dark[row * width : (row + 1) * width] + pad
+                for row in range(height)
+            ),
+            "big",
+        )
+        horizontal = dark_value
+        for shift in range(1, radius + 1):
+            horizontal |= (dark_value << (8 * shift)) | (dark_value >> (8 * shift))
+        horizontal &= full
+        dilated = horizontal
+        for shift in range(1, radius + 1):
+            step = 8 * padded_width * shift
+            dilated |= (horizontal << step) | (horizontal >> step)
+        dilated_bytes = (dilated & full).to_bytes(total, "big")
+        near_dark = b"".join(
+            dilated_bytes[row * padded_width + radius : row * padded_width + radius + width]
+            for row in range(height)
+        )
+        bright = pixels.translate(
+            bytes(1 if value >= threshold else 0 for value in range(256))
+        )
+        count = width * height
+        text = (int.from_bytes(bright, "big") & int.from_bytes(near_dark, "big")).to_bytes(
+            count, "big"
+        )
+        return text.translate(bytes(255 if value else 0 for value in range(256)))
+
+    @staticmethod
+    def _bounded_upscale(image: QImage) -> QImage:
+        """The default path's bounded 2x smooth upscale."""
+        source_pixels = max(1, image.width() * image.height())
+        bounded_factor = min(
+            OCR_UPSCALE_FACTOR,
+            sqrt(OCR_MAX_PREPROCESSED_PIXELS / source_pixels),
+        )
+        if bounded_factor <= 1.05:
+            return image
+        return image.scaled(
+            max(1, round(image.width() * bounded_factor)),
+            max(1, round(image.height() * bounded_factor)),
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
 
     @classmethod
     def _preprocess_bright_mask(cls, frame: CaptureFrame) -> tuple[QImage, str]:

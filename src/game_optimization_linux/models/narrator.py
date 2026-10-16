@@ -488,6 +488,13 @@ class OcrResult:
     # opt-in mode fell back to the default image, the reason.
     preprocess: str = "default"
     preprocess_fallback: str = ""
+    # Outline modes only: fraction of contrasted pixels >= 190 (the fallback
+    # signal) and the bright threshold actually used (190, or 220 when the
+    # adaptive mode switched). None / 0 for the other paths.
+    preprocess_bright_fraction: float | None = None
+    preprocess_threshold: int = 0
+    # Adaptive outline only: "yes"/"no" for the bright-background switch.
+    preprocess_switched: str = ""
     leading_low_quality_tokens: tuple[str, ...] = ()
     trailing_low_quality_tokens: tuple[str, ...] = ()
 
