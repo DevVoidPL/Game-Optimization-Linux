@@ -2,7 +2,8 @@
 
 outline: bright (>=190) pixels with a dark (<=110) pixel within radius 2.
 outline_adaptive: same, threshold 220 when >15% of pixels are >=190.
-Both use the bright-mask fallback rule; default and bright_mask are unchanged.
+Both keep only the dark-text fallback (no too_many_bright_pixels); default and
+bright_mask are unchanged.
 """
 
 from __future__ import annotations
@@ -17,6 +18,7 @@ from PySide6.QtGui import QImage
 
 from game_optimization_linux.models.narrator import CaptureFrame, OcrResult
 from game_optimization_linux.services.narrator_ocr import (
+    OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT,
     OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT,
     OCR_PREPROCESS_BRIGHT_MASK,
     OCR_PREPROCESS_DEFAULT,
@@ -204,15 +206,36 @@ def test_adaptive_switches_to_220_only_on_bright_background() -> None:
 
 
 @pytest.mark.parametrize("adaptive", [False, True])
-def test_outline_uses_the_bright_mask_fallback_rule(adaptive) -> None:
+def test_outline_keeps_the_mask_on_a_mostly_bright_frame(adaptive) -> None:
     frame = _uniform(240)
+    _, mask_fallback = TesseractOcrProvider._preprocess_bright_mask(frame)
+    assert mask_fallback == OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT  # bright_mask unchanged
+    prepared = TesseractOcrProvider._preprocess_outline(frame, adaptive=adaptive)
+    assert prepared.fallback == ""
+    assert prepared.preprocess != OCR_PREPROCESS_DEFAULT
+    assert prepared.bright_fraction > 0.35
+    assert prepared.threshold == (220 if adaptive else 190)
+    # No dark outline anywhere: nothing survives the mask.
+    assert prepared.image.pixelColor(50, 50).red() == 0
+    assert prepared.image.pixelColor(300, 100).red() == 0
+
+
+def test_outline_bright_scene_with_outlined_text_keeps_the_text() -> None:
+    frame = _scene(background=240)
+    prepared = TesseractOcrProvider._preprocess_outline(frame, adaptive=True)
+    assert prepared.fallback == "" and prepared.bright_fraction > 0.35
+    assert prepared.image.pixelColor(121, 61).red() == 255
+    assert prepared.image.pixelColor(2 * 10, 2 * 5).red() == 0
+
+
+@pytest.mark.parametrize("adaptive", [False, True])
+def test_outline_keeps_the_dark_text_fallback(adaptive) -> None:
+    frame = _uniform(160)
     prepared = TesseractOcrProvider._preprocess_outline(frame, adaptive=adaptive)
     assert prepared.preprocess == OCR_PREPROCESS_DEFAULT
-    assert prepared.fallback == OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT
+    assert prepared.fallback == OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT
     assert prepared.threshold == 0
     assert prepared.image == TesseractOcrProvider._preprocess_frame(frame)
-    _, mask_fallback = TesseractOcrProvider._preprocess_bright_mask(frame)
-    assert prepared.fallback == mask_fallback
 
 
 def test_outline_dark_empty_frame_stays_black() -> None:
@@ -233,9 +256,9 @@ def test_recognize_reports_outline_fields(tmp_path: Path) -> None:
     )
     assert result.preprocess_bright_fraction is not None
     assert sent[-1].pixelColor(2 * 10, 2 * 30).red() == 0
-    fell_back = provider.recognize(_uniform(240), language="en")
+    fell_back = provider.recognize(_uniform(160), language="en")
     assert fell_back.preprocess == OCR_PREPROCESS_DEFAULT
-    assert fell_back.preprocess_fallback == OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT
+    assert fell_back.preprocess_fallback == OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT
     assert fell_back.preprocess_threshold == 0
 
 

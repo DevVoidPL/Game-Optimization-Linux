@@ -69,7 +69,8 @@ OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT = "no_bright_text_on_light_background"
 # sweep (GTA V / Batman AK / Hogwarts, 2026-10-16): T190 D110 r2 is the safe
 # setting; T220 helps on bright backgrounds but erases coloured labels, so the
 # adaptive mode uses it only when the bright-pixel fraction is above 0.15.
-# The fallback rule is the same as for the bright mask.
+# Fallback: only the bright mask's dark-text rule (no bright text on a light
+# background); a mostly bright frame keeps the outline mask.
 OCR_PREPROCESS_OUTLINE = "outline"
 OCR_PREPROCESS_OUTLINE_ADAPTIVE = "outline_adaptive"
 OCR_OUTLINE_THRESHOLD = 190
@@ -1019,7 +1020,8 @@ class TesseractOcrProvider:
         """Bright glyphs next to a dark outline as white on black.
 
         Same grayscale and local-contrast steps as the default path and the
-        same pre-OCR fallback rule as the bright mask; one OCR pass per frame.
+        the bright mask's dark-text fallback only (decided before OCR); one OCR
+        pass per frame.
         """
         grayscale = cls._frame_image(frame).convertToFormat(
             QImage.Format.Format_Grayscale8
@@ -1031,6 +1033,11 @@ class TesseractOcrProvider:
         bright_fraction = cls._bright_fraction(pixels)
         switched_label = "no" if adaptive else ""
         fallback = cls._bright_mask_fallback(pixels)
+        # The outline test already drops bright background without a dark
+        # outline, so a mostly bright frame keeps the mask; only the dark-text
+        # case (nothing bright on a light background) uses the default image.
+        if fallback == OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT:
+            fallback = ""
         if fallback:
             return _PreparedOcrImage(
                 cls._preprocess_frame(frame),
