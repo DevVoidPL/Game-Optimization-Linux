@@ -47,6 +47,10 @@ Item {
     property real cropWidth: 0.90
     property real cropHeight: 0.30
     property bool advancedRegionVisible: false
+    // App-wide Narrator OCR mode from settings.json ("automatic" / "classic").
+    readonly property string ocrMode: controller && controller.settings
+                                      && controller.settings.narratorOcrMode
+                                      ? String(controller.settings.narratorOcrMode) : "automatic"
     property bool regionPreviewLoading: false
     property string regionPreviewError: ""
     property url regionPreviewSource: ""
@@ -1751,6 +1755,46 @@ Item {
                             compact: true
                             enabled: !page.sessionActive
                             onClicked: page.resetSubtitleRegion()
+                        }
+                    }
+
+                    // Application-wide OCR image preparation (settings.json).
+                    // GAME_OPTIMIZATION_NARRATOR_OCR_PREPROCESS overrides it.
+                    RowLayout {
+                        visible: page.advancedRegionVisible
+                        Layout.fillWidth: true
+                        spacing: 12
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Label {
+                                Layout.fillWidth: true
+                                text: qsTr("OCR mode")
+                                color: App.Theme.text
+                                font.pixelSize: App.Theme.fontBody
+                                font.weight: Font.DemiBold
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: qsTr("Automatic separates outlined subtitles from bright backgrounds. Classic uses the previous image preparation.")
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        AppComboBox {
+                            id: ocrModeCombo
+                            property var values: ["automatic", "classic"]
+                            Layout.preferredWidth: 180
+                            model: [qsTr("Automatic"), qsTr("Classic")]
+                            currentIndex: page.indexOfValue(values, page.ocrMode, 0)
+                            Accessible.name: qsTr("OCR mode")
+                            onActivated: function(index) {
+                                if (page.controller && page.controller.saveSetting)
+                                    page.controller.saveSetting("narratorOcrMode", values[index])
+                            }
                         }
                     }
                 }

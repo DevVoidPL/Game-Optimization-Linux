@@ -34,6 +34,9 @@ _SUPPORTED_LANGUAGES = {
 
 
 COUCH_MOTION_MODES = ("full", "reduced", "off")
+# Narrator OCR preprocessing chosen in the Narrator advanced settings:
+# "automatic" = outline_adaptive (default), "classic" = the pre-Beta image.
+NARRATOR_OCR_MODES = ("automatic", "classic")
 
 
 def _is_supported_language(value: str) -> bool:
@@ -136,6 +139,7 @@ class AppSettings:
     couch_music_volume: int = 20
     # Stable ids only: "full" | "reduced" | "off".
     couch_motion_mode: str = "full"
+    narrator_ocr_mode: str = "automatic"
 
     def __post_init__(self) -> None:
         if not isinstance(self.language, str) or not self.language.strip():
@@ -265,6 +269,8 @@ class AppSettings:
             raise ValueError("post_launch_behavior must be a PostLaunchBehavior value")
         if self.couch_motion_mode not in COUCH_MOTION_MODES:
             raise ValueError("couch_motion_mode must be full, reduced or off")
+        if self.narrator_ocr_mode not in NARRATOR_OCR_MODES:
+            raise ValueError("narrator_ocr_mode must be automatic or classic")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -315,6 +321,7 @@ class AppSettings:
             "couch_music_enabled": self.couch_music_enabled,
             "couch_music_volume": self.couch_music_volume,
             "couch_motion_mode": self.couch_motion_mode,
+            "narrator_ocr_mode": self.narrator_ocr_mode,
         }
 
     @classmethod
@@ -540,5 +547,11 @@ class AppSettings:
                 data["couch_motion_mode"]
                 if data.get("couch_motion_mode") in COUCH_MOTION_MODES
                 else defaults.couch_motion_mode
+            ),
+            # Older files have no value; unknown values fall back to automatic.
+            narrator_ocr_mode=(
+                data["narrator_ocr_mode"]
+                if data.get("narrator_ocr_mode") in NARRATOR_OCR_MODES
+                else defaults.narrator_ocr_mode
             ),
         )

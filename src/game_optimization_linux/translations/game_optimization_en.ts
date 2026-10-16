@@ -9221,6 +9221,22 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Reset to bottom area</translation>
     </message>
     <message>
+        <source>OCR mode</source>
+        <translation>OCR mode</translation>
+    </message>
+    <message>
+        <source>Automatic separates outlined subtitles from bright backgrounds. Classic uses the previous image preparation.</source>
+        <translation>Automatic separates outlined subtitles from bright backgrounds. Classic uses the previous image preparation.</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automatic</translation>
+    </message>
+    <message>
+        <source>Classic</source>
+        <translation>Classic</translation>
+    </message>
+    <message>
         <source>Captured screen or window</source>
         <translation type="vanished">Captured screen or window</translation>
     </message>

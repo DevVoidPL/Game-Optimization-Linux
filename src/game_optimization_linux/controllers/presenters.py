@@ -699,6 +699,7 @@ def settings_to_qml(settings: AppSettings) -> dict[str, Any]:
         "couch_music_enabled": "couchMusicEnabled",
         "couch_music_volume": "couchMusicVolume",
         "couch_motion_mode": "couchMotionMode",
+        "narrator_ocr_mode": "narratorOcrMode",
     }
     for source, target in aliases.items():
         if source in raw:

@@ -495,6 +495,9 @@ class OcrResult:
     preprocess_threshold: int = 0
     # Adaptive outline only: "yes"/"no" for the bright-background switch.
     preprocess_switched: str = ""
+    # Image-veto shadow mode only: outline mask pooled to 4x4 blocks as
+    # (columns, rows, bits) - bit set when any pixel of the block is text.
+    preprocess_mask: tuple[int, int, int] | None = None
     leading_low_quality_tokens: tuple[str, ...] = ()
     trailing_low_quality_tokens: tuple[str, ...] = ()
 

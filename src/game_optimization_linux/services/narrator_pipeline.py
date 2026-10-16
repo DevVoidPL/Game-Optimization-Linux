@@ -33,7 +33,7 @@ from game_optimization_linux.models.narrator import (
 )
 
 from .narrator_capture import CaptureRequest, ScreenCaptureProvider
-from .narrator_ocr import OCR_STRONG_LINE_CONFIDENCE
+from .narrator_ocr import OCR_STRONG_LINE_CONFIDENCE, image_veto_shadow_enabled
 from .narrator_persistence import TranslationCache
 
 
@@ -239,6 +239,13 @@ _SPEAKER_LABEL_FUNCTION_WORDS = frozenset(
         "or", "the", "this", "to", "with", "you", "your",
     }
 )
+# Lower-case words allowed *inside* a speaker label at the start of a line
+# ("Strach na Wróble:", "Pan z banku:", "Lady of the Lake:"). Never first or
+# last word, never in labels found later in the text. Deliberately narrow:
+# "do", "się", "nie" etc. stay sentence words ("Udaj się do: …").
+_SPEAKER_LABEL_CONNECTORS = frozenset(
+    {"na", "z", "ze", "w", "we", "od", "of", "the", "de", "von", "van", "da", "di"}
+)
 # A label after the end of an earlier sentence in the same OCR text: two
 # subtitle lines read as one ("Przepraszam? Goblin bankier: (chrapanie)").
 _TTS_INNER_SPEAKER_LABEL = re.compile(
@@ -247,18 +254,28 @@ _TTS_INNER_SPEAKER_LABEL = re.compile(
 )
 
 
-def _speaker_label_words(label: str) -> bool:
-    """Whether ``label`` can only be a character name / speaker label."""
+def _speaker_label_words(label: str, *, allow_connectors: bool = False) -> bool:
+    """Whether ``label`` can only be a character name / speaker label.
+
+    ``allow_connectors`` (start of line only) accepts a few lower-case name
+    connectors between other words: "Strach na Wróble", "Pan z banku".
+    """
 
     words = label.split()
     if not words or not words[0][:1].isupper():
         return False
-    for word in words:
+    for index, word in enumerate(words):
         # "Dr." is a name part; "Tak," or "Hej!" is speech.
         if any(character in ",;!?…\"()" for character in word):
             return False
         if word[:1].islower() and word.casefold() in _SPEAKER_LABEL_FUNCTION_WORDS:
-            return False
+            inner = 0 < index < len(words) - 1
+            if not (
+                allow_connectors
+                and inner
+                and word.casefold() in _SPEAKER_LABEL_CONNECTORS
+            ):
+                return False
     return True
 
 
@@ -288,7 +305,9 @@ def strip_speaker_label(text: str) -> str:
     match = _TTS_SPEAKER_LABEL.match(value)
     if match is not None:
         label, remainder = match.group(1), match.group(2).strip()
-        if _speaker_label_words(label) and _speech_after_label(remainder):
+        if _speaker_label_words(label, allow_connectors=True) and _speech_after_label(
+            remainder
+        ):
             value = remainder
 
     def inner(found: re.Match[str]) -> str:
@@ -303,6 +322,55 @@ def strip_speaker_label(text: str) -> str:
         return found.group(1)
 
     return _TTS_INNER_SPEAKER_LABEL.sub(inner, value)
+
+
+_TTS_STAGE_DIRECTION = re.compile(r"\([^()]*\)")
+_TTS_TRAILING_SPEAKER_LABEL = re.compile(
+    r"(?<=[.!?…])\s+([^\W\d_][^\s\d:]*(?:\s+[^\W\d_][^\s\d:]*){0,2}):$"
+)
+
+
+def strip_stage_directions(text: str) -> str:
+    """Remove complete ``(…)`` pairs with their content before TTS.
+
+    Stage directions such as "(rozbija okno)" or "(ciężkie oddychanie)" are
+    not spoken; the rest of the line is kept with tidy spaces and
+    punctuation. Nested pairs are removed from the inside out. An unclosed
+    "(" or a lone ")" never removes the rest of the line: only the bracket
+    character itself is dropped. Returns "" when nothing speakable remains
+    (including a bare "Name:" label left in front of a removed direction).
+    Only round brackets: OCR rarely turns them into [ ] or { }, and those are
+    already reduced to spaces by ``sanitize_tts_text``.
+    """
+
+    if "(" not in text and ")" not in text:
+        return text
+    value = text
+    while True:
+        reduced = _TTS_STAGE_DIRECTION.sub(" ", value)
+        if reduced == value:
+            break
+        value = reduced
+    removed = value != text
+    value = value.replace("(", " ").replace(")", " ")
+    value = " ".join(value.split())
+    value = re.sub(r"\s+([.,!?;:…])", r"\1", value)
+    value = _TTS_PUNCTUATION_RUN.sub(_collapse_punctuation_run, value)
+    value = value.lstrip(_TTS_PUNCTUATION + " ").strip()
+    if removed:
+        bare = _TTS_SPEAKER_LABEL.match(value + " x")
+        if bare is not None and bare.group(2) == "x" and _speaker_label_words(
+            bare.group(1), allow_connectors=True
+        ):
+            return ""
+        # "Przepraszam? Goblin bankier: (chrapanie)" -> no dangling label.
+        trailing = _TTS_TRAILING_SPEAKER_LABEL.search(value)
+        if trailing is not None and _speaker_label_words(trailing.group(1)):
+            value = value[: trailing.start()]
+        value = value.rstrip(",;: ").strip()
+    if not any(character.isalpha() for character in value):
+        return ""
+    return value
 
 
 def _trim_symbolic_edges(text: str) -> str:
@@ -2618,6 +2686,70 @@ def _preprocess_log_suffix(result: object) -> str:
     return suffix
 
 
+# Image veto, shadow mode: logged only, never changes a decision.
+IMAGE_VETO_IOU_THRESHOLD = 0.70
+IMAGE_VETO_MAX_SECONDS = 8.0
+IMAGE_VETO_MIN_TEXT_SIMILARITY = 0.80
+
+
+def mask_signature_iou(first: object, second: object) -> float | None:
+    """IoU of two pooled mask signatures (columns, rows, bits), or None."""
+    if not (isinstance(first, tuple) and isinstance(second, tuple)):
+        return None
+    if len(first) != 3 or len(second) != 3 or first[:2] != second[:2]:
+        return None
+    union = (first[2] | second[2]).bit_count()
+    if union == 0:
+        return None
+    return (first[2] & second[2]).bit_count() / union
+
+
+@dataclass(slots=True)
+class _ImageVetoShadow:
+    """Last emission seen by the shadow veto and whether text vanished since."""
+
+    signature: tuple[int, int, int] | None = None
+    emitted_at: float | None = None
+    text: str = ""
+    disappeared: bool = False
+
+    def observe(self, *, reason_code: str) -> None:
+        if reason_code == "confirmed_disappearance":
+            self.disappeared = True
+
+    def accepted(self, *, signature: object, now: float, text: str) -> str:
+        """Log suffix for an accepted line; then remember it as the last emission."""
+        iou = mask_signature_iou(signature, self.signature)
+        dt = None if self.emitted_at is None else max(0.0, now - self.emitted_at)
+        similarity = (
+            _phrase_metrics(self.text, text).char_similarity
+            if self.text and text
+            else None
+        )
+        would_block = (
+            iou is not None
+            and iou >= IMAGE_VETO_IOU_THRESHOLD
+            and dt is not None
+            and dt <= IMAGE_VETO_MAX_SECONDS
+            and not self.disappeared
+            and similarity is not None
+            and similarity >= IMAGE_VETO_MIN_TEXT_SIMILARITY
+        )
+        suffix = (
+            f" veto_iou={'none' if iou is None else f'{iou:.2f}'}"
+            f" veto_dt={'none' if dt is None else f'{dt:.1f}'}"
+            f" veto_text_similarity={'none' if similarity is None else f'{similarity:.2f}'}"
+            f" veto_disappeared={'yes' if self.disappeared else 'no'}"
+            f" veto_would_block={'yes' if would_block else 'no'}"
+            f" veto_threshold={IMAGE_VETO_IOU_THRESHOLD:.2f}"
+        )
+        self.signature = signature if isinstance(signature, tuple) else None
+        self.emitted_at = now
+        self.text = text
+        self.disappeared = False
+        return suffix
+
+
 def crop_frame(frame: CaptureFrame, region: object) -> CaptureFrame:
     channels_by_format = {
         "rgba8888": 4,
@@ -2881,6 +3013,7 @@ class NarratorPipeline:
         self._stabilizer = SubtitleRegionStabilizer()
         self._text_gate = SubtitleTextGate()
         self._deduplicator = PhraseDeduplicator()
+        self._veto_shadow: _ImageVetoShadow | None = None
         self._ocr_rejection_counts: dict[str, int] = {}
         # Per-session loss funnel. Bounded: one integer per known decision name.
         self._funnel: dict[str, int] = {}
@@ -3154,6 +3287,9 @@ class NarratorPipeline:
                 min_confidence=settings.ocr_min_confidence
             )
             self._deduplicator = PhraseDeduplicator()
+            self._veto_shadow = (
+                _ImageVetoShadow() if image_veto_shadow_enabled() else None
+            )
             self._ocr_rejection_counts = {}
             self._funnel = {}
             self._lost_strong_lines.clear()
@@ -3909,11 +4045,21 @@ class NarratorPipeline:
                 )
                 else logger.debug
             )
+            veto_suffix = ""
+            if self._veto_shadow is not None:
+                if final_decision == "accepted":
+                    veto_suffix = self._veto_shadow.accepted(
+                        signature=getattr(result, "preprocess_mask", None),
+                        now=now,
+                        text=str(phrase if isinstance(phrase, str) else canonical_text),
+                    )
+                else:
+                    self._veto_shadow.observe(reason_code=reason_code)
             ocr_log(
                 "Narrator OCR: raw=%r cleaned=%r similarity=%s decision=%s "
                 "confidence=%s quality=%s line_confidence=%s episode_id=%d "
                 "candidate_id=%d strong_votes=%d required_votes=%d canonical=%r "
-                "char_similarity=%s token_similarity=%s reason=%s%s",
+                "char_similarity=%s token_similarity=%s reason=%s%s%s",
                 observation.raw_text,
                 observation.filtered_text,
                 f"{line_similarity:.3f}" if line_similarity is not None else "none",
@@ -3950,6 +4096,7 @@ class NarratorPipeline:
                 ),
                 reason_code,
                 _preprocess_log_suffix(result),
+                veto_suffix,
             )
             # Loss funnel. Every observation is counted exactly once under the
             # decision the pipeline already assigned it, so no new vocabulary is
@@ -4311,6 +4458,7 @@ class NarratorPipeline:
         speech_text = sanitize_tts_text(spoken_text)
         if speech_text and not settings.read_speaker_names:
             speech_text = strip_speaker_label(speech_text)
+        speech_text = strip_stage_directions(speech_text)
         logger.debug(
             "Narrator TTS text filter phrase_id=%d removed_characters=%d",
             work_id,

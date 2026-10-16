@@ -118,9 +118,9 @@ def _reference_outline(pixels, width, height, threshold, dark, radius) -> bytes:
         ("outline", OCR_PREPROCESS_OUTLINE),
         (" Outline_Adaptive ", OCR_PREPROCESS_OUTLINE_ADAPTIVE),
         ("bright_mask", OCR_PREPROCESS_BRIGHT_MASK),
-        ("outline-adaptive", OCR_PREPROCESS_DEFAULT),
-        ("outlines", OCR_PREPROCESS_DEFAULT),
-        ("", OCR_PREPROCESS_DEFAULT),
+        ("outline-adaptive", None),
+        ("outlines", None),
+        ("", None),
     ],
 )
 def test_only_exact_values_enable_the_outline_modes(value, expected) -> None:

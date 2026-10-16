@@ -725,6 +725,9 @@ class AppController(QObject):
                 ),
             )
         self._narrator_pipeline = narrator_pipeline
+        self._apply_narrator_ocr_mode(
+            str(getattr(self._settings_model, "narrator_ocr_mode", "automatic"))
+        )
         capture_status = narrator_pipeline.capture.capabilities()
         self._narrator_component_manager.set_runtime_state(
             "capture.portal-pipewire",
@@ -3554,6 +3557,13 @@ class AppController(QObject):
         self, game: Game, options: OptimizationOptions
     ) -> str:
         return self._optimization_controller._provider_launch_preview(game, options)
+
+    def _apply_narrator_ocr_mode(self, mode: str) -> None:
+        """Pass the Narrator "OCR mode" setting to the OCR provider."""
+        pipeline = getattr(self, "_narrator_pipeline", None)
+        setter = getattr(getattr(pipeline, "ocr", None), "set_settings_mode", None)
+        if callable(setter):
+            setter(mode)
 
     @staticmethod
     def _apply_runtime_log_level(level_name: str) -> None:

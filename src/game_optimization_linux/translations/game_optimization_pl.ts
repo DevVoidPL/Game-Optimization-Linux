@@ -9243,6 +9243,22 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Przywróć dolny obszar</translation>
     </message>
     <message>
+        <source>OCR mode</source>
+        <translation>Tryb OCR</translation>
+    </message>
+    <message>
+        <source>Automatic separates outlined subtitles from bright backgrounds. Classic uses the previous image preparation.</source>
+        <translation>Automatyczny oddziela obrysowane napisy od jasnego tła. Klasyczny używa poprzedniego przygotowania obrazu.</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automatyczny</translation>
+    </message>
+    <message>
+        <source>Classic</source>
+        <translation>Klasyczny</translation>
+    </message>
+    <message>
         <source>Captured screen or window</source>
         <translation type="vanished">Przechwytywany ekran lub okno</translation>
     </message>

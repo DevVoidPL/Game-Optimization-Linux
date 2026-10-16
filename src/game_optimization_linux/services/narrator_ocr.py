@@ -46,10 +46,16 @@ OCR_EDGE_GARBAGE_MIN_CORE = 4
 OCR_MAX_PREPROCESSED_PIXELS = 4_000_000
 OCR_CONTRAST_TILE_WIDTH = 96
 OCR_CONTRAST_TILE_HEIGHT = 64
-# Experimental, opt-in preprocessing. Unset or any other value keeps the
-# default path byte-for-byte unchanged.
+# OCR preprocessing. Without the env the Narrator setting decides:
+# "automatic" -> outline_adaptive (Beta default), "classic" -> the pre-Beta
+# image ("default" in logs). The env overrides the setting for diagnostics;
+# "classic" (or "default") restores the old behaviour. Unknown values are
+# ignored with a warning.
 OCR_PREPROCESS_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_PREPROCESS"
 OCR_PREPROCESS_DEFAULT = "default"
+OCR_PREPROCESS_CLASSIC = "classic"
+OCR_SETTINGS_MODE_AUTOMATIC = "automatic"
+OCR_SETTINGS_MODE_CLASSIC = "classic"
 OCR_PREPROCESS_BRIGHT_MASK = "bright_mask"
 # Bright-text mask: after local contrast, pixels >= threshold become white text
 # on black. Offline validation (Hogwarts Legacy, 2026-10-15) found a plateau at
@@ -78,6 +84,10 @@ OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD = 220
 OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION = 0.15
 OCR_OUTLINE_DARK_LEVEL = 110
 OCR_OUTLINE_RADIUS = 2
+# Image veto, shadow mode (log only): with this env set to 1 the outline modes
+# also return a pooled mask signature of the OCR'd frame. Read by the pipeline.
+IMAGE_VETO_SHADOW_ENV = "GAME_OPTIMIZATION_NARRATOR_IMAGE_VETO_SHADOW"
+OCR_MASK_SIGNATURE_BLOCK = 4
 _OCR_OPT_IN_PREPROCESS_MODES = (
     OCR_PREPROCESS_BRIGHT_MASK,
     OCR_PREPROCESS_OUTLINE,
@@ -126,6 +136,12 @@ class _PreparedOcrImage(NamedTuple):
     # Adaptive outline only: "yes" when the bright-background threshold was
     # used, "no" otherwise; "" for every other mode.
     switched: str = ""
+    # Image-veto shadow mode only (see IMAGE_VETO_SHADOW_ENV).
+    mask_signature: tuple[int, int, int] | None = None
+
+
+def image_veto_shadow_enabled() -> bool:
+    return os.environ.get(IMAGE_VETO_SHADOW_ENV, "").strip() == "1"
 
 
 class OcrWorker(Protocol):
@@ -399,40 +415,27 @@ class TesseractOcrProvider:
         self._explicit_executable = str(executable) if executable is not None else ""
         self._runner = runner
         self._worker_factory = worker_factory
-        self._preprocess_mode = self._resolve_preprocess_mode(
-            os.environ.get(OCR_PREPROCESS_ENV, "")
-            if preprocess_mode is None
-            else preprocess_mode
-        )
-        if self._preprocess_mode == OCR_PREPROCESS_BRIGHT_MASK:
-            logger.info(
-                "Narrator OCR preprocess mode=%s threshold=%d "
-                "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
-                self._preprocess_mode,
-                OCR_BRIGHT_MASK_THRESHOLD,
-                OCR_BRIGHT_MASK_MAX_FRACTION,
-                OCR_BRIGHT_MASK_MIN_FRACTION,
+        # Explicit argument (tests/tools) > env (diagnostics) > Narrator setting.
+        self._settings_ocr_mode = OCR_SETTINGS_MODE_AUTOMATIC
+        if preprocess_mode is not None:
+            self._preprocess_override = (
+                self._resolve_preprocess_mode(preprocess_mode)
+                or OCR_PREPROCESS_DEFAULT
             )
-        elif self._preprocess_mode != OCR_PREPROCESS_DEFAULT:
-            adaptive = self._preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE
-            logger.info(
-                "Narrator OCR preprocess mode=%s threshold=%d dark_level=%d "
-                "radius=%d bright_background_threshold=%s "
-                "bright_background_fraction=%s "
-                "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
-                self._preprocess_mode,
-                OCR_OUTLINE_THRESHOLD,
-                OCR_OUTLINE_DARK_LEVEL,
-                OCR_OUTLINE_RADIUS,
-                OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD if adaptive else "none",
-                (
-                    f"{OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION:.3f}"
-                    if adaptive
-                    else "none"
-                ),
-                OCR_BRIGHT_MASK_MAX_FRACTION,
-                OCR_BRIGHT_MASK_MIN_FRACTION,
-            )
+            self._preprocess_source = "argument"
+        else:
+            env_value = os.environ.get(OCR_PREPROCESS_ENV, "")
+            self._preprocess_override = self._resolve_preprocess_mode(env_value)
+            self._preprocess_source = "env" if self._preprocess_override else "settings"
+            if env_value.strip() and self._preprocess_override is None:
+                logger.warning(
+                    "Ignoring unknown %s=%r; using the Narrator setting",
+                    OCR_PREPROCESS_ENV,
+                    env_value,
+                )
+        self._preprocess_mode = self._effective_preprocess_mode()
+        self._log_preprocess_mode()
+        self._mask_signature_enabled = image_veto_shadow_enabled()
         self._persistent_worker_enabled = (
             runner is subprocess.run
             if persistent_worker_enabled is None
@@ -680,6 +683,7 @@ class TesseractOcrProvider:
             preprocess_bright_fraction=prepared.bright_fraction,
             preprocess_threshold=prepared.threshold,
             preprocess_switched=prepared.switched,
+            preprocess_mask=prepared.mask_signature,
             leading_low_quality_tokens=quality["leading_low_quality_tokens"],
             trailing_low_quality_tokens=quality["trailing_low_quality_tokens"],
         )
@@ -979,12 +983,75 @@ class TesseractOcrProvider:
         )
 
     @staticmethod
-    def _resolve_preprocess_mode(value: str) -> str:
-        """Only an exact opt-in value enables an experimental path."""
+    def _resolve_preprocess_mode(value: str) -> str | None:
+        """Exact mode name -> internal mode; anything else -> None."""
         normalized = value.strip().casefold()
+        if normalized in (OCR_PREPROCESS_CLASSIC, OCR_PREPROCESS_DEFAULT):
+            return OCR_PREPROCESS_DEFAULT
         if normalized in _OCR_OPT_IN_PREPROCESS_MODES:
             return normalized
-        return OCR_PREPROCESS_DEFAULT
+        return None
+
+    def _effective_preprocess_mode(self) -> str:
+        if self._preprocess_override is not None:
+            return self._preprocess_override
+        if self._settings_ocr_mode == OCR_SETTINGS_MODE_CLASSIC:
+            return OCR_PREPROCESS_DEFAULT
+        return OCR_PREPROCESS_OUTLINE_ADAPTIVE
+
+    def set_settings_mode(self, mode: str) -> None:
+        """Apply the Narrator "OCR mode" setting (automatic / classic).
+
+        The env (or an explicit constructor argument) keeps priority; the
+        setting is still remembered so removing the override is consistent.
+        """
+        normalized = str(mode).strip().casefold()
+        if normalized not in (OCR_SETTINGS_MODE_AUTOMATIC, OCR_SETTINGS_MODE_CLASSIC):
+            normalized = OCR_SETTINGS_MODE_AUTOMATIC
+        changed = normalized != self._settings_ocr_mode
+        self._settings_ocr_mode = normalized
+        effective = self._effective_preprocess_mode()
+        if effective != self._preprocess_mode or changed:
+            self._preprocess_mode = effective
+            self._log_preprocess_mode()
+
+    def _log_preprocess_mode(self) -> None:
+        mode = self._preprocess_mode
+        logger.info(
+            "Narrator OCR preprocess selected mode=%s source=%s setting=%s",
+            mode,
+            self._preprocess_source,
+            self._settings_ocr_mode,
+        )
+        if mode == OCR_PREPROCESS_BRIGHT_MASK:
+            logger.info(
+                "Narrator OCR preprocess mode=%s threshold=%d "
+                "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
+                mode,
+                OCR_BRIGHT_MASK_THRESHOLD,
+                OCR_BRIGHT_MASK_MAX_FRACTION,
+                OCR_BRIGHT_MASK_MIN_FRACTION,
+            )
+        elif mode != OCR_PREPROCESS_DEFAULT:
+            adaptive = mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE
+            logger.info(
+                "Narrator OCR preprocess mode=%s threshold=%d dark_level=%d "
+                "radius=%d bright_background_threshold=%s "
+                "bright_background_fraction=%s "
+                "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
+                mode,
+                OCR_OUTLINE_THRESHOLD,
+                OCR_OUTLINE_DARK_LEVEL,
+                OCR_OUTLINE_RADIUS,
+                OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD if adaptive else "none",
+                (
+                    f"{OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION:.3f}"
+                    if adaptive
+                    else "none"
+                ),
+                OCR_BRIGHT_MASK_MAX_FRACTION,
+                OCR_BRIGHT_MASK_MIN_FRACTION,
+            )
 
     @property
     def preprocess_mode(self) -> str:
@@ -1008,6 +1075,7 @@ class TesseractOcrProvider:
             return self._preprocess_outline(
                 frame,
                 adaptive=self._preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE,
+                signature=getattr(self, "_mask_signature_enabled", False),
             )
         return _PreparedOcrImage(
             self._preprocess_frame(frame), OCR_PREPROCESS_DEFAULT, ""
@@ -1015,7 +1083,7 @@ class TesseractOcrProvider:
 
     @classmethod
     def _preprocess_outline(
-        cls, frame: CaptureFrame, *, adaptive: bool
+        cls, frame: CaptureFrame, *, adaptive: bool, signature: bool = False
     ) -> _PreparedOcrImage:
         """Bright glyphs next to a dark outline as white on black.
 
@@ -1051,15 +1119,16 @@ class TesseractOcrProvider:
         if adaptive and bright_fraction > OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION:
             threshold = OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD
             switched_label = "yes"
+        mask = cls._outline_mask(
+            pixels,
+            width,
+            height,
+            threshold=threshold,
+            dark_level=OCR_OUTLINE_DARK_LEVEL,
+            radius=OCR_OUTLINE_RADIUS,
+        )
         masked = QImage(
-            cls._outline_mask(
-                pixels,
-                width,
-                height,
-                threshold=threshold,
-                dark_level=OCR_OUTLINE_DARK_LEVEL,
-                radius=OCR_OUTLINE_RADIUS,
-            ),
+            mask,
             width,
             height,
             width,
@@ -1072,7 +1141,32 @@ class TesseractOcrProvider:
             bright_fraction,
             threshold,
             switched_label,
+            cls._mask_signature(mask, width, height) if signature else None,
         )
+
+    @staticmethod
+    def _mask_signature(
+        mask: bytes, width: int, height: int, block: int = OCR_MASK_SIGNATURE_BLOCK
+    ) -> tuple[int, int, int]:
+        """Pool a 0/255 mask to ``block``-square cells (any text pixel -> 1).
+
+        Partial blocks at the right/bottom edge are dropped. Returns
+        (columns, rows, bits) with row-major bits, first cell = highest bit.
+        """
+        columns = width // block
+        rows = height // block
+        empty = bytes(block)
+        bits = 0
+        for row in range(rows):
+            combined = 0
+            for line in range(row * block, row * block + block):
+                combined |= int.from_bytes(mask[line * width : line * width + width], "big")
+            line_bytes = combined.to_bytes(width, "big")
+            for column in range(columns):
+                bits = (bits << 1) | (
+                    line_bytes[column * block : column * block + block] != empty
+                )
+        return columns, rows, bits
 
     @staticmethod
     def _bright_fraction(pixels: bytes) -> float:

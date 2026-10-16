@@ -11,6 +11,7 @@ from game_optimization_linux.models.narrator import NarratorGameSettings
 from game_optimization_linux.services.narrator_pipeline import (
     sanitize_tts_text,
     strip_speaker_label,
+    strip_stage_directions,
 )
 from test_narrator_behavior_contract import ContractReplay
 
@@ -117,3 +118,117 @@ def test_pipeline_skips_synthesis_when_filter_leaves_no_words(
         assert history[-1].tts_submitted is False
     finally:
         replay.close()
+
+
+def _speech(raw: str, *, read_names: bool = False) -> str:
+    """The same order as NarratorPipeline._start_tts."""
+    value = sanitize_tts_text(raw)
+    if value and not read_names:
+        value = strip_speaker_label(value)
+    return strip_stage_directions(value)
+
+
+# Cases recorded in the private state file (round 7, 2026-10-15).
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("(rozbija okno)", ""),
+        ("(ciężkie oddychanie)", ""),
+        ("(rozbija okno) Uciekaj!", "Uciekaj!"),
+        ("Uciekaj! (rozbija okno)", "Uciekaj!"),
+        ("Uciekaj (rozbija okno), szybko!", "Uciekaj, szybko!"),
+        ("Tak (śmiech). Dobra.", "Tak. Dobra."),
+        ("Batman: (cicho) Idziemy.", "Idziemy."),
+        ("(śmiech) Tak. (kaszel) Nie.", "Tak. Nie."),
+        ("(głośno (bardzo)) Stój!", "Stój!"),
+        ("Uciekaj! (rozbija\nokno) Teraz.", "Uciekaj! Teraz."),
+        ("Profesor Fig: (ciężkie oddychanie)", ""),
+        ("Przepraszam? Goblin bankier: (chrapanie)", "Przepraszam?"),
+        # A complete pair is removed even when it was spoken: chosen rule.
+        ("To (i to bardzo) ważne.", "To ważne."),
+    ],
+)
+def test_complete_bracket_pairs_are_not_spoken(raw: str, expected: str) -> None:
+    assert _speech(raw) == expected
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # Unclosed or lone brackets never remove the rest of the line.
+        ("(rozbija okno Uciekaj!", "rozbija okno Uciekaj!"),
+        ("Uciekaj) teraz", "Uciekaj teraz"),
+        ("Uciekaj! (rozbija okno", "Uciekaj! rozbija okno"),
+        # OCR look-alikes are not treated as brackets.
+        ("[rozbija okno] Uciekaj!", "rozbija okno Uciekaj!"),
+        ("{rozbija okno} Uciekaj!", "rozbija okno Uciekaj!"),
+        ("l) Uciekaj!", "l Uciekaj!"),
+        ("1) Pierwsza sprawa.", "1 Pierwsza sprawa."),
+    ],
+)
+def test_unbalanced_or_lookalike_brackets_keep_the_line(raw: str, expected: str) -> None:
+    assert _speech(raw) == expected
+
+
+def test_bracket_filter_with_speaker_names_read_aloud() -> None:
+    assert _speech("Batman: (cicho) Idziemy.", read_names=True) == "Batman: Idziemy."
+    assert _speech("Profesor Fig: (ciężkie oddychanie)", read_names=True) == ""
+    assert _speech("Przepraszam? Goblin bankier: (chrapanie)", read_names=True) == (
+        "Przepraszam?"
+    )
+
+
+def test_text_without_brackets_is_unchanged_by_the_bracket_filter() -> None:
+    for text in ("Dobra, jedziemy dalej.", "O 12:30 w barze", "Policjant: ."):
+        assert strip_stage_directions(text) == text
+
+
+def test_pipeline_does_not_synthesize_a_pure_stage_direction(tmp_path: Path) -> None:
+    replay = ContractReplay(tmp_path)
+    try:
+        for _ in range(2):
+            replay.observe("(rozbija okno)")
+        assert replay.tts.values == []
+        history = replay.pipeline.snapshot.ocr_decision_history
+        assert history[-1].decision == "accepted_tts_empty_after_filter"
+        assert history[-1].tts_submitted is False
+    finally:
+        replay.close()
+
+
+def test_pipeline_speaks_the_line_without_its_stage_direction(tmp_path: Path) -> None:
+    replay = ContractReplay(tmp_path)
+    try:
+        for _ in range(2):
+            replay.observe("Batman: (cicho) Idziemy.")
+        assert replay.tts.values == ["Idziemy."]
+        assert replay.pipeline.snapshot.last_accepted_ocr_text == (
+            "Batman: (cicho) Idziemy."
+        )
+    finally:
+        replay.close()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # Lower-case name connectors inside a label at the start of a line.
+        ("Strach na Wróble: Mam plan.", "Mam plan."),
+        ("Strach na Wróble: (śmiech) Mam plan.", "(śmiech) Mam plan."),
+        ("Pan z banku: Dzień dobry.", "Dzień dobry."),
+        ("Profesor Weasley: Tego, czego się spodziewasz.", "Tego, czego się spodziewasz."),
+        # Chosen: a two-word capitalised prefix is a label; the objective
+        # itself ("Znajdź klucz.") is still read.
+        ("Cel misji: Znajdź klucz.", "Znajdź klucz."),
+        # Sentence words are not connectors; a connector never ends a label.
+        ("Udaj się do: Paleto Bay.", "Udaj się do: Paleto Bay."),
+        ("Idź do domu: Teraz.", "Idź do domu: Teraz."),
+        ("Strach na: Mam plan.", "Strach na: Mam plan."),
+        ("na Wróble: Mam plan.", "na Wróble: Mam plan."),
+        # Not widened in the middle of the text.
+        ("Przepraszam? Strach na Wróble: Mam plan.", "Przepraszam? Strach na Wróble: Mam plan."),
+        ("Przepraszam? Goblin bankier: Śpię.", "Przepraszam? Śpię."),
+    ],
+)
+def test_speaker_labels_with_connectors_only_at_line_start(raw: str, expected: str) -> None:
+    assert strip_speaker_label(raw) == expected

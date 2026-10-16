@@ -54,6 +54,8 @@ class SettingsController:
             self._app.themeModeChanged.emit()
         if field_name == "log_level":
             self._app._apply_runtime_log_level(str(qml_value(converted_value)))
+        elif field_name == "narrator_ocr_mode":
+            self._app._apply_narrator_ocr_mode(str(converted_value))
         elif field_name == "steam_installation_directories" and not self._app._demo_mode:
             setter = getattr(self._app._game_provider, "set_additional_roots", None)
             try:
@@ -180,6 +182,7 @@ class SettingsController:
             "couchMusicEnabled": "couch_music_enabled",
             "couchMusicVolume": "couch_music_volume",
             "couchMotionMode": "couch_motion_mode",
+            "narratorOcrMode": "narrator_ocr_mode",
         }
         requested = aliases.get(key, key)
         if not is_dataclass(self._app._settings_model):

@@ -9205,6 +9205,22 @@ Continúe solo después de revisar este riesgo.</translation>
         <translation>Restablecer al área inferior</translation>
     </message>
     <message>
+        <source>OCR mode</source>
+        <translation>Modo OCR</translation>
+    </message>
+    <message>
+        <source>Automatic separates outlined subtitles from bright backgrounds. Classic uses the previous image preparation.</source>
+        <translation>Automático separa los subtítulos con contorno de los fondos claros. Clásico usa la preparación de imagen anterior.</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automático</translation>
+    </message>
+    <message>
+        <source>Classic</source>
+        <translation>Clásico</translation>
+    </message>
+    <message>
         <source>Captured screen or window</source>
         <translation type="vanished">Pantalla o ventana capturada</translation>
     </message>

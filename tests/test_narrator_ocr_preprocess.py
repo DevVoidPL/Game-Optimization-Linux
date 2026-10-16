@@ -15,6 +15,7 @@ from game_optimization_linux.services.narrator_ocr import (
     OCR_PREPROCESS_BRIGHT_MASK,
     OCR_PREPROCESS_DEFAULT,
     OCR_PREPROCESS_ENV,
+    OCR_PREPROCESS_OUTLINE_ADAPTIVE,
     OCR_UPSCALE_FACTOR,
     TESSERACT_COMPONENT_ID,
     TESSERACT_MODEL_RELATIVE_PATH,
@@ -82,10 +83,12 @@ def _provider(tmp_path: Path, mode: str | None = None, sink: list | None = None)
 @pytest.mark.parametrize(
     ("value", "expected"),
     [
-        ("", OCR_PREPROCESS_DEFAULT),
-        ("0", OCR_PREPROCESS_DEFAULT),
+        ("", None),
+        ("0", None),
+        ("bright", None),
         ("default", OCR_PREPROCESS_DEFAULT),
-        ("bright", OCR_PREPROCESS_DEFAULT),
+        ("classic", OCR_PREPROCESS_DEFAULT),
+        (" Classic ", OCR_PREPROCESS_DEFAULT),
         ("bright_mask", OCR_PREPROCESS_BRIGHT_MASK),
         (" BRIGHT_MASK ", OCR_PREPROCESS_BRIGHT_MASK),
     ],
@@ -94,26 +97,76 @@ def test_only_the_exact_opt_in_value_enables_the_mask(value, expected) -> None:
     assert TesseractOcrProvider._resolve_preprocess_mode(value) == expected
 
 
-def test_mode_is_default_without_env_and_read_from_env(
+def test_without_env_the_setting_decides_and_defaults_to_outline_adaptive(
     tmp_path: Path, monkeypatch, caplog
 ) -> None:
     monkeypatch.delenv(OCR_PREPROCESS_ENV, raising=False)
     with caplog.at_level(logging.INFO):
-        assert _provider(tmp_path).preprocess_mode == OCR_PREPROCESS_DEFAULT
-    assert "Narrator OCR preprocess mode" not in caplog.text
+        provider = _provider(tmp_path)
+    assert provider.preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE
+    assert (
+        "Narrator OCR preprocess selected mode=outline_adaptive source=settings "
+        "setting=automatic"
+    ) in caplog.text
+    provider.set_settings_mode("classic")
+    assert provider.preprocess_mode == OCR_PREPROCESS_DEFAULT
+    provider.set_settings_mode("automatic")
+    assert provider.preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE
+    provider.set_settings_mode("nonsense")
+    assert provider.preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE
 
+
+@pytest.mark.parametrize(
+    ("env", "expected"),
+    [
+        ("classic", OCR_PREPROCESS_DEFAULT),
+        ("bright_mask", OCR_PREPROCESS_BRIGHT_MASK),
+        ("outline_adaptive", OCR_PREPROCESS_OUTLINE_ADAPTIVE),
+    ],
+)
+def test_env_overrides_the_setting(tmp_path: Path, monkeypatch, env, expected) -> None:
+    monkeypatch.setenv(OCR_PREPROCESS_ENV, env)
+    provider = _provider(tmp_path)
+    assert provider.preprocess_mode == expected
+    for setting in ("classic", "automatic"):
+        provider.set_settings_mode(setting)
+        assert provider.preprocess_mode == expected
+
+
+def test_unknown_env_value_is_ignored_with_a_warning(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
+    monkeypatch.setenv(OCR_PREPROCESS_ENV, "bright")
+    with caplog.at_level(logging.WARNING):
+        provider = _provider(tmp_path)
+    assert provider.preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE
+    assert "Ignoring unknown GAME_OPTIMIZATION_NARRATOR_OCR_PREPROCESS" in caplog.text
+
+
+def test_bright_mask_env_logs_its_unchanged_parameter_line(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
     monkeypatch.setenv(OCR_PREPROCESS_ENV, "bright_mask")
     with caplog.at_level(logging.INFO):
         assert _provider(tmp_path).preprocess_mode == OCR_PREPROCESS_BRIGHT_MASK
-    assert "Narrator OCR preprocess mode=bright_mask" in caplog.text
+    assert (
+        "Narrator OCR preprocess mode=bright_mask threshold=190 "
+        "fallback_max_fraction=0.350 fallback_min_fraction=0.003"
+    ) in caplog.text
 
 
-def test_without_env_the_ocr_image_is_the_unchanged_default(
-    tmp_path: Path, monkeypatch
+@pytest.mark.parametrize("how", ["env", "setting"])
+def test_classic_ocr_image_is_the_unchanged_default(
+    tmp_path: Path, monkeypatch, how
 ) -> None:
-    monkeypatch.delenv(OCR_PREPROCESS_ENV, raising=False)
+    if how == "env":
+        monkeypatch.setenv(OCR_PREPROCESS_ENV, "classic")
+    else:
+        monkeypatch.delenv(OCR_PREPROCESS_ENV, raising=False)
     sent: list[QImage] = []
     provider = _provider(tmp_path, sink=sent)
+    if how == "setting":
+        provider.set_settings_mode("classic")
     for frame in (_subtitle_on_texture(), _uniform(240), _uniform(0)):
         image, used, fallback = provider._prepare_ocr_image(frame)
         expected = TesseractOcrProvider._preprocess_frame(frame)
@@ -121,6 +174,7 @@ def test_without_env_the_ocr_image_is_the_unchanged_default(
         assert image == expected
         result = provider.recognize(frame, language="en")
         assert (result.preprocess, result.preprocess_fallback) == ("default", "")
+        assert _preprocess_log_suffix(result) == ""
         assert sent[-1] == expected
 
 
