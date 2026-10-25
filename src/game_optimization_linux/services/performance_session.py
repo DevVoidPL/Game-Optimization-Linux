@@ -20,6 +20,13 @@ from game_optimization_linux.models import (
 RUNNER_HANDSHAKE_TIMEOUT_SECONDS = 120
 RUNNER_HEARTBEAT_STALE_SECONDS = 30
 LEGACY_RECORDING_STALE_SECONDS = 6 * 60 * 60
+# A launcher (Heroic) may sync saves, check updates or prepare the prefix
+# before the game process appears.
+LAUNCHER_START_TIMEOUT_SECONDS = 300
+ACTIVE_SESSION_STATUSES = frozenset({
+    "waiting_for_steam", "waiting_for_runner", "waiting_for_launcher",
+    "recording", "waiting_for_game_exit", "processing",
+})
 
 
 class BaselineSessionRepository:
@@ -34,28 +41,40 @@ class BaselineSessionRepository:
         kind: str = "baseline",
         expected_runner_path: str = "",
         expected_runner_hash: str = "",
+        launcher: str = "",
+        output_root: Path | None = None,
     ) -> BaselineSession:
+        """New measurement session.
+
+        ``launcher`` marks a session whose game is started by that launcher
+        (no runner handshake). ``output_root`` places the MangoHud config and
+        log folder where that launcher's sandbox can read and write them; the
+        session record itself always stays in this repository.
+        """
         key = validate_game_key(app_id)
         current = self.load(key)
-        if current is not None and current.status in {
-            "waiting_for_steam", "waiting_for_runner", "recording",
-            "waiting_for_game_exit", "processing",
-        }:
+        if current is not None and current.status in ACTIVE_SESSION_STATUSES:
             raise ValueError("A baseline recording is already active for this game")
         if kind not in {"baseline", "comparison"}:
             raise ValueError("Unsupported measurement session kind")
+        if output_root is not None and not launcher:
+            raise ValueError("A separate measurement folder is only used for launcher sessions")
         session_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ-") + uuid4().hex[:10]
         directory = self.root / key / session_id
-        logs = directory / "logs"
-        logs.mkdir(parents=True, mode=0o700)
-        config = directory / "MangoHud-baseline.conf"
+        directory.mkdir(parents=True, mode=0o700)
+        output = directory if output_root is None else Path(output_root) / key / session_id
+        if output_root is not None and not output.is_absolute():
+            raise ValueError("The launcher measurement folder must be absolute")
+        logs = output / "logs"
+        logs.mkdir(parents=True, mode=0o700, exist_ok=output_root is None)
+        config = output / "MangoHud-baseline.conf"
         config.write_text(self._config(logs), encoding="utf-8")
         os.chmod(config, 0o600)
         session = BaselineSession(
             session_id,
             key,
             str(game_id),
-            "waiting_for_steam",
+            "waiting_for_launcher" if launcher else "waiting_for_steam",
             directory,
             config,
             logs,
@@ -63,7 +82,10 @@ class BaselineSessionRepository:
             kind=kind,
             expected_runner_path=str(expected_runner_path),
             expected_runner_hash=str(expected_runner_hash),
-            handshake_timeout_seconds=RUNNER_HANDSHAKE_TIMEOUT_SECONDS,
+            handshake_timeout_seconds=(
+                LAUNCHER_START_TIMEOUT_SECONDS if launcher else RUNNER_HANDSHAKE_TIMEOUT_SECONDS
+            ),
+            launcher=str(launcher),
         )
         self._save(session)
         return session
@@ -80,6 +102,10 @@ class BaselineSessionRepository:
         session = self.load(app_id)
         if session is None:
             return None, "no baseline session exists for this AppID"
+        if session.launcher:
+            # Started and observed through the launcher; the Steam runner
+            # never owns it.
+            return None, f"the session is recorded through {session.launcher}"
         if session.status not in {
             "waiting_for_steam", "waiting_for_runner", "recording",
             "waiting_for_game_exit",
@@ -131,6 +157,79 @@ class BaselineSessionRepository:
         )
         self._save(claimed)
         return claimed, "claimed"
+
+    # -- launcher sessions (Heroic starts the game; GameOpti observes it) ------
+    def mark_launcher_started(
+        self, app_id: object, session_id: str, launch_result: str
+    ) -> BaselineSession | None:
+        session = self.load(app_id)
+        if session is None or session.id != session_id or session.status != "waiting_for_launcher":
+            return session
+        updated = replace(
+            session,
+            steam_launch_result=str(launch_result),
+            lifecycle_reason=f"{session.launcher} was started; waiting for the game process",
+        )
+        self._save(updated)
+        return updated
+
+    def mark_launcher_game_running(
+        self, app_id: object, session_id: str, process: str
+    ) -> BaselineSession | None:
+        """The game's own process was seen: recording runs (or still runs)."""
+        session = self.load(app_id)
+        if session is None or session.id != session_id or not session.launcher:
+            return session
+        now = datetime.now(UTC)
+        if session.status == "waiting_for_launcher":
+            updated = replace(
+                session,
+                status="recording",
+                started_at=now,
+                handshake_at=now,
+                observed_processes=(str(process)[:300],),
+                lifecycle_reason="Game process detected; MangoHud records until the game exits",
+                last_heartbeat_at=now,
+            )
+        elif session.status in {"recording", "waiting_for_game_exit"}:
+            updated = replace(session, last_heartbeat_at=now)
+        else:
+            return session
+        self._save(updated)
+        return updated
+
+    def finish_launcher_session(
+        self, app_id: object, session_id: str
+    ) -> BaselineSession | None:
+        """The game process ended: hand a real log to analysis or fail."""
+        session = self.load(app_id)
+        if (
+            session is None
+            or session.id != session_id
+            or not session.launcher
+            or session.status not in {"recording", "waiting_for_game_exit"}
+        ):
+            return session
+        now = datetime.now(UTC)
+        if self.newest_log(app_id) is None:
+            reason = (
+                "The game ran, but MangoHud did not write a log; check that MangoHud is "
+                f"available in {session.launcher} and that the game uses Vulkan, DXVK or VKD3D"
+            )
+            updated = replace(
+                session, status="failed", finished_at=now, error=reason, lifecycle_reason=reason,
+                observed_processes=("state=exited",),
+            )
+        else:
+            updated = replace(
+                session,
+                status="processing",
+                finished_at=now,
+                observed_processes=("state=exited",),
+                lifecycle_reason="Game exited; the MangoHud log is ready for processing",
+            )
+        self._save(updated)
+        return updated
 
     def mark_steam_launched(
         self, app_id: object, session_id: str, launch_result: str
@@ -269,7 +368,10 @@ class BaselineSessionRepository:
                 session = self.load(directory.name)
             except ValueError:
                 continue
-            if session is None:
+            if session is None or session.launcher:
+                # Launcher sessions have no runner heartbeat; the controller
+                # resumes observing the game process and applies its own
+                # start timeout.
                 continue
             reason = ""
             if session.status in {"waiting_for_steam", "waiting_for_runner"}:
@@ -445,6 +547,7 @@ class BaselineSessionRepository:
             str(raw.get("expectedRunnerPath") or ""),
             str(raw.get("expectedRunnerHash") or ""),
             int(raw.get("handshakeTimeoutSeconds") or RUNNER_HANDSHAKE_TIMEOUT_SECONDS),
+            str(raw.get("launcher") or ""),
         )
 
     def save_measurement(
@@ -591,6 +694,8 @@ class BaselineSessionRepository:
 
 
 __all__ = [
+    "ACTIVE_SESSION_STATUSES",
     "BaselineSessionRepository",
+    "LAUNCHER_START_TIMEOUT_SECONDS",
     "RUNNER_HANDSHAKE_TIMEOUT_SECONDS",
 ]

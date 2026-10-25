@@ -1073,6 +1073,54 @@ def test_completed_baseline_allows_a_second_recording(
     assert launches == [game.id]
 
 
+def test_lutris_game_baseline_is_rejected_with_clear_reason_not_steam_appid(
+    tmp_path: Path,
+) -> None:
+    """No "positive decimal Steam AppID" error and no launch for Lutris; the
+    limitation and the import path are named."""
+
+    launcher = Launcher.LUTRIS
+    sessions = BaselineSessionRepository(tmp_path / "sessions")
+    controller, steam_game, launches = _baseline_controller(tmp_path, sessions)
+    game = replace(
+        steam_game,
+        id="lutris-42",
+        launcher=launcher,
+        steam_app_id=None,
+        data_source=launcher.value,
+    )
+    controller._app._resolve_game = lambda game_id, show_error=False: (
+        game if game_id == game.id else None
+    )
+
+    result = controller.recordOptimizationBaseline(game.id)
+
+    assert result["success"] is False
+    assert result["code"] == "launcher_measurement_unsupported"
+    assert "Steam AppID" not in result["error"]
+    assert "Import MangoHud log" in result["error"]
+    assert launches == []
+    assert sessions.load(game.profile_key) is None
+
+
+def test_launcher_game_can_import_a_mangohud_log(tmp_path: Path) -> None:
+    sessions = BaselineSessionRepository(tmp_path / "sessions")
+    log = _mangohud_log(tmp_path / "hogwarts.csv")
+    game = replace(
+        _game(tmp_path / "game"),
+        id="heroic-legendary-fa4240e57a3c46b39f169041b7811293",
+        launcher=Launcher.HEROIC,
+        steam_app_id=None,
+        data_source="Heroic",
+    )
+
+    session = sessions.import_log(game.profile_key, game.id, log)
+
+    assert session.status == "processing"
+    assert sessions.newest_log(game.profile_key) is not None
+
+
+
 def test_gamescope_profile_does_not_silently_block_baseline_start(
     tmp_path: Path,
 ) -> None:

@@ -269,6 +269,7 @@ modules:
       - install -Dm644 data/io.github.DevVoidPL.GameOptimizationLinux.desktop ${FLATPAK_DEST}/share/applications/io.github.DevVoidPL.GameOptimizationLinux.desktop
       - install -Dm644 data/io.github.DevVoidPL.GameOptimizationLinux.metainfo.xml ${FLATPAK_DEST}/share/metainfo/io.github.DevVoidPL.GameOptimizationLinux.metainfo.xml
       - install -Dm644 docs/narrator-components.md ${FLATPAK_DEST}/share/doc/game-optimization-linux/narrator-components.md
+      - install -Dm644 docs/frame-generation.md ${FLATPAK_DEST}/share/doc/game-optimization-linux/frame-generation.md
       - install -Dm755 scripts/install-game-optimization-runner.sh ${FLATPAK_DEST}/bin/game-optimization-install-runner
       - install -Dm755 libexec/game-optimization-run-host ${FLATPAK_DEST}/libexec/game-optimization-run-host
       - install -Dm644 src/game_optimization_linux/assets/branding/game-optimization-linux-app-icon.svg ${FLATPAK_DEST}/share/icons/hicolor/scalable/apps/io.github.DevVoidPL.GameOptimizationLinux.svg
@@ -283,16 +284,18 @@ modules:
       - type: dir
         path: ..
         skip:
-          - .git
-          - .venv
-          - .pytest_cache
+          - .*
+          - AGENTS.md
+          - CLAUDE.md
+          - GEMINI.md
+          - prompts
+          - sessions
           - .flatpak-builder
           - .flatpak-build-*
           - .flatpak-repo-*
           - build
           - build-flatpak
           - dist
-          - GrafikiProgramu
           - reports
           - tests
           - '*.egg-info'

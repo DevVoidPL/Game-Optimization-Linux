@@ -18,6 +18,57 @@ from game_optimization_linux.services import (
 )
 
 
+def test_game_modules_are_read_only_and_filter_process_identity() -> None:
+    calls = []
+
+    def runner(argv, **kwargs):
+        calls.append(argv)
+        assert kwargs["shell"] is False
+        if argv[2] == "ps":
+            return subprocess.CompletedProcess(argv, 0,
+                "4321 JediSurvivor.ex\n4322 EASteamProxy.ex\nBAD JediSurvivor.ex\n", "")
+        assert argv[2:] == ["cat", "/proc/4321/maps"]
+        return subprocess.CompletedProcess(argv, 0,
+            "1000-2000 r--p 0 00:00 1 /game with spaces/dlss-enabler.dll\n", "")
+
+    client = HostServiceClient(environment={"FLATPAK_ID": "app"}, command_runner=runner)
+    observed = client.game_process_modules("JediSurvivor.exe")
+    assert observed == ({"processId": 4321,
+                         "modules": ["/game with spaces/dlss-enabler.dll"]},)
+    with pytest.raises(HostServiceError):
+        client.game_process_modules("../../etc/passwd")
+    assert len(calls) == 2
+
+
+def test_large_wine_module_map_does_not_hide_the_post_processing_layer() -> None:
+    def runner(argv, **kwargs):
+        if argv[2] == "ps":
+            return subprocess.CompletedProcess(argv, 0, "123 GTA5_Enhanced.e\n", "")
+        text = "1000-2000 rw-p 0 00:00 0\n" * 20000
+        text += "2000-3000 r-xp 0 00:00 1 /games/GTA/.gameopti-post-processing/libvkbasalt.so\n"
+        return subprocess.CompletedProcess(argv, 0, text, "")
+    client = HostServiceClient(environment={"FLATPAK_ID": "app"}, command_runner=runner)
+    assert client.game_process_modules("GTA5_Enhanced.exe")[0]["modules"] == ["/games/GTA/.gameopti-post-processing/libvkbasalt.so"]
+
+
+def test_vkbasalt_package_transfer_is_binary_safe_and_restricts_paths() -> None:
+    import base64
+    calls = []
+    payload = b"\x7fELF\x00\xff\xfe\x80" * 100000
+    def runner(argv, **kwargs):
+        calls.append(argv)
+        assert kwargs["shell"] is False
+        if argv[2] == "flatpak":
+            return subprocess.CompletedProcess(argv, 0, "/home/user/.local/share/flatpak/runtime/vkBasalt/commit\n", "")
+        assert argv[2:5] == ["base64", "--wrap=0", "--"]
+        assert argv[-1].endswith("/files/lib/i386-linux-gnu/vkbasalt/libvkbasalt.so")
+        return subprocess.CompletedProcess(argv, 0, base64.b64encode(payload).decode(), "")
+    client = HostServiceClient(environment={"FLATPAK_ID": "app"}, command_runner=runner)
+    assert client.post_processing_component("lib/i386-linux-gnu/vkbasalt/libvkbasalt.so") == payload
+    with pytest.raises(HostServiceError): client.post_processing_component("../../etc/passwd")
+    assert len(calls) == 2
+
+
 def _game(tmp_path: Path) -> Game:
     library = tmp_path / "SteamLibrary"
     game_path = library / "steamapps" / "common" / "Fixture"

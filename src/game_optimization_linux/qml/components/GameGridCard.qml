@@ -96,7 +96,10 @@ SurfaceCard {
                     "cover"
                 ], "")
                 artworkFillMode: Image.PreserveAspectCrop
+                // Top corners follow the card; the cover sits flush on the
+                // information section below, so its bottom edge stays square.
                 cornerRadius: App.Theme.radiusLarge
+                bottomCornerRadius: 0
             }
         }
 

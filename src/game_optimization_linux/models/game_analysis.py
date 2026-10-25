@@ -681,6 +681,9 @@ class BaselineSession:
     expected_runner_path: str = ""
     expected_runner_hash: str = ""
     handshake_timeout_seconds: int = 120
+    # Launcher that starts the game for this session ("Heroic"); empty for
+    # Steam/local sessions claimed by game-optimization-run.
+    launcher: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -726,6 +729,7 @@ class BaselineSession:
             "expectedRunnerPath": self.expected_runner_path,
             "expectedRunnerHash": self.expected_runner_hash,
             "handshakeTimeoutSeconds": self.handshake_timeout_seconds,
+            "launcher": self.launcher,
         }
 
 

@@ -1,0 +1,10 @@
+usage: btrfs property get/set/list [-t <type>] <object> [<name>] [value]
+
+btrfs property get [-t <type>] <object> [<name>]
+  Get a property value of a btrfs object
+btrfs property set [-f] [-t <type>] <object> <name> <value>
+  Set a property on a btrfs object
+btrfs property list [-t <type>] <object>
+  Lists available properties with their descriptions for the given object
+
+modify properties of filesystem objects

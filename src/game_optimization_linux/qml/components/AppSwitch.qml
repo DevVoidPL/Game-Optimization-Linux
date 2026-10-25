@@ -4,6 +4,7 @@ import ".." as App
 
 Switch {
     id: control
+    property real textPixelSize: App.Theme.fontBody
 
     indicator: Rectangle {
         implicitWidth: 42
@@ -31,7 +32,7 @@ Switch {
     contentItem: Label {
         text: control.text
         color: control.enabled ? App.Theme.text : App.Theme.textMuted
-        font.pixelSize: App.Theme.fontBody
+        font.pixelSize: control.textPixelSize
         leftPadding: control.indicator.width + control.spacing
         verticalAlignment: Text.AlignVCenter
     }

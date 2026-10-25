@@ -1,0 +1,23 @@
+usage: btrfs filesystem defragment [options] <file>|<dir> [<file>|<dir>...]
+
+Defragment a file or a directory
+
+-r                        defragment files recursively
+-c[zlib,lzo,zstd]         compress the file while defragmenting, optional parameter (no space in between)
+-L, --level level         use given compression level if enabled (zlib: 1..9, zstd: -15..15, and 0 selects the default
+                          level)
+--nocomp                  don't compress while defragmenting (uncompress if needed)
+-f                        flush data to disk immediately after defragmenting
+-s start                  defragment only from byte onward
+-l len                    defragment only up to len bytes
+-t size                   target extent size hint (default: 32M)
+--step SIZE               process the range in given steps, flush after each one
+-v                        deprecated, alias for global -v option
+
+Global options:
+-v, --verbose             increase output verbosity
+
+Warning: most Linux kernels will break up the ref-links of COW data
+(e.g., files copied with 'cp --reflink', snapshots) which may cause
+considerable increase of space usage. See btrfs-filesystem(8) for
+more information.

@@ -349,6 +349,43 @@ def test_duplicate_libraries_symlinks_and_appids_are_eliminated(
     assert steam_tree["missing"].resolve() in report.inaccessible_paths
     assert steam_tree["missing"].resolve() in report.configured_libraries
     assert set(report.libraries).issubset(set(report.configured_libraries))
+    # A path that does not exist at all gives no evidence about its content.
+    assert report.present_without_steamapps == ()
+
+
+def test_mounted_library_without_steamapps_is_reported_separately(
+    tmp_path: Path, filesystem_provider: StubFilesystemProvider
+) -> None:
+    """A reachable library directory without ``steamapps`` is not a lost disk."""
+
+    root = tmp_path / "Steam"
+    (root / "steamapps").mkdir(parents=True)
+    formatted = tmp_path / "formatted-disk" / "SteamLibrary"
+    formatted.mkdir(parents=True)  # the mount is back, the content is gone
+    missing = tmp_path / "unplugged-disk" / "SteamLibrary"
+    (root / "steamapps" / "libraryfolders.vdf").write_text(
+        f'''"libraryfolders"
+{{
+    "0" {{ "path" "{_quoted(root)}" }}
+    "1" {{ "path" "{_quoted(formatted)}" }}
+    "2" {{ "path" "{_quoted(missing)}" }}
+}}
+''',
+        encoding="utf-8",
+    )
+    provider = SteamGameProvider(filesystem_provider, roots=[root])
+
+    provider.refresh()
+
+    report = provider.last_report
+    assert report.libraries == (root.resolve(),)
+    assert set(report.inaccessible_paths) == {formatted.resolve(), missing.resolve()}
+    assert report.present_without_steamapps == (formatted.resolve(),)
+    assert set(report.configured_libraries) == {
+        root.resolve(),
+        formatted.resolve(),
+        missing.resolve(),
+    }
 
 
 def test_empty_library_and_damaged_library_list_are_tolerated(

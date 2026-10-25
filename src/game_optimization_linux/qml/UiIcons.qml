@@ -3,47 +3,355 @@ pragma Singleton
 import QtQuick
 
 QtObject {
-    readonly property url btrfsAnalyzeCompression: Qt.resolvedUrl("../assets/ui-icons/btrfs-analyze-compression.svg")
-    readonly property url btrfsVerifyCompression: Qt.resolvedUrl("../assets/ui-icons/btrfs-verify-compression.svg")
-    readonly property url btrfsExactMeasurement: Qt.resolvedUrl("../assets/ui-icons/btrfs-exact-measurement.svg")
+    readonly property url btrfsAnalyzeCompression: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/btrfs-analyze-compression.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/btrfs-analyze-compression-on-light.svg")
+    readonly property url btrfsVerifyCompression: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/btrfs-verify-compression.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/btrfs-verify-compression-on-light.svg")
+    readonly property url btrfsExactMeasurement: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/btrfs-exact-measurement.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/btrfs-exact-measurement-on-light.svg")
 
-    readonly property url remasterClassic: Qt.resolvedUrl("../assets/ui-icons/remaster-classic.svg")
-    readonly property url remasterLightAi: Qt.resolvedUrl("../assets/ui-icons/remaster-light-ai.svg")
-    readonly property url remasterQualityAi: Qt.resolvedUrl("../assets/ui-icons/remaster-quality-ai.svg")
+    readonly property url remasterClassic: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/remaster-classic.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/remaster-classic-on-light.svg")
+    readonly property url remasterLightAi: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/remaster-light-ai.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/remaster-light-ai-on-light.svg")
+    readonly property url remasterQualityAi: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/remaster-quality-ai.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/remaster-quality-ai-on-light.svg")
 
-    readonly property url overviewLogicalSize: Qt.resolvedUrl("../assets/ui-icons/overview-logical-size.svg")
-    readonly property url overviewPhysicalSize: Qt.resolvedUrl("../assets/ui-icons/overview-physical-size.svg")
-    readonly property url overviewSavedSpace: Qt.resolvedUrl("../assets/ui-icons/overview-saved-space.svg")
-    readonly property url overviewOptimizationProfile: Qt.resolvedUrl("../assets/ui-icons/overview-optimization-profile.svg")
+    readonly property url overviewLogicalSize: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/overview-logical-size.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/overview-logical-size-on-light.svg")
+    readonly property url overviewPhysicalSize: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/overview-physical-size.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/overview-physical-size-on-light.svg")
+    readonly property url overviewSavedSpace: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/overview-saved-space.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/overview-saved-space-on-light.svg")
+    readonly property url overviewOptimizationProfile: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/overview-optimization-profile.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/overview-optimization-profile-on-light.svg")
 
-    readonly property url sidebarGames: Qt.resolvedUrl("../assets/ui-icons/sidebar-games.svg")
-    readonly property url sidebarNarrator: Qt.resolvedUrl("../assets/ui-icons/sidebar-narrator.svg")
-    readonly property url sidebarUpdates: Qt.resolvedUrl("../assets/ui-icons/sidebar-updates.svg")
-    readonly property url sidebarTasks: Qt.resolvedUrl("../assets/ui-icons/sidebar-tasks.svg")
-    readonly property url sidebarSystem: Qt.resolvedUrl("../assets/ui-icons/sidebar-system.svg")
-    readonly property url sidebarSettings: Qt.resolvedUrl("../assets/ui-icons/sidebar-settings.svg")
+    readonly property url sidebarGames: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/sidebar-games.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/sidebar-games-on-light.svg")
+    readonly property url sidebarNarrator: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/sidebar-narrator.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/sidebar-narrator-on-light.svg")
+    readonly property url sidebarUpdates: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/sidebar-updates.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/sidebar-updates-on-light.svg")
+    readonly property url sidebarTasks: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/sidebar-tasks.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/sidebar-tasks-on-light.svg")
+    readonly property url sidebarSystem: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/sidebar-system.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/sidebar-system-on-light.svg")
+    readonly property url sidebarDonate: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/sidebar-donate.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/sidebar-donate-on-light.svg")
+    readonly property url sidebarSettings: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/sidebar-settings.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/sidebar-settings-on-light.svg")
 
-    readonly property url actionAnalyze: Qt.resolvedUrl("../assets/ui-icons/action-analyze.svg")
-    readonly property url actionVerify: Qt.resolvedUrl("../assets/ui-icons/action-verify.svg")
-    readonly property url actionMeasure: Qt.resolvedUrl("../assets/ui-icons/action-measure.svg")
-    readonly property url actionScan: Qt.resolvedUrl("../assets/ui-icons/action-scan.svg")
-    readonly property url actionDownload: Qt.resolvedUrl("../assets/ui-icons/action-download.svg")
-    readonly property url actionInstall: Qt.resolvedUrl("../assets/ui-icons/action-install.svg")
-    readonly property url actionRemove: Qt.resolvedUrl("../assets/ui-icons/action-remove.svg")
-    readonly property url actionRestore: Qt.resolvedUrl("../assets/ui-icons/action-restore.svg")
-    readonly property url actionLaunch: Qt.resolvedUrl("../assets/ui-icons/action-launch.svg")
-    readonly property url actionRefresh: Qt.resolvedUrl("../assets/ui-icons/action-refresh.svg")
-    readonly property url actionSearch: Qt.resolvedUrl("../assets/ui-icons/action-search.svg")
-    readonly property url actionAdvancedSettings: Qt.resolvedUrl("../assets/ui-icons/action-advanced-settings.svg")
-    readonly property url actionApply: Qt.resolvedUrl("../assets/ui-icons/action-apply.svg")
-    readonly property url actionCancel: Qt.resolvedUrl("../assets/ui-icons/action-cancel.svg")
+    readonly property url actionAnalyze: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-analyze.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-analyze-on-light.svg")
+    readonly property url actionVerify: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-verify.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-verify-on-light.svg")
+    readonly property url actionMeasure: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-measure.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-measure-on-light.svg")
+    readonly property url actionScan: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-scan.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-scan-on-light.svg")
+    readonly property url actionDownload: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-download.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-download-on-light.svg")
+    readonly property url actionInstall: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-install.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-install-on-light.svg")
+    readonly property url actionRemove: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-remove.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-remove-on-light.svg")
+    readonly property url actionRestore: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-restore.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-restore-on-light.svg")
+    readonly property url actionLaunch: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-launch.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-launch-on-light.svg")
+    readonly property url actionRefresh: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-refresh.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-refresh-on-light.svg")
+    readonly property url actionSearch: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-search.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-search-on-light.svg")
+    readonly property url actionAdvancedSettings: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-advanced-settings.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-advanced-settings-on-light.svg")
+    readonly property url actionApply: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-apply.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-apply-on-light.svg")
+    readonly property url actionCancel: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-cancel.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-cancel-on-light.svg")
+    // Installing the OptiScaler integration (action), as opposed to the
+    // OptiScaler identity (brandOptiScaler) or generic actionInstall.
+    readonly property url actionInstallScaler: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/action-install-scaler.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/action-install-scaler-on-light.svg")
 
-    readonly property url statusSuccess: Qt.resolvedUrl("../assets/ui-icons/status-success.svg")
-    readonly property url statusWarning: Qt.resolvedUrl("../assets/ui-icons/status-warning.svg")
-    readonly property url statusError: Qt.resolvedUrl("../assets/ui-icons/status-error.svg")
-    readonly property url statusInformation: Qt.resolvedUrl("../assets/ui-icons/status-information.svg")
-    readonly property url statusExperimental: Qt.resolvedUrl("../assets/ui-icons/status-experimental.svg")
+    // Btrfs compression profiles (Storage tab cards).
+    readonly property url profileFast: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/profile-fast.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/profile-fast-on-light.svg")
+    readonly property url profileBalanced: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/profile-balanced.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/profile-balanced-on-light.svg")
+    readonly property url profileMaximum: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/profile-maximum.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/profile-maximum-on-light.svg")
+    readonly property url profileAuto: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/profile-auto.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/profile-auto-on-light.svg")
+    function compressionProfileIcon(key) {
+        var id = String(key || "")
+        return id === "Fast" ? profileFast : id === "Balanced" ? profileBalanced
+             : id === "Maximum" ? profileMaximum : id === "Auto" ? profileAuto : ""
+    }
 
-    readonly property url fileFolder: Qt.resolvedUrl("../assets/ui-icons/file-folder.svg")
-    readonly property url fileFile: Qt.resolvedUrl("../assets/ui-icons/file-file.svg")
+    readonly property url statusSuccess: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/status-success.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/status-success-on-light.svg")
+    readonly property url statusWarning: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/status-warning.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/status-warning-on-light.svg")
+    readonly property url statusError: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/status-error.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/status-error-on-light.svg")
+    readonly property url statusInformation: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/status-information.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/status-information-on-light.svg")
+    readonly property url statusExperimental: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/status-experimental.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/status-experimental-on-light.svg")
+
+    readonly property url fileFolder: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/file-folder.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/file-folder-on-light.svg")
+    readonly property url fileFile: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/file-file.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/file-file-on-light.svg")
+
+    readonly property url systemControllers: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/system-controllers.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/system-controllers-on-light.svg")
+    readonly property url systemRuntime: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/system-runtime.svg")
+        : Qt.resolvedUrl("../assets/ui-icons/system-runtime-on-light.svg")
+    readonly property url couchGlyphDesktop: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/desktop.svg")
+    readonly property url couchGlyphDesktopOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/desktop-on-light.svg")
+
+    // Brand artwork keeps its upstream colours in both themes.
+    readonly property url brandMangoHud: Qt.resolvedUrl("../assets/ui-icons/couch/actions/mangohud.svg")
+    // Compatibility alias for older callers.
+    readonly property url mangoHudTelemetry: brandMangoHud
+    readonly property url brandOptiScaler: Theme.dark
+        ? Qt.resolvedUrl("../assets/ui-icons/brands/optiscaler.png")
+        : Qt.resolvedUrl("../assets/ui-icons/brands/optiscaler-on-light.png")
+    // PayPal monogram (official newsroom asset, full colour on both themes).
+    readonly property url brandPayPal: Qt.resolvedUrl("../assets/ui-icons/brands/paypal.png")
+
+    // GameOpti Couch Mode icon set. Fixed two-tone SVGs are used so
+    // the mint/base palette remains consistent in both light and dark themes.
+    readonly property url couchLibrary: Qt.resolvedUrl("../assets/ui-icons/couch/library.svg")
+    readonly property url couchTasks: Qt.resolvedUrl("../assets/ui-icons/couch/tasks.svg")
+    readonly property url couchUpdates: Qt.resolvedUrl("../assets/ui-icons/couch/updates.svg")
+    readonly property url couchSettings: Qt.resolvedUrl("../assets/ui-icons/couch/settings.svg")
+    readonly property url couchLaunch: Qt.resolvedUrl("../assets/ui-icons/couch/launch.svg")
+    readonly property url couchCheckUpdates: Qt.resolvedUrl("../assets/ui-icons/couch/check-updates.svg")
+    readonly property url couchOverview: Qt.resolvedUrl("../assets/ui-icons/couch/overview.svg")
+    readonly property url couchStorage: Qt.resolvedUrl("../assets/ui-icons/couch/storage.svg")
+    readonly property url couchOptimization: Qt.resolvedUrl("../assets/ui-icons/couch/optimization.svg")
+    readonly property url couchOptiScaler: Qt.resolvedUrl("../assets/ui-icons/couch/optiscaler.svg")
+    readonly property url couchNarrator: Qt.resolvedUrl("../assets/ui-icons/couch/narrator.svg")
+    readonly property url couchAnalyze: Qt.resolvedUrl("../assets/ui-icons/couch/actions/analyze.svg")
+    readonly property url couchVerifyCompression: Qt.resolvedUrl("../assets/ui-icons/couch/actions/verify-compression.svg")
+    readonly property url couchApplyOptimization: Qt.resolvedUrl("../assets/ui-icons/couch/actions/apply-optimization.svg")
+    readonly property url couchPolishSubtitles: Qt.resolvedUrl("../assets/ui-icons/couch/actions/polish-subtitles.svg")
+    readonly property url couchCaptureWindow: Qt.resolvedUrl("../assets/ui-icons/couch/actions/capture-window.svg")
+    readonly property url couchVoice: Qt.resolvedUrl("../assets/ui-icons/couch/actions/voice.svg")
+    readonly property url couchVolume: Qt.resolvedUrl("../assets/ui-icons/couch/actions/volume.svg")
+    readonly property url couchSpeechSpeed: Qt.resolvedUrl("../assets/ui-icons/couch/actions/speech-speed.svg")
+    readonly property url couchSubtitleArea: Qt.resolvedUrl("../assets/ui-icons/couch/actions/subtitle-area.svg")
+    readonly property url couchInstall: Qt.resolvedUrl("../assets/ui-icons/couch/actions/install.svg")
+    readonly property url couchRemove: Qt.resolvedUrl("../assets/ui-icons/couch/actions/remove.svg")
+    readonly property url couchGameMode: Qt.resolvedUrl("../assets/ui-icons/couch/actions/gamemode.svg")
+    readonly property url couchGamescope: Qt.resolvedUrl("../assets/ui-icons/couch/actions/gamescope.svg")
+    readonly property url couchMangoHud: Qt.resolvedUrl("../assets/ui-icons/couch/actions/mangohud.svg")
+
+    // Facet glyph set (scripts/build-facet-icons.py, docs/ui-icons.md).
+    // Each glyph has artwork for dark surfaces and an OnLight variant.
+    readonly property url couchGlyphAnalyze: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/analyze.svg")
+    readonly property url couchGlyphAnalyzeOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/analyze-on-light.svg")
+
+    // Upstream launcher identities (couch/launchers/README.md).
+    // Full-colour marks, shown untouched on both themes; "" means "use the
+    // neutral source glyph" (custom and unknown sources).
+    // Steam: the official full-colour application icon (brands/README.md),
+    // identical on both themes like Heroic and Lutris. The monochrome
+    // launchers/steam*.png silhouettes washed out on dark covers and plates.
+    readonly property url couchLauncherSteam: Qt.resolvedUrl("../assets/ui-icons/brands/steam.png")
+    readonly property url couchLauncherHeroic: Qt.resolvedUrl("../assets/ui-icons/couch/launchers/heroic.png")
+    readonly property url couchLauncherLutris: Qt.resolvedUrl("../assets/ui-icons/couch/launchers/lutris.png")
+    function launcherLogo(value) {
+        var id = String(value || "").trim().toLowerCase()
+        return id === "steam" ? couchLauncherSteam : id === "heroic" ? couchLauncherHeroic
+             : id === "lutris" ? couchLauncherLutris : ""
+    }
+    readonly property url couchGlyphBackspace: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/backspace.svg")
+    readonly property url couchGlyphBackspaceOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/backspace-on-light.svg")
+    readonly property url couchGlyphBorderless: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/borderless.svg")
+    readonly property url couchGlyphBorderlessOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/borderless-on-light.svg")
+    readonly property url couchGlyphCancel: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/cancel.svg")
+    readonly property url couchGlyphCancelOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/cancel-on-light.svg")
+    readonly property url couchGlyphCapture: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/capture.svg")
+    readonly property url couchGlyphCaptureOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/capture-on-light.svg")
+    readonly property url couchGlyphCompress: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/compress.svg")
+    readonly property url couchGlyphCompressOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/compress-on-light.svg")
+    readonly property url couchGlyphCompressionProfile: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/compression-profile.svg")
+    readonly property url couchGlyphCompressionProfileOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/compression-profile-on-light.svg")
+    readonly property url couchGlyphController: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/controller.svg")
+    readonly property url couchGlyphControllerOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/controller-on-light.svg")
+    readonly property url couchGlyphDetails: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/details.svg")
+    readonly property url couchGlyphDetailsOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/details-on-light.svg")
+    readonly property url couchGlyphDownload: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/download.svg")
+    readonly property url couchGlyphDownloadOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/download-on-light.svg")
+    readonly property url couchGlyphFilter: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/filter.svg")
+    readonly property url couchGlyphFilterOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/filter-on-light.svg")
+    readonly property url couchGlyphFit: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/fit.svg")
+    readonly property url couchGlyphFitOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/fit-on-light.svg")
+    readonly property url couchGlyphFps: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/fps.svg")
+    readonly property url couchGlyphFpsOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/fps-on-light.svg")
+    readonly property url couchGlyphFpsLimit: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/fps-limit.svg")
+    readonly property url couchGlyphFpsLimitOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/fps-limit-on-light.svg")
+    readonly property url couchGlyphFrametime: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/frametime.svg")
+    readonly property url couchGlyphFrametimeOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/frametime-on-light.svg")
+    readonly property url couchGlyphFullscreen: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/fullscreen.svg")
+    readonly property url couchGlyphFullscreenOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/fullscreen-on-light.svg")
+    readonly property url couchGlyphGamemode: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/gamemode.svg")
+    readonly property url couchGlyphGamemodeOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/gamemode-on-light.svg")
+    readonly property url couchGlyphGamescope: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/gamescope.svg")
+    readonly property url couchGlyphGamescopeOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/gamescope-on-light.svg")
+    readonly property url couchGlyphGrab: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/grab.svg")
+    readonly property url couchGlyphGrabOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/grab-on-light.svg")
+    readonly property url couchGlyphHdr: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/hdr.svg")
+    readonly property url couchGlyphHdrOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/hdr-on-light.svg")
+    readonly property url couchGlyphInfo: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/info.svg")
+    readonly property url couchGlyphInfoOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/info-on-light.svg")
+    readonly property url couchGlyphInstall: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/install.svg")
+    readonly property url couchGlyphInstallOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/install-on-light.svg")
+    readonly property url couchGlyphKeyboard: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/keyboard.svg")
+    readonly property url couchGlyphKeyboardOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/keyboard-on-light.svg")
+    readonly property url couchGlyphLaunch: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/launch.svg")
+    readonly property url couchGlyphLaunchOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/launch-on-light.svg")
+    readonly property url couchGlyphLibrary: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/library.svg")
+    readonly property url couchGlyphLibraryOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/library-on-light.svg")
+    readonly property url couchGlyphMangohud: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/mangohud.svg")
+    readonly property url couchGlyphMangohudOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/mangohud-on-light.svg")
+    readonly property url couchGlyphMemory: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/memory.svg")
+    readonly property url couchGlyphMemoryOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/memory-on-light.svg")
+    readonly property url couchGlyphMore: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/more.svg")
+    readonly property url couchGlyphMoreOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/more-on-light.svg")
+    readonly property url couchGlyphNarrator: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/narrator.svg")
+    readonly property url couchGlyphNarratorOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/narrator-on-light.svg")
+    readonly property url couchGlyphNext: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/next.svg")
+    readonly property url couchGlyphNextOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/next-on-light.svg")
+    readonly property url couchGlyphOptimization: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/optimization.svg")
+    readonly property url couchGlyphOptimizationOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/optimization-on-light.svg")
+    readonly property url couchGlyphOptiscaler: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/optiscaler.svg")
+    readonly property url couchGlyphOptiscalerOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/optiscaler-on-light.svg")
+    readonly property url couchGlyphOverview: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/overview.svg")
+    readonly property url couchGlyphOverviewOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/overview-on-light.svg")
+    readonly property url couchGlyphPosition: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/position.svg")
+    readonly property url couchGlyphPositionOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/position-on-light.svg")
+    readonly property url couchGlyphPreset: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/preset.svg")
+    readonly property url couchGlyphPresetOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/preset-on-light.svg")
+    readonly property url couchGlyphPrevious: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/previous.svg")
+    readonly property url couchGlyphPreviousOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/previous-on-light.svg")
+    readonly property url couchGlyphRefresh: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/refresh.svg")
+    readonly property url couchGlyphRefreshOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/refresh-on-light.svg")
+    readonly property url couchGlyphRegion: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/region.svg")
+    readonly property url couchGlyphRegionOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/region-on-light.svg")
+    readonly property url couchGlyphRemove: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/remove.svg")
+    readonly property url couchGlyphRemoveOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/remove-on-light.svg")
+    readonly property url couchGlyphResolutionGame: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/resolution-game.svg")
+    readonly property url couchGlyphResolutionGameOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/resolution-game-on-light.svg")
+    readonly property url couchGlyphResolutionOutput: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/resolution-output.svg")
+    readonly property url couchGlyphResolutionOutputOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/resolution-output-on-light.svg")
+    readonly property url couchGlyphSearch: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/search.svg")
+    readonly property url couchGlyphSearchOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/search-on-light.svg")
+    readonly property url couchGlyphSort: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/sort.svg")
+    readonly property url couchGlyphSortOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/sort-on-light.svg")
+    readonly property url couchGlyphLibraryOffline: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/library-offline.svg")
+    readonly property url couchGlyphLibraryOfflineOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/library-offline-on-light.svg")
+    readonly property url couchGlyphSave: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/save.svg")
+    readonly property url couchGlyphSaveOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/save-on-light.svg")
+    readonly property url couchGlyphScanSource: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/scan-source.svg")
+    readonly property url couchGlyphScanSourceOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/scan-source-on-light.svg")
+    readonly property url couchGlyphSettings: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/settings.svg")
+    readonly property url couchGlyphSettingsOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/settings-on-light.svg")
+    readonly property url couchGlyphSharpness: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/sharpness.svg")
+    readonly property url couchGlyphSharpnessOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/sharpness-on-light.svg")
+    readonly property url couchGlyphSource: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/source.svg")
+    readonly property url couchGlyphSourceOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/source-on-light.svg")
+    readonly property url couchGlyphSpeechRate: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/speech-rate.svg")
+    readonly property url couchGlyphSpeechRateOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/speech-rate-on-light.svg")
+    readonly property url couchGlyphStart: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/start.svg")
+    readonly property url couchGlyphStartOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/start-on-light.svg")
+    readonly property url couchGlyphStatusError: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/status-error.svg")
+    readonly property url couchGlyphStatusErrorOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/status-error-on-light.svg")
+    readonly property url couchGlyphStatusReady: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/status-ready.svg")
+    readonly property url couchGlyphStatusReadyOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/status-ready-on-light.svg")
+    readonly property url couchGlyphStatusWarning: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/status-warning.svg")
+    readonly property url couchGlyphStatusWarningOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/status-warning-on-light.svg")
+    readonly property url couchGlyphStop: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/stop.svg")
+    readonly property url couchGlyphStopOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/stop-on-light.svg")
+    readonly property url couchGlyphStorage: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/storage.svg")
+    readonly property url couchGlyphStorageOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/storage-on-light.svg")
+    readonly property url couchGlyphSubtitles: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/subtitles.svg")
+    readonly property url couchGlyphSubtitlesOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/subtitles-on-light.svg")
+    readonly property url couchGlyphTasks: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/tasks.svg")
+    readonly property url couchGlyphTasksOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/tasks-on-light.svg")
+    readonly property url couchGlyphTemperature: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/temperature.svg")
+    readonly property url couchGlyphTemperatureOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/temperature-on-light.svg")
+    readonly property url couchGlyphTextSize: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/text-size.svg")
+    readonly property url couchGlyphTextSizeOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/text-size-on-light.svg")
+    readonly property url couchGlyphToggleOff: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/toggle-off.svg")
+    readonly property url couchGlyphToggleOffOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/toggle-off-on-light.svg")
+    readonly property url couchGlyphToggleOn: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/toggle-on.svg")
+    readonly property url couchGlyphToggleOnOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/toggle-on-on-light.svg")
+    readonly property url couchGlyphTune: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/tune.svg")
+    readonly property url couchGlyphTuneOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/tune-on-light.svg")
+    readonly property url couchGlyphUpdates: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/updates.svg")
+    readonly property url couchGlyphUpdatesOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/updates-on-light.svg")
+    readonly property url couchGlyphUsage: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/usage.svg")
+    readonly property url couchGlyphUsageOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/usage-on-light.svg")
+    readonly property url couchGlyphVerify: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/verify.svg")
+    readonly property url couchGlyphVerifyOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/verify-on-light.svg")
+    readonly property url couchGlyphVerifyCompression: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/verify-compression.svg")
+    readonly property url couchGlyphVerifyCompressionOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/verify-compression-on-light.svg")
+    readonly property url couchGlyphVoice: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/voice.svg")
+    readonly property url couchGlyphVoiceOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/voice-on-light.svg")
+    readonly property url couchGlyphVolume: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/volume.svg")
+    readonly property url couchGlyphVolumeOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/volume-on-light.svg")
+    readonly property url couchGlyphVrr: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/vrr.svg")
+    readonly property url couchGlyphVrrOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/vrr-on-light.svg")
+    readonly property url couchGlyphWindowed: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/windowed.svg")
+    readonly property url couchGlyphWindowedOnLight: Qt.resolvedUrl("../assets/ui-icons/couch/glyphs/windowed-on-light.svg")
 }

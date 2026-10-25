@@ -161,6 +161,7 @@ def _controller(
     *,
     scanner: object | None = None,
     initial_games: tuple[Game, ...] | None = None,
+    filesystem_provider: object | None = None,
 ) -> AppController:
     return AppController(
         game_provider=provider,
@@ -168,6 +169,7 @@ def _controller(
         library_cache=LibraryCache(tmp_path / "library.json"),
         settings_store=SettingsStore(tmp_path / "settings.json"),
         task_service=MockTaskService(),
+        filesystem_provider=filesystem_provider,
         initial_games=initial_games,
         demo_mode=False,
         auto_refresh=False,
@@ -326,6 +328,250 @@ def test_disconnected_library_games_remain_cached_and_actions_are_blocked(
         assert reconnected["libraryAvailable"] is True
         assert reconnected["launchAllowed"] is True
         assert reconnected["analysisAllowed"] is True
+    finally:
+        controller.shutdown()
+
+
+class _MountedFilesystemProvider:
+    """Reports one mounted filesystem at a fixed mount point."""
+
+    def __init__(self, mount_point: Path, device: str) -> None:
+        self.mount_point = mount_point
+        self.device = device
+        self.inspected: list[Path] = []
+
+    def inspect(self, path: Path) -> FilesystemInfo:
+        self.inspected.append(Path(path))
+        return FilesystemInfo(
+            mount_point=self.mount_point,
+            filesystem=FilesystemType.BTRFS,
+            compression_supported=True,
+            label=self.device,
+            device=self.device,
+            mount_options=("rw",),
+            writable=True,
+            filesystem_name="btrfs",
+        )
+
+    def for_game(self, game: Game) -> FilesystemInfo:
+        return self.inspect(game.install_path)
+
+    def list_filesystems(self, **_: object) -> tuple[FilesystemInfo, ...]:
+        return ()
+
+
+def _external_cached_games(
+    mount_point: Path, *, device: str = "/dev/sdb1"
+) -> tuple[Path, tuple[Game, ...]]:
+    library = mount_point / "SteamLibrary"
+    cached = tuple(
+        replace(
+            _game(library / "steamapps" / "common" / name, game_id),
+            name=name,
+            library_path=library,
+            mount_point=mount_point,
+            filesystem_device=device,
+            filesystem=FilesystemType.BTRFS,
+            filesystem_name="btrfs",
+            status=GameStatus.DRIVE_DISCONNECTED,
+            library_available=False,
+        )
+        for game_id, name in (
+            ("steam-208650", "Batman Arkham Knight"),
+            ("steam-292030", "The Witcher 3"),
+        )
+    )
+    return library, cached
+
+
+def test_mounted_library_without_installations_expires_cached_games(
+    tmp_path: Path,
+) -> None:
+    """A reformatted disk mounted back at the same path drops its stale records."""
+
+    mount_point = tmp_path / "run" / "media" / "user" / "50bc3466-disk"
+    library, cached = _external_cached_games(mount_point)
+    library.mkdir(parents=True)  # directory exists again, steamapps does not
+    local_path = tmp_path / "local" / "steamapps" / "common" / "Local Game"
+    local_path.mkdir(parents=True)
+    local = _game(local_path, "steam-local")
+    provider = _FakeSteamProvider((local,))
+    provider.last_report.configured_libraries = (local.library_path, library)
+    provider.last_report.libraries = (local.library_path,)
+    provider.last_report.inaccessible_paths = (library,)
+    provider.last_report.present_without_steamapps = (library,)
+    controller = _controller(tmp_path, provider, initial_games=cached)
+    try:
+        assert [game["id"] for game in controller.games] == [g.id for g in cached]
+        assert controller.refreshGames() is True
+        _wait_until(lambda: not controller.isScanning)
+
+        assert [game["id"] for game in controller.games] == [local.id]
+        assert [game.id for game in LibraryCache(tmp_path / "library.json").load()] == [
+            local.id
+        ]
+    finally:
+        controller.shutdown()
+
+    restarted = _controller(tmp_path, provider)
+    try:
+        assert [game["id"] for game in restarted.games] == [local.id]
+    finally:
+        restarted.shutdown()
+
+
+def test_genuinely_disconnected_library_keeps_offline_entries(
+    tmp_path: Path,
+) -> None:
+    """No directory, nothing mounted at the remembered mount point: keep cache."""
+
+    mount_point = tmp_path / "run" / "media" / "user" / "unplugged-disk"
+    library, cached = _external_cached_games(mount_point)
+    # The automounter leaves no directory behind; a parent filesystem is all
+    # that an inspection of the missing mount point could ever report.
+    filesystem = _MountedFilesystemProvider(tmp_path, "/dev/sda2")
+    provider = _FakeSteamProvider(())
+    provider.last_report.configured_libraries = (library,)
+    provider.last_report.libraries = ()
+    provider.last_report.inaccessible_paths = (library,)
+    provider.last_report.present_without_steamapps = ()
+    controller = _controller(
+        tmp_path, provider, initial_games=cached, filesystem_provider=filesystem
+    )
+    try:
+        assert controller.refreshGames() is True
+        _wait_until(lambda: not controller.isScanning)
+
+        games = {game["id"]: game for game in controller.games}
+        assert set(games) == {g.id for g in cached}
+        assert all(game["status"] == "Drive disconnected" for game in games.values())
+        assert all(game["libraryAvailable"] is False for game in games.values())
+        assert filesystem.inspected == []
+        cached_ids = {game.id for game in LibraryCache(tmp_path / "library.json").load()}
+        assert cached_ids == {g.id for g in cached}
+
+        # An empty mount-point directory with only the parent filesystem mounted
+        # (the disk is still unplugged) is equally inconclusive.
+        mount_point.mkdir(parents=True)
+        assert controller.refreshGames() is True
+        _wait_until(lambda: not controller.isScanning)
+        assert {game["id"] for game in controller.games} == {g.id for g in cached}
+        assert filesystem.inspected == [mount_point]
+    finally:
+        controller.shutdown()
+
+
+def test_replaced_filesystem_at_remembered_mount_point_expires_cached_games(
+    tmp_path: Path,
+) -> None:
+    """Same mount point, different device, no library directory: records expire."""
+
+    mount_point = tmp_path / "run" / "media" / "user" / "games-disk"
+    library, cached = _external_cached_games(mount_point, device="/dev/sdb1")
+    mount_point.mkdir(parents=True)  # mounted again, but formatted: no SteamLibrary
+    filesystem = _MountedFilesystemProvider(mount_point, "/dev/sdc1")
+    provider = _FakeSteamProvider(())
+    provider.last_report.configured_libraries = (library,)
+    provider.last_report.libraries = ()
+    provider.last_report.inaccessible_paths = (library,)
+    provider.last_report.present_without_steamapps = ()
+    controller = _controller(
+        tmp_path, provider, initial_games=cached, filesystem_provider=filesystem
+    )
+    try:
+        assert controller.refreshGames() is True
+        _wait_until(lambda: not controller.isScanning)
+
+        assert controller.games == []
+        assert LibraryCache(tmp_path / "library.json").load() == []
+        assert filesystem.inspected == [mount_point]
+    finally:
+        controller.shutdown()
+
+
+def test_unavailable_configured_library_can_be_forgotten_explicitly(
+    tmp_path: Path,
+) -> None:
+    """When absence cannot be proven (disk unplugged), the user may forget it.
+
+    The library stays in Steam's ``libraryfolders.vdf`` and nothing on disk is
+    touched; only GameOpti's cached records and view are affected, and the
+    per-game profile directory is preserved.
+    """
+
+    mount_point = tmp_path / "run" / "media" / "user" / "unplugged-disk"
+    library, cached = _external_cached_games(mount_point)
+    profile_dir = tmp_path / "games" / "208650"
+    profile_dir.mkdir(parents=True)
+    (profile_dir / "optimization.json").write_text("{}", encoding="utf-8")
+    provider = _FakeSteamProvider(())
+    provider.last_report.configured_libraries = (library,)
+    provider.last_report.libraries = ()
+    provider.last_report.inaccessible_paths = (library,)
+    provider.last_report.present_without_steamapps = ()
+    controller = _controller(tmp_path, provider, initial_games=cached)
+    try:
+        assert controller.refreshGames() is True
+        _wait_until(lambda: not controller.isScanning)
+        summaries = controller.compressionLibrarySummaries
+        assert [summary["libraryPath"] for summary in summaries] == [str(library)]
+        assert summaries[0]["libraryAvailable"] is False
+        # Steam still lists the path, so the strict cache-forget path refuses…
+        assert summaries[0]["canForgetLibrary"] is False
+        assert controller.forgetLibrary(str(library)) is False
+        # …but the explicit local "forget in Game Optimization" action remains.
+        assert summaries[0]["canIgnoreLibrary"] is True
+        assert controller.ignoreLibrary(str(library)) is True
+
+        assert controller.games == []
+        assert controller.compressionLibrarySummaries == []
+        assert LibraryCache(tmp_path / "library.json").load() == []
+        assert controller.settings["ignoredSteamLibraries"] == [str(library)]
+        assert (profile_dir / "optimization.json").is_file()
+    finally:
+        controller.shutdown()
+
+    # The ignored library survives a restart even though Steam still reports it.
+    restarted = _controller(tmp_path, provider, initial_games=cached)
+    try:
+        assert restarted.games == []
+        assert restarted.refreshGames() is True
+        _wait_until(lambda: not restarted.isScanning)
+        assert restarted.games == []
+        # Restoring re-enables the ordinary disconnected-library handling.
+        assert restarted.restoreIgnoredLibrary(str(library)) is True
+        assert restarted.settings["ignoredSteamLibraries"] == []
+    finally:
+        restarted.shutdown()
+
+
+def test_other_launcher_games_survive_steam_library_expiry(tmp_path: Path) -> None:
+    """Expiring stale Steam records never touches Heroic/Lutris installations."""
+
+    mount_point = tmp_path / "run" / "media" / "user" / "formatted-disk"
+    library, cached = _external_cached_games(mount_point)
+    library.mkdir(parents=True)
+    heroic_path = mount_point / "Heroic" / "Game"
+    heroic = replace(
+        _game(heroic_path, "heroic-gog-1"),
+        name="Heroic Game",
+        launcher=Launcher.HEROIC,
+        library_path=None,
+        status=GameStatus.READY,
+        library_available=True,
+    )
+    provider = _FakeSteamProvider((heroic,))
+    provider.last_report.configured_libraries = (library,)
+    provider.last_report.libraries = ()
+    provider.last_report.inaccessible_paths = (library,)
+    provider.last_report.present_without_steamapps = (library,)
+    controller = _controller(tmp_path, provider, initial_games=(*cached, heroic))
+    try:
+        assert controller.refreshGames() is True
+        _wait_until(lambda: not controller.isScanning)
+
+        assert [game["id"] for game in controller.games] == [heroic.id]
+        assert controller.games[0]["launcher"] == "Heroic"
     finally:
         controller.shutdown()
 

@@ -78,12 +78,14 @@ from .manual_game import (
 )
 from .settings import AppSettings
 from .mangohud import (
+    MANGOHUD_DEFAULT_COLORS,
     MANGOHUD_METRICS,
     MANGOHUD_POSITIONS,
     MANGOHUD_PRESETS,
     MANGOHUD_SCHEMA_VERSION,
     MangoHudProfile,
     PRESET_METRICS,
+    preset_for_metrics,
     validate_app_id,
     validate_game_key,
 )
@@ -123,6 +125,7 @@ from .optiscaler import (
     OPTISCALER_CHANNELS,
     OPTISCALER_COMPATIBILITY_STATES,
     OPTISCALER_FSR4_MODES,
+    OPTISCALER_FSR_VARIANTS,
     OPTISCALER_PROXY_DLLS,
     OPTISCALER_RUNTIME_VERIFICATION_STATES,
     OPTISCALER_SCHEMA_VERSION,
@@ -198,6 +201,7 @@ __all__ = [
     "OPTISCALER_BACKENDS",
     "OPTISCALER_CHANNELS",
     "OPTISCALER_COMPATIBILITY_STATES",
+    "OPTISCALER_FSR_VARIANTS",
     "USER_GOALS",
     "GameStatus",
     "CANONICAL_GAMEPAD_ACTIONS",
@@ -206,6 +210,7 @@ __all__ = [
     "GamepadEvent",
     "GamepadType",
     "Launcher",
+    "MANGOHUD_DEFAULT_COLORS",
     "MANGOHUD_METRICS",
     "MANGOHUD_POSITIONS",
     "MANGOHUD_PRESETS",
@@ -243,6 +248,7 @@ __all__ = [
     "OptiScalerProfile",
     "PostLaunchBehavior",
     "PRESET_METRICS",
+    "preset_for_metrics",
     "SessionType",
     "SizeScanStatus",
     "SystemInfo",

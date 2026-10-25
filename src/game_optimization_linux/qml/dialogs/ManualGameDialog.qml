@@ -14,6 +14,8 @@ Popup {
     property string editingId: ""
     property string errorMessage: ""
     property bool advancedVisible: false
+    property bool launchVisible: false
+    property bool appearanceVisible: false
     property alias gameName: nameField.text
     signal saved(string gameId)
 
@@ -21,6 +23,8 @@ Popup {
         editingId = ""
         errorMessage = ""
         advancedVisible = false
+        launchVisible = false
+        appearanceVisible = false
         nameField.text = ""
         executableField.text = ""
         installDirectoryField.text = ""
@@ -74,6 +78,10 @@ Popup {
         advancedVisible = environment.length > 0
                           || preLaunchField.text.length > 0
                           || postLaunchField.text.length > 0
+        // Sections with saved values open when editing, so nothing is hidden.
+        launchVisible = workingDirectoryField.text.length > 0 || argumentsField.text.length > 0
+                        || runnerField.text.length > 0 || winePrefixField.text.length > 0
+        appearanceVisible = portraitField.text.length > 0 || headerField.text.length > 0
         open()
         nameField.forceActiveFocus()
     }
@@ -172,15 +180,9 @@ Popup {
                 width: Math.max(1, parent.width - 12)
                 spacing: 11
 
+                // Basic: enough to add a game; fits 1280x720 without scrolling.
                 Label { text: qsTr("Name *"); color: App.Theme.textSecondary }
                 AppTextField { id: nameField; objectName: "manualGameNameField"; Layout.fillWidth: true }
-
-                Label { text: qsTr("Executable / command *"); color: App.Theme.textSecondary }
-                RowLayout {
-                    Layout.fillWidth: true
-                    AppTextField { id: executableField; objectName: "manualGameExecutableField"; Layout.fillWidth: true }
-                    AppButton { text: qsTr("Browse…"); compact: true; onClicked: executablePicker.open() }
-                }
 
                 Label { text: qsTr("Game directory"); color: App.Theme.textSecondary }
                 RowLayout {
@@ -189,42 +191,82 @@ Popup {
                     AppButton { text: qsTr("Browse…"); compact: true; onClicked: installDirectoryPicker.open() }
                 }
 
-                Label { text: qsTr("Working directory"); color: App.Theme.textSecondary }
+                Label { text: qsTr("Executable / command *"); color: App.Theme.textSecondary }
                 RowLayout {
                     Layout.fillWidth: true
-                    AppTextField { id: workingDirectoryField; Layout.fillWidth: true; placeholderText: qsTr("Defaults to the game directory") }
-                    AppButton { text: qsTr("Browse…"); compact: true; onClicked: workingDirectoryPicker.open() }
+                    AppTextField { id: executableField; objectName: "manualGameExecutableField"; Layout.fillWidth: true }
+                    AppButton { text: qsTr("Browse…"); compact: true; onClicked: executablePicker.open() }
+                }
+                Label {
+                    Layout.fillWidth: true
+                    text: qsTr("Choose the game's own executable. A folder alone does not reliably identify the right file, Wine/Proton or prefix.")
+                    color: App.Theme.textMuted
+                    font.pixelSize: App.Theme.fontCaption
+                    wrapMode: Text.WordWrap
                 }
 
-                Label { text: qsTr("Arguments"); color: App.Theme.textSecondary }
-                AppTextField { id: argumentsField; objectName: "manualGameArgumentsField"; Layout.fillWidth: true; placeholderText: qsTr("Example: --mode \"High quality\"") }
-
-                Label { text: qsTr("Wine / Proton executable and options"); color: App.Theme.textSecondary }
-                RowLayout {
+                AppButton {
+                    objectName: "manualGameLaunchSectionToggle"
+                    text: (dialog.launchVisible ? "\u25BE " : "\u25B8 ") + qsTr("Advanced launch")
+                    kind: "ghost"
+                    onClicked: dialog.launchVisible = !dialog.launchVisible
+                }
+                ColumnLayout {
+                    visible: dialog.launchVisible
                     Layout.fillWidth: true
-                    AppTextField { id: runnerField; Layout.fillWidth: true; placeholderText: qsTr("Optional; kept separate from the game executable") }
-                    AppButton { text: qsTr("Browse…"); compact: true; onClicked: runnerPicker.open() }
+                    Layout.leftMargin: 8
+                    spacing: 9
+
+                    Label { text: qsTr("Working directory"); color: App.Theme.textSecondary }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        AppTextField { id: workingDirectoryField; Layout.fillWidth: true; placeholderText: qsTr("Defaults to the game directory") }
+                        AppButton { text: qsTr("Browse…"); compact: true; onClicked: workingDirectoryPicker.open() }
+                    }
+
+                    Label { text: qsTr("Arguments"); color: App.Theme.textSecondary }
+                    AppTextField { id: argumentsField; objectName: "manualGameArgumentsField"; Layout.fillWidth: true; placeholderText: qsTr("Example: --mode \"High quality\"") }
+
+                    Label { text: qsTr("Wine / Proton executable and options"); color: App.Theme.textSecondary }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        AppTextField { id: runnerField; Layout.fillWidth: true; placeholderText: qsTr("Optional; kept separate from the game executable") }
+                        AppButton { text: qsTr("Browse…"); compact: true; onClicked: runnerPicker.open() }
+                    }
+
+                    Label { text: qsTr("Wine prefix"); color: App.Theme.textSecondary }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        AppTextField { id: winePrefixField; Layout.fillWidth: true }
+                        AppButton { text: qsTr("Browse…"); compact: true; onClicked: winePrefixPicker.open() }
+                    }
                 }
 
-                Label { text: qsTr("Wine prefix"); color: App.Theme.textSecondary }
-                RowLayout {
-                    Layout.fillWidth: true
-                    AppTextField { id: winePrefixField; Layout.fillWidth: true }
-                    AppButton { text: qsTr("Browse…"); compact: true; onClicked: winePrefixPicker.open() }
+                AppButton {
+                    objectName: "manualGameAppearanceSectionToggle"
+                    text: (dialog.appearanceVisible ? "\u25BE " : "\u25B8 ") + qsTr("Appearance")
+                    kind: "ghost"
+                    onClicked: dialog.appearanceVisible = !dialog.appearanceVisible
                 }
-
-                Label { text: qsTr("Portrait artwork"); color: App.Theme.textSecondary }
-                RowLayout {
+                ColumnLayout {
+                    visible: dialog.appearanceVisible
                     Layout.fillWidth: true
-                    AppTextField { id: portraitField; Layout.fillWidth: true }
-                    AppButton { text: qsTr("Browse…"); compact: true; onClicked: portraitPicker.open() }
-                }
+                    Layout.leftMargin: 8
+                    spacing: 9
 
-                Label { text: qsTr("Header artwork"); color: App.Theme.textSecondary }
-                RowLayout {
-                    Layout.fillWidth: true
-                    AppTextField { id: headerField; Layout.fillWidth: true }
-                    AppButton { text: qsTr("Browse…"); compact: true; onClicked: headerPicker.open() }
+                    Label { text: qsTr("Portrait artwork"); color: App.Theme.textSecondary }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        AppTextField { id: portraitField; Layout.fillWidth: true }
+                        AppButton { text: qsTr("Browse…"); compact: true; onClicked: portraitPicker.open() }
+                    }
+
+                    Label { text: qsTr("Header artwork"); color: App.Theme.textSecondary }
+                    RowLayout {
+                        Layout.fillWidth: true
+                        AppTextField { id: headerField; Layout.fillWidth: true }
+                        AppButton { text: qsTr("Browse…"); compact: true; onClicked: headerPicker.open() }
+                    }
                 }
 
                 AppButton {

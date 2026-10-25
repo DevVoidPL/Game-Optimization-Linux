@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Shapes
 import "../components"
 import "../dialogs"
 import "details"
@@ -18,10 +19,57 @@ Item {
     readonly property bool launchAllowed: Boolean(value(["launchAllowed"], false))
     readonly property bool analysisAllowed: Boolean(value(["analysisAllowed"], false))
     readonly property bool customManualGame: Boolean(value(["customManualGame"], false))
-    readonly property bool launcherIntegrationSupported: {
-        var launcher = String(value(["launcher"], ""))
-        return launcher !== "Heroic" && launcher !== "Lutris"
-               && !page.customManualGame
+    // Feature availability from the game's actual data (directory, executable,
+    // runner, launcher config), not from its source. Each entry carries a
+    // concrete reason when unavailable; the tab stays visible but disabled.
+    property var capabilities: ({})
+    // Keep compression prominent; launcher setup belongs to the game's overview.
+    // Only the selected page is instantiated.
+    readonly property var tabCapabilityKeys: ["", "", "optimization", "optiscaler", "mangohud", "optimization"]
+    readonly property var tabTitles: [qsTr("Overview"), qsTr("Compression"), qsTr("Optimization"), qsTr("Upscaling & effects"), qsTr("MangoHud"), qsTr("Performance analysis")]
+    function refreshCapabilities() {
+        page.capabilities = page.controller && page.controller.getGameCapabilities && page.gameId
+                            ? (page.controller.getGameCapabilities(page.gameId) || ({})) : ({})
+    }
+    function tabAvailable(index) {
+        var key = page.tabCapabilityKeys[index] || ""
+        if (!key) return true
+        if (key === "integrations") return !page.customManualGame
+        var entry = page.capabilities[key]
+        if (entry === undefined) return !page.customManualGame
+        return Boolean(entry.available)
+    }
+    function tabReason(index) {
+        var entry = page.capabilities[page.tabCapabilityKeys[index] || ""] || ({})
+        return App.I18n.message(String(entry.reason || (page.customManualGame ? qsTr("Optimization is not available for custom games") : "")))
+    }
+    readonly property var unavailableTabReasons: {
+        var lines = []
+        var seen = ({})
+        for (var i = 1; i < page.tabTitles.length; ++i) {
+            var reason = page.tabReason(i)
+            if (!page.tabAvailable(i) && reason.length > 0 && !seen[reason]) {
+                seen[reason] = true
+                lines.push(page.tabTitles[i] + ": " + reason)
+            }
+        }
+        // Tools checked in the environment that starts the game (e.g. the
+        // launcher's Flatpak): GameMode / Gamescope inside Optimization.
+        var tools = page.capabilities.tools || ({})
+        for (var name in tools) {
+            var tool = tools[name] || ({})
+            if (name !== "mangohud" && !tool.available && String(tool.reason || "").length > 0)
+                lines.push(String(tool.label || name) + ": " + App.I18n.message(String(tool.reason)))
+        }
+        return lines
+    }
+    // The launcher sandbox is checked in the background; refresh until known.
+    property int capabilityPolls: 0
+    Timer {
+        interval: 1000
+        repeat: true
+        running: Boolean(page.capabilities.pending) && page.capabilityPolls < 40
+        onTriggered: { page.capabilityPolls += 1; page.refreshCapabilities() }
     }
     signal toastRequested(string message, string tone)
 
@@ -40,7 +88,21 @@ Item {
             controller.backToGames()
     }
 
-    onGameIdChanged: tabBar.currentIndex = 0
+    onGameIdChanged: { tabBar.currentIndex = 0; page.capabilityPolls = 0; page.scrollPositions = ({}); page.refreshCapabilities() }
+    // Scroll position per tab while the same game stays open.
+    property var scrollPositions: ({})
+    property real pendingScrollRestore: -1
+    function restoreScroll() {
+        var flick = tabLoader.item && tabLoader.item.scrollFlickable ? tabLoader.item.scrollFlickable : null
+        if (!flick || page.pendingScrollRestore < 0) return
+        var maxY = Math.max(0, flick.contentHeight - flick.height)
+        if (maxY >= page.pendingScrollRestore) {
+            flick.contentY = page.pendingScrollRestore
+            page.pendingScrollRestore = -1
+        }
+    }
+    onGameDataChanged: page.refreshCapabilities()
+    Component.onCompleted: page.refreshCapabilities()
 
     ColumnLayout {
         visible: page.hasSelection
@@ -60,20 +122,53 @@ Item {
             }
 
             GameCover {
+                id: headerArtwork
+                objectName: "detailsGameArtwork"
                 Layout.preferredWidth: page.width < 980 ? 168 : 252
-                Layout.preferredHeight: page.width < 980 ? 105 : 142
+                Layout.preferredHeight: Layout.preferredWidth / (artworkAspectRatio >= 1.4 ? artworkAspectRatio : 16 / 9)
+                gameId: page.gameId
+                diagnosticViewKind: "details"
                 title: page.value(["name", "title"], qsTr("Game"))
                 launcher: page.value(["launcher"], qsTr("Library"))
                 artworkSource: page.value([
-                    "effectiveArtworkUrl",
-                    "headerArtwork",
                     "headerArtworkUrl",
+                    "headerArtwork",
+                    "effectiveArtworkUrl",
                     "fallbackArtwork",
                     "portraitArtwork",
                     "cover"
                 ], "")
                 artworkFillMode: Image.PreserveAspectFit
+
+                // Cover only the four corner cutouts. Unlike an offscreen shader
+                // mask, this also renders with Qt's software backend.
+                Shape {
+                    id: artworkCorners
+                    objectName: "headerArtworkCorners"
+                    anchors.fill: parent
+                    readonly property real r: App.Theme.radiusMedium
+                    ShapePath {
+                        strokeColor: "transparent"
+                        fillColor: App.Theme.background
+                        fillRule: ShapePath.OddEvenFill
+                        startX: 0; startY: 0
+                        PathLine { x: artworkCorners.width; y: 0 }
+                        PathLine { x: artworkCorners.width; y: artworkCorners.height }
+                        PathLine { x: 0; y: artworkCorners.height }
+                        PathLine { x: 0; y: 0 }
+                        PathMove { x: artworkCorners.r; y: 0 }
+                        PathLine { x: artworkCorners.width - artworkCorners.r; y: 0 }
+                        PathArc { x: artworkCorners.width; y: artworkCorners.r; radiusX: artworkCorners.r; radiusY: artworkCorners.r }
+                        PathLine { x: artworkCorners.width; y: artworkCorners.height - artworkCorners.r }
+                        PathArc { x: artworkCorners.width - artworkCorners.r; y: artworkCorners.height; radiusX: artworkCorners.r; radiusY: artworkCorners.r }
+                        PathLine { x: artworkCorners.r; y: artworkCorners.height }
+                        PathArc { x: 0; y: artworkCorners.height - artworkCorners.r; radiusX: artworkCorners.r; radiusY: artworkCorners.r }
+                        PathLine { x: 0; y: artworkCorners.r }
+                        PathArc { x: artworkCorners.r; y: 0; radiusX: artworkCorners.r; radiusY: artworkCorners.r }
+                    }
+                }
             }
+
 
             ColumnLayout {
                 Layout.fillWidth: true
@@ -98,8 +193,8 @@ Item {
                     }
 
                     StatusBadge {
-                        text: page.value(["status"], qsTr("Ready"))
-                        status: text
+                        text: App.I18n.status(page.value(["status"], "ready"))
+                        status: page.value(["status"], "ready")
                     }
                 }
 
@@ -164,7 +259,7 @@ Item {
                         visible: page.width >= 1080
                         Layout.preferredWidth: 115
                         label: qsTr("Current saving")
-                        value: page.value(["savedSpace"], "0 GB")
+                        value: App.I18n.status(page.value(["savedSpace"], "0 GB"))
                     }
 
                     LabeledValue {
@@ -257,27 +352,22 @@ Item {
             }
 
             Repeater {
-                model: [
-                    qsTr("Overview"),
-                    qsTr("Storage"),
-                    qsTr("Optimization"),
-                    qsTr("OptiScaler"),
-                    qsTr("Narrator"),
-                    qsTr("MangoHud")
-                ]
+                // A language change updates labels without recreating buttons
+                // (and briefly selecting/loading each unrelated page).
+                model: page.tabCapabilityKeys.length
 
                 delegate: TabButton {
                     id: tabButton
                     required property int index
-                    required property string modelData
-                    width: Math.max(92, (tabBar.width - tabBar.spacing * 5) / 6)
+                    width: Math.max(92, (tabBar.width - tabBar.spacing * (page.tabTitles.length - 1)) / page.tabTitles.length)
                     height: tabBar.height
                     implicitWidth: 96
                     implicitHeight: height
-                    text: modelData
-                    enabled: index < 2 || page.launcherIntegrationSupported
+                    text: page.tabTitles[index]
+                    enabled: page.tabAvailable(tabButton.index)
                     ToolTip.visible: !enabled && tabDisabledHover.hovered
-                    ToolTip.text: qsTr("Full optimization launch integration for this launcher is not available yet")
+                    ToolTip.text: page.tabReason(tabButton.index)
+                    Accessible.description: tabButton.enabled ? "" : page.tabReason(tabButton.index)
                     focusPolicy: Qt.StrongFocus
 
                     contentItem: Label {
@@ -312,11 +402,16 @@ Item {
             Layout.fillHeight: true
             sourceComponent: {
                 if (tabBar.currentIndex === 1) return storageComponent
-                if (tabBar.currentIndex === 2) return optimizationComponent
+                if (tabBar.currentIndex === 2) return performanceComponent
                 if (tabBar.currentIndex === 3) return optiScalerComponent
-                if (tabBar.currentIndex === 4) return narratorComponent
-                if (tabBar.currentIndex === 5) return mangoHudComponent
+                if (tabBar.currentIndex === 4) return mangoHudComponent
+                if (tabBar.currentIndex === 5) return diagnosticsComponent
                 return overviewComponent
+            }
+            onLoaded: {
+                var saved = page.scrollPositions[String(tabBar.currentIndex)]
+                page.pendingScrollRestore = saved === undefined ? -1 : Number(saved)
+                page.restoreScroll()
             }
         }
     }
@@ -345,12 +440,27 @@ Item {
         }
     }
 
+    Connections {
+        target: tabLoader.item && tabLoader.item.scrollFlickable ? tabLoader.item.scrollFlickable : null
+        ignoreUnknownSignals: true
+        function onContentYChanged() {
+            if (page.pendingScrollRestore >= 0 || !tabLoader.item) return
+            var positions = page.scrollPositions
+            positions[String(tabBar.currentIndex)] = tabLoader.item.scrollFlickable.contentY
+            page.scrollPositions = positions
+        }
+        function onContentHeightChanged() { page.restoreScroll() }
+    }
+
     Component {
         id: overviewComponent
         OverviewTab {
             controller: page.controller
             gameData: page.gameData
             tasksData: page.tasksData
+            capabilities: page.capabilities
+            capabilityNotices: page.unavailableTabReasons
+            onOptiScalerRequested: tabBar.currentIndex = 3
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
         }
     }
@@ -366,8 +476,20 @@ Item {
     }
 
     Component {
-        id: optimizationComponent
+        id: performanceComponent
         OptimizationTab {
+            section: "performance"
+            controller: page.controller
+            gameData: page.gameData
+            onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
+            onOptiScalerRequested: tabBar.currentIndex = 3
+        }
+    }
+
+    Component {
+        id: diagnosticsComponent
+        OptimizationTab {
+            section: "diagnostics"
             controller: page.controller
             gameData: page.gameData
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
@@ -377,16 +499,7 @@ Item {
 
     Component {
         id: optiScalerComponent
-        OptiScalerTab {
-            controller: page.controller
-            gameData: page.gameData
-            onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
-        }
-    }
-
-    Component {
-        id: narratorComponent
-        NarratorTab {
+        ScalingEffectsTab {
             controller: page.controller
             gameData: page.gameData
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
@@ -398,6 +511,7 @@ Item {
         MangoHudTab {
             controller: page.controller
             gameData: page.gameData
+            onOptimizationRequested: tabBar.currentIndex = 2
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
         }
     }

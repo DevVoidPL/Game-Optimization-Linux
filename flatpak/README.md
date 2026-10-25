@@ -1,33 +1,46 @@
-# Game Optimization Linux Flatpak
+# Build GameOpti with Flatpak
 
-These instructions build the development checkout. For the current public
-**1.8 Alpha** download, use [GitHub Releases](https://github.com/DevVoidPL/Game-Optimization-Linux/releases).
-**2.0 Beta is announced and not yet available**; a local bundle's internal
-version label does not establish a public release. See [../ROADMAP.md](../ROADMAP.md).
+These instructions build the current development source. Public downloads and
+release notes are available on [GitHub Releases](https://github.com/DevVoidPL/Game-Optimization-Linux/releases).
+See the [project status](../ROADMAP.md) for the Beta 2.0 schedule.
 
-Build the development repository without installing from inside Flatpak Builder:
+Install Flatpak and Flatpak Builder, either from your distribution or as
+`org.flatpak.Builder` from Flathub. The manifest uses the Freedesktop 25.08
+runtime and SDK. Run the following commands from the repository root.
+
+## Build
+
+With the Flathub Builder application:
 
 ```bash
-flatpak run --filesystem="$PWD" --command=flatpak-builder org.flatpak.Builder \
-  --force-clean --repo=.flatpak-build-repo build-flatpak \
+flatpak run --filesystem="$PWD" org.flatpak.Builder \
+  --user --force-clean --default-branch=stable \
+  --repo=.flatpak-build-repo .flatpak-build-dir \
   flatpak/io.github.DevVoidPL.GameOptimizationLinux.yml
 ```
 
-Export the bundle and install it with the host Flatpak executable:
+A host installation of `flatpak-builder` accepts the same arguments. Dependencies
+are pinned in the manifest; the first build downloads their sources. Generated
+build directories and repositories stay outside version control.
+
+## Export and install locally
+
+Use the host Flatpak executable for these steps:
 
 ```bash
 APP_VERSION="$(sed -nE 's/^APP_VERSION[[:space:]]*=[[:space:]]*"([^"[:space:]]+)"[[:space:]]*$/\1/p' src/game_optimization_linux/config.py)"
 BUNDLE="dist/Game-Optimization-Linux-${APP_VERSION}-x86_64.flatpak"
-flatpak build-bundle .flatpak-build-repo \
-  "$BUNDLE" \
+mkdir -p dist
+flatpak build-bundle .flatpak-build-repo "$BUNDLE" \
   io.github.DevVoidPL.GameOptimizationLinux stable
-flatpak install --user --reinstall \
-  "$BUNDLE"
+flatpak install --user --reinstall "$BUNDLE"
+flatpak run io.github.DevVoidPL.GameOptimizationLinux --desktop
 ```
 
-Do not pass `--install` to Flatpak Builder running inside its sandbox. That
-would export a desktop entry pointing at the Builder sandbox's
-`/app/bin/flatpak` instead of the host Flatpak executable.
+Do not use Builder's `--install` from inside its Flatpak sandbox: installation
+must use the host executable. Local installation preserves application data.
+Exporting a bundle does not publish a GitHub release.
 
-The manifest pins `py7zr` and all runtime dependencies. Archive extraction is
-performed inside the sandbox and never calls a host `7z` executable.
+The manifest includes the maintained runner installer and required application
+assets. Optional graphics components and Narrator models are downloaded on
+demand; private voice files and local configuration are not part of the build.

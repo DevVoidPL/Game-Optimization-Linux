@@ -37,18 +37,38 @@ _KNOWN_UPSCALER_VALUES = frozenset(
 
 FSR_SECTION = "FSR"
 UPSCALERS_SECTION = "Upscalers"
+SHARPNESS_SECTION = "Sharpness"
+LOG_SECTION = "Log"
+MENU_SECTION = "Menu"
 MANAGED_FSR_KEYS = (
     "Fsr4Update",
     "Fsr4ForceEnableInt8",
     "Fsr4ForceModel",
+    "Fsr4GpuSupport",
+    "Fsr4Model",
     "FsrAgilitySDKUpgrade",
     "Fsr4EnableWatermark",
+    "Fsr4Preset",
 )
 MANAGED_UPSCALER_KEYS = (
     "Dx11Upscaler",
     "Dx12Upscaler",
     "VulkanUpscaler",
 )
+MANAGED_SHARPNESS_KEYS = ("OverrideSharpness", "Sharpness")
+MANAGED_LOG_KEYS = ("LogToFile", "LogLevel")
+MANAGED_MENU_KEYS = ("ShortcutKey",)
+# OptiScaler v10 (``Fsr4GpuSupport``/``Fsr4Model``, OptiTypes.h FSR4Support
+# and FSR4Model enums).  Values are upstream integers.
+FSR4_GPU_SUPPORT_INT8 = "2"
+FSR4_GPU_SUPPORT_INT8_LITE = "4"
+FSR4_MODEL_INT8 = "1"
+FSR4_MODEL_INT8_LITE = "3"
+FSR4_PRESET_VALUES = ("auto", "0", "1", "2", "3", "4", "5")
+LOG_MODES = ("auto", "info", "debug")
+_LOG_LEVELS = {"info": "2", "debug": "1"}
+# Virtual-key codes documented in OptiScaler.ini ([Menu] ShortcutKey).
+OVERLAY_SHORTCUTS = ("auto", "0x2D", "0x24", "0x23", "0x79", "0x7B")
 AUTO_FALSE_FSR_KEYS = frozenset(
     {
         "fsr4enablewatermark",
@@ -73,16 +93,29 @@ class OptiScalerIniCapabilities:
     dx12_values: tuple[str, ...]
     vulkan_values: tuple[str, ...]
     known: bool = True
+    fsr4_model: bool = False
+    fsr4_preset: bool = False
+    sharpness: bool = False
+    log: bool = False
+    overlay_shortcut: bool = False
 
     @property
     def supports_fsr4(self) -> bool:
-        # v0.9.4 exposes Fsr4Update.  Newer INI generations removed that key
-        # and expose Fsr4ForceModel as their FSR4 control instead.
-        return self.fsr4_update or self.force_int8_style == "model"
+        # v0.9.4 exposes Fsr4Update.  Later nightlies expose Fsr4ForceModel,
+        # and v10 replaced both with Fsr4GpuSupport + Fsr4Model.
+        return self.fsr4_update or self.force_int8_style in {"model", "gpu_support"}
 
     @property
     def supports_force_int8(self) -> bool:
-        return self.known and self.force_int8_style in {"boolean", "model"}
+        return self.known and self.force_int8_style in {
+            "boolean", "model", "gpu_support"
+        }
+
+    @property
+    def supports_lite(self) -> bool:
+        """INT8 Lite exists only as a v10 ``Fsr4Model`` choice."""
+
+        return self.known and self.force_int8_style == "gpu_support" and self.fsr4_model
 
     @property
     def force_int8_state(self) -> str:
@@ -102,6 +135,12 @@ class OptiScalerIniCapabilities:
             "dx11Upscalers": list(self.dx11_values),
             "dx12Upscalers": list(self.dx12_values),
             "vulkanUpscalers": list(self.vulkan_values),
+            "fsr4Model": self.fsr4_model,
+            "lite": self.supports_lite,
+            "fsr4Preset": self.fsr4_preset,
+            "sharpness": self.sharpness,
+            "log": self.log,
+            "overlayShortcut": self.overlay_shortcut,
         }
 
 
@@ -134,6 +173,10 @@ class OptiScalerIniState:
     dx11_upscaler: str = ""
     dx12_upscaler: str = ""
     vulkan_upscaler: str = ""
+    fsr4_preset: str = ""
+    sharpness: str = ""
+    log_mode: str = ""
+    overlay_shortcut: str = ""
 
     def to_dict(self) -> dict[str, str]:
         return {
@@ -143,6 +186,10 @@ class OptiScalerIniState:
             "dx11Upscaler": self.dx11_upscaler,
             "dx12Upscaler": self.dx12_upscaler,
             "vulkanUpscaler": self.vulkan_upscaler,
+            "fsr4Preset": self.fsr4_preset,
+            "sharpness": self.sharpness,
+            "logMode": self.log_mode,
+            "overlayShortcut": self.overlay_shortcut,
         }
 
 
@@ -210,10 +257,14 @@ def inspect_optiscaler_ini(text: str) -> OptiScalerIniCapabilities:
         )
 
     force_style = "none"
-    if has(fsr, "Fsr4ForceModel"):
+    if has(fsr, "Fsr4GpuSupport"):
+        force_style = "gpu_support"
+    elif has(fsr, "Fsr4ForceModel"):
         force_style = "model"
     elif has(fsr, "Fsr4ForceEnableInt8"):
         force_style = "boolean"
+    sharpness_section = SHARPNESS_SECTION.casefold()
+    log_section = LOG_SECTION.casefold()
     return OptiScalerIniCapabilities(
         fsr4_update=has(fsr, "Fsr4Update"),
         force_int8_style=force_style,
@@ -223,6 +274,12 @@ def inspect_optiscaler_ini(text: str) -> OptiScalerIniCapabilities:
         dx12_values=backend_values("Dx12Upscaler") if has(upscalers, "Dx12Upscaler") else (),
         vulkan_values=backend_values("VulkanUpscaler") if has(upscalers, "VulkanUpscaler") else (),
         known=True,
+        fsr4_model=has(fsr, "Fsr4Model"),
+        fsr4_preset=has(fsr, "Fsr4Preset"),
+        sharpness=has(sharpness_section, "OverrideSharpness")
+        and has(sharpness_section, "Sharpness"),
+        log=has(log_section, "LogToFile") and has(log_section, "LogLevel"),
+        overlay_shortcut=has(MENU_SECTION.casefold(), "ShortcutKey"),
     )
 
 
@@ -239,7 +296,25 @@ def inspect_optiscaler_ini_state(text: str) -> OptiScalerIniState:
     update = value(fsr, "Fsr4Update")
     force_boolean = value(fsr, "Fsr4ForceEnableInt8")
     force_model = value(fsr, "Fsr4ForceModel")
-    if update == "false":
+    gpu_support = value(fsr, "Fsr4GpuSupport")
+    model = value(fsr, "Fsr4Model")
+    if (fsr, "fsr4gpusupport") in values:
+        # v10 generation: the model key is authoritative.
+        if model == FSR4_MODEL_INT8_LITE:
+            mode = "lite"
+        elif model == FSR4_MODEL_INT8 or gpu_support in {
+            FSR4_GPU_SUPPORT_INT8, FSR4_GPU_SUPPORT_INT8_LITE
+        }:
+            mode = "force_int8"
+        elif model == "0" or gpu_support in {"0", "1"}:
+            # GameOpti writes the explicit upstream default "0 = No override"
+            # for the full model, so it stays distinguishable from "auto".
+            mode = "normal"
+        elif gpu_support in {"auto", ""} and model in {"auto", ""}:
+            mode = "automatic"
+        else:
+            mode = "unknown"
+    elif update == "false":
         mode = "disabled"
     elif force_model == "2" or force_boolean == "true":
         mode = "force_int8"
@@ -256,6 +331,17 @@ def inspect_optiscaler_ini_state(text: str) -> OptiScalerIniState:
         current = value(fsr, key)
         return current if current in {"true", "false", "auto"} else "unknown"
 
+    sharpness_section = SHARPNESS_SECTION.casefold()
+    log_section = LOG_SECTION.casefold()
+    override = value(sharpness_section, "OverrideSharpness")
+    log_to_file = value(log_section, "LogToFile")
+    log_level = value(log_section, "LogLevel")
+    if log_to_file == "true":
+        log_mode = "debug" if log_level in {"0", "1"} else "info"
+    elif log_to_file in {"auto", "false"}:
+        log_mode = "auto"
+    else:
+        log_mode = ""
     return OptiScalerIniState(
         fsr4_mode=mode,
         watermark=tri_state("Fsr4EnableWatermark"),
@@ -263,6 +349,15 @@ def inspect_optiscaler_ini_state(text: str) -> OptiScalerIniState:
         dx11_upscaler=value(upscalers, "Dx11Upscaler"),
         dx12_upscaler=value(upscalers, "Dx12Upscaler"),
         vulkan_upscaler=value(upscalers, "VulkanUpscaler"),
+        fsr4_preset=value(fsr, "Fsr4Preset"),
+        sharpness=(
+            value(sharpness_section, "Sharpness") if override == "true"
+            else "auto" if override in {"auto", "false"} else ""
+        ),
+        log_mode=log_mode,
+        overlay_shortcut=values.get(
+            (MENU_SECTION.casefold(), "shortcutkey"), ""
+        ).strip(),
     )
 
 
@@ -282,6 +377,12 @@ def managed_ini_differences(
             key.casefold(): UPSCALERS_SECTION.casefold()
             for key in MANAGED_UPSCALER_KEYS
         },
+        **{
+            key.casefold(): SHARPNESS_SECTION.casefold()
+            for key in MANAGED_SHARPNESS_KEYS
+        },
+        **{key.casefold(): LOG_SECTION.casefold() for key in MANAGED_LOG_KEYS},
+        **{key.casefold(): MENU_SECTION.casefold() for key in MANAGED_MENU_KEYS},
     }
     differences: list[dict[str, str]] = []
     for raw_key, raw_expected in managed_settings.items():
@@ -383,12 +484,16 @@ def managed_ini_updates(
     """Translate profile choices to keys supported by this installed INI."""
 
     mode = str(fsr4_mode).casefold()
-    if mode not in {"automatic", "normal", "force_int8", "disabled"}:
+    if mode not in {"automatic", "normal", "force_int8", "lite", "disabled"}:
         raise ValueError("unsupported FSR4 mode")
     if not capabilities.supports_fsr4:
         raise ValueError("the installed OptiScaler release does not expose FSR4 controls")
     if mode == "force_int8" and not capabilities.supports_force_int8:
         raise ValueError("the installed OptiScaler release does not expose Force INT8")
+    if mode == "lite" and not capabilities.supports_lite:
+        raise ValueError(
+            "FSR 4 INT8 Lite requires OptiScaler v10 (Fsr4Model); the installed release does not expose it"
+        )
     if mode == "disabled" and not capabilities.fsr4_update:
         raise ValueError(
             "the installed OptiScaler release cannot explicitly disable FSR4"
@@ -401,7 +506,21 @@ def managed_ini_updates(
             "force_int8": "true",
             "disabled": "false",
         }[mode]
-    if capabilities.force_int8_style == "model":
+    if capabilities.force_int8_style == "gpu_support":
+        # v10: Fsr4GpuSupport overrides the detected support class, Fsr4Model
+        # picks the network.  INT8 Lite "only uses standard shader features"
+        # and is shipped only by the Vulkan driver library (amdvkffx64).
+        updates[(FSR_SECTION, "Fsr4GpuSupport")] = {
+            "automatic": "auto",
+            "normal": "0",
+            "force_int8": FSR4_GPU_SUPPORT_INT8,
+            "lite": FSR4_GPU_SUPPORT_INT8_LITE,
+        }[mode]
+        if capabilities.fsr4_model:
+            updates[(FSR_SECTION, "Fsr4Model")] = (
+                FSR4_MODEL_INT8_LITE if mode == "lite" else "auto"
+            )
+    elif capabilities.force_int8_style == "model":
         updates[(FSR_SECTION, "Fsr4ForceModel")] = (
             "2" if mode == "force_int8" else "0" if mode in {"normal", "disabled"} else "auto"
         )
@@ -433,6 +552,71 @@ def managed_ini_updates(
         if configured_value not in available:
             raise ValueError(f"{key}={value} is not advertised by the installed OptiScaler INI")
         updates[(UPSCALERS_SECTION, key)] = configured_value
+    return updates
+
+
+def normalize_sharpness(value: object) -> str:
+    """``auto`` (upstream default: no override) or a 0.00-1.00 strength."""
+
+    text = str(value if value is not None else "auto").strip().casefold()
+    if text in {"", "auto"}:
+        return "auto"
+    try:
+        number = float(text)
+    except ValueError as error:
+        raise ValueError("Sharpness must be auto or a number from 0.0 to 1.0") from error
+    if not 0.0 <= number <= 1.0:
+        raise ValueError("Sharpness must be auto or a number from 0.0 to 1.0")
+    return f"{number:.2f}"
+
+
+def managed_option_updates(
+    *,
+    fsr4_preset: str,
+    sharpness: str,
+    log_mode: str,
+    overlay_shortcut: str,
+    capabilities: OptiScalerIniCapabilities,
+) -> dict[tuple[str, str], str]:
+    """Map the additional per-game options to keys present in this INI.
+
+    A value other than ``auto`` for a key the installed release does not
+    expose is rejected instead of being written as an unknown key.
+    """
+
+    preset = str(fsr4_preset or "auto").strip().casefold()
+    if preset not in FSR4_PRESET_VALUES:
+        raise ValueError("Fsr4Preset must be auto or 0-5")
+    strength = normalize_sharpness(sharpness)
+    log = str(log_mode or "auto").strip().casefold()
+    if log not in LOG_MODES:
+        raise ValueError("unsupported OptiScaler log mode")
+    shortcut = str(overlay_shortcut or "auto").strip()
+    if shortcut.casefold() == "auto":
+        shortcut = "auto"
+    if shortcut not in OVERLAY_SHORTCUTS:
+        raise ValueError("unsupported OptiScaler overlay shortcut")
+    updates: dict[tuple[str, str], str] = {}
+    for enabled, available, label in (
+        (preset != "auto", capabilities.fsr4_preset, "Fsr4Preset"),
+        (strength != "auto", capabilities.sharpness, "Sharpness"),
+        (log != "auto", capabilities.log, "LogToFile"),
+        (shortcut != "auto", capabilities.overlay_shortcut, "ShortcutKey"),
+    ):
+        if enabled and not available:
+            raise ValueError(f"{label} is not exposed by the installed OptiScaler INI")
+    if capabilities.fsr4_preset:
+        updates[(FSR_SECTION, "Fsr4Preset")] = preset
+    if capabilities.sharpness:
+        updates[(SHARPNESS_SECTION, "OverrideSharpness")] = (
+            "true" if strength != "auto" else "auto"
+        )
+        updates[(SHARPNESS_SECTION, "Sharpness")] = strength
+    if capabilities.log:
+        updates[(LOG_SECTION, "LogToFile")] = "true" if log != "auto" else "auto"
+        updates[(LOG_SECTION, "LogLevel")] = _LOG_LEVELS.get(log, "auto")
+    if capabilities.overlay_shortcut:
+        updates[(MENU_SECTION, "ShortcutKey")] = shortcut
     return updates
 
 
@@ -541,6 +725,8 @@ __all__ = [
     "OptiScalerIniCapabilities",
     "inspect_optiscaler_ini",
     "managed_ini_updates",
+    "managed_option_updates",
+    "normalize_sharpness",
     "recommend_fsr4",
     "update_ini_text",
 ]

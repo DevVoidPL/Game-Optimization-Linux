@@ -274,6 +274,10 @@ def game_to_qml(
         str(raw.get("launcher", "")).casefold() == "manual"
         and str(raw.get("data_source", "")).casefold() == "local"
     )
+    try:
+        profile_key = str(getattr(game, "profile_key", "") or "")
+    except Exception:  # noqa: BLE001 - presenter must not fail on odd test doubles
+        profile_key = ""
     custom_manual_game = bool(
         str(raw.get("launcher", "")).casefold() == "manual"
         and str(raw.get("id", "")).startswith("manual-")
@@ -319,6 +323,8 @@ def game_to_qml(
         "launcher": str(raw.get("launcher", "Unknown")),
         "launcherGameId": str(raw.get("launcher_game_id") or ""),
         "customManualGame": custom_manual_game,
+        # Key of saved per-game profiles (OptiScaler, optimization, MangoHud).
+        "profileKey": profile_key,
         "store": str(raw.get("store") or "unknown"),
         "launchUri": str(raw.get("launch_uri") or ""),
         "launcherVariant": str(raw.get("launcher_variant") or ""),
@@ -691,12 +697,15 @@ def settings_to_qml(settings: AppSettings) -> dict[str, Any]:
         "navigation_repeat_rate_ms": "navigationRepeatRateMs",
         "hide_cursor_in_couch_mode": "hideCursorInCouchMode",
         "start_couch_mode_fullscreen": "startCouchModeFullscreen",
+        "couch_show_system_usage": "couchShowSystemUsage",
         "post_launch_behavior": "postLaunchBehavior",
         "interface_sounds": "interfaceSounds",
         "couch_menu_sounds_enabled": "couchMenuSoundsEnabled",
         "couch_menu_sounds_volume": "couchMenuSoundsVolume",
         "couch_music_enabled": "couchMusicEnabled",
         "couch_music_volume": "couchMusicVolume",
+        "couch_motion_mode": "couchMotionMode",
+        "narrator_ocr_mode": "narratorOcrMode",
     }
     for source, target in aliases.items():
         if source in raw:

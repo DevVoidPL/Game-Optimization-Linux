@@ -13,6 +13,9 @@ from game_optimization_linux.services.narrator_region import (
     normalized_region_from_preview,
     preview_rect_from_normalized,
 )
+from game_optimization_linux.services.narrator_persistence import (
+    NarratorSettingsRepository,
+)
 
 
 def test_narrator_page_uses_native_selector_instead_of_qml_popup() -> None:
@@ -59,6 +62,31 @@ def test_normalized_coordinate_conversion_without_scaling() -> None:
     )
 
     assert region == NormalizedRect(x=0.1, y=0.6, width=0.7, height=0.2)
+
+
+def test_saved_graphical_roi_is_game_specific_and_survives_restart(
+    tmp_path: Path,
+) -> None:
+    repository = NarratorSettingsRepository(tmp_path / "games")
+    game_key = "123"
+    region_a = NormalizedRect(x=0.12, y=0.58, width=0.74, height=0.24)
+    region_b = NormalizedRect(x=0.20, y=0.66, width=0.62, height=0.18)
+
+    repository.save_overrides(
+        game_key,
+        {
+            "subtitle_region": region_a.to_dict(),
+        },
+    )
+    assert repository.load(game_key).subtitle_region == region_a
+
+    repository.save_overrides(
+        game_key,
+        {"subtitle_region": region_b.to_dict()},
+    )
+    restarted = NarratorSettingsRepository(tmp_path / "games")
+    assert restarted.load(game_key).subtitle_region == region_b
+    assert restarted.load("456").subtitle_region != region_b
 
 
 def test_letterboxed_preview_maps_only_the_painted_game_frame() -> None:
@@ -226,3 +254,44 @@ def test_rgb888_preview_rejects_stride_shorter_than_one_pixel_row() -> None:
 
     with pytest.raises(ValueError, match="Invalid subtitle preview stride"):
         encode_region_preview(frame)
+
+
+def test_region_canvas_gamepad_presets_move_resize_stay_normalized() -> None:
+    from PySide6.QtGui import QImage
+
+    from game_optimization_linux.controllers.narrator_region_selector import (
+        RegionCanvas,
+        SubtitleRegionSelectorWindow,
+    )
+
+    image = QImage(160, 90, QImage.Format.Format_RGB888)
+    image.fill(0)
+    canvas = RegionCanvas(image, source_width=1600, source_height=900)
+    assert canvas.normalized_region() is None        # mouse contract: empty start
+    for expected in ("bottom_20", "bottom_30", "center_bottom", "full_screen", "bottom_20"):
+        assert canvas.handle_gamepad_action("NextTab")
+        assert canvas.preset_id == expected
+    assert canvas.handle_gamepad_action("PreviousTab") and canvas.preset_id == "full_screen"
+    canvas.handle_gamepad_action("PreviousTab")      # center_bottom
+    for _ in range(40):                              # clamp at the right edge
+        canvas.handle_gamepad_action("NavigateRight")
+    region = canvas.normalized_region()
+    assert region.x + region.width <= 1.0 and region.x == pytest.approx(0.30)
+    for _ in range(40):                              # grow to the whole frame
+        canvas.handle_gamepad_action("PageDown")
+    assert canvas.normalized_region().to_dict() == pytest.approx(
+        {"x": 0.0, "y": 0.0, "width": 1.0, "height": 1.0})
+    for _ in range(80):                              # never below the minimum
+        canvas.handle_gamepad_action("PageUp")
+    assert canvas.normalized_region().width == pytest.approx(RegionCanvas.MIN_GAMEPAD_SIZE)
+    assert canvas.handle_gamepad_action("Confirm") is False
+
+    window = SubtitleRegionSelectorWindow(image, source_width=1600, source_height=900)
+    assert window.canvas.preset_id == "bottom_20"    # ready preset on start
+    submitted: list[object] = []
+    window.selectionSubmitted.connect(submitted.append)
+    assert window.handle_gamepad_action("Confirm")
+    assert len(submitted) == 1 and submitted[0] == pytest.approx(
+        {"x": 0.0, "y": 0.8, "width": 1.0, "height": 0.2})
+    assert "A:" in window.gamepad_hint.text() and "B:" in window.gamepad_hint.text()
+    window.deleteLater()

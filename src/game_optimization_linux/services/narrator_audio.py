@@ -148,6 +148,10 @@ class QtNarratorAudioOutput(QObject):
 
         return self._superseded_count
 
+    @property
+    def queue_depth(self) -> int:
+        return int(self._current is not None) + int(self._pending is not None)
+
     def play(
         self,
         audio: PcmAudio,

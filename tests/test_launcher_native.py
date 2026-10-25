@@ -143,3 +143,42 @@ def test_controller_routes_only_heroic_and_lutris_to_launcher_native(
         assert native.games == [heroic.id]
     finally:
         controller.shutdown()
+
+
+def test_post_launch_behavior_applies_to_heroic_and_lutris(tmp_path: Path) -> None:
+    """Regression: "After launching a game" was ignored outside Steam."""
+
+    heroic = _game(
+        Launcher.HEROIC,
+        variant="flatpak",
+        uri="heroic://launch?appName=id&runner=legendary",
+    )
+
+    class RecordingLauncher:
+        def launch(self, game: Game, *_args: object) -> tuple[str, ...]:
+            return ("flatpak", "run", "heroic")
+
+    store = SettingsStore(tmp_path / "settings.json")
+    controller = AppController(
+        game_provider=DemoGameProvider((heroic,)),
+        task_service=MockTaskService(),
+        settings_store=store,
+        system_provider=DemoSystemProvider(),
+        launcher_native=RecordingLauncher(),
+        initial_games=(heroic,),
+        demo_mode=False,
+        auto_refresh=False,
+    )
+    actions: list[str] = []
+    controller.windowActionRequested.connect(actions.append)
+    try:
+        # Default is Minimize, as for Steam.
+        assert controller.launchGame(heroic.id) is True
+        assert actions == ["minimize"]
+
+        assert controller.saveSetting("postLaunchBehavior", "Stay open") is True
+        controller._last_launch_request.clear()
+        assert controller.launchGame(heroic.id) is True
+        assert actions == ["minimize", "stay"]
+    finally:
+        controller.shutdown()

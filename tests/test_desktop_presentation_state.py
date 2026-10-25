@@ -585,6 +585,145 @@ def test_single_and_unavailable_update_entries_can_be_cleared(tmp_path: Path) ->
         restored.shutdown()
 
 
+def _observation(game: Game, build_id: str) -> ManifestObservation:
+    return ManifestObservation(
+        game_id=game.id,
+        app_id=str(game.steam_app_id),
+        install_path=str(game.install_path),
+        library_path=str(game.library_path),
+        build_id=build_id,
+        manifest_path=str(game.library_path / "steamapps" / "appmanifest_4242.acf"),
+        manifest_mtime_ns=1,
+        manifest_size_bytes=1,
+        install_size_bytes=1,
+        state_flags=4,
+        library_available=game.library_available,
+        update_in_progress=False,
+    )
+
+
+def test_cleared_pending_update_stays_hidden_while_it_changes_pending_state(
+    tmp_path: Path,
+) -> None:
+    """Regression: a hidden update returned as soon as Steam touched the manifest.
+
+    The same build moves analysis_required -> waiting_for_stability -> back.
+    That is one update event; its tombstone must cover every pending state.
+    """
+
+    disconnected = replace(
+        _game(tmp_path),
+        library_available=False,
+        status=GameStatus.DRIVE_DISCONNECTED,
+    )
+    observation = _observation(disconnected, "211474")
+    update_state = GameUpdateStateStore(tmp_path / "updates.json")
+    display_path = tmp_path / "display.json"
+
+    def save(status: GameUpdateStatus) -> None:
+        update_state.save(
+            UpdateStateDatabase(
+                records={
+                    disconnected.id: GameUpdateRecord(
+                        game_id=disconnected.id,
+                        app_id="4242",
+                        status=status,
+                        current_observation=observation,
+                        pending_observation=(
+                            observation
+                            if status is GameUpdateStatus.WAITING_FOR_STABILITY
+                            else None
+                        ),
+                    )
+                },
+                initial_inventory_complete=True,
+            )
+        )
+
+    save(GameUpdateStatus.ANALYSIS_REQUIRED)
+    controller = _controller(
+        tmp_path,
+        disconnected,
+        tracker=GameUpdateTracker(update_state),
+        display_store=UpdateDisplayStateStore(display_path),
+    )
+    try:
+        assert controller.updatesSummary["unavailableClearableCount"] == 1
+        assert controller.updatesSummary["finishedClearableCount"] == 0
+        assert controller.clearUnavailableUpdates() == 1
+        assert controller.updates == []
+        assert controller.updatesSummary["unavailableClearableCount"] == 0
+    finally:
+        controller.shutdown()
+
+    for status in (
+        GameUpdateStatus.WAITING_FOR_STABILITY,
+        GameUpdateStatus.WAITING_FOR_LAUNCHER,
+        GameUpdateStatus.ANALYSIS_REQUIRED,
+    ):
+        save(status)
+        restored = _controller(
+            tmp_path,
+            disconnected,
+            tracker=GameUpdateTracker(update_state),
+            display_store=UpdateDisplayStateStore(display_path),
+        )
+        try:
+            assert restored.updates == [], status
+        finally:
+            restored.shutdown()
+
+    # A genuinely new build is a new event and must be shown again.
+    observation = _observation(disconnected, "211475")
+    save(GameUpdateStatus.WAITING_FOR_STABILITY)
+    newer = _controller(
+        tmp_path,
+        disconnected,
+        tracker=GameUpdateTracker(update_state),
+        display_store=UpdateDisplayStateStore(display_path),
+    )
+    try:
+        assert len(newer.updates) == 1
+        assert newer.updates[0]["buildId"] == "211475"
+    finally:
+        newer.shutdown()
+
+
+def test_bulk_clear_counts_match_what_each_action_removes(tmp_path: Path) -> None:
+    game = _game(tmp_path)
+    update_state = GameUpdateStateStore(tmp_path / "updates.json")
+    update_state.save(
+        UpdateStateDatabase(
+            records={
+                game.id: GameUpdateRecord(
+                    game_id=game.id,
+                    app_id="4242",
+                    status=GameUpdateStatus.ANALYSIS_REQUIRED,
+                    current_observation=_observation(game, "1"),
+                )
+            },
+            initial_inventory_complete=True,
+        )
+    )
+    controller = _controller(
+        tmp_path,
+        game,
+        tracker=GameUpdateTracker(update_state),
+        display_store=UpdateDisplayStateStore(tmp_path / "display.json"),
+    )
+    try:
+        # Pending work on a connected library is neither finished nor unavailable.
+        assert len(controller.updates) == 1
+        assert controller.updatesSummary["finishedClearableCount"] == 0
+        assert controller.updatesSummary["unavailableClearableCount"] == 0
+        assert controller.clearFinishedUpdates() == 0
+        assert controller.clearUnavailableUpdates() == 0
+        assert len(controller.updates) == 1
+    finally:
+        controller.shutdown()
+
+
+
 def test_very_old_informational_update_is_hidden_automatically(tmp_path: Path) -> None:
     game = _game(tmp_path)
     update_state = GameUpdateStateStore(tmp_path / "old-updates.json")

@@ -320,3 +320,33 @@ def test_lutris_database_without_installed_column_is_not_guessed(tmp_path: Path)
     assert provider.refresh() == ()
     assert provider.last_report.roots[0].state == "malformed"
     assert "installed" in provider.last_report.errors[0]
+
+
+def test_lutris_native_and_flatpak_roots_without_duplicates(tmp_path: Path) -> None:
+    """Standard roots cover native and Flatpak; configs may live in the data dir."""
+
+    home = tmp_path / "home"
+    native, flatpak = LutrisGameProvider.standard_roots(home)
+    assert (native.variant, flatpak.variant) == ("native", "flatpak")
+    assert "net.lutris.Lutris" in flatpak.data_dir.parts
+    install = tmp_path / "Games" / "Shared"
+    install.mkdir(parents=True)
+    row = {"id": 5, "name": "Shared", "slug": "shared", "runner": "wine",
+           "installed": 1, "configpath": "shared-5"}
+    _lutris_db(native, [row])                       # no directory column value
+    _lutris_db(flatpak, [row, {**row, "id": 6, "name": "Other", "configpath": "other-6",
+                              "directory": str(install)}])
+    # Current Lutris keeps game YAML under the data dir when ~/.config/lutris is absent.
+    for root in (native, flatpak):
+        path = root.data_dir / "games" / "shared-5.yml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(yaml.safe_dump({"game": {"exe": str(install / "Game.exe")}}), encoding="utf-8")
+    database_bytes = (native.data_dir / "pga.db").read_bytes()
+
+    provider = LutrisGameProvider(_Filesystem(), home=home)
+    games = provider.refresh()
+
+    assert [game.id for game in games] == ["lutris-6", "lutris-5"]  # sorted by name, no duplicate
+    assert {game.launcher for game in games} == {Launcher.LUTRIS}
+    assert provider.last_report.duplicate_games == 1
+    assert (native.data_dir / "pga.db").read_bytes() == database_bytes  # read-only

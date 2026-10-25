@@ -334,27 +334,47 @@ Item {
             subtitle: qsTr("Local Steam changes, pending compression, and recent results")
 
             AppButton {
+                objectName: "updatesClearFinishedButton"
+                readonly property int clearableCount: page.numberValue(page.summaryData, [
+                    "finishedClearableCount", "finished_clearable_count"
+                ], 0)
                 text: qsTr("Clear finished")
                 kind: "secondary"
                 compact: true
+                enabled: clearableCount > 0
+                toolTip: enabled
+                         ? qsTr("Hide completed, failed and up-to-date entries")
+                         : qsTr("No finished entries to clear")
                 onClicked: {
                     if (page.controller && page.controller.clearFinishedUpdates) {
                         var removed = page.controller.clearFinishedUpdates()
                         if (removed > 0)
                             page.toastRequested(qsTr("Finished entries cleared"), "success")
+                        else
+                            page.toastRequested(qsTr("No finished entries to clear"), "info")
                     }
                 }
             }
 
             AppButton {
+                objectName: "updatesClearUnavailableButton"
+                readonly property int clearableCount: page.numberValue(page.summaryData, [
+                    "unavailableClearableCount", "unavailable_clearable_count"
+                ], 0)
                 text: qsTr("Clear unavailable")
                 kind: "ghost"
                 compact: true
+                enabled: clearableCount > 0
+                toolTip: enabled
+                         ? qsTr("Hide entries of disconnected or removed games")
+                         : qsTr("No unavailable entries to clear")
                 onClicked: {
                     if (page.controller && page.controller.clearUnavailableUpdates) {
                         var removed = page.controller.clearUnavailableUpdates()
                         if (removed > 0)
                             page.toastRequested(qsTr("Unavailable library entries cleared"), "success")
+                        else
+                            page.toastRequested(qsTr("No unavailable entries to clear"), "info")
                     }
                 }
             }
@@ -475,63 +495,39 @@ Item {
                                 "fallbackArtwork", "headerArtwork"
                             ], "")
                             artworkFillMode: Image.PreserveAspectCrop
-                            cornerRadius: App.Theme.radiusSmall
+                            // Same rounding as the Games grid covers (GameGridCard).
+                            cornerRadius: App.Theme.radiusLarge
                         }
 
                         ColumnLayout {
                             objectName: "updatesCardInformation"
                             Layout.fillWidth: true
                             Layout.minimumWidth: 0
-                            spacing: 6
+                            spacing: 4
 
-                            Label {
-                                Layout.fillWidth: true
-                                text: page.gameName(updateCard.updateData)
-                                color: App.Theme.text
-                                font.pixelSize: App.Theme.fontBodyLarge
-                                font.weight: Font.Bold
-                                elide: Text.ElideRight
-                                ToolTip.visible: titleHover.hovered && truncated
-                                ToolTip.text: text
-                                HoverHandler { id: titleHover }
-                            }
-
+                            // Row 1: title + status (badge and optional dismiss) on one line.
+                            // The title takes the remaining width; the badge never squeezes it
+                            // below a readable width because the badge keeps its natural size
+                            // and the title elides (full text in tooltip).
                             RowLayout {
                                 Layout.fillWidth: true
-                                spacing: 8
+                                spacing: 10
 
                                 Label {
-                                    text: String(page.value(updateCard.updateData, ["launcher"], qsTr("Steam")))
-                                    color: App.Theme.textSecondary
-                                    font.pixelSize: App.Theme.fontCaption
-                                }
-                                Label {
-                                    visible: updateCard.width >= 650
+                                    objectName: "updatesCardTitle"
                                     Layout.fillWidth: true
-                                    text: qsTr("Build ID: %1").arg(String(page.value(
-                                        updateCard.updateData, ["buildId", "build_id"], qsTr("Unknown"))))
-                                    color: App.Theme.textMuted
-                                    font.pixelSize: App.Theme.fontCaption
+                                    Layout.minimumWidth: 0
+                                    text: page.gameName(updateCard.updateData)
+                                    color: App.Theme.text
+                                    font.pixelSize: App.Theme.fontBodyLarge
+                                    font.weight: Font.Bold
                                     elide: Text.ElideRight
-                                }
-                                Item { Layout.fillWidth: updateCard.width < 650 }
-                                Rectangle {
-                                    Layout.preferredWidth: 24
-                                    Layout.preferredHeight: 24
-                                    radius: 8
-                                    color: App.Theme.statusSurface(
-                                               page.toneState(updateCard.updateState))
-
-                                    Label {
-                                        anchors.centerIn: parent
-                                        text: page.stateSymbol(updateCard.updateState)
-                                        color: App.Theme.statusColor(
-                                                   page.toneState(updateCard.updateState))
-                                        font.pixelSize: 12
-                                        font.weight: Font.Bold
-                                    }
+                                    ToolTip.visible: titleHover.hovered && truncated
+                                    ToolTip.text: text
+                                    HoverHandler { id: titleHover }
                                 }
                                 StatusBadge {
+                                    Layout.alignment: Qt.AlignVCenter
                                     text: page.translatedState(updateCard.updateState)
                                     status: page.toneState(updateCard.updateState)
                                 }
@@ -540,6 +536,8 @@ Item {
                                                  updateCard.updateData,
                                                  ["canDismiss", "can_dismiss"],
                                                  false)
+                                    Layout.preferredWidth: 30
+                                    Layout.preferredHeight: 30
                                     iconSource: App.UiIcons.actionRemove
                                     toolTip: qsTr("Remove this entry")
                                     onClicked: {
@@ -553,18 +551,33 @@ Item {
                                 }
                             }
 
+                            // Row 2: secondary metadata in one muted line. Launcher first,
+                            // technical build ID last (and only when there is room).
                             Label {
+                                objectName: "updatesCardMeta"
                                 Layout.fillWidth: true
-                                text: qsTr("Detected %1 · %2 changed")
-                                      .arg(page.formatDate(page.value(updateCard.updateData, [
-                                          "detectedAt", "detected_at"
-                                      ], "")))
-                                      .arg(page.formatBytes(page.numberValue(updateCard.updateData, [
-                                          "changedBytes", "changed_bytes"
-                                      ], 0)))
+                                text: {
+                                    var parts = [
+                                        String(page.value(updateCard.updateData, ["launcher"], qsTr("Steam"))),
+                                        qsTr("Detected %1 · %2 changed")
+                                            .arg(page.formatDate(page.value(updateCard.updateData, [
+                                                "detectedAt", "detected_at"
+                                            ], "")))
+                                            .arg(page.formatBytes(page.numberValue(updateCard.updateData, [
+                                                "changedBytes", "changed_bytes"
+                                            ], 0)))
+                                    ]
+                                    if (updateCard.width >= 650)
+                                        parts.push(qsTr("Build ID: %1").arg(String(page.value(
+                                            updateCard.updateData, ["buildId", "build_id"], qsTr("Unknown")))))
+                                    return parts.join(" · ")
+                                }
                                 color: App.Theme.textSecondary
                                 font.pixelSize: App.Theme.fontCaption
                                 elide: Text.ElideRight
+                                ToolTip.visible: metaHover.hovered && truncated
+                                ToolTip.text: text
+                                HoverHandler { id: metaHover }
                             }
 
                             Label {

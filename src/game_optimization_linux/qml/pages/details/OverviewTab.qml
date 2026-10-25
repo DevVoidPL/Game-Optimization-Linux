@@ -10,11 +10,15 @@ Item {
     property var controller
     property var gameData: ({})
     property var tasksData: []
+    property var capabilities: ({})
+    property var capabilityNotices: []
+    signal optiScalerRequested()
     readonly property string gameId: String(value(["id"], ""))
     readonly property bool demoMode: Boolean(controller && controller.demoMode)
     readonly property bool localGame: Boolean(value(["localGame"], false))
     readonly property var executableCandidates: value(["executableCandidates"], []) || []
     signal toastRequested(string message, string tone)
+    readonly property var scrollFlickable: scroll.contentItem
 
     function value(keys, fallback) {
         var source = gameData || {}
@@ -80,7 +84,7 @@ Item {
                 MetricTile {
                     Layout.fillWidth: true
                     label: qsTr("Physical size")
-                    value: tab.value(["physicalSize"], "-")
+                    value: App.I18n.status(tab.value(["physicalSize"], "-"))
                     iconSource: App.UiIcons.overviewPhysicalSize
                     tone: App.Theme.secondary
                 }
@@ -88,7 +92,7 @@ Item {
                 MetricTile {
                     Layout.fillWidth: true
                     label: qsTr("Space saved")
-                    value: tab.value(["savedSpace"], "0 GB")
+                    value: App.I18n.status(tab.value(["savedSpace"], "0 GB"))
                     iconSource: App.UiIcons.overviewSavedSpace
                     tone: App.Theme.success
                 }
@@ -152,7 +156,7 @@ Item {
                             LabeledValue {
                                 Layout.fillWidth: true
                                 label: qsTr("Game status")
-                                value: tab.value(["status"], qsTr("Ready"))
+                                value: App.I18n.status(tab.value(["status"], "ready"))
                             }
                         }
                     }
@@ -182,7 +186,7 @@ Item {
                                 font.pixelSize: App.Theme.fontBody
                             }
                             StatusBadge {
-                                text: tab.value(["lastOperation", "lastTaskStatus"], qsTr("Not run"))
+                                text: App.I18n.status(tab.value(["lastOperation", "lastTaskStatus"], "not run"))
                                 status: text
                             }
                         }
@@ -198,7 +202,7 @@ Item {
                                 font.pixelSize: App.Theme.fontBody
                             }
                             StatusBadge {
-                                text: tab.value(["backupStatus"], qsTr("Not checked"))
+                                text: App.I18n.status(tab.value(["backupStatus"], "not checked"))
                                 status: text
                             }
                         }
@@ -214,7 +218,7 @@ Item {
                                 font.pixelSize: App.Theme.fontBody
                             }
                             Label {
-                                text: tab.value(["lastCompression"], qsTr("Never"))
+                                text: App.I18n.status(tab.value(["lastCompression"], "never"))
                                 color: App.Theme.text
                                 font.pixelSize: App.Theme.fontCaption
                                 font.weight: Font.DemiBold
@@ -311,8 +315,9 @@ Item {
                         Repeater {
                             model: [
                                 { "name": qsTr("Btrfs compression"), "status": tab.value(["compressionAvailable"], false) ? qsTr("Available") : qsTr("Unsupported") },
-                                { "name": qsTr("Graphics remaster"), "status": tab.value(["engineCompatibility"], qsTr("Not checked")) },
-                                { "name": qsTr("Optimization"), "status": qsTr("Optional") }
+                                { "name": qsTr("Optimization"), "status": App.I18n.status(tab.capabilities.optimization ? (tab.capabilities.optimization.available ? "available" : "unavailable") : "not checked") },
+                                { "name": "OptiScaler", "status": App.I18n.status(tab.capabilities.optiscaler ? (tab.capabilities.optiscaler.available ? "available" : "unavailable") : "not checked") },
+                                { "name": "MangoHud", "status": App.I18n.status(tab.capabilities.mangohud ? (tab.capabilities.mangohud.available ? "available" : "unavailable") : "not checked") }
                             ]
 
                             delegate: Rectangle {
@@ -348,84 +353,45 @@ Item {
                 }
             }
 
-            SurfaceCard {
+            OptiScalerSummaryCard {
+                objectName: "optiScalerSummaryCard"
                 Layout.fillWidth: true
-                padding: 18
+                controller: tab.controller
+                gameData: tab.gameData
+                onOpenRequested: tab.optiScalerRequested()
+            }
 
-                contentItem: ColumnLayout {
-                    spacing: 12
 
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 14
 
-                        Rectangle {
-                            Layout.preferredWidth: 45
-                            Layout.preferredHeight: 45
-                            radius: 14
-                            color: App.Theme.accentSoft
-                            Label {
-                                anchors.centerIn: parent
-                                text: "⌕"
-                                color: App.Theme.accent
-                                font.pixelSize: 21
-                            }
-                        }
+            Label {
+                Layout.fillWidth: true
+                visible: !Boolean(tab.value(["customManualGame"], false))
+                text: qsTr("Launcher settings")
+                color: App.Theme.text
+                font.pixelSize: App.Theme.fontTitle
+                font.weight: Font.Bold
+            }
 
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-                            Label {
-                                text: qsTr("Analyze Game")
-                                color: App.Theme.text
-                                font.pixelSize: 17
-                                font.weight: Font.Bold
-                            }
-                            Label {
-                                Layout.fillWidth: true
-                                text: tab.demoMode
-                                      ? qsTr("Run a safe simulated scan and generate recommendations.")
-                                      : qsTr("Per-game analysis is planned for a later stage.")
-                                color: App.Theme.textSecondary
-                                font.pixelSize: App.Theme.fontCaption
-                                wrapMode: Text.WordWrap
-                            }
-                        }
+            Label {
+                objectName: "launcherCapabilityNotices"
+                visible: tab.capabilityNotices.length > 0
+                Layout.fillWidth: true
+                text: tab.capabilityNotices.join("\n")
+                color: App.Theme.textSecondary
+                wrapMode: Text.WordWrap
+            }
 
-                        AppButton {
-                            text: !tab.demoMode ? qsTr("Coming soon")
-                                  : tab.analysisActive ? qsTr("In progress") : qsTr("Analyze Game")
-                            iconSource: App.UiIcons.actionAnalyze
-                            kind: "primary"
-                            busy: tab.analysisActive && tab.analysisStatus.toLowerCase() !== "paused"
-                            enabled: tab.demoMode && !tab.analysisActive
-                            onClicked: {
-                                if (tab.controller && tab.controller.analyzeGame)
-                                    tab.controller.analyzeGame(tab.gameId)
-                            }
-                        }
-                    }
-
-                    ColumnLayout {
-                        visible: tab.analysisActive
-                        Layout.fillWidth: true
-                        spacing: 6
-
-                        AppProgressBar {
-                            Layout.fillWidth: true
-                            value: {
-                                var raw = Number(tab.analysisTask.progress || tab.analysisTask.progressPercent || 0)
-                                return raw > 1 ? raw / 100 : raw
-                            }
-                            indeterminateMode: tab.analysisStatus.toLowerCase() === "queued"
-                        }
-
-                        Label {
-                            text: qsTr("Simulation status: %1").arg(tab.analysisStatus)
-                            color: App.Theme.textMuted
-                            font.pixelSize: App.Theme.fontCaption
-                        }
-                    }
+            Loader {
+                objectName: "overviewLauncherSettings"
+                Layout.fillWidth: true
+                active: !Boolean(tab.value(["customManualGame"], false))
+                visible: active
+                sourceComponent: OptimizationTab {
+                    embedded: true
+                    section: "integrations"
+                    controller: tab.controller
+                    gameData: tab.gameData
+                    onToastRequested: function(message, tone) { tab.toastRequested(message, tone) }
                 }
             }
 

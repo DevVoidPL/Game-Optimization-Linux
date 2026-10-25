@@ -6,7 +6,7 @@ labels, while the config writer owns the mapping to MangoHud keys.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, fields, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from pathlib import PurePosixPath
@@ -83,8 +83,38 @@ PRESET_METRICS: dict[str, tuple[str, ...]] = {
     "custom": (),
 }
 
+# Defaults of MangoHud 0.8.4 (MangoHud.conf.example "Color customization").
+# A colour equal to its default is not written, so older configs stay identical.
+MANGOHUD_DEFAULT_COLORS: dict[str, str] = {
+    "text_color": "FFFFFF",
+    "gpu_color": "2E9762",
+    "cpu_color": "2E97CB",
+    "vram_color": "AD64C1",
+    "ram_color": "C26693",
+    "frametime_color": "00FF00",
+    "background_color": "020202",
+}
+
+
+def preset_for_metrics(metrics: object) -> str:
+    """Return the preset whose metric set equals ``metrics``, else ``custom``.
+
+    ``disabled`` is never inferred: an enabled profile with no metrics is a
+    custom choice, not a request to switch MangoHud off.
+    """
+
+    selected = set(_metrics(metrics))
+    for preset in ("fps_only", "basic", "extended"):
+        if selected == set(PRESET_METRICS[preset]):
+            return preset
+    return "custom"
+
+
 _APP_ID_PATTERN = re.compile(r"^[1-9][0-9]*$")
+_COLOR_PATTERN = re.compile(r"^[0-9A-Fa-f]{6}$")
 _LOCAL_GAME_ID_PATTERN = re.compile(r"^local-[0-9a-f]{24}$")
+# Ids built by the Heroic/Lutris providers; used as file names, so no dots-only parts.
+_LAUNCHER_GAME_ID_PATTERN = re.compile(r"^(?:heroic|lutris)-[A-Za-z0-9][A-Za-z0-9._%-]{0,119}$")
 _KEY_PATTERN = re.compile(r"^[A-Za-z0-9_]+(?:\+[A-Za-z0-9_]+)*$")
 
 
@@ -97,11 +127,13 @@ def validate_app_id(value: object) -> str:
 
 def validate_game_key(value: object) -> str:
     game_key = str(value or "").strip()
-    if _APP_ID_PATTERN.fullmatch(game_key) or _LOCAL_GAME_ID_PATTERN.fullmatch(
-        game_key
+    if (
+        _APP_ID_PATTERN.fullmatch(game_key)
+        or _LOCAL_GAME_ID_PATTERN.fullmatch(game_key)
+        or (_LAUNCHER_GAME_ID_PATTERN.fullmatch(game_key) and ".." not in game_key)
     ):
         return game_key
-    raise ValueError("game key must be a Steam AppID or stable local game ID")
+    raise ValueError("game key must be a Steam AppID or a stable local, Heroic or Lutris game ID")
 
 
 def _integer(value: object, name: str, minimum: int, maximum: int) -> int:
@@ -160,6 +192,13 @@ def _key(value: object, name: str) -> str:
     return normalized
 
 
+def _color(value: object, name: str) -> str:
+    normalized = str(value or "").strip().lstrip("#")
+    if not _COLOR_PATTERN.fullmatch(normalized):
+        raise ValueError(f"{name} must be a RRGGBB colour")
+    return normalized.upper()
+
+
 def _metrics(value: object) -> tuple[str, ...]:
     if isinstance(value, Mapping):
         requested = [key for key, enabled in value.items() if enabled is True]
@@ -199,7 +238,20 @@ class MangoHudProfile:
     output_folder: str = ""
     toggle_logging_key: str = "Shift_L+F2"
     executable_path: str = ""
+    frame_timing_graph: bool = False
+    text_color: str = MANGOHUD_DEFAULT_COLORS["text_color"]
+    gpu_color: str = MANGOHUD_DEFAULT_COLORS["gpu_color"]
+    cpu_color: str = MANGOHUD_DEFAULT_COLORS["cpu_color"]
+    vram_color: str = MANGOHUD_DEFAULT_COLORS["vram_color"]
+    ram_color: str = MANGOHUD_DEFAULT_COLORS["ram_color"]
+    frametime_color: str = MANGOHUD_DEFAULT_COLORS["frametime_color"]
+    background_color: str = MANGOHUD_DEFAULT_COLORS["background_color"]
     updated_at: datetime = datetime.min.replace(tzinfo=UTC)
+    # Keys written by a newer build are kept verbatim so saving from this
+    # build does not silently drop them.
+    extra_fields: Mapping[str, Any] = field(
+        default_factory=dict, compare=False, hash=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         if self.schema_version != MANGOHUD_SCHEMA_VERSION:
@@ -244,6 +296,16 @@ class MangoHudProfile:
             object.__setattr__(self, "vsync", _integer(self.vsync, "vsync", -1, 3))
         object.__setattr__(self, "toggle_hud_key", _key(self.toggle_hud_key, "toggle_hud_key"))
         object.__setattr__(self, "metrics", _metrics(self.metrics))
+        object.__setattr__(
+            self,
+            "frame_timing_graph",
+            _boolean(self.frame_timing_graph, "frame_timing_graph"),
+        )
+        for color_name in MANGOHUD_DEFAULT_COLORS:
+            object.__setattr__(
+                self, color_name, _color(getattr(self, color_name), color_name)
+            )
+        object.__setattr__(self, "extra_fields", dict(self.extra_fields or {}))
         object.__setattr__(
             self, "logging_enabled", _boolean(self.logging_enabled, "logging_enabled")
         )
@@ -300,7 +362,7 @@ class MangoHudProfile:
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        known = {
             "schema_version": self.schema_version,
             "app_id": self.app_id,
             "enabled": self.enabled,
@@ -324,8 +386,16 @@ class MangoHudProfile:
             "output_folder": self.output_folder,
             "toggle_logging_key": self.toggle_logging_key,
             "executable_path": self.executable_path,
+            "frame_timing_graph": self.frame_timing_graph,
+            **{name: getattr(self, name) for name in MANGOHUD_DEFAULT_COLORS},
             "updated_at": self.updated_at.astimezone(UTC).isoformat(),
         }
+        extra = {
+            key: value
+            for key, value in self.extra_fields.items()
+            if key not in known
+        }
+        return {**extra, **known}
 
     @classmethod
     def from_dict(
@@ -350,16 +420,25 @@ class MangoHudProfile:
         values["updated_at"] = updated_at
         if not values.get("output_folder") and default_output_folder is not None:
             values["output_folder"] = str(default_output_folder)
-        return cls(**values)
+        names = {item.name for item in fields(cls)} - {"extra_fields"}
+        extra = {
+            key: value
+            for key, value in values.items()
+            if key not in names and key != "extra_fields"
+        }
+        known = {key: value for key, value in values.items() if key in names}
+        return cls(**known, extra_fields=extra)
 
 
 __all__ = [
+    "MANGOHUD_DEFAULT_COLORS",
     "MANGOHUD_METRICS",
     "MANGOHUD_POSITIONS",
     "MANGOHUD_PRESETS",
     "MANGOHUD_SCHEMA_VERSION",
     "MangoHudProfile",
     "PRESET_METRICS",
+    "preset_for_metrics",
     "validate_app_id",
     "validate_game_key",
 ]

@@ -9,6 +9,9 @@ import "../.." as App
 SurfaceCard {
     id: section
 
+    property bool collapsible: false
+    property bool expanded: !collapsible
+    property bool detailsOpen: !collapsible || expanded
     property var controller
     property var gameData: ({})
     readonly property string gameId: String(gameData && gameData.id || "")
@@ -117,60 +120,74 @@ SurfaceCard {
             Label { Layout.fillWidth: true; text: qsTr("Proton Tweaks"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
             StatusBadge { text: qsTr("Per game"); status: "neutral" }
         }
-        Label {
+        AppButton {
+            objectName: "protonTweaksToggle"
+            visible: section.collapsible
             Layout.fillWidth: true
-            text: qsTr("All options are off by default. Compatibility and debug options are not general performance boosts.")
-            color: App.Theme.textSecondary
-            wrapMode: Text.WordWrap
+            kind: "ghost"
+            text: (section.detailsOpen ? "▾ " : "▸ ") + qsTr("Proton options (%1 enabled)").arg(section.entries.filter(function(entry) { return Boolean(section.toggles[String(entry.id)]) }).length)
+            onClicked: section.expanded = !section.expanded
         }
+        ColumnLayout {
+            objectName: "protonTweaksBody"
+            Layout.fillWidth: true
+            visible: section.detailsOpen
 
-        Repeater {
-            model: section.entries
-            ColumnLayout {
-                id: tweakRow
-                required property var modelData
-                readonly property string tweakId: String(modelData.id || "")
+            Label {
                 Layout.fillWidth: true
-                spacing: 4
+                text: qsTr("All options are off by default. Compatibility and debug options are not general performance boosts.")
+                color: App.Theme.textSecondary
+                wrapMode: Text.WordWrap
+            }
 
-                SettingRow {
+            Repeater {
+                model: section.entries
+                ColumnLayout {
+                    id: tweakRow
+                    required property var modelData
+                    readonly property string tweakId: String(modelData.id || "")
                     Layout.fillWidth: true
-                    title: section.labelFor(tweakRow.tweakId, String(tweakRow.modelData.label || ""))
-                    description: section.descriptionFor(tweakRow.tweakId, String(tweakRow.modelData.description || ""))
-                    RowLayout {
-                        spacing: 4
-                        StatusBadge {
-                            text: section.categoryLabel(String(tweakRow.modelData.category || "experimental"))
-                            status: String(tweakRow.modelData.category || "") === "experimental" ? "warning" : "neutral"
-                            iconSource: String(tweakRow.modelData.category || "") === "experimental"
-                                        ? App.UiIcons.statusExperimental : ""
-                        }
-                        AppSwitch {
-                            checked: Boolean(section.toggles[tweakRow.tweakId])
-                            onToggled: section.setEnabled(tweakRow.tweakId, checked)
+                    spacing: 4
+
+                    SettingRow {
+                        Layout.fillWidth: true
+                        title: section.labelFor(tweakRow.tweakId, String(tweakRow.modelData.label || ""))
+                        description: section.descriptionFor(tweakRow.tweakId, String(tweakRow.modelData.description || ""))
+                        RowLayout {
+                            spacing: 4
+                            StatusBadge {
+                                text: section.categoryLabel(String(tweakRow.modelData.category || "experimental"))
+                                status: String(tweakRow.modelData.category || "") === "experimental" ? "warning" : "neutral"
+                                iconSource: String(tweakRow.modelData.category || "") === "experimental"
+                                            ? App.UiIcons.statusExperimental : ""
+                            }
+                            AppSwitch {
+                                checked: Boolean(section.toggles[tweakRow.tweakId])
+                                onToggled: section.setEnabled(tweakRow.tweakId, checked)
+                            }
                         }
                     }
+                    Label {
+                        Layout.fillWidth: true
+                        visible: String(tweakRow.modelData.hardwareState || "") === "unsupported"
+                                 || String(tweakRow.modelData.hardwareState || "") === "manual_verification_required"
+                        text: String(tweakRow.modelData.hardwareState || "") === "unsupported"
+                              ? qsTr("The detected GPU vendor does not match this option.")
+                              : qsTr("Hardware compatibility must be verified manually; the GPU name alone is not sufficient.")
+                        color: App.Theme.warning
+                        wrapMode: Text.WordWrap
+                    }
+                    Divider { Layout.fillWidth: true }
                 }
-                Label {
-                    Layout.fillWidth: true
-                    visible: String(tweakRow.modelData.hardwareState || "") === "unsupported"
-                             || String(tweakRow.modelData.hardwareState || "") === "manual_verification_required"
-                    text: String(tweakRow.modelData.hardwareState || "") === "unsupported"
-                          ? qsTr("The detected GPU vendor does not match this option.")
-                          : qsTr("Hardware compatibility must be verified manually; the GPU name alone is not sufficient.")
-                    color: App.Theme.warning
-                    wrapMode: Text.WordWrap
-                }
-                Divider { Layout.fillWidth: true }
             }
-        }
 
-        Label { Layout.fillWidth: true; text: qsTr("Final Proton environment: %1").arg(section.draftEnvironmentText() || qsTr("none")); color: App.Theme.textMuted; font.family: "monospace"; wrapMode: Text.WordWrap }
-        Label { Layout.fillWidth: true; visible: section.errorMessage.length > 0; text: section.errorMessage; color: App.Theme.danger; wrapMode: Text.WordWrap }
-        RowLayout {
-            Layout.fillWidth: true
-            Item { Layout.fillWidth: true }
-            AppButton { text: qsTr("Save Proton Tweaks"); enabled: section.dirty; onClicked: section.save() }
+            Label { Layout.fillWidth: true; text: qsTr("Final Proton environment: %1").arg(section.draftEnvironmentText() || qsTr("none")); color: App.Theme.textMuted; font.family: "monospace"; wrapMode: Text.WordWrap }
+            Label { Layout.fillWidth: true; visible: section.errorMessage.length > 0; text: section.errorMessage; color: App.Theme.danger; wrapMode: Text.WordWrap }
+            RowLayout {
+                Layout.fillWidth: true
+                Item { Layout.fillWidth: true }
+                AppButton { text: qsTr("Save Proton Tweaks"); enabled: section.dirty; onClicked: section.save() }
+            }
         }
     }
 

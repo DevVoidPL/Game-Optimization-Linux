@@ -9,7 +9,11 @@ import importlib.util
 import json
 import logging
 from math import isfinite
+import os
 from pathlib import Path
+import re
+import shutil
+import tempfile
 import selectors
 import subprocess
 import sys
@@ -35,6 +39,18 @@ PIPER_BASS_VOICE_ID = "pl_PL-bass-high"
 PIPER_BASS_VOICE_VERSION = "5b44ec7bab7c5822cfec48fbd5aa99db71a823d6"
 PIPER_BASS_MODEL_RELATIVE_PATH = Path("voices") / "pl_PL-bass-high.onnx"
 PIPER_BASS_CONFIG_RELATIVE_PATH = Path("voices") / "pl_PL-bass-high.onnx.json"
+PIPER_DARKMAN_COMPONENT_ID = "tts.polish-darkman"
+PIPER_DARKMAN_VOICE_ID = "pl_PL-darkman-medium"
+PIPER_DARKMAN_VOICE_VERSION = "c10ece1aade47bb51c153c893d14e5bf8e5b7117"
+PIPER_DARKMAN_MODEL_RELATIVE_PATH = Path("voices") / "pl_PL-darkman-medium.onnx"
+PIPER_DARKMAN_CONFIG_RELATIVE_PATH = (
+    Path("voices") / "pl_PL-darkman-medium.onnx.json"
+)
+# User-imported voices live next to the downloaded ones, in the same data dir.
+PIPER_CUSTOM_COMPONENT_ID = "tts.custom-voices"
+PIPER_CUSTOM_VOICE_PREFIX = "custom-"
+_CUSTOM_VOICE_DIRECTORY = Path("voices")
+_CUSTOM_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 _WORKER_BOOTSTRAP = (
     "import runpy, sys; "
     "path = sys.argv.pop(1); "
@@ -52,6 +68,84 @@ class PolishVoice:
     component_id: str
     model_relative_path: Path
     config_relative_path: Path
+    custom: bool = False
+
+
+class CustomVoiceError(ValueError):
+    """A user-selected voice file cannot be imported.
+
+    ``code`` is stable for the UI to translate; ``detail`` is an optional file
+    or voice name shown inside the translated message.
+    """
+
+    def __init__(self, message: str, *, code: str = "invalid", detail: str = "") -> None:
+        super().__init__(message)
+        self.code = code
+        self.detail = detail
+
+
+class CustomVoiceLanguageError(CustomVoiceError):
+    """The voice is valid but not Polish; importing needs user confirmation."""
+
+    def __init__(self, language: str) -> None:
+        super().__init__(
+            f"The voice language is {language or 'unknown'}, not Polish",
+            code="not_polish",
+            detail=language,
+        )
+        self.language = language
+
+
+def validate_piper_voice_config(config_path: Path) -> str:
+    """Validate a Piper ``.onnx.json`` file and return its language code."""
+
+    try:
+        values = json.loads(Path(config_path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError) as error:
+        raise CustomVoiceError(
+            "The voice configuration file could not be read",
+            code="config_unreadable",
+        ) from error
+    except json.JSONDecodeError as error:
+        raise CustomVoiceError(
+            "The voice configuration file is not valid JSON",
+            code="config_invalid_json",
+        ) from error
+    if not isinstance(values, dict):
+        raise CustomVoiceError(
+            "The voice configuration is not a Piper voice", code="config_not_piper"
+        )
+
+    def positive_int(value: object) -> bool:
+        return isinstance(value, int) and not isinstance(value, bool) and value > 0
+
+    audio = values.get("audio")
+    phoneme_map = values.get("phoneme_id_map")
+    if not (
+        positive_int(values.get("num_symbols"))
+        and positive_int(values.get("num_speakers"))
+        and isinstance(audio, dict)
+        and positive_int(audio.get("sample_rate"))
+        and isinstance(phoneme_map, dict)
+        and phoneme_map
+    ):
+        raise CustomVoiceError(
+            "The voice configuration is not a Piper voice", code="config_not_piper"
+        )
+    phoneme_type = str(values.get("phoneme_type", "espeak"))
+    espeak = values.get("espeak")
+    espeak_voice = str(espeak.get("voice", "")) if isinstance(espeak, dict) else ""
+    if phoneme_type == "espeak" and not espeak_voice:
+        raise CustomVoiceError(
+            "The voice configuration is not a Piper voice", code="config_not_piper"
+        )
+    language = values.get("language")
+    code = str(language.get("code", "")) if isinstance(language, dict) else ""
+    return code or espeak_voice
+
+
+def _is_polish(language: str) -> bool:
+    return language.casefold().replace("-", "_").split("_")[0] == "pl"
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,6 +160,12 @@ class PiperSynthesis:
     client_decode_ms: float | None = None
     worker_startup_ms: float | None = None
     worker_reused: bool = True
+    worker_pid: int = 0
+    worker_thread_name: str = ""
+    process_nice: int | None = None
+    onnx_intra_op_threads: int = 0
+    onnx_inter_op_threads: int = 0
+    onnx_execution_mode: str = ""
     # The length_scale Piper actually used, and the voice's own default, as
     # reported by the worker. length_scale is inverse to speed.
     length_scale: float | None = None
@@ -90,6 +190,15 @@ POLISH_VOICES = (
         component_id=PIPER_BASS_COMPONENT_ID,
         model_relative_path=PIPER_BASS_MODEL_RELATIVE_PATH,
         config_relative_path=PIPER_BASS_CONFIG_RELATIVE_PATH,
+    ),
+    PolishVoice(
+        voice_id=PIPER_DARKMAN_VOICE_ID,
+        name="Darkman",
+        language="pl",
+        version=PIPER_DARKMAN_VOICE_VERSION,
+        component_id=PIPER_DARKMAN_COMPONENT_ID,
+        model_relative_path=PIPER_DARKMAN_MODEL_RELATIVE_PATH,
+        config_relative_path=PIPER_DARKMAN_CONFIG_RELATIVE_PATH,
     ),
 )
 
@@ -138,9 +247,20 @@ class PiperWorkerClient:
         self._stderr_tail: deque[str] = deque(maxlen=40)
         self.initialization_ms: float | None = None
         self.startup_ms: float | None = None
+        self.worker_pid = 0
+        self.worker_thread_name = ""
+        self.process_nice: int | None = None
+        self.onnx_intra_op_threads = 0
+        self.onnx_inter_op_threads = 0
+        self.onnx_execution_mode = ""
+        self.last_start_reused = False
 
     def start(self) -> None:
         with self._io_lock:
+            existing = self._process
+            self.last_start_reused = bool(
+                existing is not None and existing.poll() is None
+            )
             self._ensure_process()
 
     def synthesize(
@@ -217,6 +337,22 @@ class PiperWorkerClient:
                 client_decode_ms=decode_ms,
                 worker_startup_ms=self.startup_ms if not reused else None,
                 worker_reused=reused,
+                worker_pid=self._response_int(response, "worker_pid") or self.worker_pid,
+                worker_thread_name=self._response_string(
+                    response, "worker_thread"
+                ) or self.worker_thread_name,
+                process_nice=self._response_int(response, "process_nice"),
+                onnx_intra_op_threads=(
+                    self._response_int(response, "onnx_intra_op_threads")
+                    or self.onnx_intra_op_threads
+                ),
+                onnx_inter_op_threads=(
+                    self._response_int(response, "onnx_inter_op_threads")
+                    or self.onnx_inter_op_threads
+                ),
+                onnx_execution_mode=self._response_string(
+                    response, "onnx_execution_mode"
+                ) or self.onnx_execution_mode,
                 length_scale=self._response_float(response, "length_scale"),
                 voice_default_length_scale=self._response_float(
                     response, "voice_default_length_scale"
@@ -294,6 +430,23 @@ class PiperWorkerClient:
         self.initialization_ms = self._response_float(
             response, "initialization_ms"
         )
+        self.worker_pid = (
+            self._response_int(response, "worker_pid")
+            or int(getattr(process, "pid", 0) or 0)
+        )
+        self.worker_thread_name = self._response_string(
+            response, "worker_thread"
+        )
+        self.process_nice = self._response_int(response, "process_nice")
+        self.onnx_intra_op_threads = (
+            self._response_int(response, "onnx_intra_op_threads") or 0
+        )
+        self.onnx_inter_op_threads = (
+            self._response_int(response, "onnx_inter_op_threads") or 0
+        )
+        self.onnx_execution_mode = self._response_string(
+            response, "onnx_execution_mode"
+        )
         return process
 
     @staticmethod
@@ -304,6 +457,21 @@ class PiperWorkerClient:
             return max(0.0, float(response[name]))
         except (KeyError, TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _response_int(response: dict[str, object], name: str) -> int | None:
+        try:
+            value = response[name]
+            if isinstance(value, bool):
+                return None
+            return int(value)
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _response_string(response: dict[str, object], name: str) -> str:
+        value = response.get(name)
+        return str(value) if isinstance(value, str) else ""
 
     def _read_response(self, process: subprocess.Popen[str]) -> dict[str, object]:
         assert process.stdout is not None
@@ -357,7 +525,6 @@ class PiperWorkerClient:
 
 class PiperPolishTtsProvider:
     provider_id = PIPER_PROVIDER_ID
-    voices = POLISH_VOICES
     default_voice_id = PIPER_VOICE_ID
 
     def __init__(
@@ -376,6 +543,7 @@ class PiperPolishTtsProvider:
         self._inference_lock = Lock()
         self._worker: PiperWorker | None = None
         self._worker_voice_id = ""
+        self._last_prepare_reused: bool | None = None
 
     def prepare(self, voice_id: str) -> None:
         """Load only the selected voice in the persistent worker."""
@@ -388,9 +556,170 @@ class PiperPolishTtsProvider:
             if callable(start):
                 try:
                     start()
+                    reused = getattr(worker, "last_start_reused", None)
+                    self._last_prepare_reused = (
+                        bool(reused) if isinstance(reused, bool) else None
+                    )
                 except Exception:
                     self._drop_worker(worker)
                     raise
+
+    @property
+    def voices(self) -> tuple[PolishVoice, ...]:
+        return POLISH_VOICES + self.custom_voices
+
+    @property
+    def custom_voices(self) -> tuple[PolishVoice, ...]:
+        directory = (
+            self._component_root / PIPER_CUSTOM_COMPONENT_ID / _CUSTOM_VOICE_DIRECTORY
+        )
+        try:
+            models = sorted(directory.glob("*.onnx"))
+        except OSError:
+            return ()
+        voices: list[PolishVoice] = []
+        for model in models:
+            if not model.with_name(model.name + ".json").is_file():
+                continue
+            stem = model.name[: -len(".onnx")]
+            voices.append(
+                PolishVoice(
+                    voice_id=PIPER_CUSTOM_VOICE_PREFIX + stem,
+                    name=stem,
+                    language="pl",
+                    version="",
+                    component_id=PIPER_CUSTOM_COMPONENT_ID,
+                    model_relative_path=_CUSTOM_VOICE_DIRECTORY / model.name,
+                    config_relative_path=_CUSTOM_VOICE_DIRECTORY / (model.name + ".json"),
+                    custom=True,
+                )
+            )
+        return tuple(voices)
+
+    def import_custom_voice(
+        self, model_path: Path, *, allow_other_language: bool = False
+    ) -> PolishVoice:
+        """Copy a user Piper voice (``.onnx`` + ``.onnx.json``) into the data dir.
+
+        No checksum exists for user files; the config is validated as a Piper
+        voice instead. A non-Polish voice raises CustomVoiceLanguageError unless
+        the user confirmed it.
+        """
+
+        source = Path(model_path)
+        if source.suffix.casefold() != ".onnx" or not source.is_file():
+            raise CustomVoiceError(
+                "Choose a Piper voice model file (.onnx)", code="not_onnx"
+            )
+        config = source.with_name(source.name + ".json")
+        if not config.is_file():
+            raise CustomVoiceError(
+                f"The configuration file {config.name} was not found next to the model",
+                code="missing_config",
+                detail=config.name,
+            )
+        language = validate_piper_voice_config(config)
+        if not _is_polish(language) and not allow_other_language:
+            raise CustomVoiceLanguageError(language)
+        stem = _CUSTOM_NAME.sub("_", source.name[: -len(".onnx")]).strip("._")
+        if not stem:
+            raise CustomVoiceError(
+                "The voice file name is not usable", code="invalid_name"
+            )
+        voice_id = PIPER_CUSTOM_VOICE_PREFIX + stem
+        if any(voice.voice_id == voice_id for voice in self.voices):
+            raise CustomVoiceError(
+                f"A custom voice named {stem} already exists",
+                code="already_exists",
+                detail=stem,
+            )
+        directory = (
+            self._component_root / PIPER_CUSTOM_COMPONENT_ID / _CUSTOM_VOICE_DIRECTORY
+        )
+        directory.mkdir(parents=True, exist_ok=True)
+        targets = (
+            (source, directory / f"{stem}.onnx"),
+            (config, directory / f"{stem}.onnx.json"),
+        )
+        staged: list[tuple[Path, Path]] = []
+        try:
+            for origin, target in targets:
+                descriptor, temporary = tempfile.mkstemp(
+                    prefix=f".{target.name}.", suffix=".tmp", dir=directory
+                )
+                os.close(descriptor)
+                staged.append((Path(temporary), target))
+                shutil.copyfile(origin, temporary)
+            # The model appears only after its config, so a half-imported
+            # voice is never listed.
+            for temporary, target in reversed(staged):
+                os.replace(temporary, target)
+        except OSError as error:
+            for temporary, target in staged:
+                temporary.unlink(missing_ok=True)
+            (directory / f"{stem}.onnx").unlink(missing_ok=True)
+            (directory / f"{stem}.onnx.json").unlink(missing_ok=True)
+            raise CustomVoiceError(
+                "The voice files could not be copied", code="copy_failed"
+            ) from error
+        return self._voice(voice_id)
+
+    def remove_custom_voice(self, voice_id: str) -> None:
+        voice = self._voice(voice_id)
+        if not voice.custom:
+            raise CustomVoiceError(
+                "Only custom voices can be removed here", code="not_custom"
+            )
+        with self._inference_lock:
+            with self._state_lock:
+                worker = self._worker if self._worker_voice_id == voice_id else None
+                if worker is not None:
+                    self._worker = None
+                    self._worker_voice_id = ""
+            if worker is not None:
+                worker.close()
+            model, config = self._voice_paths(voice)
+            model.unlink(missing_ok=True)
+            config.unlink(missing_ok=True)
+
+    @property
+    def model_prepare_reused(self) -> bool | None:
+        return self._last_prepare_reused
+
+    def _worker_value(self, name: str, default: object) -> object:
+        with self._state_lock:
+            worker = self._worker
+        return getattr(worker, name, default) if worker is not None else default
+
+    @property
+    def worker_pid(self) -> int:
+        return int(self._worker_value("worker_pid", 0) or 0)
+
+    @property
+    def worker_thread_name(self) -> str:
+        return str(self._worker_value("worker_thread_name", "") or "")
+
+    @property
+    def worker_initialization_ms(self) -> float | None:
+        value = self._worker_value("initialization_ms", None)
+        return float(value) if isinstance(value, (int, float)) else None
+
+    @property
+    def worker_process_nice(self) -> int | None:
+        value = self._worker_value("process_nice", None)
+        return int(value) if isinstance(value, int) and not isinstance(value, bool) else None
+
+    @property
+    def worker_onnx_intra_op_threads(self) -> int:
+        return int(self._worker_value("onnx_intra_op_threads", 0) or 0)
+
+    @property
+    def worker_onnx_inter_op_threads(self) -> int:
+        return int(self._worker_value("onnx_inter_op_threads", 0) or 0)
+
+    @property
+    def worker_onnx_execution_mode(self) -> str:
+        return str(self._worker_value("onnx_execution_mode", "") or "")
 
     @property
     def model_path(self) -> Path:
@@ -614,6 +943,16 @@ __all__ = [
     "PIPER_BASS_MODEL_RELATIVE_PATH",
     "PIPER_BASS_VOICE_ID",
     "PIPER_BASS_VOICE_VERSION",
+    "PIPER_CUSTOM_COMPONENT_ID",
+    "PIPER_CUSTOM_VOICE_PREFIX",
+    "CustomVoiceError",
+    "CustomVoiceLanguageError",
+    "validate_piper_voice_config",
+    "PIPER_DARKMAN_COMPONENT_ID",
+    "PIPER_DARKMAN_CONFIG_RELATIVE_PATH",
+    "PIPER_DARKMAN_MODEL_RELATIVE_PATH",
+    "PIPER_DARKMAN_VOICE_ID",
+    "PIPER_DARKMAN_VOICE_VERSION",
     "PIPER_CONFIG_RELATIVE_PATH",
     "PIPER_MODEL_RELATIVE_PATH",
     "PIPER_PROVIDER_ID",

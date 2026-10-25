@@ -42,8 +42,8 @@ from game_optimization_linux.models.narrator import NormalizedRect
 from game_optimization_linux.services.narrator_region import fitted_preview_content
 
 
-def _tr(text: str) -> str:
-    return QCoreApplication.translate("SubtitleRegionSelector", text)
+# Translations use literal QCoreApplication.translate("SubtitleRegionSelector", ...)
+# calls (not a wrapper) so pyside6-lupdate can extract them into the catalogs.
 
 
 class RegionInteractionMode(StrEnum):
@@ -65,6 +65,7 @@ class RegionCanvas(QWidget):
 
     selectionChanged = Signal(object)
     cancelRequested = Signal()
+    presetChanged = Signal(str)
 
     HANDLE_RADIUS = 8.0
     MIN_SELECTION_DIP = 2.0
@@ -107,6 +108,7 @@ class RegionCanvas(QWidget):
         self._interaction_mode = RegionInteractionMode.NONE
         self._press_position = QPointF()
         self._base_selection = QRectF()
+        self._preset_index = -1
 
     @property
     def source_width(self) -> int:
@@ -178,6 +180,82 @@ class RegionCanvas(QWidget):
         self._normalized_region = None
         self.selectionChanged.emit(None)
         self.update()
+
+    # -- gamepad ------------------------------------------------------------
+    # (preset id, normalized x, y, width, height). The first one is used when
+    # the selector opens without a region.
+    PRESETS: tuple[tuple[str, float, float, float, float], ...] = (
+        ("bottom_20", 0.0, 0.80, 1.0, 0.20),
+        ("bottom_30", 0.0, 0.70, 1.0, 0.30),
+        ("center_bottom", 0.15, 0.68, 0.70, 0.22),
+        ("full_screen", 0.0, 0.0, 1.0, 1.0),
+    )
+    MOVE_STEP = 0.02
+    RESIZE_FACTOR = 1.1
+    MIN_GAMEPAD_SIZE = 0.03
+
+    @property
+    def preset_id(self) -> str:
+        index = self._preset_index
+        return self.PRESETS[index][0] if 0 <= index < len(self.PRESETS) else ""
+
+    def apply_preset(self, index: int) -> None:
+        self._preset_index = int(index) % len(self.PRESETS)
+        _name, x, y, width, height = self.PRESETS[self._preset_index]
+        self._interaction_mode = RegionInteractionMode.NONE
+        self.set_normalized_region(NormalizedRect(x=x, y=y, width=width, height=height))
+        self.presetChanged.emit(self.preset_id)
+
+    def handle_gamepad_action(self, action: str) -> bool:
+        """Presets (LB/RB), move (D-pad / left stick), resize (right stick,
+        L2/R2: PageDown grows, PageUp shrinks). True when handled."""
+
+        if action in {"PreviousTab", "NextTab"}:
+            current = self._preset_index
+            if current < 0:
+                target = 0 if action == "NextTab" else len(self.PRESETS) - 1
+            else:
+                target = current + (1 if action == "NextTab" else -1)
+            self.apply_preset(target)
+            return True
+        moves = {
+            "NavigateLeft": (-self.MOVE_STEP, 0.0),
+            "NavigateRight": (self.MOVE_STEP, 0.0),
+            "NavigateUp": (0.0, -self.MOVE_STEP),
+            "NavigateDown": (0.0, self.MOVE_STEP),
+        }
+        if action not in moves and action not in {"PageUp", "PageDown"}:
+            return False
+        if self._normalized_region is None or not self.has_valid_selection():
+            self.apply_preset(0)
+        region = QRectF(self._normalized_region)
+        if action in moves:
+            dx, dy = moves[action]
+            x = max(0.0, min(1.0 - region.width(), region.left() + dx))
+            y = max(0.0, min(1.0 - region.height(), region.top() + dy))
+            self._set_gamepad_region(x, y, region.width(), region.height())
+            return True
+        factor = self.RESIZE_FACTOR if action == "PageDown" else 1.0 / self.RESIZE_FACTOR
+        width = max(self.MIN_GAMEPAD_SIZE, min(1.0, region.width() * factor))
+        height = max(self.MIN_GAMEPAD_SIZE, min(1.0, region.height() * factor))
+        center = region.center()
+        x = max(0.0, min(1.0 - width, center.x() - width / 2.0))
+        y = max(0.0, min(1.0 - height, center.y() - height / 2.0))
+        self._set_gamepad_region(x, y, width, height)
+        return True
+
+    def _set_gamepad_region(self, x: float, y: float, width: float, height: float) -> None:
+        x, y = max(0.0, min(1.0, x)), max(0.0, min(1.0, y))
+        width, height = min(width, 1.0 - x), min(height, 1.0 - y)
+        # NormalizedRect has no tolerance: keep x + width <= 1.0 exactly.
+        while x + width > 1.0:
+            width -= 1e-9
+        while y + height > 1.0:
+            height -= 1e-9
+        self._preset_index = -1
+        self._interaction_mode = RegionInteractionMode.NONE
+        self.set_normalized_region(NormalizedRect(x=x, y=y, width=width, height=height))
+        self.presetChanged.emit("")
 
     def set_normalized_region(self, region: NormalizedRect | None) -> None:
         self._normalized_region = (
@@ -401,6 +479,7 @@ class RegionCanvas(QWidget):
         self._set_selection_from_canvas_rect(rect.intersected(fitted))
 
     def _set_selection_from_canvas_rect(self, rect: QRectF) -> None:
+        self._preset_index = -1
         fitted = self.fitted_image_rect()
         if fitted.isEmpty() or rect.isEmpty():
             self._normalized_region = None
@@ -442,7 +521,7 @@ class SubtitleRegionSelectorWindow(QWidget):
         )
         super().__init__(parent, flags)
         self.setObjectName("nativeSubtitleRegionSelector")
-        self.setWindowTitle(_tr("Select subtitle area"))
+        self.setWindowTitle(QCoreApplication.translate("SubtitleRegionSelector", "Select subtitle area"))
         self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
         self.setStyleSheet(
@@ -467,11 +546,12 @@ class SubtitleRegionSelectorWindow(QWidget):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(18, 14, 18, 14)
         layout.setSpacing(10)
-        instruction = QLabel(_tr("Select subtitle area"), self)
+        instruction = QLabel(QCoreApplication.translate("SubtitleRegionSelector", "Select subtitle area"), self)
         instruction.setObjectName("selectorInstruction")
         instruction.setStyleSheet("font-size: 18px; font-weight: 600;")
         hint = QLabel(
-            _tr(
+            QCoreApplication.translate(
+                "SubtitleRegionSelector",
                 "Drag over subtitles. Drag the selection to move it or use its edges and corners to resize it."
             ),
             self,
@@ -486,16 +566,37 @@ class SubtitleRegionSelectorWindow(QWidget):
         self._dimensions_label = QLabel(self)
         self._dimensions_label.setObjectName("selectorDimensions")
         footer.addWidget(self._dimensions_label, 1)
-        self.reset_button = QPushButton(_tr("Reset"), self)
+        self.reset_button = QPushButton(QCoreApplication.translate("SubtitleRegionSelector", "Reset"), self)
         self.reset_button.setObjectName("resetRegionButton")
-        self.cancel_button = QPushButton(_tr("Cancel"), self)
+        self.cancel_button = QPushButton(QCoreApplication.translate("SubtitleRegionSelector", "Cancel"), self)
         self.cancel_button.setObjectName("cancelRegionButton")
-        self.save_button = QPushButton(_tr("Save region"), self)
+        self.save_button = QPushButton(QCoreApplication.translate("SubtitleRegionSelector", "Save region"), self)
         self.save_button.setObjectName("saveRegionButton")
         footer.addWidget(self.reset_button)
         footer.addWidget(self.cancel_button)
         footer.addWidget(self.save_button)
         layout.addLayout(footer)
+
+        gamepad_row = QHBoxLayout()
+        self._preset_label = QLabel(self)
+        self._preset_label.setObjectName("selectorPreset")
+        self._preset_label.setStyleSheet("color: #52a8ff; font-weight: 600;")
+        self.gamepad_hint = QLabel(
+            QCoreApplication.translate(
+                "SubtitleRegionSelector",
+                "LB/RB: preset    D-pad/left stick: move    Right stick or L2/R2: size    A: save    B: cancel",
+            ),
+            self,
+        )
+        self.gamepad_hint.setObjectName("selectorGamepadHint")
+        self.gamepad_hint.setStyleSheet("color: #aeb8c5;")
+        gamepad_row.addWidget(self._preset_label)
+        gamepad_row.addStretch(1)
+        gamepad_row.addWidget(self.gamepad_hint)
+        layout.addLayout(gamepad_row)
+
+        self.canvas.presetChanged.connect(self._preset_changed)
+        self._preset_changed("")
 
         self.canvas.selectionChanged.connect(self._selection_changed)
         self.canvas.cancelRequested.connect(self.request_cancel)
@@ -504,6 +605,33 @@ class SubtitleRegionSelectorWindow(QWidget):
         self.save_button.clicked.connect(self.submit_selection)
         self._selection_changed(
             initial_region.to_dict() if initial_region is not None else None
+        )
+        if initial_region is None:
+            self.canvas.apply_preset(0)
+
+    def handle_gamepad_action(self, action: str) -> bool:
+        """A saves, B cancels; everything else goes to the canvas."""
+
+        if action == "Confirm":
+            self.submit_selection()
+            return True
+        if action == "Back":
+            self.request_cancel()
+            return True
+        return self.canvas.handle_gamepad_action(action)
+
+    def _preset_changed(self, preset_id: str) -> None:
+        names = {
+            "bottom_20": QCoreApplication.translate("SubtitleRegionSelector", "Bottom 20%"),
+            "bottom_30": QCoreApplication.translate("SubtitleRegionSelector", "Bottom 30%"),
+            "center_bottom": QCoreApplication.translate("SubtitleRegionSelector", "Center bottom"),
+            "full_screen": QCoreApplication.translate("SubtitleRegionSelector", "Full screen"),
+        }
+        name = names.get(preset_id, "")
+        self._preset_label.setText(
+            QCoreApplication.translate("SubtitleRegionSelector", "Preset: %1").replace("%1", name)
+            if name
+            else ""
         )
 
     def set_error(self, message: str) -> None:
@@ -550,7 +678,7 @@ class SubtitleRegionSelectorWindow(QWidget):
         self._dimensions_label.setStyleSheet("")
         if valid:
             self._dimensions_label.setText(
-                _tr("Source: %1x%2    OCR region: %3x%4")
+                QCoreApplication.translate("SubtitleRegionSelector", "Source: %1x%2    OCR region: %3x%4")
                 .replace("%1", str(self.canvas.source_width))
                 .replace("%2", str(self.canvas.source_height))
                 .replace("%3", str(width))
@@ -558,7 +686,7 @@ class SubtitleRegionSelectorWindow(QWidget):
             )
         else:
             self._dimensions_label.setText(
-                _tr("Source: %1x%2    OCR region: %3x%4")
+                QCoreApplication.translate("SubtitleRegionSelector", "Source: %1x%2    OCR region: %3x%4")
                 .replace("%1", str(self.canvas.source_width))
                 .replace("%2", str(self.canvas.source_height))
                 .replace("%3", "0")
@@ -585,6 +713,15 @@ class NarratorRegionSelectorCoordinator(QObject):
     @property
     def active_window(self) -> SubtitleRegionSelectorWindow | None:
         return self._window
+
+    def handle_gamepad_action(self, action: str) -> bool:
+        """Route a gamepad action to the open selector. False when closed."""
+
+        window = self._window
+        if window is None:
+            return False
+        window.handle_gamepad_action(str(action))
+        return True
 
     def attach_main_window(self, window: QObject | None) -> None:
         self._main_window = window if isinstance(window, QWindow) else None

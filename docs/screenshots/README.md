@@ -18,8 +18,7 @@ been altered. These are interface previews, not gameplay or benchmark results.
 
 The Couch image was captured from the development application on 20 October 2026
 using built-in demo data and isolated settings. It contains sample game entries,
-with host resource monitoring disabled. Earlier Alpha images in this directory
-remain available as historical screenshots.
+with host resource monitoring disabled. Older Alpha captures are available in the repository history.
 
 Game artwork and third-party logos belong to their respective rights holders;
 they illustrate the application and do not imply endorsement.

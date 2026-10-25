@@ -350,8 +350,14 @@ class BtrfsCompressionProvider:
         automatic_authorized: bool = False,
         cancel_event: Event | None = None,
         progress_callback: CompressionProgressCallback | None = None,
+        interactive_measurement: bool = True,
     ) -> CompressionResult:
-        """Execute a freshly revalidated plan and perform read-only verification."""
+        """Execute a freshly revalidated plan and perform read-only verification.
+
+        With ``interactive_measurement=False`` the password-protected compsize
+        provider is never called; before/after come from the unprivileged
+        analysis and the savings are reported as not measured.
+        """
 
         started_at = datetime.now(UTC)
         started_clock = self._clock()
@@ -445,6 +451,7 @@ class BtrfsCompressionProvider:
             game,
             preflight.before,
             warnings,
+            interactive=interactive_measurement,
         )
         root_after_baseline = self._require_game_root(game)
         if not self._same_root_identity(root_identity, root_after_baseline):
@@ -525,7 +532,9 @@ class BtrfsCompressionProvider:
                 execution_before,
             )
         except Exception as error:
-            after = self._verification_measurement(game, warnings)
+            after = self._verification_measurement(
+                game, warnings, interactive=interactive_measurement
+            )
             return CompressionResult(
                 plan_id=plan.id,
                 game_id=game.id,
@@ -569,6 +578,7 @@ class BtrfsCompressionProvider:
             game,
             self.measurement_from_report(after_report),
             warnings,
+            interactive=interactive_measurement,
         )
         verification_errors = self._verify_after(
             preflight.before.logical_bytes,
@@ -710,9 +720,18 @@ class BtrfsCompressionProvider:
         game: Game,
         fallback: CompressionMeasurement,
         warnings: list[str],
+        *,
+        interactive: bool = True,
     ) -> CompressionMeasurement:
         provider = self._measurement_provider
         if provider is None:
+            return fallback
+        if not interactive:
+            # The exact provider always asks for a password (pkexec); it runs
+            # only as the explicit "exact measurement" action.
+            warnings.append(
+                "Exact compsize measurement was not requested; savings are not measured"
+            )
             return fallback
         try:
             measurement = provider.measure(game)
@@ -1704,7 +1723,7 @@ class BtrfsCompressionProvider:
         )
 
     def _verification_measurement(
-        self, game: Game, warnings: list[str]
+        self, game: Game, warnings: list[str], *, interactive: bool = True
     ) -> CompressionMeasurement | None:
         try:
             report = self._analyzer.analyze(
@@ -1719,6 +1738,7 @@ class BtrfsCompressionProvider:
             game,
             self.measurement_from_report(report),
             warnings,
+            interactive=interactive,
         )
 
     @staticmethod

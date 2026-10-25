@@ -6,6 +6,7 @@ import ".." as App
 
 ComboBox {
     id: control
+    property real textPixelSize: App.Theme.fontBody
 
     property string menuObjectName: "appComboBoxPopup"
     readonly property bool menuVisible: menuPopup.visible
@@ -44,7 +45,7 @@ ComboBox {
         contentItem: Label {
             text: String(optionDelegate.modelData)
             color: optionDelegate.highlighted ? App.Theme.text : App.Theme.textSecondary
-            font.pixelSize: App.Theme.fontBody
+            font.pixelSize: control.textPixelSize
             verticalAlignment: Text.AlignVCenter
             elide: Text.ElideRight
         }
@@ -66,7 +67,7 @@ ComboBox {
         leftPadding: 0
         rightPadding: control.indicator.width + control.spacing
         text: control.displayText
-        font.pixelSize: App.Theme.fontBody
+        font.pixelSize: control.textPixelSize
         color: control.enabled ? App.Theme.text : App.Theme.textMuted
         verticalAlignment: Text.AlignVCenter
         elide: Text.ElideRight

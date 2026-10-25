@@ -889,6 +889,11 @@ class GameUpdateRecord:
     installation_detected: bool = False
     last_error: str = ""
     updated_at: datetime = field(default_factory=_utc_now)
+    # Identity of the update event for which unattended compression was
+    # already queued. Persisted so a restart cannot retry the same event on
+    # its own after a warning, failure, cancellation or unverified result.
+    # It does not mean success: the status stays "analysis required".
+    automatic_attempt_event: str = ""
 
     @property
     def pending_signature(self) -> str:
@@ -955,6 +960,7 @@ class GameUpdateRecord:
             "installation_detected": self.installation_detected,
             "last_error": self.last_error,
             "updated_at": self.updated_at.isoformat(),
+            "automatic_attempt_event": self.automatic_attempt_event,
         }
 
     @classmethod
@@ -1002,6 +1008,7 @@ class GameUpdateRecord:
             installation_detected=raw.get("installation_detected") is True,
             last_error=str(raw.get("last_error", "")),
             updated_at=_aware_datetime(raw.get("updated_at")),
+            automatic_attempt_event=str(raw.get("automatic_attempt_event", "") or ""),
         )
 
 
@@ -1144,6 +1151,20 @@ class GameUpdateTracker:
         self._records = dict(loaded.records)
         self._initial_inventory_complete = loaded.initial_inventory_complete
         self._lock = RLock()
+
+    @property
+    def stability_delay_seconds(self) -> float:
+        with self._lock:
+            return self._delay
+
+    def set_stability_delay(self, seconds: float) -> None:
+        """Apply a changed "Safety delay" setting without a restart."""
+
+        value = float(seconds)
+        if value < 0:
+            raise ValueError("stability_delay_seconds cannot be negative")
+        with self._lock:
+            self._delay = value
 
     @property
     def initial_inventory_complete(self) -> bool:
@@ -1319,6 +1340,23 @@ class GameUpdateTracker:
             self._save_locked()
             return updated
 
+    def record_automatic_attempt(self, game_id: str, event_identity: str) -> GameUpdateRecord:
+        """Durably remember that unattended compression was queued for an event.
+
+        Only the marker changes; the status is left as it is, so an attempt
+        that ends with a warning, failure or unverified result is never shown
+        as a successful compression.
+        """
+
+        with self._lock:
+            record = self._records.get(str(game_id))
+            if record is None:
+                raise KeyError(f"no update state for {game_id}")
+            updated = replace(record, automatic_attempt_event=str(event_identity))
+            self._records[updated.game_id] = updated
+            self._save_locked()
+            return updated
+
     def mark_compression_verified(self, game_id: str) -> GameUpdateRecord:
         with self._lock:
             record = self._records.get(str(game_id))
@@ -1464,6 +1502,12 @@ class GameUpdateTracker:
             requires_full_analysis=requires_full,
             installation_detected=installation,
             updated_at=now,
+            # Steam re-touching the manifest of the same build re-finalizes the
+            # change; the attempt marker must survive it. A new build has a
+            # different event identity, so the old marker no longer matches.
+            automatic_attempt_event=(
+                previous.automatic_attempt_event if previous is not None else ""
+            ),
         )
         if (
             previous is not None

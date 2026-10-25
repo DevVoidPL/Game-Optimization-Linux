@@ -10,6 +10,7 @@ Button {
     property string iconText: ""
     property url iconSource: ""
     property bool compact: false
+    property real textPixelSize: App.Theme.fontBody
     property bool busy: false
     property string toolTip: ""
 
@@ -39,48 +40,60 @@ Button {
         return App.Theme.text
     }
 
-    contentItem: RowLayout {
-        id: contentRow
-        spacing: 8
+    // Icon and label are centred together as one group. A bare RowLayout with a
+    // fill-width label would pin the icon to the left edge and centre only the
+    // text (visible on wide buttons such as the PayPal donation button).
+    contentItem: Item {
+        implicitWidth: contentRow.implicitWidth
+        implicitHeight: contentRow.implicitHeight
 
-        BusyIndicator {
-            visible: control.busy
-            running: visible
-            implicitWidth: 17
-            implicitHeight: 17
-            palette.dark: control.foregroundColor
-        }
+        RowLayout {
+            id: contentRow
+            anchors.centerIn: parent
+            width: Math.min(implicitWidth, parent.width)
+            spacing: 8
 
-        Label {
-            visible: !control.busy && control.iconSource.toString().length === 0
-                     && control.iconText.length > 0
-            text: control.iconText
-            color: control.enabled ? control.foregroundColor : App.Theme.textMuted
-            font.pixelSize: control.compact ? 14 : 16
-            horizontalAlignment: Text.AlignHCenter
-        }
+            BusyIndicator {
+                visible: control.busy
+                running: visible
+                implicitWidth: 17
+                implicitHeight: 17
+                palette.dark: control.foregroundColor
+            }
 
-        UiIcon {
-            visible: !control.busy && control.iconSource.toString().length > 0
-            source: control.iconSource
-            sourceSize.width: control.compact ? 16 : 18
-            sourceSize.height: control.compact ? 16 : 18
-            Layout.preferredWidth: sourceSize.width
-            Layout.preferredHeight: sourceSize.height
-            tintEnabled: !App.Theme.dark || control.kind === "primary"
-                         || control.kind === "danger"
-            tintColor: control.enabled ? control.foregroundColor : App.Theme.textMuted
-        }
+            Label {
+                visible: !control.busy && control.iconSource.toString().length === 0
+                         && control.iconText.length > 0
+                text: control.iconText
+                color: control.enabled ? control.foregroundColor : App.Theme.textMuted
+                font.pixelSize: control.compact ? 14 : 16
+                horizontalAlignment: Text.AlignHCenter
+            }
 
-        Label {
-            visible: control.text.length > 0
-            text: control.text
-            color: control.enabled ? control.foregroundColor : App.Theme.textMuted
-            font.pixelSize: App.Theme.fontBody
-            font.weight: Font.DemiBold
-            elide: Text.ElideRight
-            horizontalAlignment: Text.AlignHCenter
-            Layout.fillWidth: true
+            UiIcon {
+                visible: !control.busy && control.iconSource.toString().length > 0
+                source: control.iconSource
+                sourceSize.width: control.compact ? 16 : 18
+                sourceSize.height: control.compact ? 16 : 18
+                Layout.preferredWidth: sourceSize.width
+                Layout.preferredHeight: sourceSize.height
+                tintEnabled: control.kind === "primary" || control.kind === "danger"
+                tintColor: control.enabled ? control.foregroundColor : App.Theme.textMuted
+            }
+
+            Label {
+                visible: control.text.length > 0
+                text: control.text
+                color: control.enabled ? control.foregroundColor : App.Theme.textMuted
+                font.pixelSize: control.textPixelSize
+                font.weight: Font.DemiBold
+                elide: Text.ElideRight
+                horizontalAlignment: Text.AlignHCenter
+                // Shrinks (with elision) when the button is narrower than the
+                // natural content width; otherwise keeps the group compact.
+                Layout.fillWidth: true
+                Layout.minimumWidth: 0
+            }
         }
     }
 

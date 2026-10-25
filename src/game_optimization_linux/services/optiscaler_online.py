@@ -22,9 +22,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
+import logging
+
 from game_optimization_linux.config import CACHE_DIR
 
 from .archive_reader import ArchiveReadError, open_archive
+
+logger = logging.getLogger(__name__)
 
 
 OFFICIAL_RELEASES_URL: Final = (
@@ -44,6 +48,57 @@ DEFAULT_MAX_ARCHIVE_BYTES: Final = 1024 * 1024 * 1024
 DOWNLOAD_CHUNK_SIZE: Final = 1024 * 1024
 
 
+def version_key(value: str) -> tuple[tuple[int, ...], int, tuple[Any, ...]]:
+    """Sortable key: numeric release parts, then pre-releases before finals.
+
+    ``10.0.0-pre1`` < ``10.0.0`` and ``0.9.4`` < ``10.0.0-pre1``. Build suffixes
+    such as ``-3f5396adef`` in cache names are ignored by callers.
+    """
+
+    text = str(value or "").strip().casefold().removeprefix("v")
+    main, _, suffix = text.partition("-")
+    numbers = tuple(int(part) for part in re.findall(r"\d+", main)) or (0,)
+    while len(numbers) > 1 and numbers[-1] == 0:
+        numbers = numbers[:-1]
+    if not suffix or suffix in {"final", "release"}:
+        return numbers, 1, ()
+    parts = tuple(
+        int(part) if part.isdigit() else part
+        for part in re.findall(r"\d+|[a-z]+", suffix)
+    )
+    return numbers, 0, parts
+
+
+def compare_installed_release(
+    installed_version: str,
+    installed_channel: str,
+    available_version: str,
+    available_channel: str,
+) -> str:
+    """Relation of the installed build to the release of the selected channel.
+
+    Returns ``same`` | ``older`` | ``newer`` | ``other_channel`` | ``unknown``.
+    A nightly (``edge``) build is never offered as an "update" to a stable
+    release or vice versa: it is reported as ``other_channel``.
+    """
+
+    installed = str(installed_version or "").strip()
+    available = str(available_version or "").strip()
+    if not installed or not available:
+        return "unknown"
+    installed_channel = str(installed_channel or "stable").strip().casefold()
+    available_channel = str(available_channel or "stable").strip().casefold()
+    if installed_channel != available_channel:
+        return "other_channel"
+    left, right = version_key(installed), version_key(available)
+    if left == right:
+        return "same"
+    try:
+        return "older" if left < right else "newer"
+    except TypeError:
+        return "unknown"
+
+
 class OptiScalerOnlineError(RuntimeError):
     """Base error for official release discovery and caching."""
 
@@ -54,6 +109,45 @@ class OptiScalerNetworkError(OptiScalerOnlineError):
 
 class OptiScalerMetadataError(OptiScalerOnlineError):
     """GitHub returned unusable or unsupported release metadata."""
+
+
+class OptiScalerNoReleaseError(OptiScalerMetadataError):
+    """The release list held no build for the channel (seen as a transient
+    GitHub response: an empty or partial list while the API/CDN updates)."""
+
+    def __init__(self, message: str, *, channel: str = "stable", entries: int = 0) -> None:
+        super().__init__(message)
+        self.channel = channel
+        self.entries = entries
+
+
+class OptiScalerRateLimitError(OptiScalerMetadataError):
+    """GitHub refused the metadata request because the API rate limit is used up."""
+
+    def __init__(self, message: str, *, retry_at: float) -> None:
+        super().__init__(message)
+        self.retry_at = float(retry_at)
+
+    def retry_minutes(self, now: float) -> int:
+        return max(1, int((self.retry_at - now + 59) // 60))
+
+
+def _rate_limit_retry_at(headers: Any, now: float) -> float | None:
+    """Return when GitHub allows the next request, or None if not rate limited."""
+
+    if headers is None:
+        return None
+    getter = getattr(headers, "get", None)
+    if not callable(getter):
+        return None
+    retry_after = str(getter("Retry-After") or "").strip()
+    if retry_after.isdigit():
+        return now + int(retry_after)
+    remaining = str(getter("X-RateLimit-Remaining") or "").strip()
+    reset = str(getter("X-RateLimit-Reset") or "").strip()
+    if remaining == "0" and reset.isdigit():
+        return max(now + 60, float(reset))
+    return None
 
 
 class OptiScalerDownloadError(OptiScalerOnlineError):
@@ -381,8 +475,10 @@ def parse_release(payload: object, *, channel: str = "stable") -> OptiScalerRele
         raise OptiScalerMetadataError(
             f"the latest {selected_channel} OptiScaler releases have no supported ZIP or 7z asset"
         )
-    raise OptiScalerMetadataError(
-        f"no {selected_channel} OptiScaler release is available"
+    raise OptiScalerNoReleaseError(
+        f"no {selected_channel} OptiScaler release is available",
+        channel=selected_channel,
+        entries=len(payload),
     )
 
 
@@ -456,14 +552,22 @@ class OptiScalerReleaseClient:
         max_metadata_bytes: int = DEFAULT_MAX_METADATA_BYTES,
         max_archive_bytes: int = DEFAULT_MAX_ARCHIVE_BYTES,
         clock: Callable[[], float] = time.time,
+        sleep: Callable[[float], None] = time.sleep,
+        no_release_attempts: int = 3,
+        no_release_retry_delay: float = 2.0,
     ) -> None:
         self.cache_root = Path(cache_root)
+        self._sleep = sleep
+        self.no_release_attempts = max(1, int(no_release_attempts))
+        self.no_release_retry_delay = max(0.0, float(no_release_retry_delay))
         self._opener = opener
         self.timeout = max(0.1, float(timeout))
         self.metadata_max_age = max(0, int(metadata_max_age))
         self.max_metadata_bytes = max(1024, int(max_metadata_bytes))
         self.max_archive_bytes = max(1024, int(max_archive_bytes))
         self._clock = clock
+        # After a GitHub rate limit, no metadata request is sent before this time.
+        self._rate_limited_until = 0.0
 
     @property
     def metadata_cache_path(self) -> Path:
@@ -541,7 +645,18 @@ class OptiScalerReleaseClient:
             },
         )
 
+    @property
+    def rate_limited_until(self) -> float:
+        return self._rate_limited_until
+
+    def _rate_limit_error(self) -> OptiScalerRateLimitError:
+        return OptiScalerRateLimitError(
+            "GitHub API rate limit reached", retry_at=self._rate_limited_until
+        )
+
     def _fetch_release_metadata(self, channel: str = "stable") -> OptiScalerRelease:
+        if self._clock() < self._rate_limited_until:
+            raise self._rate_limit_error()
         repository = (
             OFFICIAL_NIGHTLY_REPOSITORY
             if str(channel or "stable").strip().casefold() == "edge"
@@ -580,6 +695,15 @@ class OptiScalerReleaseClient:
                         )
                 body = response.read(self.max_metadata_bytes + 1)
         except HTTPError as error:
+            now = self._clock()
+            retry_at = _rate_limit_retry_at(getattr(error, "headers", None), now)
+            if error.code == 429 or (error.code == 403 and retry_at is not None):
+                self._rate_limited_until = retry_at if retry_at is not None else now + 60 * 15
+                raise self._rate_limit_error() from error
+            if error.code == 403:
+                # Anonymous API refusal without headers: treat as a rate limit.
+                self._rate_limited_until = now + 60 * 15
+                raise self._rate_limit_error() from error
             raise OptiScalerMetadataError(
                 f"GitHub release metadata returned HTTP {error.code}"
             ) from error
@@ -616,13 +740,36 @@ class OptiScalerReleaseClient:
             if age <= self.metadata_max_age:
                 return replace(release, source="cache", stale=False)
         try:
-            release = self._fetch_release_metadata(selected)
+            release = self._fetch_with_retry(selected)
             self._save_release(release)
             return release
         except (OptiScalerNetworkError, OptiScalerMetadataError):
             if cached is not None and allow_stale_cache:
                 return replace(cached[0], source="cache", stale=True)
             raise
+
+    def _fetch_with_retry(self, channel: str) -> OptiScalerRelease:
+        """Repeat only a release list without any build for the channel.
+
+        On 22.10.2026 the Nightly list briefly came back without a single
+        prerelease (15:29 UTC, no workflow running); the same request worked
+        minutes later. Such a reply is retried; network, rate-limit and
+        validation errors are not.
+        """
+
+        attempts = max(1, self.no_release_attempts)
+        for attempt in range(1, attempts + 1):
+            try:
+                return self._fetch_release_metadata(channel)
+            except OptiScalerNoReleaseError as error:
+                logger.warning(
+                    "GitHub listed no %s OptiScaler build (attempt %d/%d, %d entries)",
+                    channel, attempt, attempts, error.entries,
+                )
+                if attempt >= attempts:
+                    raise
+                self._sleep(self.no_release_retry_delay * attempt)
+        raise AssertionError("unreachable")
 
     def _archive_paths(self, release: OptiScalerRelease) -> tuple[Path, Path]:
         version_directory = (
@@ -724,9 +871,14 @@ class OptiScalerReleaseClient:
         return self._cached_archive(release, archive_path, record_path)
 
     def ensure_archive(
-        self, release: OptiScalerRelease
+        self,
+        release: OptiScalerRelease,
+        progress: Callable[[int, int], None] | None = None,
     ) -> CachedOptiScalerArchive:
-        """Return a verified cached archive, downloading it at most once."""
+        """Return a verified cached archive, downloading it at most once.
+
+        ``progress(downloaded_bytes, total_bytes)`` is called while downloading.
+        """
 
         _validate_release(release)
         if release.asset.size > self.max_archive_bytes:
@@ -798,6 +950,8 @@ class OptiScalerReleaseClient:
                                     )
                                 output.write(chunk)
                                 digest.update(chunk)
+                                if progress is not None:
+                                    progress(downloaded, int(release.asset.size))
                         break
                     except HTTPError as error:
                         raise OptiScalerDownloadError(
@@ -874,11 +1028,15 @@ __all__ = [
     "OptiScalerDownloadError",
     "OptiScalerMetadataError",
     "OptiScalerNetworkError",
+    "OptiScalerNoReleaseError",
+    "OptiScalerRateLimitError",
     "OptiScalerOnlineError",
     "OptiScalerRelease",
     "OptiScalerReleaseAsset",
     "OptiScalerReleaseClient",
     "SUPPORTED_ARCHIVE_SUFFIXES",
+    "compare_installed_release",
     "parse_latest_stable_release",
     "parse_release",
+    "version_key",
 ]

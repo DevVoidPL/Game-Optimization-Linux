@@ -6,6 +6,50 @@ QtObject {
         return String(value === undefined || value === null ? "" : value)
     }
 
+    // Presentation name for a stable launcher id / backend launcher value.
+    // Ids stay "steam" | "heroic" | "lutris" | "custom" (backend "Manual").
+    function launcherName(value) {
+        switch (text(value).trim().toLowerCase()) {
+        case "steam": return "Steam"
+        case "heroic": return "Heroic Games Launcher"
+        case "lutris": return "Lutris"
+        case "manual":
+        // Distinct text from the profile "Custom": shown as "Własne" in Polish.
+        case "custom": return qsTr("Custom games", "launcher source")
+        default: return text(value)
+        }
+    }
+
+    // Honest Narrator state for a game, from session.cardState (backend):
+    // disabled | waiting_for_game | manual | missing | running | error.
+    function narratorMissingLabel(kind) {
+        switch (text(kind)) {
+        case "capture": return qsTr("screen capture")
+        case "ocr": return qsTr("subtitle OCR")
+        case "translation": return qsTr("translation")
+        case "tts": return qsTr("voice")
+        case "audio": return qsTr("audio output")
+        default: return text(kind)
+        }
+    }
+    function narratorState(session) {
+        var data = session || ({})
+        var state = text(data.cardState)
+        if (state === "running")
+            return { "tone": "success", "text": qsTr("Running") }
+        if (state === "error")
+            return { "tone": "danger", "text": qsTr("Error: %1").arg(message(text(data.message)) || qsTr("Unknown")) }
+        if (state === "missing") {
+            var labels = (data.missingRequirements || []).map(function(kind) { return narratorMissingLabel(kind) })
+            return { "tone": "warning", "text": qsTr("On · missing: %1").arg(labels.join(", ")) }
+        }
+        if (state === "waiting_for_game")
+            return { "tone": "success", "text": qsTr("On · starts with the game") }
+        if (state === "manual")
+            return { "tone": "info", "text": qsTr("On · start the Narrator manually") }
+        return { "tone": "neutral", "text": qsTr("Off") }
+    }
+
     function profile(value) {
         switch (text(value)) {
         case "Fast": return qsTr("Fast")
@@ -68,6 +112,7 @@ QtObject {
         case "missing": return qsTr("Missing")
         case "missing files": return qsTr("Missing files")
         case "measurement failed": return qsTr("Measurement failed")
+        case "measurement unavailable": return qsTr("Measurement unavailable")
         case "moderate": return qsTr("Moderate")
         case "moderate benefit": return qsTr("Moderate benefit")
         case "needs attention": return qsTr("Needs attention")
@@ -270,6 +315,8 @@ QtObject {
         var original = text(value)
         var match
         switch (original) {
+        case "Heroic Flatpak cannot be checked from here": return qsTr("Heroic Flatpak cannot be checked from here")
+        case "Lutris Flatpak cannot be checked from here": return qsTr("Lutris Flatpak cannot be checked from here")
         case "Preliminary recommendation - game measurement required":
             return qsTr("Preliminary recommendation - game measurement required")
         case "Recommendation uses saved session measurements":
@@ -344,6 +391,8 @@ QtObject {
             return qsTr("The demo task queue could not be updated")
         case "The task list could not be updated":
             return qsTr("The task list could not be updated")
+        case "Exact compsize measurement was not requested; savings are not measured":
+            return qsTr("Exact compsize measurement was not requested; savings are not measured")
         case "Waiting for authorization to measure compression":
             return qsTr("Waiting for authorization to measure compression")
         case "unknown provider error":
@@ -452,6 +501,18 @@ QtObject {
             return qsTr("The game library is unavailable")
         case "Compression state requires verification after an interrupted operation":
             return qsTr("Compression state requires verification after an interrupted operation")
+        case "Automatic recording is not available for Lutris games yet. Record a MangoHud log in the game (logging key) and use Import MangoHud log":
+            return qsTr("Automatic recording is not available for Lutris games yet. Record a MangoHud log in the game (logging key) and use Import MangoHud log")
+        case "Recording cancelled":
+            return qsTr("Recording cancelled")
+        case "No measurement is running for this game":
+            return qsTr("No measurement is running for this game")
+        case "GameOpti cannot see running games here, so it could not tell when the game ends":
+            return qsTr("GameOpti cannot see running games here, so it could not tell when the game ends")
+        case "Baseline recording exceeded the four-hour MangoHud limit":
+            return qsTr("Baseline recording exceeded the four-hour MangoHud limit")
+        case "A baseline recording is already active for this game":
+            return qsTr("A baseline recording is already active for this game")
         case "Narrator settings saved":
             return qsTr("Narrator settings saved")
         case "Narrator settings could not be saved":
@@ -522,9 +583,138 @@ QtObject {
             return qsTr("Screen capture permission was cancelled")
         case "Screen capture stopped":
             return qsTr("Screen capture stopped")
+        case "Could not reach GitHub. Check the internet connection and try again":
+            return qsTr("Could not reach GitHub. Check the internet connection and try again")
+        case "GitHub did not list any Nightly build right now; the installation was not changed. Try again in a few minutes":
+            return qsTr("GitHub did not list any Nightly build right now; the installation was not changed. Try again in a few minutes")
+        case "DLSS Enabler is active for this game; switch back to OptiScaler first":
+            return qsTr("DLSS Enabler is active for this game; switch back to OptiScaler first")
+        case "Use the DLSS Enabler switch; it installs files and keeps OptiScaler restorable":
+            return qsTr("Use the DLSS Enabler switch; it installs files and keeps OptiScaler restorable")
+        case "GitHub did not list any Stable release right now; the installation was not changed. Try again in a few minutes":
+            return qsTr("GitHub did not list any Stable release right now; the installation was not changed. Try again in a few minutes")
+        case "Confirm replacing the listed files to continue":
+            return qsTr("Confirm replacing the listed files to continue")
+        case "The game was moved to another Steam library. Confirm the new location before changing OptiScaler files":
+            return qsTr("The game was moved to another Steam library. Confirm the new location before changing OptiScaler files")
+        case "The OptiScaler installation is inconsistent: the recorded files were not found in the current game directory. Nothing was changed":
+            return qsTr("The OptiScaler installation is inconsistent: the recorded files were not found in the current game directory. Nothing was changed")
+        case "The game was moved to another Steam library; confirm the new location":
+            return qsTr("The game was moved to another Steam library; confirm the new location")
+        case "Inconsistent installation: recorded files are missing in the current game directory":
+            return qsTr("Inconsistent installation: recorded files are missing in the current game directory")
+        case "The game directory is not writable. In Flatpak, grant access to this Steam library, then try again":
+            return qsTr("The game directory is not writable. In Flatpak, grant access to this Steam library, then try again")
+        case "game directory is unavailable":
+            return qsTr("game directory is unavailable")
+        case "A game file or directory is not accessible":
+            return qsTr("A game file or directory is not accessible")
+        case "The portal capture session closed":
+            return qsTr("The capture session was closed (the chosen window disappeared or the choice was cancelled)")
+        case "Check the preview - it should show the game":
+            return qsTr("Check the preview - it should show the game")
+        case "Narrator started with the game":
+            return qsTr("Narrator started with the game")
+        case "Narrator started with the game. Choose the game window once; the choice is remembered":
+            return qsTr("Narrator started with the game. Choose the game window once; the choice is remembered")
+        case "Checking OptiScaler took too long":
+            return qsTr("Checking OptiScaler took too long")
+        case "The installation can only be relocated when every recorded file matches in the new game directory":
+            return qsTr("The installation can only be relocated when every recorded file matches in the new game directory")
+        case "conflicting files require confirmation":
+            return qsTr("conflicting files require confirmation")
+        case "select a local OptiScaler archive":
+            return qsTr("select a local OptiScaler archive")
+        case "this 7z archive uses BCJ2 and the bundled extractor is unavailable":
+            return qsTr("this 7z archive uses BCJ2 and the bundled extractor is unavailable")
+        case "Check the official OptiScaler release before creating an installation plan":
+            return qsTr("Check the official OptiScaler release before creating an installation plan")
+        case "Check the official OptiScaler release before installation":
+            return qsTr("Check the official OptiScaler release before installation")
+        case "Select an available Steam game first":
+            return qsTr("Select an available Steam game first")
+        case "OptiScaler is not installed":
+            return qsTr("OptiScaler is not installed")
+        case "A Steam update is currently active":
+            return qsTr("A Steam update is currently active")
+        case "OptiScaler operation cancelled":
+            return qsTr("OptiScaler operation cancelled")
+        case "OptiScaler is not installed for this game":
+            return qsTr("OptiScaler is not installed for this game")
+        case "OptiScaler operation was cancelled":
+            return qsTr("OptiScaler operation was cancelled")
+        case "An OptiScaler task for this game is already active":
+            return qsTr("An OptiScaler task for this game is already active")
         default:
             break
         }
+        // OptiScaler (backend reasons with a variable part).
+        match = original.match(/^(\S+) is not available in the (\S+) Flatpak environment \(runtime (.+)\)$/)
+        if (match)
+            return qsTr("%1 is not available in the %2 Flatpak environment (runtime %3)").arg(match[1]).arg(match[2]).arg(match[3])
+        match = original.match(/^(\S+) is missing in the (\S+) Flatpak environment$/)
+        if (match)
+            return qsTr("%1 is missing in the %2 Flatpak environment").arg(match[1]).arg(match[2])
+        match = original.match(/^(\S+) is available in the launcher sandbox$/)
+        if (match)
+            return qsTr("%1 is available in the launcher sandbox").arg(match[1])
+        match = original.match(/^(\S+) is installed; restart the launcher so the running instance sees it$/)
+        if (match)
+            return qsTr("%1 is installed; restart the launcher so the running instance sees it").arg(match[1])
+        match = original.match(/^(\S+) was installed, but the launcher sandbox still does not provide it$/)
+        if (match)
+            return qsTr("%1 was installed, but the launcher sandbox still does not provide it").arg(match[1])
+        match = original.match(/^Installing (\S+)$/)
+        if (match)
+            return qsTr("Installing %1").arg(match[1])
+        if (original === "Authorization was denied or cancelled; nothing was installed")
+            return qsTr("Authorization was denied or cancelled; nothing was installed")
+        if (original === "The Flatpak remote could not be reached; check the network connection")
+            return qsTr("The Flatpak remote could not be reached; check the network connection")
+        if (original === "The Flatpak remote does not provide this extension")
+            return qsTr("The Flatpak remote does not provide this extension")
+        if (original === "Gamescope cannot reach the game inside the UMU container of the Heroic Flatpak; GameOpti turns on Heroic's Disable UMU option for this game while Gamescope is used (Proton runs without the Steam Runtime container and UMU game fixes)")
+            return qsTr("Gamescope cannot reach the game inside the UMU container of the Heroic Flatpak; GameOpti turns on Heroic's Disable UMU option for this game while Gamescope is used (Proton runs without the Steam Runtime container and UMU game fixes)")
+        match = original.match(/^MangoHud together with Gamescope is not confirmed for (\S+) yet \(Gamescope would draw MangoHud with --mangoapp\); turn one of them off and test them separately$/)
+        if (match)
+            return qsTr("MangoHud together with Gamescope is not confirmed for %1 yet (Gamescope would draw MangoHud with --mangoapp); turn one of them off and test them separately").arg(match[1])
+        match = original.match(/^The (\S+) Flatpak cannot read ~\/\.config\/MangoHud \(permission xdg-config\/MangoHud\); MangoHud is not applied$/)
+        if (match)
+            return qsTr("The %1 Flatpak cannot read ~/.config/MangoHud (permission xdg-config/MangoHud); MangoHud is not applied").arg(match[1])
+        match = original.match(/^The MangoHud config is outdated: (.+)$/)
+        if (match)
+            return qsTr("The MangoHud config is outdated: %1").arg(match[1])
+        if (original === "The MangoHud config is outdated")
+            return qsTr("The MangoHud config is outdated")
+        if (original === "The launcher uses a MangoHud config GameOpti does not manage; it was not changed")
+            return qsTr("The launcher uses a MangoHud config GameOpti does not manage; it was not changed")
+        match = original.match(/^Close (\S+) first; GameOpti starts it for the measurement$/)
+        if (match)
+            return qsTr("Close %1 first; GameOpti starts it for the measurement").arg(match[1])
+        match = original.match(/^The game did not start within (\d+) seconds after (\S+) was opened$/)
+        if (match)
+            return qsTr("The game did not start within %1 seconds after %2 was opened").arg(match[1]).arg(match[2])
+        match = original.match(/^The game ran, but MangoHud did not write a log; check that MangoHud is available in (\S+) and that the game uses Vulkan, DXVK or VKD3D$/)
+        if (match)
+            return qsTr("The game ran, but MangoHud did not write a log; check that MangoHud is available in %1 and that the game uses Vulkan, DXVK or VKD3D").arg(match[1])
+        match = original.match(/^Checking the (\S+) Flatpak sandbox; try again in a moment$/)
+        if (match)
+            return qsTr("Checking the %1 Flatpak sandbox; try again in a moment").arg(match[1])
+        match = original.match(/^GitHub API rate limit reached; try again in ([0-9]+) min$/)
+        if (match)
+            return qsTr("GitHub API rate limit reached; try again in %1 min").arg(match[1])
+        match = original.match(/^Downloading the official OptiScaler release failed: (.+)$/)
+        if (match)
+            return qsTr("Downloading the official OptiScaler release failed: %1").arg(match[1])
+        match = original.match(/^A game file or directory is not accessible: (.+)$/)
+        if (match)
+            return qsTr("A game file or directory is not accessible: %1").arg(match[1])
+        match = original.match(/^OptiScaler operation failed: (.+)$/)
+        if (match)
+            return qsTr("OptiScaler operation failed: %1").arg(message(match[1]))
+        match = original.match(/^Failed to refresh OptiScaler status: (.+)$/)
+        if (match)
+            return qsTr("Failed to refresh OptiScaler status: %1").arg(message(match[1]))
         match = original.match(/^Narrator components are unavailable: (.+)$/)
         if (match)
             return qsTr("Narrator components are unavailable: %1").arg(match[1])
@@ -660,6 +850,10 @@ QtObject {
         var original = text(value)
         var match
         switch (original) {
+        case "not determined": return qsTr("not determined")
+        case "not detected": return qsTr("not detected")
+        case "A MangoHud baseline with FPS, frametime, CPU and GPU metrics is required":
+            return qsTr("A MangoHud baseline with FPS, frametime, CPU and GPU metrics is required")
         case "gpu_bottleneck": return qsTr("GPU bottleneck")
         case "cpu_bottleneck": return qsTr("CPU bottleneck")
         case "vram_pressure": return qsTr("VRAM pressure")

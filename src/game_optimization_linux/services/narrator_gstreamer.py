@@ -53,9 +53,27 @@ _RESTART_BACKOFF_SECONDS = (0.5, 1.0, 2.0, 4.0)
 # Negotiation failed because PipeWire offered a format the current tail cannot
 # accept. On the system-memory tail this is the DMA-BUF signature, and the only
 # thing that justifies trying the GL fallback.
+#
+# The same message has a second, unrelated cause once the stream is already
+# running: pipewiresrc 1.4.x (Flatpak runtime 25.08 ships 1.4.9) drops its
+# possible_caps after the first negotiation, so when the compositor changes the
+# stream size mid-stream (KWin updateStreamSize() on a window resize, e.g.
+# 1920x1080 <-> 1920x1050) handle_format_change() finds no caps and aborts with
+# "unhandled format" followed by "Format negotiation failed". Reproduced against
+# the installed runtime; 1.6.x renegotiates instead. The tail itself is fine: a
+# fresh pipewiresrc on the same node negotiates the new size, while KWin keeps
+# the stream alive on a stream error. So the signature only means DMA-BUF when
+# no frame was ever delivered on the attempt; after frames flowed it is a
+# mid-stream format change and the SAME variant is restarted.
+#
+# "Format negotiation failed" is PipeWire's stream error for the same event
+# (pw_stream_set_error -> on_state_changed). gst-launch prints it after the
+# "unhandled format" line and the surfaced message keeps only the last 600
+# bytes of stderr, so it is frequently the only format marker that survives.
 _DMABUF_SIGNATURE_MARKERS = (
     "unhandled format",
     "no supported formats found",
+    "format negotiation failed",
 )
 
 # GL failed at runtime despite the elements being installed. The GstVideoMeta
@@ -388,6 +406,30 @@ class GStreamerPipeWireTransport:
         numerator = max(1, min(10, round(float(sampling_hz))))
         inherited_fd = os.dup(remote_fd)
         target_property = "target-object" if target_is_serial else "path"
+        with self._lock:
+            fresh_session = not self._restart_pending
+            if fresh_session:
+                # A fresh session (new start or "Retry"), not an automatic
+                # restart: every variant gets a clean attempt again. This must
+                # happen BEFORE choosing a variant, otherwise variants retired
+                # by an earlier session are carried over and the new session
+                # fails at once with "no untried pipeline variant left".
+                previously_failed = self.failed_variants
+                self._frames_received = 0
+                self._stream_errors = 0
+                self._restarts = 0
+                self._failed_variants.clear()
+                self._tried_variants.clear()
+                self._dmabuf_suspected = False
+            else:
+                previously_failed = ()
+        if previously_failed:
+            # Keep the earlier negotiation failure visible in the log.
+            logger.info(
+                "Narrator PipeWire capture fresh session: clearing variants that "
+                "failed in the previous session (failed=%s)",
+                ",".join(previously_failed),
+            )
         variant = self._select_variant()
         if not variant:
             os.close(inherited_fd)
@@ -441,15 +483,6 @@ class GStreamerPipeWireTransport:
             self._stopping.clear()
             self._stderr_tail.clear()
             self._negotiated_variant = variant
-            if not self._restart_pending:
-                # A fresh session, not an automatic restart: reset the counters
-                # and give every variant a clean attempt again.
-                self._frames_received = 0
-                self._stream_errors = 0
-                self._restarts = 0
-                self._failed_variants.clear()
-                self._tried_variants.clear()
-                self._dmabuf_suspected = False
             self._restart_pending = False
             if variant not in self._tried_variants:
                 self._tried_variants.append(variant)
@@ -561,6 +594,14 @@ class GStreamerPipeWireTransport:
                         first_frame = not self._ready
                         self._ready = True
                         self._frames_received += 1
+                        if first_frame and self._restarts:
+                            # A restart that delivers frames has recovered; the
+                            # budget is for consecutive failures, so a long
+                            # session with several window resizes does not end
+                            # with a false "did not recover" after the fifth.
+                            # Each restart still needs real frames, so a
+                            # pipeline that never recovers remains bounded.
+                            self._restarts = 0
                     if first_frame:
                         detail = bytes(self._stderr_tail).decode(
                             "utf-8", errors="replace"
@@ -647,9 +688,25 @@ class GStreamerPipeWireTransport:
             restarts = self._restarts
             parameters = dict(self._last_start or {})
             variant = self._negotiated_variant
+            # True once this attempt delivered a frame: negotiation succeeded.
+            frames_flowed = self._ready
         gl_failed = self._indicates_gl_failure(message)
         dmabuf_signature = self._indicates_dmabuf(message)
-        if (gl_failed or dmabuf_signature) and parameters:
+        format_changed = dmabuf_signature and frames_flowed and not gl_failed
+        if format_changed:
+            # The variant negotiated and delivered frames, so the format
+            # signature cannot mean "this tail cannot accept what PipeWire
+            # offers". It is the mid-stream size change described at
+            # _DMABUF_SIGNATURE_MARKERS: keep the variant, retry it.
+            logger.info(
+                "Narrator PipeWire capture variant=%s stream format changed "
+                "mid-stream after frames flowed (stream_errors=%d); retrying the "
+                "same variant: %s",
+                variant or "unknown",
+                errors,
+                message,
+            )
+        elif (gl_failed or dmabuf_signature) and parameters:
             # The variant itself is wrong for this compositor. Retire it and try
             # the other one; do not spend the restart budget on the same tail.
             with self._lock:
@@ -689,7 +746,9 @@ class GStreamerPipeWireTransport:
                 f"{', '.join(self.tried_variants) or 'none'})",
             )
             return
-        recoverable = self._is_recoverable(message) and bool(parameters)
+        recoverable = (format_changed or self._is_recoverable(message)) and bool(
+            parameters
+        )
         if recoverable and restarts < _MAX_STREAM_RESTARTS:
             delay = _RESTART_BACKOFF_SECONDS[
                 min(restarts, len(_RESTART_BACKOFF_SECONDS) - 1)

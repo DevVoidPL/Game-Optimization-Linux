@@ -300,3 +300,52 @@ def test_real_full_incremental_cancel_and_verification_workflow() -> None:
         assert not history.pending()
         assert len(history.history(game.id)) == 3
         assert _content_digest(game.install_path) == updated_content
+
+
+def test_real_profile_selects_the_zstd_level_actually_executed() -> None:
+    """Each profile reaches ``btrfs filesystem defragment -czstd --level N``.
+
+    The runner records argv and then runs the real command, so the level is
+    the one Btrfs really received, on a few MiB in a disposable directory.
+    """
+
+    with _real_btrfs_sandbox() as sandbox:
+        game = _game(sandbox, "ProfileGame")
+        (game.install_path / "compressible.bin").write_bytes(b"P" * (2 * _MIB))
+        content = _content_digest(game.install_path)
+        executed: list[list[str]] = []
+
+        def recording_runner(argv, **kwargs):
+            executed.append(list(argv))
+            return subprocess.run(argv, **kwargs)
+
+        analyzer = _analyzer()
+        provider = BtrfsCompressionProvider(
+            analyzer,
+            command_runner=recording_runner,
+            game_running_checker=lambda _game: False,
+            steam_update_checker=lambda _game: False,
+        )
+        service = CompressionService(
+            provider,
+            CompressionHistoryStore(sandbox / "state" / "compression.json"),
+            fingerprint_loader=lambda _game: None,
+        )
+        for profile, level in (
+            (CompressionProfile.FAST, "1"),
+            (CompressionProfile.BALANCED, "3"),
+            (CompressionProfile.MAXIMUM, "9"),
+        ):
+            executed.clear()
+            report = analyzer.analyze(game, sample_files=False)
+            plan = service.prepare(game, report, profile, confirmation_required=True)
+            assert plan.eligible, plan.blockers
+            assert plan.one_time_recompression_level == int(level)
+            result = service.execute(plan.id, game, confirmed=True)
+            assert result.status in {"completed", "completed_with_warning"}
+            defrag = [argv for argv in executed if "defragment" in argv]
+            assert defrag, executed
+            for argv in defrag:
+                assert argv[argv.index("--level") + 1] == level
+                assert "-czstd" in argv
+        assert _content_digest(game.install_path) == content

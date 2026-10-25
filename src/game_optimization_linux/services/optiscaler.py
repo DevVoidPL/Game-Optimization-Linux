@@ -37,6 +37,7 @@ from .optiscaler_fsr4 import (
     inspect_optiscaler_ini_state,
     managed_ini_differences,
     managed_ini_updates,
+    managed_option_updates,
     update_ini_text,
 )
 
@@ -55,9 +56,51 @@ ANTI_CHEAT_MARKERS = (
     "beservice",
     "equ8",
     "faceit",
-    "ricochet",
     "vgk.sys",
 )
+# File/folder name -> anti-cheat product.  A match only means the files are
+# present in the game folder; it says nothing about whether the user plays
+# online.  Substring matching on generic words is not used: on 24.10.2026
+# "ricochet" matched Jedi: Survivor movie assets (BlasterShot_Ricochet.uasset),
+# a false positive.  Ricochet (Call of Duty) ships no recognisable client file
+# name, so it is not detected by file name at all.
+_ANTI_CHEAT_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"easyanticheat|easy anti-cheat|^eac_launcher"), "Easy Anti-Cheat"),
+    (re.compile(r"^battleye$|^beclient(_x64)?\.(dll|cfg)$|^beservice(_x64)?\.exe$"), "BattlEye"),
+    (re.compile(r"^equ8"), "EQU8"),
+    (re.compile(r"^faceit"), "FACEIT"),
+    (re.compile(r"^vgk\.sys$"), "Vanguard"),
+)
+ANTI_CHEAT_SCAN_LIMIT = 50000
+ANTI_CHEAT_MAX_MATCHES = 12
+
+
+def anti_cheat_matches(root: Path) -> list[dict[str, str]]:
+    """Anti-cheat file names inside ``root`` only (no symlinks followed).
+
+    Returns ``[{"path": relative path, "rule": product}]``.  The scan is
+    bounded and stays inside the given game directory.
+    """
+
+    found: list[dict[str, str]] = []
+    visited = 0
+    try:
+        base = Path(root).resolve(strict=True)
+    except OSError:
+        return found
+    for directory, names, files in os.walk(base, followlinks=False):
+        names[:] = [name for name in names if not (Path(directory) / name).is_symlink()]
+        for name in (*names, *files):
+            visited += 1
+            if visited > ANTI_CHEAT_SCAN_LIMIT:
+                return found
+            folded = name.casefold()
+            rule = next((label for pattern, label in _ANTI_CHEAT_RULES if pattern.search(folded)), "")
+            if rule:
+                found.append({"path": str((Path(directory) / name).relative_to(base)), "rule": rule})
+                if len(found) >= ANTI_CHEAT_MAX_MATCHES:
+                    return found
+    return found
 LOADER_MARKERS = (
     "nvapi64.dll",
     "nvngx.dll",
@@ -316,7 +359,9 @@ def merge_wine_dll_overrides(existing: str, addition: str) -> str:
 
     for token in str(existing or "").split(";"):
         include(token)
-    include(addition, replace_existing=True)
+    # One managed entry (OptiScaler) or several (DLSS Enabler: version;dxgi).
+    for token in str(addition or "").split(";"):
+        include(token, replace_existing=True)
     return ";".join(
         f"{name}={','.join(modes)}" for name, modes in entries if modes
     )
@@ -341,11 +386,10 @@ class OptiScalerService:
 
     @staticmethod
     def game_key(game: Game) -> str:
-        if game.steam_app_id:
-            return str(game.steam_app_id)
-        if game.data_source.casefold() == "local" and game.id.startswith("local-"):
-            return game.id
-        raise OptiScalerError("OptiScaler requires a Steam or configured local game")
+        key = game.profile_key
+        if key:
+            return key
+        raise OptiScalerError("OptiScaler requires a Steam, Heroic, Lutris or configured local game")
 
     @staticmethod
     def _check_cancel(cancel_event: Event | None) -> None:
@@ -501,6 +545,13 @@ class OptiScalerService:
         return match.group(1).replace("_", "-") if match else "Unknown"
 
     @staticmethod
+    def _candidate_payload(game: Game, candidate: Any) -> dict[str, Any]:
+        """Candidate with its full path, so the user can see what is chosen."""
+        payload = candidate.to_dict()
+        payload["fullPath"] = str(Path(game.install_path) / candidate.relative_path)
+        return payload
+
+    @staticmethod
     def _canonical_game_root(game: Game) -> Path:
         try:
             root = game.install_path.resolve(strict=True)
@@ -567,20 +618,127 @@ class OptiScalerService:
         return candidate
 
     def _anti_cheat_markers(self, root: Path) -> tuple[str, ...]:
-        found: list[str] = []
-        visited = 0
-        for directory, names, files in os.walk(root, followlinks=False):
-            names[:] = [name for name in names if not (Path(directory) / name).is_symlink()]
-            for name in (*names, *files):
-                visited += 1
-                if visited > 50000:
-                    return tuple(found)
-                folded = name.casefold()
-                if any(marker in folded for marker in ANTI_CHEAT_MARKERS):
-                    found.append(str((Path(directory) / name).relative_to(root)))
-                    if len(found) >= 12:
-                        return tuple(found)
-        return tuple(found)
+        return tuple(item["path"] for item in anti_cheat_matches(root))
+
+    def locate_installation(
+        self, game: Game, manifest: Mapping[str, Any]
+    ) -> dict[str, Any]:
+        """Find the managed files in the game's *current* library location.
+
+        The manifest stores the absolute directory used at install time; Steam
+        may since have moved the game to another library.  States:
+
+        * ``current``      - the recorded directory exists inside this game;
+        * ``moved``        - it does not exist, but every installed file is in
+                             the current game directory with the recorded
+                             SHA-256 (the game was moved); needs confirmation
+                             before the manifest is rewritten;
+        * ``inconsistent`` - recorded directory missing and the files in the
+                             current directory do not match; nothing is changed;
+        * ``unavailable``  - the current game directory cannot be read.
+        """
+
+        stored_text = str(manifest.get("install_directory", "") or "")
+        stored = Path(stored_text) if stored_text else None
+        result: dict[str, Any] = {
+            "state": "unavailable",
+            "storedDirectory": stored_text,
+            "currentDirectory": "",
+            "mismatchedFiles": [],
+        }
+        try:
+            game_root = self._canonical_game_root(game)
+        except OptiScalerError:
+            return result
+        executable = str(manifest.get("executable", "") or "").replace("\\", "/")
+        relative_dir = PurePosixPath(executable).parent.as_posix() if executable else "."
+        expected = (
+            game_root if relative_dir in {"", "."}
+            else self._target(game_root, relative_dir)
+        )
+        result["currentDirectory"] = str(expected)
+        if stored is not None and stored.is_dir():
+            try:
+                resolved = stored.resolve(strict=True)
+                resolved.relative_to(game_root)
+            except (OSError, ValueError):
+                result["state"] = "inconsistent"
+                result["currentDirectory"] = str(expected)
+                return result
+            result.update({"state": "current", "currentDirectory": str(resolved)})
+            return result
+        if not expected.is_dir():
+            result["state"] = "inconsistent"
+            return result
+        mismatched: list[str] = []
+        for item in manifest.get("installed_files", []):
+            if not isinstance(item, Mapping):
+                continue
+            relative = str(item.get("relative_path", ""))
+            expected_hash = str(item.get("after_sha256", "") or "")
+            if not relative or _is_mutable_configuration(relative):
+                continue
+            target = self._target(expected, relative)
+            try:
+                matches = target.is_file() and (
+                    not expected_hash or self._hash_file(target) == expected_hash
+                )
+            except OSError:
+                matches = False
+            if not matches:
+                mismatched.append(relative)
+        result["mismatchedFiles"] = mismatched[:20]
+        result["state"] = "moved" if not mismatched else "inconsistent"
+        return result
+
+    def _install_root_for_change(self, game: Game, manifest: Mapping[str, Any]) -> Path:
+        """Current install root for a file operation; never a raw OSError."""
+
+        location = self.locate_installation(game, manifest)
+        state = location["state"]
+        if state == "current":
+            root = Path(location["currentDirectory"])
+            if not os.access(root, os.W_OK | os.X_OK):
+                raise OptiScalerError(
+                    "The game directory is not writable. In Flatpak, grant access "
+                    "to this Steam library, then try again"
+                )
+            return root
+        if state == "moved":
+            raise OptiScalerError(
+                "The game was moved to another Steam library. Confirm the new "
+                "location before changing OptiScaler files"
+            )
+        if state == "inconsistent":
+            raise OptiScalerError(
+                "The OptiScaler installation is inconsistent: the recorded files "
+                "were not found in the current game directory. Nothing was changed"
+            )
+        raise OptiScalerError("game directory is unavailable")
+
+    def relocate_installation(self, game: Game) -> OptiScalerProfile:
+        """After confirmation, point the manifest at the game's new location."""
+
+        self._assert_mutation_allowed(game)
+        profile = self.profile_repository.load(self.game_key(game))
+        manifest = self._load_manifest(profile)
+        location = self.locate_installation(game, manifest)
+        if location["state"] != "moved":
+            raise OptiScalerError(
+                "The installation can only be relocated when every recorded file "
+                "matches in the new game directory"
+            )
+        current = str(location["currentDirectory"])
+        manifest["install_directory"] = current
+        manifest["relocated_from"] = location["storedDirectory"]
+        manifest["relocated_at"] = datetime.now(UTC).isoformat()
+        _atomic_write(
+            self.manifest_path(profile.app_id, profile.manifest_id),
+            json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        )
+        updated = replace(profile, install_directory=current, updated_at=datetime.now(UTC))
+        self.profile_repository.save(updated)
+        return updated
 
     def manifest_path(self, app_id: str, manifest_id: str) -> Path:
         return self.data_root / app_id / "optiscaler" / "manifests" / f"{manifest_id}.json"
@@ -724,7 +882,7 @@ class OptiScalerService:
         blockers: list[str] = []
         if not game.library_available:
             blockers.append("The game library is unavailable")
-        if game.update_in_progress:
+        if self._steam_write_blocked(game):
             blockers.append("A Steam update is currently active")
         anti_cheat = self._anti_cheat_markers(root)
         if (game.has_anticheat or anti_cheat) and not allow_anticheat_risk:
@@ -825,7 +983,7 @@ class OptiScalerService:
             != expected_install_identity
         ):
             raise OptiScalerError("the executable directory changed before installation")
-        if game.update_in_progress:
+        if self._steam_write_blocked(game):
             raise OptiScalerError("A Steam update is currently active")
         try:
             if self._process_detector(current_game_root):
@@ -1483,9 +1641,14 @@ class OptiScalerService:
             shutil.rmtree(backup_root, ignore_errors=True)
             raise
 
+    @staticmethod
+    def _steam_write_blocked(game: Game) -> bool:
+        from ..providers.steam import steam_update_activity
+        return steam_update_activity(game)["blocked"]
+
     def _assert_mutation_allowed(self, game: Game) -> None:
         root = self._canonical_game_root(game)
-        if game.update_in_progress:
+        if self._steam_write_blocked(game):
             raise OptiScalerError("A Steam update is currently active")
         if self._process_detector(root):
             raise OptiScalerError("The game is currently running")
@@ -1503,12 +1666,14 @@ class OptiScalerService:
                 None,
             )
         manifest = self._load_manifest(profile)
-        install_root = Path(str(manifest["install_directory"])).resolve(strict=False)
-        expected_root = self._canonical_game_root(game)
-        try:
-            install_root.relative_to(expected_root)
-        except ValueError as error:
-            raise OptiScalerError("manifest install directory is outside this game") from error
+        location = self.locate_installation(game, manifest)
+        if location["state"] != "current":
+            summary = {
+                "moved": "The game was moved to another Steam library; confirm the new location",
+                "inconsistent": "Inconsistent installation: recorded files are missing in the current game directory",
+            }.get(location["state"], "game directory is unavailable")
+            raise OptiScalerError(summary)
+        install_root = Path(location["currentDirectory"])
         issues: list[dict[str, Any]] = []
         installed_relatives: set[str] = set()
         payload_missing = False
@@ -1804,16 +1969,7 @@ class OptiScalerService:
         if not profile.enabled or profile.installation_state != "installed":
             raise OptiScalerError("OptiScaler is not installed for this game")
         manifest = self._load_manifest(profile)
-        install_root = Path(str(manifest.get("install_directory", ""))).resolve(
-            strict=True
-        )
-        expected_root = self._canonical_game_root(game)
-        try:
-            install_root.relative_to(expected_root)
-        except ValueError as error:
-            raise OptiScalerError(
-                "manifest install directory is outside this game"
-            ) from error
+        install_root = self._install_root_for_change(game, manifest)
         installed_entries = [
             item
             for item in manifest.get("installed_files", [])
@@ -1950,17 +2106,39 @@ class OptiScalerService:
         dx11_upscaler: str,
         dx12_upscaler: str,
         vulkan_upscaler: str,
+        fsr4_preset: str | None = None,
+        sharpness: str | None = None,
+        log_mode: str | None = None,
+        overlay_shortcut: str | None = None,
     ) -> OptiScalerProfile:
-        """Apply the user-selected keys supported by the installed release."""
+        """Apply the user-selected keys supported by the installed release.
+
+        ``None`` for an additional option keeps the profile's stored value, so
+        older callers never reset settings they do not know about.
+        """
 
         if not isinstance(fsr_agility_sdk_upgrade, bool):
             raise OptiScalerError("FsrAgilitySDKUpgrade must be a boolean")
         if not isinstance(fsr4_watermark, bool):
             raise OptiScalerError("Fsr4EnableWatermark must be a boolean")
-        _profile, manifest, _target, _relative, _original, text = (
+        stored, manifest, _target, _relative, _original, text = (
             self._managed_ini_context(game)
         )
         capabilities = inspect_optiscaler_ini(text)
+        options = {
+            "fsr4_preset": stored.fsr4_preset if fsr4_preset is None else fsr4_preset,
+            "sharpness": stored.sharpness if sharpness is None else sharpness,
+            "log_mode": stored.log_mode if log_mode is None else log_mode,
+            "overlay_shortcut": (
+                stored.overlay_shortcut if overlay_shortcut is None else overlay_shortcut
+            ),
+        }
+        applied_mode_preview = str(effective_fsr4_mode or fsr4_mode).casefold()
+        if applied_mode_preview == "lite" and stored.fsr_variant != "official":
+            raise OptiScalerError(
+                "FSR 4 INT8 Lite cannot be combined with a Cyboman FSR 4.1.1 DLL; "
+                "restore the official upscaler first"
+            )
         if fsr_agility_sdk_upgrade and not any(
             "d3d12_optiscaler" in {
                 part.casefold()
@@ -1985,8 +2163,17 @@ class OptiScalerService:
                 vulkan_upscaler=vulkan_upscaler,
                 capabilities=capabilities,
             )
+            option_updates = managed_option_updates(
+                capabilities=capabilities, **options
+            )
         except ValueError as error:
             raise OptiScalerError(str(error)) from error
+        try:
+            # Validate through the profile model (normalizes sharpness).
+            normalized = replace(stored, **options)
+        except ValueError as error:
+            raise OptiScalerError(str(error)) from error
+        updates.update(option_updates)
         mode = str(fsr4_mode).casefold()
         profile_changes = {
             "fsr4_mode": mode,
@@ -1997,6 +2184,10 @@ class OptiScalerService:
             "dx11_upscaler": str(dx11_upscaler).casefold(),
             "dx12_upscaler": str(dx12_upscaler).casefold(),
             "vulkan_upscaler": str(vulkan_upscaler).casefold(),
+            "fsr4_preset": normalized.fsr4_preset,
+            "sharpness": normalized.sharpness,
+            "log_mode": normalized.log_mode,
+            "overlay_shortcut": normalized.overlay_shortcut,
         }
         record: dict[str, Any] = {
             "fsr4Mode": mode,
@@ -2023,10 +2214,15 @@ class OptiScalerService:
         if value not in OPTISCALER_BACKENDS:
             raise OptiScalerError(f"Unsupported backend: {backend}")
         if value == "dlss_enabler":
+            # Files must change; DlssEnablerService performs that switch.
             raise OptiScalerError(
-                "DLSS Enabler detection is available, but installation is not implemented"
+                "Use the DLSS Enabler switch; it installs files and keeps OptiScaler restorable"
             )
         profile = self.profile_repository.load(self.game_key(game))
+        if profile.backend == "dlss_enabler":
+            raise OptiScalerError(
+                "DLSS Enabler is active for this game; switch back to OptiScaler first"
+            )
         updated = replace(profile, backend=value, enabled=value != "none")
         self.profile_repository.save(updated)
         return updated
@@ -2059,14 +2255,7 @@ class OptiScalerService:
         emit = progress or (lambda _stage, _value: None)
         profile = self.profile_repository.load(self.game_key(game))
         manifest = self._load_manifest(profile)
-        install_root = Path(str(manifest["install_directory"])).resolve(strict=True)
-        game_root = self._canonical_game_root(game)
-        try:
-            install_root.relative_to(game_root)
-        except ValueError as error:
-            raise OptiScalerError(
-                "manifest install directory is outside this game"
-            ) from error
+        install_root = self._install_root_for_change(game, manifest)
         backup_root = self.backup_root(profile.app_id, profile.manifest_id)
         manifest_path = self.manifest_path(profile.app_id, profile.manifest_id)
         try:
@@ -2335,7 +2524,7 @@ class OptiScalerService:
         emit = progress or (lambda _stage, _value: None)
         profile = self.profile_repository.load(self.game_key(game))
         manifest = self._load_manifest(profile)
-        install_root = Path(str(manifest["install_directory"])).resolve(strict=True)
+        install_root = self._install_root_for_change(game, manifest)
         backup_root = self.backup_root(profile.app_id, profile.manifest_id)
         replacements = [
             item for item in manifest.get("replaced_files", []) if isinstance(item, Mapping)
@@ -2408,11 +2597,20 @@ class OptiScalerService:
         capabilities = empty_capabilities
         ini_state = inspect_optiscaler_ini_state("")
         ini_error = ""
-        if profile.enabled and manifest:
+        active_install = bool(
+            profile.enabled
+            and profile.manifest_id
+            and profile.installation_state in {"installed", "partial", "corrupt"}
+        )
+        location = (
+            self.locate_installation(game, manifest)
+            if manifest and active_install
+            else {"state": "not_applicable", "storedDirectory": "",
+                  "currentDirectory": "", "mismatchedFiles": []}
+        )
+        if profile.enabled and manifest and location["state"] == "current":
             try:
-                install_root = Path(
-                    str(manifest.get("install_directory", ""))
-                ).resolve(strict=True)
+                install_root = Path(str(location["currentDirectory"]))
                 ini_entries = [
                     item
                     for item in manifest.get("installed_files", [])
@@ -2469,14 +2667,35 @@ class OptiScalerService:
         )
         if capabilities.agility_sdk_upgrade and not has_agility_payload:
             capabilities = replace(capabilities, agility_sdk_upgrade=False)
-        # No upstream log parser is implemented here.  Profile/config state is
-        # never accepted as runtime evidence; the watermark must be checked in
-        # the running game.
+        # Profile/config state is never accepted as runtime evidence.  An
+        # OptiScaler.log written after the last configuration change is read
+        # as a hint (provider hooks, SR version, FSR 4 unavailable); only the
+        # in-game watermark confirms the model of the running frames.
         runtime_verification_status = "not_verified"
+        runtime_log: dict[str, Any] = {"logFound": False, "status": "not_verified"}
+        if active_install and location.get("state") == "current":
+            from .fsr_variants import inspect_runtime_log
+
+            log_path = Path(str(location.get("currentDirectory", ""))) / "OptiScaler.log"
+            runtime_log = inspect_runtime_log(log_path)
+            modified = str(runtime_log.get("logModifiedAt", ""))
+            changed_at = profile.last_verified_at or profile.updated_at
+            try:
+                stale = bool(
+                    modified
+                    and changed_at is not None
+                    and datetime.fromisoformat(modified) < changed_at
+                )
+            except ValueError:
+                stale = True
+            runtime_log["stale"] = stale
+            if not stale and runtime_log.get("status") == "verified_fsr3_fallback":
+                runtime_verification_status = "verified_fsr3_fallback"
         verification_labels = {
             "not_verified": "Runtime verification required",
             "verified_fsr4": "Verified FSR4",
             "verified_fsr4_int8": "Verified FSR4-I8",
+            "verified_fsr4_int8_lite": "Verified FSR4 INT8 Lite",
             "verified_fsr3_fallback": "Verified FSR3 fallback",
         }
         installed_source_identity = (
@@ -2531,14 +2750,25 @@ class OptiScalerService:
             {
                 "success": True,
                 "appId": profile.app_id,
-                "installationState": profile.installation_state,
+                "installationState": (
+                    "inconsistent"
+                    if location["state"] in {"inconsistent", "unavailable"}
+                    and active_install
+                    else profile.installation_state
+                ),
+                "installLocation": location,
                 "installed": bool(
                     profile.enabled
                     and profile.manifest_id
                     and profile.installation_state
                     in {"installed", "partial"}
                 ),
-                "installedVersion": profile.installed_version,
+                # A removed installation has no current version; the last one
+                # is kept separately so the UI never shows both states.
+                "installedVersion": (
+                    profile.installed_version if active_install else ""
+                ),
+                "lastInstalledVersion": profile.installed_version,
                 "injectionDll": profile.injection_dll,
                 "protonOverride": profile.proton_override,
                 "manifestId": profile.manifest_id,
@@ -2558,8 +2788,12 @@ class OptiScalerService:
                 ),
                 "executableStatus": resolution.status,
                 "executableConfidence": resolution.status,
-                "selectedExecutable": selected.to_dict() if selected else {},
-                "executableCandidates": [item.to_dict() for item in resolution.candidates],
+                "selectedExecutable": (
+                    self._candidate_payload(game, selected) if selected else {}
+                ),
+                "executableCandidates": [
+                    self._candidate_payload(game, item) for item in resolution.candidates
+                ],
                 "executableMessage": resolution.message,
                 "installedFiles": installed_files,
                 "backend": profile.backend,
@@ -2631,6 +2865,13 @@ class OptiScalerService:
                     else profile.fsr4_watermark
                 ),
                 "requestedFsr4Watermark": profile.fsr4_watermark,
+                "fsr4Preset": ini_state.fsr4_preset or profile.fsr4_preset,
+                "sharpness": ini_state.sharpness or profile.sharpness,
+                "logMode": ini_state.log_mode or profile.log_mode,
+                "overlayShortcut": (
+                    ini_state.overlay_shortcut or profile.overlay_shortcut
+                ),
+                "fsrVariant": profile.fsr_variant,
                 "fsr4WatermarkState": ini_state.watermark,
                 "dx11Upscaler": ini_state.dx11_upscaler or profile.dx11_upscaler,
                 "dx12Upscaler": ini_state.dx12_upscaler or profile.dx12_upscaler,
@@ -2649,7 +2890,8 @@ class OptiScalerService:
                     runtime_verification_status
                 ],
                 "runtimeVerified": runtime_verification_status
-                in {"verified_fsr4", "verified_fsr4_int8"},
+                in {"verified_fsr4", "verified_fsr4_int8", "verified_fsr4_int8_lite"},
+                "runtimeLog": runtime_log,
                 "iniCapabilities": capabilities.to_dict(),
                 "releaseCapabilities": dict(
                     manifest.get("capabilities", {})

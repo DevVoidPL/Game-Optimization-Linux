@@ -31,10 +31,26 @@ FocusScope {
         return fallback
     }
 
+    property var sessionData: ({})
+    readonly property bool sessionActive: ["starting", "selecting_source", "listening", "ocr",
+        "translating", "speaking", "stopping"].indexOf(String(value(sessionData, ["status"], "idle"))) >= 0
+
+    Connections {
+        target: page.controller || null
+        ignoreUnknownSignals: true
+        function onNarratorChanged(gameId) {
+            if ((!gameId || String(gameId) === page.selectedGameId) && page.controller
+                    && typeof page.controller.getNarratorSessionState === "function" && page.selectedGameId)
+                page.sessionData = page.controller.getNarratorSessionState(page.selectedGameId) || ({})
+        }
+    }
+
     function loadSettings() {
         if (!controller || !selectedGameId
                 || typeof controller.getNarratorGameSettings !== "function")
             return
+        sessionData = typeof controller.getNarratorSessionState === "function"
+                ? (controller.getNarratorSessionState(selectedGameId) || ({})) : ({})
         settingsData = controller.getNarratorGameSettings(selectedGameId) || ({})
         voices = value(settingsData, ["voices"], []) || []
         translationProfiles = value(settingsData, ["translationProfiles"], []) || []
@@ -127,7 +143,7 @@ FocusScope {
         anchors.margins: 52 * page.couchScale
         spacing: 18 * page.couchScale
         Label {
-            text: qsTr("Narrator")
+            text: qsTr("Lektor")
             color: App.Theme.text
             font.pixelSize: 38 * page.couchScale
             font.weight: Font.Bold
@@ -244,14 +260,16 @@ FocusScope {
                 }
                 CouchButton {
                     id: startButton
-                    text: value(settingsData, ["enabled"], false) ? qsTr("Stop Narrator") : qsTr("Start Narrator")
-                    iconSource: value(settingsData, ["enabled"], false) ? App.UiIcons.actionCancel : App.UiIcons.actionLaunch
+                    // Start/stop follows the real session, not the per-game
+                    // "enabled" setting (which only decides autostart).
+                    text: page.sessionActive ? qsTr("Stop Narrator") : qsTr("Start Narrator")
+                    iconSource: page.sessionActive ? App.UiIcons.actionCancel : App.UiIcons.actionLaunch
                     couchScale: page.couchScale
+                    enabled: page.sessionActive || Boolean(value(settingsData, ["enabled"], false))
                     onClicked: {
-                        save()
-                        if (value(settingsData, ["enabled"], false)) {
+                        if (page.sessionActive) {
                             if (controller && controller.stopNarrator) controller.stopNarrator()
-                        } else if (controller && controller.startNarrator) {
+                        } else if (save() && controller && controller.startNarrator) {
                             controller.startNarrator(selectedGameId)
                         }
                         loadSettings()

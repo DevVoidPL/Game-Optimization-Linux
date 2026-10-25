@@ -1,23 +1,34 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
-.pytest_cache/
-.coverage
-htmlcov/
 .venv/
 venv/
-build/
-dist/
-*.log
-.idea/
-.vscode/
-reports/compression_benchmarks/
 
-# Flatpak generated/test artifacts
+# Tests and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# Build outputs
+/build/
+/dist/
+/build-flatpak/
 .flatpak-builder/
 .flatpak-build*/
 .flatpak-repo*/
 .flatpak-stage*/
-.flatpak-couch-probe*/
-dist/
-.venv/
+*.flatpak
+*.flatpakref
+
+# Local runtime files and editor settings
+*.log
+.env
+.env.*
+!.env.example
+.idea/
+.vscode/
+*~

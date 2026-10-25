@@ -21,6 +21,7 @@ from game_optimization_linux.services.narrator_components import (
 from game_optimization_linux.services.narrator_tts import (
     PIPER_BASS_COMPONENT_ID,
     PIPER_COMPONENT_ID,
+    PIPER_DARKMAN_COMPONENT_ID,
 )
 from game_optimization_linux.services.narrator_ocr import (
     TESSERACT_COMPONENT_ID,
@@ -409,3 +410,81 @@ def test_managed_older_component_exposes_verified_update_and_attribution(
     assert component.state is NarratorComponentState.UPDATE_AVAILABLE
     assert component.update_version == "2"
     assert component.attribution == "Model authors"
+
+
+def test_darkman_voice_component_uses_exact_pinned_official_artifacts() -> None:
+    definition = next(
+        item
+        for item in DEFAULT_NARRATOR_COMPONENTS
+        if item.component_id == PIPER_DARKMAN_COMPONENT_ID
+    )
+
+    assert definition.component_id not in {PIPER_COMPONENT_ID, PIPER_BASS_COMPONENT_ID}
+    assert definition.kind is NarratorComponentKind.TTS
+    assert definition.install_ready is True
+    assert definition.version == "piper-voices-c10ece1"
+    assert definition.license_id == "MIT / CC0 source data"
+    assert definition.runtime_license_id == "GPL-3.0-or-later"
+    assert definition.artifact_license_id == "MIT; source dataset CC0"
+    assert definition.attribution == "pl_PL-darkman-medium from rhasspy/piper-voices"
+    assert [artifact.size_bytes for artifact in definition.artifacts] == [
+        63_201_294,
+        4_816,
+    ]
+    assert definition.download_size_bytes == sum(
+        artifact.size_bytes for artifact in definition.artifacts
+    )
+    assert [artifact.sha256 for artifact in definition.artifacts] == [
+        "db505438a5364e8e2e0242c4324130a873ed660dfbe8d9689cef428ffb1b645f",
+        "70f999f11fa8ad13d3ef779041ee93c9f38be5abdbacdfad42449712fe91c81b",
+    ]
+    assert all(
+        artifact.source_url.startswith(
+            "https://huggingface.co/rhasspy/piper-voices/resolve/"
+            "c10ece1aade47bb51c153c893d14e5bf8e5b7117/pl/pl_PL/darkman/medium/"
+        )
+        for artifact in definition.artifacts
+    )
+    assert [artifact.target_relative_path for artifact in definition.artifacts] == [
+        "voices/pl_PL-darkman-medium.onnx",
+        "voices/pl_PL-darkman-medium.onnx.json",
+    ]
+
+
+def test_darkman_voice_installs_and_verifies_under_separate_component_ownership(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    official = next(
+        item
+        for item in DEFAULT_NARRATOR_COMPONENTS
+        if item.component_id == PIPER_DARKMAN_COMPONENT_ID
+    )
+    payloads = {
+        official.artifacts[0].source_url: b"small-darkman-model-fixture",
+        official.artifacts[1].source_url: b'{"audio":{"sample_rate":22050}}',
+    }
+    artifacts = tuple(
+        replace(
+            artifact,
+            sha256=hashlib.sha256(payloads[artifact.source_url]).hexdigest(),
+            size_bytes=len(payloads[artifact.source_url]),
+        )
+        for artifact in official.artifacts
+    )
+    definition = replace(
+        official,
+        artifacts=artifacts,
+        download_size_bytes=sum(artifact.size_bytes for artifact in artifacts),
+    )
+    monkeypatch.setattr(
+        "game_optimization_linux.services.narrator_components.urlopen",
+        lambda url, **_values: _Response(payloads[str(url)], str(url)),
+    )
+    manager = NarratorComponentManager(tmp_path, definitions=(definition,))
+
+    manager.install(PIPER_DARKMAN_COMPONENT_ID)
+
+    assert manager.verify_installed(PIPER_DARKMAN_COMPONENT_ID) == (True, "")
+    assert (
+        tmp_path / PIPER_DARKMAN_COMPONENT_ID / "voices/pl_PL-darkman-medium.onnx"
+    ).read_bytes() == b"small-darkman-model-fixture"

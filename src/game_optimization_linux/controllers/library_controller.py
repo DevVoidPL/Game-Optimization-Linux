@@ -916,7 +916,10 @@ class LibraryController:
         merged = {game.id: game for game in discovered_games}
         inaccessible = self._app._provider_inaccessible_paths()
         configured = self._app._provider_configured_library_paths()
+        present_without_steamapps = self._provider_present_without_steamapps()
         retained = 0
+        expired = 0
+        replaced_libraries: dict[str, bool] = {}
         failed_launchers = set(
             getattr(self._app._game_provider, "failed_launchers", ()) or ()
         )
@@ -948,6 +951,27 @@ class LibraryController:
             )
             if not belongs_to_inaccessible or not still_configured:
                 continue
+            # The library directory is reachable, so the disk is mounted and the
+            # absence of installations is established.  A mounted library must
+            # be reconciled against real evidence, not resurrected from cache.
+            if any(
+                self._app._path_is_within_library(game, root)
+                for root in present_without_steamapps
+            ):
+                expired += 1
+                continue
+            # The library directory is unreachable, but its remembered mount
+            # point may host a live filesystem again (reformatted, replaced
+            # or simply emptied).  Inspect that identity before keeping the
+            # record as a disconnected disk.
+            library_key = str(game.library_path or game.install_path)
+            if library_key not in replaced_libraries:
+                replaced_libraries[library_key] = (
+                    self._cached_library_absence_established(game) is not None
+                )
+            if replaced_libraries[library_key]:
+                expired += 1
+                continue
             merged[game.id] = replace(
                 game,
                 status=GameStatus.DRIVE_DISCONNECTED,
@@ -963,8 +987,108 @@ class LibraryController:
                 "Retained %d cached games from unavailable launcher libraries",
                 retained,
             )
-        self._app._log_library_decisions(discovered_games)
+        if expired:
+            logger.info(
+                "Expired %d cached games whose library is mounted without "
+                "their installations or whose filesystem was replaced",
+                expired,
+            )
+        self._app._log_library_decisions(
+            discovered_games,
+            replaced_libraries=tuple(
+                Path(key) for key, value in replaced_libraries.items() if value
+            ),
+        )
         return list(merged.values())
+
+    def _provider_present_without_steamapps(self) -> tuple[Path, ...]:
+        report = getattr(self._app._game_provider, "last_report", None)
+        if report is None:
+            return ()
+        raw_paths = (
+            report.get("present_without_steamapps", ())
+            if isinstance(report, Mapping)
+            else getattr(report, "present_without_steamapps", ())
+        )
+        if not isinstance(raw_paths, Sequence) or isinstance(raw_paths, (str, bytes)):
+            return ()
+        paths: list[Path] = []
+        for raw_path in raw_paths:
+            try:
+                paths.append(Path(os.fspath(raw_path)))
+            except TypeError:
+                continue
+        return tuple(paths)
+
+    def _cached_library_absence_established(self, game: Game) -> str | None:
+        """Return why a missing cached library is proven absent, or ``None``.
+
+        The cached record remembers the mount point and device that hosted
+        the library.  When a filesystem is mounted exactly at that mount point
+        again while the library directory is gone, the absence is established
+        on a live filesystem: ``"replaced"`` when the mounted device differs
+        from the remembered one (formatted or swapped disk), ``"removed"``
+        when it is the same filesystem without the library.  Any uncertainty
+        (no such mount point, nothing mounted there, the sandbox cannot see
+        it, inspection failure) returns ``None`` so a merely disconnected disk
+        is never mistaken for a replaced one.
+        """
+
+        cached_mount = game.mount_point
+        if cached_mount is None:
+            return None
+        library = game.library_path or game.install_path
+        try:
+            mount_text = os.path.normcase(os.path.abspath(os.fspath(cached_mount)))
+            library_text = os.path.normcase(os.path.abspath(os.fspath(library)))
+            if os.path.commonpath((library_text, mount_text)) != mount_text:
+                return None
+        except (OSError, TypeError, ValueError):
+            return None
+        # The root filesystem is always mounted (and inside a sandbox it is
+        # not even the host root), so it cannot prove anything about a
+        # library that lives below it.
+        if mount_text == os.path.normcase(os.path.abspath(os.sep)):
+            return None
+        provider = self._app._filesystem_provider
+        if provider is None:
+            return None
+        try:
+            if not cached_mount.is_dir():
+                return None
+            current = provider.inspect(cached_mount)
+        except Exception as error:  # provider boundary: uncertainty keeps the cache
+            logger.debug(
+                "Could not inspect filesystem identity for %s: %s", cached_mount, error
+            )
+            return None
+        current_mount = getattr(current, "mount_point", None)
+        if current_mount is None:
+            return None
+        try:
+            if os.path.normcase(os.path.abspath(os.fspath(current_mount))) != mount_text:
+                # Only a parent filesystem is mounted; the remembered mount
+                # point is an empty directory and the disk is disconnected.
+                return None
+        except (OSError, TypeError, ValueError):
+            return None
+        cached_device = (game.filesystem_device or "").strip()
+        current_device = str(getattr(current, "device", "") or "").strip()
+        reason = (
+            "replaced"
+            if cached_device and current_device and current_device != cached_device
+            else "removed"
+        )
+        logger.info(
+            "Steam library absence established: path=%s mount=%s cached_device=%s "
+            "current_device=%s decision=%s",
+            library,
+            cached_mount,
+            cached_device or "-",
+            current_device or "-",
+            reason,
+        )
+        return reason
 
     def _provider_accessible_library_paths(self) -> tuple[Path, ...]:
         report = getattr(self._app._game_provider, "last_report", None)
@@ -985,11 +1109,17 @@ class LibraryController:
                 continue
         return tuple(result)
 
-    def _log_library_decisions(self, discovered_games: Sequence[Game]) -> None:
+    def _log_library_decisions(
+        self,
+        discovered_games: Sequence[Game],
+        *,
+        replaced_libraries: Sequence[Path] = (),
+    ) -> None:
         """Explain which Steam library evidence controlled the active model."""
 
         configured = self._app._provider_configured_library_paths()
         accessible = self._app._provider_accessible_library_paths()
+        present_without_steamapps = self._provider_present_without_steamapps()
         cached_games = tuple(
             game
             for game in self._app._domain_games.values()
@@ -1034,6 +1164,14 @@ class LibraryController:
             )
             if is_configured and is_available:
                 decision = "active"
+            elif is_configured and any(
+                self._app._same_path(library, path) for path in present_without_steamapps
+            ):
+                decision = "mounted_without_installations"
+            elif is_configured and any(
+                self._app._same_path(library, path) for path in replaced_libraries
+            ):
+                decision = "filesystem_replaced"
             elif is_configured:
                 decision = "disconnected"
             else:

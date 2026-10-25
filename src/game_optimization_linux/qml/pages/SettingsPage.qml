@@ -122,12 +122,14 @@ Item {
 
                     SettingRow {
                         Layout.fillWidth: true
+                        objectName: "settingsAutomaticUpdatesRow"
                         title: qsTr("Automatic updates")
-                        description: qsTr("Check for new releases without installing them automatically")
+                        // No release check exists in this build; the saved value is kept untouched.
+                        description: qsTr("Not implemented yet: GameOpti does not check for new releases itself. Updates arrive through Flatpak or the package manager.")
 
-                        AppSwitch {
-                            checked: Boolean(page.setting(["automaticUpdates", "automatic_updates"], true))
-                            onToggled: page.save("automaticUpdates", checked)
+                        StatusBadge {
+                            text: qsTr("Not implemented")
+                            status: "paused"
                         }
                     }
 
@@ -164,6 +166,439 @@ Item {
                             }
                         }
                     }
+                }
+            }
+
+            SurfaceCard {
+                Layout.fillWidth: true
+                Layout.leftMargin: App.Theme.contentPadding
+                Layout.rightMargin: App.Theme.contentPadding
+                padding: 20
+
+                contentItem: ColumnLayout {
+                    spacing: 4
+
+                    Label {
+                        text: qsTr("Appearance")
+                        color: App.Theme.text
+                        font.pixelSize: 17
+                        font.weight: Font.Bold
+                    }
+
+                    SettingRow {
+                        Layout.fillWidth: true
+                        title: qsTr("Color mode")
+                        description: qsTr("Follow the desktop or choose a fixed light or dark palette")
+
+                        RowLayout {
+                            spacing: 8
+
+                            Repeater {
+                                model: [
+                                    { "label": qsTr("System"), "value": "system", "symbol": "◐" },
+                                    { "label": qsTr("Dark"), "value": "dark", "symbol": "●" },
+                                    { "label": qsTr("Light"), "value": "light", "symbol": "○" }
+                                ]
+
+                                delegate: Button {
+                                    id: themeButton
+                                    required property var modelData
+                                    property bool active: String(page.setting(["themeMode", "theme"], "system")) === modelData.value
+                                    implicitWidth: 84
+                                    implicitHeight: 42
+                                    focusPolicy: Qt.StrongFocus
+                                    onClicked: page.save("themeMode", modelData.value)
+
+                                    contentItem: RowLayout {
+                                        spacing: 6
+                                        Label {
+                                            text: themeButton.modelData.symbol
+                                            color: themeButton.active ? App.Theme.accent : App.Theme.textMuted
+                                            font.pixelSize: 14
+                                        }
+                                        Label {
+                                            text: themeButton.modelData.label
+                                            color: themeButton.active ? App.Theme.text : App.Theme.textSecondary
+                                            font.pixelSize: App.Theme.fontCaption
+                                            font.weight: themeButton.active ? Font.DemiBold : Font.Normal
+                                        }
+                                    }
+
+                                    background: Rectangle {
+                                        radius: App.Theme.radiusSmall
+                                        color: themeButton.active ? App.Theme.accentSoft
+                                                                  : themeButton.hovered ? App.Theme.surfaceHover : App.Theme.input
+                                        border.width: themeButton.visualFocus || themeButton.active ? 2 : 1
+                                        border.color: themeButton.active || themeButton.visualFocus ? App.Theme.accent : App.Theme.border
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                Layout.fillWidth: true
+                Layout.leftMargin: App.Theme.contentPadding
+                Layout.rightMargin: App.Theme.contentPadding
+                padding: 20
+
+                contentItem: ColumnLayout {
+                    spacing: 10
+
+                    Label {
+                        text: qsTr("Storage locations")
+                        color: App.Theme.text
+                        font.pixelSize: 17
+                        font.weight: Font.Bold
+                    }
+
+                    SettingRow {
+                        Layout.fillWidth: true
+                        title: qsTr("Steam discovery")
+                        description: page.controller && page.controller.demoMode
+                                     ? qsTr("Demo data is active because GAME_OPTIMIZATION_DEMO=1")
+                                     : qsTr("Standard and Flatpak locations are scanned read-only")
+
+                        StatusBadge {
+                            text: page.controller && page.controller.isScanning
+                                  ? qsTr("Scanning")
+                                  : page.controller && page.controller.steamFound
+                                    ? qsTr("Steam detected") : qsTr("Not detected")
+                            status: page.controller && page.controller.steamFound ? "Ready" : "Not checked"
+                        }
+                    }
+
+                    Divider { Layout.fillWidth: true }
+
+                    SettingRow {
+                        Layout.fillWidth: true
+                        title: qsTr("Show Steam tools and runtimes")
+                        description: qsTr("Include Proton, Steam Linux Runtime, SDKs, and dedicated servers on Games")
+
+                        AppSwitch {
+                            checked: Boolean(page.setting(["showSteamToolsAndRuntimes", "show_steam_tools_and_runtimes"], false))
+                            onToggled: page.save("showSteamToolsAndRuntimes", checked)
+                        }
+                    }
+
+                    Divider { Layout.fillWidth: true }
+
+                    Label {
+                        text: qsTr("Additional Steam locations")
+                        color: App.Theme.text
+                        font.pixelSize: App.Theme.fontBody
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Optional Steam roots are read during the next library refresh. No files are modified.")
+                        color: App.Theme.textMuted
+                        font.pixelSize: App.Theme.fontCaption
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Repeater {
+                        model: page.steamInstallationDirectories
+
+                        delegate: Rectangle {
+                            id: steamDirectoryRow
+                            required property int index
+                            required property var modelData
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 42
+                            radius: App.Theme.radiusSmall
+                            color: App.Theme.input
+                            border.width: 1
+                            border.color: App.Theme.border
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 5
+                                spacing: 8
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: String(steamDirectoryRow.modelData)
+                                    color: App.Theme.textSecondary
+                                    font.pixelSize: App.Theme.fontCaption
+                                    font.family: "monospace"
+                                    elide: Text.ElideMiddle
+                                }
+
+                                IconButton {
+                                    iconSource: App.UiIcons.actionRemove
+                                    danger: true
+                                    toolTip: qsTr("Remove additional Steam location")
+                                    onClicked: {
+                                        var updated = []
+                                        for (var i = 0; i < page.steamInstallationDirectories.length; ++i) {
+                                            if (i !== steamDirectoryRow.index)
+                                                updated.push(String(page.steamInstallationDirectories[i]))
+                                        }
+                                        page.save("steamInstallationDirectories", updated)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        AppTextField {
+                            id: newSteamDirectoryField
+                            Layout.fillWidth: true
+                            placeholderText: qsTr("/path/to/Steam")
+                            font.family: "monospace"
+                            onAccepted: addSteamDirectoryButton.clicked()
+                        }
+
+                        AppButton {
+                            id: addSteamDirectoryButton
+                            text: qsTr("Add Steam location")
+                            iconText: "+"
+                            enabled: newSteamDirectoryField.text.trim().length > 0
+                            onClicked: {
+                                var updated = []
+                                for (var i = 0; i < page.steamInstallationDirectories.length; ++i)
+                                    updated.push(String(page.steamInstallationDirectories[i]))
+                                updated.push(newSteamDirectoryField.text.trim())
+                                page.save("steamInstallationDirectories", updated)
+                                newSteamDirectoryField.clear()
+                            }
+                        }
+                    }
+
+                    Label {
+                        visible: page.ignoredSteamLibraries.length > 0
+                        text: qsTr("Libraries forgotten in Game Optimization")
+                        color: App.Theme.text
+                        font.pixelSize: App.Theme.fontBody
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        visible: page.ignoredSteamLibraries.length > 0
+                        text: qsTr("These paths remain untouched in Steam and can be restored at any time.")
+                        color: App.Theme.textMuted
+                        font.pixelSize: App.Theme.fontCaption
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Repeater {
+                        model: page.ignoredSteamLibraries
+
+                        delegate: Rectangle {
+                            id: ignoredLibraryRow
+                            required property var modelData
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 42
+                            radius: App.Theme.radiusSmall
+                            color: App.Theme.input
+                            border.width: 1
+                            border.color: App.Theme.border
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 5
+                                spacing: 8
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: String(ignoredLibraryRow.modelData)
+                                    color: App.Theme.textSecondary
+                                    font.pixelSize: App.Theme.fontCaption
+                                    font.family: "monospace"
+                                    elide: Text.ElideMiddle
+                                }
+
+                                AppButton {
+                                    compact: true
+                                    text: qsTr("Restore")
+                                    iconSource: App.UiIcons.actionRestore
+                                    onClicked: {
+                                        if (page.controller
+                                                && page.controller.restoreIgnoredLibrary)
+                                            page.controller.restoreIgnoredLibrary(
+                                                String(ignoredLibraryRow.modelData))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    Divider { Layout.fillWidth: true }
+
+                    SettingRow {
+                        Layout.fillWidth: true
+                        objectName: "settingsBackupDirectoryRow"
+                        title: qsTr("Backup directory")
+                        // Not wired: OptiScaler backups and their restore use fixed per-game paths.
+                        description: qsTr("Not implemented yet: OptiScaler keeps its backups per game in the application data folder and restores them from there. This path is not used.")
+
+                        StatusBadge {
+                            text: qsTr("Not implemented")
+                            status: "paused"
+                        }
+                    }
+
+                    Divider { Layout.fillWidth: true }
+
+                    SettingRow {
+                        Layout.fillWidth: true
+                        objectName: "settingsQuarantineDirectoryRow"
+                        title: qsTr("Quarantine directory")
+                        // Not wired: deep cleanup quarantines on the game's own drive.
+                        description: qsTr("Not implemented yet: deep cleanup moves files to a quarantine folder on the same drive as the game, so they can be restored without copying. This path is not used.")
+
+                        StatusBadge {
+                            text: qsTr("Not implemented")
+                            status: "paused"
+                        }
+                    }
+
+                    Divider { Layout.fillWidth: true }
+
+                    Label {
+                        text: qsTr("Game library directories")
+                        color: App.Theme.text
+                        font.pixelSize: App.Theme.fontBody
+                        font.weight: Font.DemiBold
+                    }
+
+                    Label {
+                        Layout.fillWidth: true
+                        text: qsTr("Only immediate child folders are checked for local games. Home and filesystem roots are rejected.")
+                        color: App.Theme.textMuted
+                        font.pixelSize: App.Theme.fontCaption
+                        wrapMode: Text.WordWrap
+                    }
+
+                    Repeater {
+                        model: page.libraryDirectories
+
+                        delegate: Rectangle {
+                            id: libraryRow
+                            required property int index
+                            required property var modelData
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 42
+                            radius: App.Theme.radiusSmall
+                            color: App.Theme.input
+                            border.width: 1
+                            border.color: App.Theme.border
+
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 5
+                                spacing: 8
+
+                                Label {
+                                    Layout.fillWidth: true
+                                    text: String(libraryRow.modelData)
+                                    color: App.Theme.textSecondary
+                                    font.pixelSize: App.Theme.fontCaption
+                                    font.family: "monospace"
+                                    elide: Text.ElideMiddle
+                                }
+
+                                IconButton {
+                                    iconSource: App.UiIcons.actionRemove
+                                    danger: true
+                                    toolTip: qsTr("Remove library directory")
+                                    onClicked: {
+                                        var updated = []
+                                        for (var i = 0; i < page.libraryDirectories.length; ++i) {
+                                            if (i !== libraryRow.index)
+                                                updated.push(String(page.libraryDirectories[i]))
+                                        }
+                                        page.save("libraryDirectories", updated)
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        AppTextField {
+                            id: newLibraryField
+                            Layout.fillWidth: true
+                            placeholderText: qsTr("/path/to/games")
+                            font.family: "monospace"
+                            onAccepted: addLibraryButton.clicked()
+                        }
+
+                        AppButton {
+                            id: addLibraryButton
+                            text: qsTr("Add")
+                            iconText: "+"
+                            enabled: newLibraryField.text.trim().length > 0
+                            onClicked: {
+                                var updated = []
+                                for (var i = 0; i < page.libraryDirectories.length; ++i)
+                                    updated.push(String(page.libraryDirectories[i]))
+                                updated.push(newLibraryField.text.trim())
+                                page.save("libraryDirectories", updated)
+                                newLibraryField.clear()
+                            }
+                        }
+
+                        AppButton {
+                            text: qsTr("Rescan")
+                            iconSource: App.UiIcons.actionScan
+                            enabled: page.libraryDirectories.length > 0
+                            onClicked: {
+                                if (page.controller && page.controller.requestLibraryScan)
+                                    page.controller.requestLibraryScan(
+                                        "settings_local_rescan", "", "manual")
+                            }
+                        }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                Layout.fillWidth: true
+                Layout.leftMargin: App.Theme.contentPadding
+                Layout.rightMargin: App.Theme.contentPadding
+                padding: 20
+
+                contentItem: ColumnLayout {
+                    spacing: 4
+
+                    Label {
+                        text: qsTr("Compression")
+                        color: App.Theme.text
+                        font.pixelSize: 17
+                        font.weight: Font.Bold
+                    }
+
+                    SettingRow {
+                        Layout.fillWidth: true
+                        title: qsTr("Default compression profile")
+                        description: qsTr("Preselected mode when opening the Storage tab")
+
+                        AppComboBox {
+                            property var values: ["Fast", "Balanced", "Maximum", "Auto"]
+                            property var labels: [qsTr("Fast"), qsTr("Balanced"), qsTr("Maximum"), qsTr("Auto")]
+                            Layout.preferredWidth: 150
+                            model: labels
+                            currentIndex: page.indexOfValue(values, page.setting(["defaultCompressionProfile", "default_compression_profile"], "Auto"), 3)
+                            onActivated: function(index) { page.save("defaultCompressionProfile", values[index]) }
+                        }
+                    }
+
                 }
             }
 
@@ -553,7 +988,7 @@ Item {
                                     id: repeatDelaySlider
                                     Layout.preferredWidth: 190
                                     from: 150
-                                    to: 1000
+                                    to: 1500
                                     stepSize: 50
                                     value: Number(page.setting(["navigationRepeatDelayMs", "navigation_repeat_delay_ms"], 350))
                                     onMoved: repeatSaveTimer.restart()
@@ -684,486 +1119,10 @@ Item {
                 }
             }
 
-            SurfaceCard {
-                Layout.fillWidth: true
-                Layout.leftMargin: App.Theme.contentPadding
-                Layout.rightMargin: App.Theme.contentPadding
-                padding: 20
-
-                contentItem: ColumnLayout {
-                    spacing: 4
-
-                    Label {
-                        text: qsTr("Appearance")
-                        color: App.Theme.text
-                        font.pixelSize: 17
-                        font.weight: Font.Bold
-                    }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("Color mode")
-                        description: qsTr("Follow the desktop or choose a fixed light or dark palette")
-
-                        RowLayout {
-                            spacing: 8
-
-                            Repeater {
-                                model: [
-                                    { "label": qsTr("System"), "value": "system", "symbol": "◐" },
-                                    { "label": qsTr("Dark"), "value": "dark", "symbol": "●" },
-                                    { "label": qsTr("Light"), "value": "light", "symbol": "○" }
-                                ]
-
-                                delegate: Button {
-                                    id: themeButton
-                                    required property var modelData
-                                    property bool active: String(page.setting(["themeMode", "theme"], "system")) === modelData.value
-                                    implicitWidth: 84
-                                    implicitHeight: 42
-                                    focusPolicy: Qt.StrongFocus
-                                    onClicked: page.save("themeMode", modelData.value)
-
-                                    contentItem: RowLayout {
-                                        spacing: 6
-                                        Label {
-                                            text: themeButton.modelData.symbol
-                                            color: themeButton.active ? App.Theme.accent : App.Theme.textMuted
-                                            font.pixelSize: 14
-                                        }
-                                        Label {
-                                            text: themeButton.modelData.label
-                                            color: themeButton.active ? App.Theme.text : App.Theme.textSecondary
-                                            font.pixelSize: App.Theme.fontCaption
-                                            font.weight: themeButton.active ? Font.DemiBold : Font.Normal
-                                        }
-                                    }
-
-                                    background: Rectangle {
-                                        radius: App.Theme.radiusSmall
-                                        color: themeButton.active ? App.Theme.accentSoft
-                                                                  : themeButton.hovered ? App.Theme.surfaceHover : App.Theme.input
-                                        border.width: themeButton.visualFocus || themeButton.active ? 2 : 1
-                                        border.color: themeButton.active || themeButton.visualFocus ? App.Theme.accent : App.Theme.border
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            SurfaceCard {
-                Layout.fillWidth: true
-                Layout.leftMargin: App.Theme.contentPadding
-                Layout.rightMargin: App.Theme.contentPadding
-                padding: 20
-
-                contentItem: ColumnLayout {
-                    spacing: 4
-
-                    Label {
-                        text: qsTr("Resource limits")
-                        color: App.Theme.text
-                        font.pixelSize: 17
-                        font.weight: Font.Bold
-                    }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("Default compression profile")
-                        description: qsTr("Preselected mode when opening the Storage tab")
-
-                        AppComboBox {
-                            property var values: ["Fast", "Balanced", "Maximum", "Auto"]
-                            property var labels: [qsTr("Fast"), qsTr("Balanced"), qsTr("Maximum"), qsTr("Auto")]
-                            Layout.preferredWidth: 150
-                            model: labels
-                            currentIndex: page.indexOfValue(values, page.setting(["defaultCompressionProfile", "default_compression_profile"], "Auto"), 3)
-                            onActivated: function(index) { page.save("defaultCompressionProfile", values[index]) }
-                        }
-                    }
-
-                }
-            }
-
-            SurfaceCard {
-                Layout.fillWidth: true
-                Layout.leftMargin: App.Theme.contentPadding
-                Layout.rightMargin: App.Theme.contentPadding
-                padding: 20
-
-                contentItem: ColumnLayout {
-                    spacing: 10
-
-                    Label {
-                        text: qsTr("Storage locations")
-                        color: App.Theme.text
-                        font.pixelSize: 17
-                        font.weight: Font.Bold
-                    }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("Steam discovery")
-                        description: page.controller && page.controller.demoMode
-                                     ? qsTr("Demo data is active because GAME_OPTIMIZATION_DEMO=1")
-                                     : qsTr("Standard and Flatpak locations are scanned read-only")
-
-                        StatusBadge {
-                            text: page.controller && page.controller.isScanning
-                                  ? qsTr("Scanning")
-                                  : page.controller && page.controller.steamFound
-                                    ? qsTr("Steam detected") : qsTr("Not detected")
-                            status: page.controller && page.controller.steamFound ? "Ready" : "Not checked"
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("Show Steam tools and runtimes")
-                        description: qsTr("Include Proton, Steam Linux Runtime, SDKs, and dedicated servers on Games")
-
-                        AppSwitch {
-                            checked: Boolean(page.setting(["showSteamToolsAndRuntimes", "show_steam_tools_and_runtimes"], false))
-                            onToggled: page.save("showSteamToolsAndRuntimes", checked)
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
-                    Label {
-                        text: qsTr("Additional Steam locations")
-                        color: App.Theme.text
-                        font.pixelSize: App.Theme.fontBody
-                        font.weight: Font.DemiBold
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        text: qsTr("Optional Steam roots are read during the next library refresh. No files are modified.")
-                        color: App.Theme.textMuted
-                        font.pixelSize: App.Theme.fontCaption
-                        wrapMode: Text.WordWrap
-                    }
-
-                    Repeater {
-                        model: page.steamInstallationDirectories
-
-                        delegate: Rectangle {
-                            id: steamDirectoryRow
-                            required property int index
-                            required property var modelData
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 42
-                            radius: App.Theme.radiusSmall
-                            color: App.Theme.input
-                            border.width: 1
-                            border.color: App.Theme.border
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 5
-                                spacing: 8
-
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: String(steamDirectoryRow.modelData)
-                                    color: App.Theme.textSecondary
-                                    font.pixelSize: App.Theme.fontCaption
-                                    font.family: "monospace"
-                                    elide: Text.ElideMiddle
-                                }
-
-                                IconButton {
-                                    iconSource: App.UiIcons.actionRemove
-                                    danger: true
-                                    toolTip: qsTr("Remove additional Steam location")
-                                    onClicked: {
-                                        var updated = []
-                                        for (var i = 0; i < page.steamInstallationDirectories.length; ++i) {
-                                            if (i !== steamDirectoryRow.index)
-                                                updated.push(String(page.steamInstallationDirectories[i]))
-                                        }
-                                        page.save("steamInstallationDirectories", updated)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        AppTextField {
-                            id: newSteamDirectoryField
-                            Layout.fillWidth: true
-                            placeholderText: qsTr("/path/to/Steam")
-                            font.family: "monospace"
-                            onAccepted: addSteamDirectoryButton.clicked()
-                        }
-
-                        AppButton {
-                            id: addSteamDirectoryButton
-                            text: qsTr("Add Steam location")
-                            iconText: "+"
-                            enabled: newSteamDirectoryField.text.trim().length > 0
-                            onClicked: {
-                                var updated = []
-                                for (var i = 0; i < page.steamInstallationDirectories.length; ++i)
-                                    updated.push(String(page.steamInstallationDirectories[i]))
-                                updated.push(newSteamDirectoryField.text.trim())
-                                page.save("steamInstallationDirectories", updated)
-                                newSteamDirectoryField.clear()
-                            }
-                        }
-                    }
-
-                    Label {
-                        visible: page.ignoredSteamLibraries.length > 0
-                        text: qsTr("Libraries forgotten in Game Optimization")
-                        color: App.Theme.text
-                        font.pixelSize: App.Theme.fontBody
-                        font.weight: Font.DemiBold
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        visible: page.ignoredSteamLibraries.length > 0
-                        text: qsTr("These paths remain untouched in Steam and can be restored at any time.")
-                        color: App.Theme.textMuted
-                        font.pixelSize: App.Theme.fontCaption
-                        wrapMode: Text.WordWrap
-                    }
-
-                    Repeater {
-                        model: page.ignoredSteamLibraries
-
-                        delegate: Rectangle {
-                            id: ignoredLibraryRow
-                            required property var modelData
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 42
-                            radius: App.Theme.radiusSmall
-                            color: App.Theme.input
-                            border.width: 1
-                            border.color: App.Theme.border
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 5
-                                spacing: 8
-
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: String(ignoredLibraryRow.modelData)
-                                    color: App.Theme.textSecondary
-                                    font.pixelSize: App.Theme.fontCaption
-                                    font.family: "monospace"
-                                    elide: Text.ElideMiddle
-                                }
-
-                                AppButton {
-                                    compact: true
-                                    text: qsTr("Restore")
-                                    iconSource: App.UiIcons.actionRestore
-                                    onClicked: {
-                                        if (page.controller
-                                                && page.controller.restoreIgnoredLibrary)
-                                            page.controller.restoreIgnoredLibrary(
-                                                String(ignoredLibraryRow.modelData))
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("Backup directory")
-                        description: qsTr("Future backups will be placed here; no directory is touched in demo mode")
-
-                        AppTextField {
-                            Layout.preferredWidth: Math.min(360, page.width * 0.38)
-                            text: String(page.setting(["backupDirectory", "backup_directory"], "backups"))
-                            font.family: "monospace"
-                            onEditingFinished: page.save("backupDirectory", text)
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("Quarantine directory")
-                        description: qsTr("Reserved for a future safe-review workflow")
-
-                        AppTextField {
-                            Layout.preferredWidth: Math.min(360, page.width * 0.38)
-                            text: String(page.setting(["quarantineDirectory", "quarantine_directory"], "quarantine"))
-                            font.family: "monospace"
-                            onEditingFinished: page.save("quarantineDirectory", text)
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
-                    Label {
-                        text: qsTr("Game library directories")
-                        color: App.Theme.text
-                        font.pixelSize: App.Theme.fontBody
-                        font.weight: Font.DemiBold
-                    }
-
-                    Label {
-                        Layout.fillWidth: true
-                        text: qsTr("Only immediate child folders are checked for local games. Home and filesystem roots are rejected.")
-                        color: App.Theme.textMuted
-                        font.pixelSize: App.Theme.fontCaption
-                        wrapMode: Text.WordWrap
-                    }
-
-                    Repeater {
-                        model: page.libraryDirectories
-
-                        delegate: Rectangle {
-                            id: libraryRow
-                            required property int index
-                            required property var modelData
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 42
-                            radius: App.Theme.radiusSmall
-                            color: App.Theme.input
-                            border.width: 1
-                            border.color: App.Theme.border
-
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 5
-                                spacing: 8
-
-                                Label {
-                                    Layout.fillWidth: true
-                                    text: String(libraryRow.modelData)
-                                    color: App.Theme.textSecondary
-                                    font.pixelSize: App.Theme.fontCaption
-                                    font.family: "monospace"
-                                    elide: Text.ElideMiddle
-                                }
-
-                                IconButton {
-                                    iconSource: App.UiIcons.actionRemove
-                                    danger: true
-                                    toolTip: qsTr("Remove library directory")
-                                    onClicked: {
-                                        var updated = []
-                                        for (var i = 0; i < page.libraryDirectories.length; ++i) {
-                                            if (i !== libraryRow.index)
-                                                updated.push(String(page.libraryDirectories[i]))
-                                        }
-                                        page.save("libraryDirectories", updated)
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 8
-
-                        AppTextField {
-                            id: newLibraryField
-                            Layout.fillWidth: true
-                            placeholderText: qsTr("/path/to/games")
-                            font.family: "monospace"
-                            onAccepted: addLibraryButton.clicked()
-                        }
-
-                        AppButton {
-                            id: addLibraryButton
-                            text: qsTr("Add")
-                            iconText: "+"
-                            enabled: newLibraryField.text.trim().length > 0
-                            onClicked: {
-                                var updated = []
-                                for (var i = 0; i < page.libraryDirectories.length; ++i)
-                                    updated.push(String(page.libraryDirectories[i]))
-                                updated.push(newLibraryField.text.trim())
-                                page.save("libraryDirectories", updated)
-                                newLibraryField.clear()
-                            }
-                        }
-
-                        AppButton {
-                            text: qsTr("Rescan")
-                            iconSource: App.UiIcons.actionScan
-                            enabled: page.libraryDirectories.length > 0
-                            onClicked: {
-                                if (page.controller && page.controller.requestLibraryScan)
-                                    page.controller.requestLibraryScan(
-                                        "settings_local_rescan", "", "manual")
-                            }
-                        }
-                    }
-                }
-            }
-
-            SurfaceCard {
-                Layout.fillWidth: true
-                Layout.leftMargin: App.Theme.contentPadding
-                Layout.rightMargin: App.Theme.contentPadding
-                padding: 20
-
-                contentItem: ColumnLayout {
-                    spacing: 4
-
-                    Label {
-                        text: qsTr("Experimental")
-                        color: App.Theme.text
-                        font.pixelSize: 17
-                        font.weight: Font.Bold
-                    }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        title: qsTr("Experimental features")
-                        description: qsTr("Show unfinished capabilities. They remain simulation-only in this build.")
-
-                        AppSwitch {
-                            checked: Boolean(page.setting(["experimentalFeatures", "experimental_features"], false))
-                            onToggled: page.save("experimentalFeatures", checked)
-                        }
-                    }
-
-                    Rectangle {
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: safetyText.implicitHeight + 24
-                        radius: App.Theme.radiusMedium
-                        color: App.Theme.warningSoft
-
-                        Label {
-                            id: safetyText
-                            anchors.fill: parent
-                            anchors.margins: 12
-                            text: page.controller && page.controller.demoMode
-                                  ? qsTr("Demo safety: no sudo, deletion, Btrfs property changes, governor changes, downloads, or launcher-file edits are performed.")
-                                  : qsTr("Safety: no sudo, deletion, global mount changes, downloads, or launcher-file edits are performed. Btrfs writes require a confirmed plan or explicit automatic opt-in.")
-                            color: App.Theme.warning
-                            font.pixelSize: App.Theme.fontCaption
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-                }
-            }
+            // The informational "Safety" card was removed at the owner's request.
+            // Operation safeguards live in the backend and are unchanged.
+            // "Experimental features" is not shown: nothing reads experimental_features
+            // (the stored value is preserved).
 
             Item { Layout.preferredHeight: App.Theme.contentPadding }
         }

@@ -393,12 +393,14 @@ Item {
                         radius: 18
                         color: App.Theme.accentSoft
 
-                        Label {
+                        UiIcon {
+                            objectName: "systemRuntimeIcon"
                             anchors.centerIn: parent
-                            text: "◈"
-                            color: App.Theme.accent
-                            font.pixelSize: 26
-                            font.weight: Font.Bold
+                            width: 30
+                            height: 30
+                            sourceSize.width: 30
+                            sourceSize.height: 30
+                            source: App.UiIcons.systemRuntime
                         }
                     }
 
@@ -561,12 +563,14 @@ Item {
                         Layout.preferredHeight: 48
                         radius: 15
                         color: App.Theme.accentSoft
-                        Label {
+                        UiIcon {
+                            objectName: "systemControllersIcon"
                             anchors.centerIn: parent
-                            text: "◎"
-                            color: App.Theme.accent
-                            font.pixelSize: 23
-                            font.weight: Font.Bold
+                            width: 28
+                            height: 28
+                            sourceSize.width: 28
+                            sourceSize.height: 28
+                            source: App.UiIcons.systemControllers
                         }
                     }
 

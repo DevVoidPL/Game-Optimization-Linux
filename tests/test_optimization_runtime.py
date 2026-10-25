@@ -540,6 +540,33 @@ def test_launch_plan_merges_optiscaler_with_existing_wine_overrides() -> None:
     assert any("OptiScaler Proton override" in reason for reason in plan.reasons)
 
 
+def test_post_processing_preserves_unrelated_launch_environment() -> None:
+    missing = RuntimeToolAvailability("tool", False)
+    plan = OptimizationLaunchPlanner().build(
+        GameOptimizationProfile.default("224760"), ["/game"],
+        gamemode=missing, gamescope=missing,
+        existing_environment={"VK_INSTANCE_LAYERS": "other_layer", "VK_ADD_LAYER_PATH": "/other"},
+        existing_wine_overrides="xaudio2_7=n",
+        post_processing_environment={"VK_INSTANCE_LAYERS": "VK_LAYER_VKBASALT_post_processing",
+                                     "VK_ADD_LAYER_PATH": "/game/private", "WINEDLLOVERRIDES": "dxgi=n,b"},
+    )
+    assert plan.environment["WINEDLLOVERRIDES"] == "xaudio2_7=n;dxgi=n,b"
+    assert plan.environment["VK_INSTANCE_LAYERS"] == "VK_LAYER_VKBASALT_post_processing:other_layer"
+    assert plan.environment["VK_ADD_LAYER_PATH"] == "/game/private:/other"
+
+
+def test_vkbasalt_is_only_enabled_inside_gamescope_game_command() -> None:
+    profile = replace(GameOptimizationProfile.default("224760"), gamescope_enabled=True, gamescope_mode="native")
+    plan = OptimizationLaunchPlanner().build(
+        profile, ["/game"], gamemode=RuntimeToolAvailability("tool", False),
+        gamescope=_tool("Gamescope", "gamescope", ("-W", "-H", "-w", "-h", "-r", "-f", "-b")),
+        post_processing_environment={"ENABLE_VKBASALT": "1", "VKBASALT_CONFIG_FILE": "/game/private.conf",
+                                     "VK_INSTANCE_LAYERS": "VK_LAYER_VKBASALT_post_processing"},
+    )
+    assert "ENABLE_VKBASALT" in plan.wrapper_environment_removed
+    assert "VKBASALT_CONFIG_FILE=/game/private.conf" in plan.command
+
+
 def test_proton_tweaks_and_optiscaler_share_one_deterministic_environment() -> None:
     profile = replace(
         GameOptimizationProfile.default("224760"),
@@ -1195,6 +1222,23 @@ def test_prepared_launcher_keeps_original_steam_argv_out_of_payload_and_orders_w
     assert text.rstrip().endswith('/usr/bin/gamemoderun "$@"')
     assert text.index("/usr/bin/gamescope") < text.index("/usr/bin/gamemoderun")
     assert "flatpak-spawn" not in text
+
+
+def test_post_processing_session_stream_is_shared_by_helpers_without_truncation(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+    command = [sys.executable, "-c",
+        "import os,sys,subprocess; assert os.environ['VKBASALT_LOG_FILE']=='stderr'; "
+        "print('parent before',file=sys.stderr,flush=True); "
+        "subprocess.run([sys.executable,'-c',\"import sys; print('helper shader log',file=sys.stderr)\"],check=True); "
+        "print('parent after',file=sys.stderr,flush=True)"]
+    plan = SimpleNamespace(command=command, steam_command=command,
+                           wrapper_environment_removed=(), wrapper_environment_overrides={})
+    log = tmp_path / "session with spaces.log"
+    script = tmp_path / "launcher"
+    script.write_bytes(runner_module._host_launcher_payload(plan, {"VKBASALT_LOG_FILE": "/old/shared.log"}, log))
+    result = subprocess.run(["sh", str(script), *command], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    assert log.read_text().splitlines() == ["parent before", "helper shader log", "parent after"]
 
 
 def _host_launch_handoff(
@@ -2026,7 +2070,7 @@ def test_controller_saves_proton_tweaks_and_updates_combined_preview(
     assert "PROTON_USE_WINED3D=1" in preview["protonOverrides"]
 
 
-def test_gamescope_profile_removes_and_rejects_mangohud_fps_limit(
+def test_gamescope_owns_fps_limit_without_erasing_mangohud_preference(
     tmp_path: Path,
 ) -> None:
     game = replace(demo_games()[0], steam_app_id="224760")
@@ -2080,7 +2124,8 @@ def test_gamescope_profile_removes_and_rejects_mangohud_fps_limit(
         assert saved["launchPlan"]["fpsLimitOwner"] == "gamescope"
         assert saved["launchPlan"]["command"].count("-r") == 1
         assert "--framerate-limit" not in saved["launchPlan"]["command"]
-        assert mangohud_repository.load("224760").fps_limit is None
+        # The MangoHud preference is kept, but never applied while Gamescope owns -r.
+        assert mangohud_repository.load("224760").fps_limit == 90
         assert "fps_limit=" not in mangohud_repository.config_path("224760").read_text()
 
         mango_saved = controller.saveMangoHudProfile(game.id, {
@@ -2089,8 +2134,15 @@ def test_gamescope_profile_removes_and_rejects_mangohud_fps_limit(
         })
         assert mango_saved["success"] is True
         assert mango_saved["fpsLimit"] == 0
+        assert mango_saved["fpsLimitPreference"] == 120
         assert mango_saved["fpsLimitOwner"] == "gamescope"
-        assert mangohud_repository.load("224760").fps_limit is None
+        assert "fps_limit=" not in mangohud_repository.config_path("224760").read_text()
+
+        # Removing Gamescope's limit lets the kept MangoHud preference apply again.
+        controller.saveOptimizationProfile(game.id, {"preset": "custom", "targetFpsMode": "unlimited",
+                                                     "gamescopeEnabled": True, "gamescopeMode": "native"})
+        assert "fps_limit=120" in mangohud_repository.config_path("224760").read_text()
+        assert controller.getMangoHudProfile(game.id)["fpsLimitOwner"] == "mangohud"
     finally:
         controller.shutdown()
 

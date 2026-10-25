@@ -88,14 +88,108 @@ QtObject {
     readonly property int couchHeroTitleSize: 46
     readonly property int couchBodySize: 18
     readonly property int couchHelperSize: 16
-    readonly property int couchAnimation: 150
+    // Motion-aware: 150 ms by default, shortened or removed by couchMotionMode.
+    readonly property int couchAnimation: couchFadeDuration(150)
     // Icon sizes are keyed by component type so every Couch surface renders
     // icons at a predictable, non-distorted size instead of ad-hoc pixels.
-    readonly property int couchIconSizeNav: 26
-    readonly property int couchIconSizeTile: 36
+    readonly property int couchIconSizeNav: 30
+    readonly property int couchIconSizeTab: 30
+    readonly property int couchIconSizeTile: 48
     readonly property int couchIconSizeButton: 22
     readonly property int couchIconSizeAction: 22
     readonly property int couchIconSizeStatus: 16
+
+    // ---- Couch Mode visual system -------------------------------------
+    // Every value below is defined for both the dark and the light theme.
+
+    // Spacing and shape scale (pixels at the 1920 px reference width).
+    readonly property int couchSpaceXS: 6
+    readonly property int couchSpaceS: 10
+    readonly property int couchSpaceM: 14
+    readonly property int couchSpaceL: 20
+    readonly property int couchSpaceXL: 28
+    readonly property int couchSpaceXXL: 40
+    readonly property int couchRadiusSmall: 12
+
+    // Typography scale.
+    readonly property int couchCaptionSize: 14
+    readonly property int couchLabelSize: 16
+    readonly property int couchSubtitleSize: 22
+
+    // Optical icon sizes of the Couch icon family (24 px is the minimum).
+    readonly property int couchIconSmall: 24
+    readonly property int couchIconMedium: 32
+    readonly property int couchIconLarge: 48
+
+    // Focus treatment. Focus never relies on colour alone: a thick ring with a
+    // contrast line, a scale change and (optionally) a soft glow.
+    readonly property color couchFocusRing: accent
+    readonly property color couchFocusRingContrast: dark ? "#0B1018" : "#FFFFFF"
+    readonly property color couchFocusGlow: accentGlow
+    readonly property color couchFocusSurface: surfaceSelected
+    readonly property color couchFocusText: dark ? "#FFFFFF" : text
+    readonly property color couchFocusSubtext: dark ? "#EAF7F3" : textSecondary
+    readonly property real couchFocusScale: 1.04
+    readonly property real couchPressScale: 0.98
+
+    // Icon rendering colours used when an icon has to be drawn in one colour.
+    readonly property color couchIconMonochrome: text
+    readonly property color couchIconMuted: textMuted
+
+    // Artwork overlays for hero/cover imagery (used from Stage 2 on).
+    readonly property color couchScrimStrong: dark ? "#E60A0F17" : "#E6EEF3F8"
+    readonly property color couchScrimMedium: dark ? "#A80A0F17" : "#B5EEF3F8"
+    readonly property color couchScrimSoft: dark ? "#650A0F17" : "#70EEF3F8"
+
+    // Motion. "full" (default), "reduced" (no movement/scale animation, very
+    // short fades) or "off" (every transition is instant).
+    property string couchMotionMode: "full"
+    readonly property bool couchMotionReduced: couchMotionMode === "reduced"
+                                               || couchMotionMode === "off"
+    // Movement, scale and position animations.
+    function couchMotionDuration(fullMs) {
+        return couchMotionMode === "full" ? fullMs : 0
+    }
+    // Opacity and colour feedback.
+    function couchFadeDuration(fullMs) {
+        if (couchMotionMode === "off")
+            return 0
+        if (couchMotionMode === "reduced")
+            return Math.min(fullMs, 60)
+        return fullMs
+    }
+    readonly property int couchMotionFast: couchMotionDuration(120)
+    readonly property int couchMotionNormal: couchMotionDuration(180)
+    readonly property int couchFadeFast: couchFadeDuration(120)
+    readonly property int couchFadeNormal: couchFadeDuration(180)
+
+    // Semantic state tones: success, warning, danger, info, neutral, unavailable.
+    // Label colours are chosen for >= 4.5:1 contrast on the tone surface in
+    // both themes; the dot colour for >= 3:1.
+    function couchToneColor(tone) {
+        var value = String(tone || "neutral")
+        if (value === "success") return success
+        if (value === "warning") return warning
+        if (value === "danger") return danger
+        if (value === "info") return info
+        return textSecondary
+    }
+    function couchToneSurface(tone) {
+        var value = String(tone || "neutral")
+        if (value === "success") return successSoft
+        if (value === "warning") return warningSoft
+        if (value === "danger") return dangerSoft
+        if (value === "info") return infoSoft
+        return surfaceRaised
+    }
+    function couchToneText(tone) {
+        var value = String(tone || "neutral")
+        if (value === "success") return dark ? success : "#0F6B40"
+        if (value === "warning") return dark ? warning : "#7A4B00"
+        if (value === "danger") return dark ? danger : "#A12A3A"
+        if (value === "info") return dark ? info : "#1B5E96"
+        return textSecondary
+    }
 
     function statusColor(status) {
         var value = String(status || "").toLowerCase()

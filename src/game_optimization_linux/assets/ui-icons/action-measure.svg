@@ -1,7 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#4fd7c6" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">
-  <rect x="3" y="10" width="18" height="4" rx="1"/>
-  <line x1="6.5" y1="10" x2="6.5" y2="12.4"/>
-  <line x1="10" y1="10" x2="10" y2="12.4"/>
-  <line x1="13.5" y1="10" x2="13.5" y2="13.5"/>
-  <line x1="17" y1="10" x2="17" y2="12.4"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill-rule="nonzero" stroke="none">
+  <title>Measure</title>
+  <path d="M6.03 20.13 2.2 16.3 15.99 2.51 16.64 3.16ZM6.23 17.36 7.22 16.37 4.67 13.83 3.68 14.82ZM7.72 13.9 8.71 12.91 7.15 11.35 6.16 12.34ZM11.74 10.99 9.62 8.88 8.63 9.87 10.98 12.21ZM12.67 8.95 13.62 7.99 13.65 7.95 12.1 6.4 11.11 7.39ZM15.55 4.9 14.57 3.93 13.58 4.92 14.79 6.12Z" fill="#CFDDE6" />
+  <path d="M7.12 21.22 17.73 4.25 21.36 7.89 7.57 21.67ZM16.13 7.46 17.12 6.47 16.64 5.99 15.88 7.21Z" fill="#4FE3B8" />
 </svg>

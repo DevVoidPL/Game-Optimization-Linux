@@ -1,224 +1,632 @@
 [
   {
-    "filename": "btrfs-analyze-compression.svg",
-    "semantic_name": "Analyze compression",
-    "category": "btrfs",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "btrfs-verify-compression.svg",
-    "semantic_name": "Verify compression",
-    "category": "btrfs",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "btrfs-exact-measurement.svg",
-    "semantic_name": "Exact measurement",
-    "category": "btrfs",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "remaster-classic.svg",
-    "semantic_name": "Classic Enhancement",
-    "category": "graphics-remaster",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "remaster-light-ai.svg",
-    "semantic_name": "Light AI",
-    "category": "graphics-remaster",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "remaster-quality-ai.svg",
-    "semantic_name": "Quality AI",
-    "category": "graphics-remaster",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "overview-logical-size.svg",
-    "semantic_name": "Logical size",
-    "category": "overview",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "overview-physical-size.svg",
-    "semantic_name": "Physical size",
-    "category": "overview",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "overview-saved-space.svg",
-    "semantic_name": "Saved space",
-    "category": "overview",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "overview-optimization-profile.svg",
-    "semantic_name": "Optimization profile",
-    "category": "overview",
-    "default_color": "#4fd7c6"
-  },
-  {
     "filename": "sidebar-games.svg",
     "semantic_name": "Games",
     "category": "sidebar",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
   },
   {
-    "filename": "sidebar-narrator.svg",
-    "semantic_name": "Narrator",
+    "filename": "sidebar-games-on-light.svg",
+    "semantic_name": "Games",
     "category": "sidebar",
-    "default_color": "#4fd7c6"
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "sidebar-updates.svg",
     "semantic_name": "Updates",
     "category": "sidebar",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "sidebar-updates-on-light.svg",
+    "semantic_name": "Updates",
+    "category": "sidebar",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "sidebar-tasks.svg",
     "semantic_name": "Tasks",
     "category": "sidebar",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "sidebar-tasks-on-light.svg",
+    "semantic_name": "Tasks",
+    "category": "sidebar",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "sidebar-system.svg",
     "semantic_name": "System",
     "category": "sidebar",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "sidebar-system-on-light.svg",
+    "semantic_name": "System",
+    "category": "sidebar",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "sidebar-settings.svg",
     "semantic_name": "Settings",
     "category": "sidebar",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "sidebar-settings-on-light.svg",
+    "semantic_name": "Settings",
+    "category": "sidebar",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "sidebar-narrator.svg",
+    "semantic_name": "Narrator",
+    "category": "sidebar",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "sidebar-narrator-on-light.svg",
+    "semantic_name": "Narrator",
+    "category": "sidebar",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "sidebar-donate.svg",
+    "semantic_name": "Donate",
+    "category": "sidebar",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "sidebar-donate-on-light.svg",
+    "semantic_name": "Donate",
+    "category": "sidebar",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-analyze.svg",
     "semantic_name": "Analyze",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-analyze-on-light.svg",
+    "semantic_name": "Analyze",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-verify.svg",
     "semantic_name": "Verify",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-verify-on-light.svg",
+    "semantic_name": "Verify",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-measure.svg",
     "semantic_name": "Measure",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-measure-on-light.svg",
+    "semantic_name": "Measure",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-scan.svg",
     "semantic_name": "Scan",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-scan-on-light.svg",
+    "semantic_name": "Scan",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-download.svg",
     "semantic_name": "Download",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-download-on-light.svg",
+    "semantic_name": "Download",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-install.svg",
     "semantic_name": "Install",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-install-on-light.svg",
+    "semantic_name": "Install",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-remove.svg",
     "semantic_name": "Remove",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-remove-on-light.svg",
+    "semantic_name": "Remove",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-restore.svg",
     "semantic_name": "Restore",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-restore-on-light.svg",
+    "semantic_name": "Restore",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-launch.svg",
     "semantic_name": "Launch game",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-launch-on-light.svg",
+    "semantic_name": "Launch game",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-refresh.svg",
     "semantic_name": "Refresh",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
   },
   {
-    "filename": "status-success.svg",
-    "semantic_name": "Success",
-    "category": "status",
-    "default_color": "#34d399"
-  },
-  {
-    "filename": "status-warning.svg",
-    "semantic_name": "Warning",
-    "category": "status",
-    "default_color": "#f5c451"
-  },
-  {
-    "filename": "status-error.svg",
-    "semantic_name": "Error",
-    "category": "status",
-    "default_color": "#f2685f"
-  },
-  {
-    "filename": "status-information.svg",
-    "semantic_name": "Information",
-    "category": "status",
-    "default_color": "#5b9df5"
-  },
-  {
-    "filename": "status-experimental.svg",
-    "semantic_name": "Experimental",
-    "category": "status",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "file-folder.svg",
-    "semantic_name": "Folder",
-    "category": "file",
-    "default_color": "#4fd7c6"
-  },
-  {
-    "filename": "file-file.svg",
-    "semantic_name": "File",
-    "category": "file",
-    "default_color": "#4fd7c6"
+    "filename": "action-refresh-on-light.svg",
+    "semantic_name": "Refresh",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-search.svg",
     "semantic_name": "Search",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-search-on-light.svg",
+    "semantic_name": "Search",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-advanced-settings.svg",
     "semantic_name": "Advanced settings",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-advanced-settings-on-light.svg",
+    "semantic_name": "Advanced settings",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-apply.svg",
     "semantic_name": "Apply",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-apply-on-light.svg",
+    "semantic_name": "Apply",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
   },
   {
     "filename": "action-cancel.svg",
     "semantic_name": "Cancel",
     "category": "action",
-    "default_color": "#4fd7c6"
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-cancel-on-light.svg",
+    "semantic_name": "Cancel",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "action-install-scaler.svg",
+    "semantic_name": "Install OptiScaler",
+    "category": "action",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "action-install-scaler-on-light.svg",
+    "semantic_name": "Install OptiScaler",
+    "category": "action",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "profile-fast.svg",
+    "semantic_name": "Fast",
+    "category": "compression-profile",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "profile-fast-on-light.svg",
+    "semantic_name": "Fast",
+    "category": "compression-profile",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "profile-balanced.svg",
+    "semantic_name": "Balanced",
+    "category": "compression-profile",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "profile-balanced-on-light.svg",
+    "semantic_name": "Balanced",
+    "category": "compression-profile",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "profile-maximum.svg",
+    "semantic_name": "Maximum",
+    "category": "compression-profile",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "profile-maximum-on-light.svg",
+    "semantic_name": "Maximum",
+    "category": "compression-profile",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "profile-auto.svg",
+    "semantic_name": "Automatic",
+    "category": "compression-profile",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "profile-auto-on-light.svg",
+    "semantic_name": "Automatic",
+    "category": "compression-profile",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "btrfs-analyze-compression.svg",
+    "semantic_name": "Analyze compression",
+    "category": "btrfs",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "btrfs-analyze-compression-on-light.svg",
+    "semantic_name": "Analyze compression",
+    "category": "btrfs",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "btrfs-verify-compression.svg",
+    "semantic_name": "Verify compression",
+    "category": "btrfs",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "btrfs-verify-compression-on-light.svg",
+    "semantic_name": "Verify compression",
+    "category": "btrfs",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "btrfs-exact-measurement.svg",
+    "semantic_name": "Exact measurement",
+    "category": "btrfs",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "btrfs-exact-measurement-on-light.svg",
+    "semantic_name": "Exact measurement",
+    "category": "btrfs",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "overview-logical-size.svg",
+    "semantic_name": "Logical size",
+    "category": "overview",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "overview-logical-size-on-light.svg",
+    "semantic_name": "Logical size",
+    "category": "overview",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "overview-physical-size.svg",
+    "semantic_name": "Physical size",
+    "category": "overview",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "overview-physical-size-on-light.svg",
+    "semantic_name": "Physical size",
+    "category": "overview",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "overview-saved-space.svg",
+    "semantic_name": "Saved space",
+    "category": "overview",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "overview-saved-space-on-light.svg",
+    "semantic_name": "Saved space",
+    "category": "overview",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "overview-optimization-profile.svg",
+    "semantic_name": "Optimization profile",
+    "category": "overview",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "overview-optimization-profile-on-light.svg",
+    "semantic_name": "Optimization profile",
+    "category": "overview",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "remaster-classic.svg",
+    "semantic_name": "Classic Enhancement",
+    "category": "graphics-remaster",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "remaster-classic-on-light.svg",
+    "semantic_name": "Classic Enhancement",
+    "category": "graphics-remaster",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "remaster-light-ai.svg",
+    "semantic_name": "Light AI",
+    "category": "graphics-remaster",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "remaster-light-ai-on-light.svg",
+    "semantic_name": "Light AI",
+    "category": "graphics-remaster",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "remaster-quality-ai.svg",
+    "semantic_name": "Quality AI",
+    "category": "graphics-remaster",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "remaster-quality-ai-on-light.svg",
+    "semantic_name": "Quality AI",
+    "category": "graphics-remaster",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "status-success.svg",
+    "semantic_name": "Success",
+    "category": "status",
+    "default_color": "#9FF2CB",
+    "theme": "dark"
+  },
+  {
+    "filename": "status-success-on-light.svg",
+    "semantic_name": "Success",
+    "category": "status",
+    "default_color": "#4FC48D",
+    "theme": "light"
+  },
+  {
+    "filename": "status-warning.svg",
+    "semantic_name": "Warning",
+    "category": "status",
+    "default_color": "#FFE3A1",
+    "theme": "dark"
+  },
+  {
+    "filename": "status-warning-on-light.svg",
+    "semantic_name": "Warning",
+    "category": "status",
+    "default_color": "#E0A43C",
+    "theme": "light"
+  },
+  {
+    "filename": "status-error.svg",
+    "semantic_name": "Error",
+    "category": "status",
+    "default_color": "#FFB3AC",
+    "theme": "dark"
+  },
+  {
+    "filename": "status-error-on-light.svg",
+    "semantic_name": "Error",
+    "category": "status",
+    "default_color": "#F08A95",
+    "theme": "light"
+  },
+  {
+    "filename": "status-information.svg",
+    "semantic_name": "Information",
+    "category": "status",
+    "default_color": "#B2D1FC",
+    "theme": "dark"
+  },
+  {
+    "filename": "status-information-on-light.svg",
+    "semantic_name": "Information",
+    "category": "status",
+    "default_color": "#6FB3EC",
+    "theme": "light"
+  },
+  {
+    "filename": "status-experimental.svg",
+    "semantic_name": "Experimental",
+    "category": "status",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "status-experimental-on-light.svg",
+    "semantic_name": "Experimental",
+    "category": "status",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "file-file.svg",
+    "semantic_name": "File",
+    "category": "file",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "file-file-on-light.svg",
+    "semantic_name": "File",
+    "category": "file",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "file-folder.svg",
+    "semantic_name": "Folder",
+    "category": "file",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "file-folder-on-light.svg",
+    "semantic_name": "Folder",
+    "category": "file",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "system-controllers.svg",
+    "semantic_name": "Controller",
+    "category": "system",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "system-controllers-on-light.svg",
+    "semantic_name": "Controller",
+    "category": "system",
+    "default_color": "#128A66",
+    "theme": "light"
+  },
+  {
+    "filename": "system-runtime.svg",
+    "semantic_name": "Runtime",
+    "category": "system",
+    "default_color": "#4FE3B8",
+    "theme": "dark"
+  },
+  {
+    "filename": "system-runtime-on-light.svg",
+    "semantic_name": "Runtime",
+    "category": "system",
+    "default_color": "#128A66",
+    "theme": "light"
   }
 ]

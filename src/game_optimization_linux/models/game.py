@@ -21,6 +21,7 @@ from .enums import (
     TextureMode,
     TextureScope,
 )
+from .mangohud import validate_game_key
 
 
 def _require_non_negative(value: float, field_name: str) -> None:
@@ -170,6 +171,21 @@ class Game:
                 raise ValueError(f"{field_name} must be a Path")
         if not isinstance(self.launch_available, bool):
             raise ValueError("launch_available must be a boolean")
+
+    @property
+    def profile_key(self) -> str:
+        """Key of saved per-game profiles, or "" when the game has none."""
+
+        if self.steam_app_id:
+            return str(self.steam_app_id)
+        if self.launcher is Launcher.MANUAL and self.data_source.casefold() == "local":
+            return self.id
+        if self.launcher in {Launcher.HEROIC, Launcher.LUTRIS}:
+            try:
+                return validate_game_key(self.id)
+            except ValueError:
+                return ""
+        return ""
 
     @property
     def size_label(self) -> str:

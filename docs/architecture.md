@@ -5,7 +5,7 @@ state, platform integration and file operations.
 
 This describes the development checkout, which may include unfinished work
 beyond the public 1.8 Alpha. See [development status](../ROADMAP.md); the
-announced 2.0 Beta is not yet available for download.
+GameOpti Beta 2.0 is being completed and polished.
 
 ## Application layers
 
@@ -15,10 +15,11 @@ announced 2.0 Beta is not yet available for download.
   Qt timers and signal delivery, then delegates domain work to controllers in
   `controllers/`.
 - Domain controllers group library scanning, compression/tasks, Updates,
-  MangoHud, OptiScaler, optimization/Proton, settings and system presentation.
+  MangoHud, graphics backends, GPU memory, optimization/Proton, settings and system presentation.
   Public QML method names remain on the facade so the UI API stays stable.
 - `services/` contains persistence, planning, background tasks and integrations
-  such as OptiScaler, MangoHud, Proton Tweaks and Steam update tracking.
+  such as OptiScaler, DLSS Enabler, post-processing, frame generation, GPU-memory
+  protection, MangoHud, Proton Tweaks and Steam update tracking.
 - `providers/` read Steam/Linux state or perform the guarded Btrfs operations.
   Models in `models/` carry typed state between providers, services and the
   controllers.
@@ -30,8 +31,8 @@ the application thread.
 ## Per-game launch flow
 
 Per-game files live below the application's XDG configuration directory. The
-optimization profile, MangoHud profile, Proton Tweaks and OptiScaler state are
-loaded for one Steam AppID and merged into a `LaunchPlan`:
+optimization profile, MangoHud profile, Proton tweaks and graphics-backend settings
+are loaded for a stable game key and merged into a `LaunchPlan`:
 
 ```text
 per-game profiles -> OptimizationLaunchPlanner -> LaunchPlan
@@ -46,8 +47,10 @@ one stable Launch Options command; profile changes do not edit Steam VDF files.
 In the development checkout, Heroic/Lutris profiles can be applied through
 managed environment/wrapper entries in the selected game's launcher
 configuration, with a backup and restore workflow. This is a separate path
-from the Steam runner; measured FPS sessions remain tied to the Steam runner.
-Custom/Manual launch configuration does not use the full optimization pipeline.
+from the Steam runner. Native Heroic also supports measured sessions through
+its managed launch configuration. Other paths retain their recording/import
+limitations. Manual games have an explicit launch configuration and do not
+inherit every Steam-specific integration.
 
 ## Narrator flow
 

@@ -179,6 +179,22 @@ Item {
                                                    ? compressionHistory[0] : ({})
 
     signal toastRequested(string message, string tone)
+    readonly property var scrollFlickable: scroll.contentItem
+
+    // True once the user picked a profile for the current game. An explicit
+    // choice is kept when any setting is saved; only a new game (or no choice
+    // yet) takes the default compression profile again.
+    property bool profileChosenByUser: false
+
+    function chooseProfile(mode) {
+        selectedMode = mode
+        profileChosenByUser = true
+    }
+
+    function applyDefaultProfileUnlessChosen() {
+        if (!profileChosenByUser)
+            applyDefaultProfile()
+    }
 
     function applyDefaultProfile() {
         var settings = controller && controller.settings ? controller.settings : ({})
@@ -202,7 +218,7 @@ Item {
     Connections {
         target: tab.controller || null
         ignoreUnknownSignals: true
-        function onSettingsChanged() { tab.applyDefaultProfile() }
+        function onSettingsChanged() { tab.applyDefaultProfileUnlessChosen() }
         function onTaskFinished(taskId, status) {
             Qt.callLater(function() {
                 tab.logMeasurementState("taskFinished:" + taskId + ":" + status)
@@ -805,6 +821,7 @@ Item {
     }
 
     onGameIdChanged: {
+        profileChosenByUser = false
         applyDefaultProfile()
         preparedPlan = ({})
     }
@@ -1382,16 +1399,20 @@ Item {
                                 focusPolicy: Qt.StrongFocus
                                 enabled: tab.profilesEnabled
                                 Accessible.name: modelData.name
-                                onClicked: tab.selectedMode = modelData.key
+                                onClicked: tab.chooseProfile(modelData.key)
 
                                 contentItem: ColumnLayout {
                                     spacing: 5
                                     RowLayout {
                                         Layout.fillWidth: true
-                                        Label {
-                                            text: modeButton.modelData.symbol
-                                            color: modeButton.active ? App.Theme.accent : App.Theme.textSecondary
-                                            font.pixelSize: 16
+                                        UiIcon {
+                                            objectName: "compressionProfileIcon_" + modeButton.modelData.key
+                                            Layout.preferredWidth: 20
+                                            Layout.preferredHeight: 20
+                                            sourceSize.width: 20
+                                            sourceSize.height: 20
+                                            source: App.UiIcons.compressionProfileIcon(modeButton.modelData.key)
+                                            opacity: modeButton.active || !modeButton.enabled ? 1.0 : 0.72
                                         }
                                         Label {
                                             Layout.fillWidth: true
@@ -2046,32 +2067,9 @@ Item {
                 }
             }
 
-            SurfaceCard {
-                Layout.fillWidth: true
-                padding: 20
-                elevated: true
-
-                contentItem: RowLayout {
-                    spacing: 12
-                    ColumnLayout {
-                        Layout.fillWidth: true
-                        spacing: 3
-                        Label {
-                            text: qsTr("Deep Optimize")
-                            color: App.Theme.text
-                            font.pixelSize: 18
-                            font.weight: Font.Bold
-                        }
-                        Label {
-                            Layout.fillWidth: true
-                            text: qsTr("Recursive directory defragmentation remains disabled. Game Optimization processes verified files individually and requires manual confirmation when snapshots or reflinks make data shared.")
-                            color: App.Theme.textSecondary
-                            font.pixelSize: App.Theme.fontCaption
-                            wrapMode: Text.WordWrap
-                        }
-                    }
-                    StatusBadge { text: qsTr("Planned"); status: "paused" }
-                }
+            DeepAnalysisSection {
+                controller: tab.controller
+                gameId: tab.gameId
             }
 
             Item { Layout.preferredHeight: 12 }

@@ -15,7 +15,7 @@ import subprocess
 import sys
 from threading import Lock, RLock, Thread
 import time
-from typing import Callable, Protocol, TextIO
+from typing import Callable, NamedTuple, Protocol, TextIO
 import unicodedata
 from uuid import uuid4
 
@@ -46,6 +46,53 @@ OCR_EDGE_GARBAGE_MIN_CORE = 4
 OCR_MAX_PREPROCESSED_PIXELS = 4_000_000
 OCR_CONTRAST_TILE_WIDTH = 96
 OCR_CONTRAST_TILE_HEIGHT = 64
+# OCR preprocessing. Without the env the Narrator setting decides:
+# "automatic" -> outline_adaptive (Beta default), "classic" -> the pre-Beta
+# image ("default" in logs). The env overrides the setting for diagnostics;
+# "classic" (or "default") restores the old behaviour. Unknown values are
+# ignored with a warning.
+OCR_PREPROCESS_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_PREPROCESS"
+OCR_PREPROCESS_DEFAULT = "default"
+OCR_PREPROCESS_CLASSIC = "classic"
+OCR_SETTINGS_MODE_AUTOMATIC = "automatic"
+OCR_SETTINGS_MODE_CLASSIC = "classic"
+OCR_PREPROCESS_BRIGHT_MASK = "bright_mask"
+# Bright-text mask: after local contrast, pixels >= threshold become white text
+# on black. Offline validation (Hogwarts Legacy, 2026-10-15) found a plateau at
+# 175-205; 190 is its middle.
+OCR_BRIGHT_MASK_THRESHOLD = 190
+# Fall back to the default image when the mask cannot represent the text:
+# almost everything is bright (light scene / dark text on light), or nothing is
+# bright on a light background (dark text). A dark, empty frame keeps the mask.
+OCR_BRIGHT_MASK_MAX_FRACTION = 0.35
+OCR_BRIGHT_MASK_MIN_FRACTION = 0.003
+OCR_BRIGHT_MASK_LIGHT_LEVEL = 128
+OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT = "too_many_bright_pixels"
+OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT = "no_bright_text_on_light_background"
+# Outline mask: a text pixel is bright (>= threshold) AND has a dark (<= dark
+# level) pixel within a square of the given radius, i.e. the subtitle outline.
+# Bright background without an outline (sand, sky, road) is dropped. Offline
+# sweep (GTA V / Batman AK / Hogwarts, 2026-10-16): T190 D110 r2 is the safe
+# setting; T220 helps on bright backgrounds but erases coloured labels, so the
+# adaptive mode uses it only when the bright-pixel fraction is above 0.15.
+# Fallback: only the bright mask's dark-text rule (no bright text on a light
+# background); a mostly bright frame keeps the outline mask.
+OCR_PREPROCESS_OUTLINE = "outline"
+OCR_PREPROCESS_OUTLINE_ADAPTIVE = "outline_adaptive"
+OCR_OUTLINE_THRESHOLD = 190
+OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD = 220
+OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION = 0.15
+OCR_OUTLINE_DARK_LEVEL = 110
+OCR_OUTLINE_RADIUS = 2
+# Image veto, shadow mode (log only): with this env set to 1 the outline modes
+# also return a pooled mask signature of the OCR'd frame. Read by the pipeline.
+IMAGE_VETO_SHADOW_ENV = "GAME_OPTIMIZATION_NARRATOR_IMAGE_VETO_SHADOW"
+OCR_MASK_SIGNATURE_BLOCK = 4
+_OCR_OPT_IN_PREPROCESS_MODES = (
+    OCR_PREPROCESS_BRIGHT_MASK,
+    OCR_PREPROCESS_OUTLINE,
+    OCR_PREPROCESS_OUTLINE_ADAPTIVE,
+)
 OCR_WORKER_TIMEOUT_SECONDS = 15.0
 OCR_DEBUG_CAPTURE_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_DEBUG"
 OCR_DEBUG_CAPTURE_LIMIT_ENV = "GAME_OPTIMIZATION_NARRATOR_OCR_DEBUG_LIMIT"
@@ -76,6 +123,25 @@ _WORKER_BOOTSTRAP = (
 
 
 logger = logging.getLogger(__name__)
+
+
+class _PreparedOcrImage(NamedTuple):
+    """Image sent to OCR plus how it was prepared (for the OCR log line)."""
+
+    image: QImage
+    preprocess: str
+    fallback: str
+    bright_fraction: float | None = None
+    threshold: int = 0
+    # Adaptive outline only: "yes" when the bright-background threshold was
+    # used, "no" otherwise; "" for every other mode.
+    switched: str = ""
+    # Image-veto shadow mode only (see IMAGE_VETO_SHADOW_ENV).
+    mask_signature: tuple[int, int, int] | None = None
+
+
+def image_veto_shadow_enabled() -> bool:
+    return os.environ.get(IMAGE_VETO_SHADOW_ENV, "").strip() == "1"
 
 
 class OcrWorker(Protocol):
@@ -343,11 +409,33 @@ class TesseractOcrProvider:
         debug_capture_limit: int | None = None,
         debug_capture_root: Path = OCR_DEBUG_CAPTURE_DIR,
         clock: Callable[[], float] = time.monotonic,
+        preprocess_mode: str | None = None,
     ) -> None:
         self._component_root = Path(component_root)
         self._explicit_executable = str(executable) if executable is not None else ""
         self._runner = runner
         self._worker_factory = worker_factory
+        # Explicit argument (tests/tools) > env (diagnostics) > Narrator setting.
+        self._settings_ocr_mode = OCR_SETTINGS_MODE_AUTOMATIC
+        if preprocess_mode is not None:
+            self._preprocess_override = (
+                self._resolve_preprocess_mode(preprocess_mode)
+                or OCR_PREPROCESS_DEFAULT
+            )
+            self._preprocess_source = "argument"
+        else:
+            env_value = os.environ.get(OCR_PREPROCESS_ENV, "")
+            self._preprocess_override = self._resolve_preprocess_mode(env_value)
+            self._preprocess_source = "env" if self._preprocess_override else "settings"
+            if env_value.strip() and self._preprocess_override is None:
+                logger.warning(
+                    "Ignoring unknown %s=%r; using the Narrator setting",
+                    OCR_PREPROCESS_ENV,
+                    env_value,
+                )
+        self._preprocess_mode = self._effective_preprocess_mode()
+        self._log_preprocess_mode()
+        self._mask_signature_enabled = image_veto_shadow_enabled()
         self._persistent_worker_enabled = (
             runner is subprocess.run
             if persistent_worker_enabled is None
@@ -445,7 +533,10 @@ class TesseractOcrProvider:
         started = self._clock()
         image_started = self._clock()
         roi_image = self._frame_image(frame)
-        image = self._preprocess_frame(frame)
+        prepared = self._prepare_ocr_image_details(frame)
+        image = prepared.image
+        preprocess = prepared.preprocess
+        preprocess_fallback = prepared.fallback
         image_preprocessing_ms = max(
             0.0, (self._clock() - image_started) * 1000.0
         )
@@ -581,6 +672,20 @@ class TesseractOcrProvider:
             filter_summary=quality["filter_summary"],
             strongest_line_confidence=strongest_confidence,
             strongest_line_text=strongest_text,
+            selected_line_confidence=quality["selected_line_confidence"],
+            quality_score=quality["quality_score"],
+            input_width=frame.width,
+            input_height=frame.height,
+            preprocessed_width=image.width(),
+            preprocessed_height=image.height(),
+            preprocess=preprocess,
+            preprocess_fallback=preprocess_fallback,
+            preprocess_bright_fraction=prepared.bright_fraction,
+            preprocess_threshold=prepared.threshold,
+            preprocess_switched=prepared.switched,
+            preprocess_mask=prepared.mask_signature,
+            leading_low_quality_tokens=quality["leading_low_quality_tokens"],
+            trailing_low_quality_tokens=quality["trailing_low_quality_tokens"],
         )
 
     def prepare(self, language: str) -> None:
@@ -876,6 +981,357 @@ class TesseractOcrProvider:
             Qt.AspectRatioMode.IgnoreAspectRatio,
             Qt.TransformationMode.SmoothTransformation,
         )
+
+    @staticmethod
+    def _resolve_preprocess_mode(value: str) -> str | None:
+        """Exact mode name -> internal mode; anything else -> None."""
+        normalized = value.strip().casefold()
+        if normalized in (OCR_PREPROCESS_CLASSIC, OCR_PREPROCESS_DEFAULT):
+            return OCR_PREPROCESS_DEFAULT
+        if normalized in _OCR_OPT_IN_PREPROCESS_MODES:
+            return normalized
+        return None
+
+    def _effective_preprocess_mode(self) -> str:
+        if self._preprocess_override is not None:
+            return self._preprocess_override
+        if self._settings_ocr_mode == OCR_SETTINGS_MODE_CLASSIC:
+            return OCR_PREPROCESS_DEFAULT
+        return OCR_PREPROCESS_OUTLINE_ADAPTIVE
+
+    def set_settings_mode(self, mode: str) -> None:
+        """Apply the Narrator "OCR mode" setting (automatic / classic).
+
+        The env (or an explicit constructor argument) keeps priority; the
+        setting is still remembered so removing the override is consistent.
+        """
+        normalized = str(mode).strip().casefold()
+        if normalized not in (OCR_SETTINGS_MODE_AUTOMATIC, OCR_SETTINGS_MODE_CLASSIC):
+            normalized = OCR_SETTINGS_MODE_AUTOMATIC
+        changed = normalized != self._settings_ocr_mode
+        self._settings_ocr_mode = normalized
+        effective = self._effective_preprocess_mode()
+        if effective != self._preprocess_mode or changed:
+            self._preprocess_mode = effective
+            self._log_preprocess_mode()
+
+    def _log_preprocess_mode(self) -> None:
+        mode = self._preprocess_mode
+        logger.info(
+            "Narrator OCR preprocess selected mode=%s source=%s setting=%s",
+            mode,
+            self._preprocess_source,
+            self._settings_ocr_mode,
+        )
+        if mode == OCR_PREPROCESS_BRIGHT_MASK:
+            logger.info(
+                "Narrator OCR preprocess mode=%s threshold=%d "
+                "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
+                mode,
+                OCR_BRIGHT_MASK_THRESHOLD,
+                OCR_BRIGHT_MASK_MAX_FRACTION,
+                OCR_BRIGHT_MASK_MIN_FRACTION,
+            )
+        elif mode != OCR_PREPROCESS_DEFAULT:
+            adaptive = mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE
+            logger.info(
+                "Narrator OCR preprocess mode=%s threshold=%d dark_level=%d "
+                "radius=%d bright_background_threshold=%s "
+                "bright_background_fraction=%s "
+                "fallback_max_fraction=%.3f fallback_min_fraction=%.3f",
+                mode,
+                OCR_OUTLINE_THRESHOLD,
+                OCR_OUTLINE_DARK_LEVEL,
+                OCR_OUTLINE_RADIUS,
+                OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD if adaptive else "none",
+                (
+                    f"{OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION:.3f}"
+                    if adaptive
+                    else "none"
+                ),
+                OCR_BRIGHT_MASK_MAX_FRACTION,
+                OCR_BRIGHT_MASK_MIN_FRACTION,
+            )
+
+    @property
+    def preprocess_mode(self) -> str:
+        return self._preprocess_mode
+
+    def _prepare_ocr_image(self, frame: CaptureFrame) -> tuple[QImage, str, str]:
+        """Return (image, used preprocessing, fallback reason)."""
+        prepared = self._prepare_ocr_image_details(frame)
+        return prepared.image, prepared.preprocess, prepared.fallback
+
+    def _prepare_ocr_image_details(self, frame: CaptureFrame) -> _PreparedOcrImage:
+        if self._preprocess_mode == OCR_PREPROCESS_BRIGHT_MASK:
+            image, fallback = self._preprocess_bright_mask(frame)
+            if fallback:
+                return _PreparedOcrImage(image, OCR_PREPROCESS_DEFAULT, fallback)
+            return _PreparedOcrImage(image, OCR_PREPROCESS_BRIGHT_MASK, "")
+        if self._preprocess_mode in (
+            OCR_PREPROCESS_OUTLINE,
+            OCR_PREPROCESS_OUTLINE_ADAPTIVE,
+        ):
+            return self._preprocess_outline(
+                frame,
+                adaptive=self._preprocess_mode == OCR_PREPROCESS_OUTLINE_ADAPTIVE,
+                signature=getattr(self, "_mask_signature_enabled", False),
+            )
+        return _PreparedOcrImage(
+            self._preprocess_frame(frame), OCR_PREPROCESS_DEFAULT, ""
+        )
+
+    @classmethod
+    def _preprocess_outline(
+        cls, frame: CaptureFrame, *, adaptive: bool, signature: bool = False
+    ) -> _PreparedOcrImage:
+        """Bright glyphs next to a dark outline as white on black.
+
+        Same grayscale and local-contrast steps as the default path and the
+        the bright mask's dark-text fallback only (decided before OCR); one OCR
+        pass per frame.
+        """
+        grayscale = cls._frame_image(frame).convertToFormat(
+            QImage.Format.Format_Grayscale8
+        )
+        contrasted = cls._improve_local_contrast(grayscale)
+        width = contrasted.width()
+        height = contrasted.height()
+        pixels = cls._grayscale_bytes(contrasted)
+        bright_fraction = cls._bright_fraction(pixels)
+        switched_label = "no" if adaptive else ""
+        fallback = cls._bright_mask_fallback(pixels)
+        # The outline test already drops bright background without a dark
+        # outline, so a mostly bright frame keeps the mask; only the dark-text
+        # case (nothing bright on a light background) uses the default image.
+        if fallback == OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT:
+            fallback = ""
+        if fallback:
+            return _PreparedOcrImage(
+                cls._preprocess_frame(frame),
+                OCR_PREPROCESS_DEFAULT,
+                fallback,
+                bright_fraction,
+                0,
+                switched_label,
+            )
+        threshold = OCR_OUTLINE_THRESHOLD
+        if adaptive and bright_fraction > OCR_OUTLINE_BRIGHT_BACKGROUND_FRACTION:
+            threshold = OCR_OUTLINE_BRIGHT_BACKGROUND_THRESHOLD
+            switched_label = "yes"
+        mask = cls._outline_mask(
+            pixels,
+            width,
+            height,
+            threshold=threshold,
+            dark_level=OCR_OUTLINE_DARK_LEVEL,
+            radius=OCR_OUTLINE_RADIUS,
+        )
+        masked = QImage(
+            mask,
+            width,
+            height,
+            width,
+            QImage.Format.Format_Grayscale8,
+        ).copy()
+        return _PreparedOcrImage(
+            cls._bounded_upscale(masked),
+            OCR_PREPROCESS_OUTLINE_ADAPTIVE if adaptive else OCR_PREPROCESS_OUTLINE,
+            "",
+            bright_fraction,
+            threshold,
+            switched_label,
+            cls._mask_signature(mask, width, height) if signature else None,
+        )
+
+    @staticmethod
+    def _mask_signature(
+        mask: bytes, width: int, height: int, block: int = OCR_MASK_SIGNATURE_BLOCK
+    ) -> tuple[int, int, int]:
+        """Pool a 0/255 mask to ``block``-square cells (any text pixel -> 1).
+
+        Partial blocks at the right/bottom edge are dropped. Returns
+        (columns, rows, bits) with row-major bits, first cell = highest bit.
+        """
+        columns = width // block
+        rows = height // block
+        empty = bytes(block)
+        bits = 0
+        for row in range(rows):
+            combined = 0
+            for line in range(row * block, row * block + block):
+                combined |= int.from_bytes(mask[line * width : line * width + width], "big")
+            line_bytes = combined.to_bytes(width, "big")
+            for column in range(columns):
+                bits = (bits << 1) | (
+                    line_bytes[column * block : column * block + block] != empty
+                )
+        return columns, rows, bits
+
+    @staticmethod
+    def _bright_fraction(pixels: bytes) -> float:
+        """Share of pixels at or above the bright-mask threshold (190)."""
+        if not pixels:
+            return 0.0
+        table = bytes(
+            1 if value >= OCR_BRIGHT_MASK_THRESHOLD else 0 for value in range(256)
+        )
+        return pixels.translate(table).count(1) / len(pixels)
+
+    @staticmethod
+    def _outline_mask(
+        pixels: bytes,
+        width: int,
+        height: int,
+        *,
+        threshold: int,
+        dark_level: int,
+        radius: int,
+    ) -> bytes:
+        """255 where pixel >= threshold and a pixel <= dark_level lies within
+        the (2*radius+1)^2 square around it, else 0.
+
+        Pure Python without numpy: each pixel becomes one 0/1 byte of a big
+        integer, so the square dilation of the dark map is a few byte shifts
+        and ORs (horizontal, then vertical). Rows are padded with ``radius``
+        zero bytes on both sides so horizontal shifts never cross into the
+        neighbouring row.
+        """
+        if width <= 0 or height <= 0:
+            return b""
+        radius = max(0, radius)
+        padded_width = width + 2 * radius
+        total = padded_width * height
+        full = (1 << (8 * total)) - 1
+        pad = bytes(radius)
+        dark = pixels.translate(
+            bytes(1 if value <= dark_level else 0 for value in range(256))
+        )
+        dark_value = int.from_bytes(
+            b"".join(
+                pad + dark[row * width : (row + 1) * width] + pad
+                for row in range(height)
+            ),
+            "big",
+        )
+        horizontal = dark_value
+        for shift in range(1, radius + 1):
+            horizontal |= (dark_value << (8 * shift)) | (dark_value >> (8 * shift))
+        horizontal &= full
+        dilated = horizontal
+        for shift in range(1, radius + 1):
+            step = 8 * padded_width * shift
+            dilated |= (horizontal << step) | (horizontal >> step)
+        dilated_bytes = (dilated & full).to_bytes(total, "big")
+        near_dark = b"".join(
+            dilated_bytes[row * padded_width + radius : row * padded_width + radius + width]
+            for row in range(height)
+        )
+        bright = pixels.translate(
+            bytes(1 if value >= threshold else 0 for value in range(256))
+        )
+        count = width * height
+        text = (int.from_bytes(bright, "big") & int.from_bytes(near_dark, "big")).to_bytes(
+            count, "big"
+        )
+        return text.translate(bytes(255 if value else 0 for value in range(256)))
+
+    @staticmethod
+    def _bounded_upscale(image: QImage) -> QImage:
+        """The default path's bounded 2x smooth upscale."""
+        source_pixels = max(1, image.width() * image.height())
+        bounded_factor = min(
+            OCR_UPSCALE_FACTOR,
+            sqrt(OCR_MAX_PREPROCESSED_PIXELS / source_pixels),
+        )
+        if bounded_factor <= 1.05:
+            return image
+        return image.scaled(
+            max(1, round(image.width() * bounded_factor)),
+            max(1, round(image.height() * bounded_factor)),
+            Qt.AspectRatioMode.IgnoreAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+
+    @classmethod
+    def _preprocess_bright_mask(cls, frame: CaptureFrame) -> tuple[QImage, str]:
+        """Bright subtitle glyphs as white on black, or the default image.
+
+        Uses the same grayscale and local-contrast steps as the default path,
+        then thresholds once. The fallback decision is made before OCR, so a
+        frame is still recognized exactly once.
+        """
+        grayscale = cls._frame_image(frame).convertToFormat(
+            QImage.Format.Format_Grayscale8
+        )
+        contrasted = cls._improve_local_contrast(grayscale)
+        width = contrasted.width()
+        height = contrasted.height()
+        pixels = cls._grayscale_bytes(contrasted)
+        fallback = cls._bright_mask_fallback(pixels)
+        if fallback:
+            return cls._preprocess_frame(frame), fallback
+        mask_table = bytes(
+            255 if value >= OCR_BRIGHT_MASK_THRESHOLD else 0 for value in range(256)
+        )
+        masked = QImage(
+            pixels.translate(mask_table),
+            width,
+            height,
+            width,
+            QImage.Format.Format_Grayscale8,
+        ).copy()
+        source_pixels = max(1, width * height)
+        bounded_factor = min(
+            OCR_UPSCALE_FACTOR,
+            sqrt(OCR_MAX_PREPROCESSED_PIXELS / source_pixels),
+        )
+        if bounded_factor <= 1.05:
+            return masked, ""
+        return (
+            masked.scaled(
+                max(1, round(width * bounded_factor)),
+                max(1, round(height * bounded_factor)),
+                Qt.AspectRatioMode.IgnoreAspectRatio,
+                Qt.TransformationMode.SmoothTransformation,
+            ),
+            "",
+        )
+
+    @staticmethod
+    def _grayscale_bytes(image: QImage) -> bytes:
+        """Tightly packed 8-bit rows, independent of QImage line padding."""
+        width = image.width()
+        height = image.height()
+        stride = image.bytesPerLine()
+        source = bytes(image.constBits())
+        if stride == width:
+            return source[: width * height]
+        return b"".join(
+            source[row * stride : row * stride + width] for row in range(height)
+        )
+
+    @staticmethod
+    def _bright_mask_fallback(pixels: bytes) -> str:
+        """Reason to keep the default image, or "" when the mask applies."""
+        count = len(pixels)
+        if count == 0:
+            return OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT
+        bright_table = bytes(
+            1 if value >= OCR_BRIGHT_MASK_THRESHOLD else 0 for value in range(256)
+        )
+        bright = pixels.translate(bright_table).count(1)
+        if bright > count * OCR_BRIGHT_MASK_MAX_FRACTION:
+            return OCR_BRIGHT_MASK_FALLBACK_TOO_BRIGHT
+        if bright < count * OCR_BRIGHT_MASK_MIN_FRACTION:
+            light_table = bytes(
+                1 if value >= OCR_BRIGHT_MASK_LIGHT_LEVEL else 0
+                for value in range(256)
+            )
+            # Median >= light level <=> at least half of the pixels are light.
+            if pixels.translate(light_table).count(1) * 2 >= count:
+                return OCR_BRIGHT_MASK_FALLBACK_DARK_TEXT
+        return ""
 
     @staticmethod
     def _improve_local_contrast(image: QImage) -> QImage:
@@ -1285,6 +1741,63 @@ class TesseractOcrProvider:
         return len(visible) >= 2 and fragments / len(visible) >= 0.60
 
     @staticmethod
+    def _edge_low_quality_tokens(
+        tokens: list[dict[str, object]],
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        """Return weak edge-token evidence without deleting possible words.
+
+        A token is only marked when it is short, below 0.60 confidence and at
+        least 0.20 below its own retained line.  The text gate combines this
+        evidence with a repeated/canonical core before removing a lone possible
+        word, so legal short words such as ``a`` or ``UP`` are not blacklisted.
+        """
+
+        groups: dict[tuple[int, int, int, int], list[dict[str, object]]] = {}
+        for token in tokens:
+            if not bool(token.get("included")) or not str(token["text"]).strip():
+                continue
+            key = tuple(
+                int(token[name])
+                for name in ("page", "block", "paragraph", "line")
+            )
+            groups.setdefault(key, []).append(token)
+        retained_lines = [values for values in groups.values() if values]
+        if not retained_lines:
+            return (), ()
+
+        def weak(token: dict[str, object], line_confidence: float | None) -> bool:
+            text = str(token["text"]).strip()
+            if (
+                not text
+                or len(text) > OCR_EDGE_GARBAGE_MAX_LENGTH
+                or not bool(token.get("valid_confidence"))
+                or line_confidence is None
+            ):
+                return False
+            token_confidence = float(token["confidence"]) / 100.0
+            return (
+                token_confidence < OCR_EDGE_GARBAGE_CONFIDENCE / 100.0
+                and line_confidence - token_confidence >= 0.20
+            )
+
+        first_line = retained_lines[0]
+        last_line = retained_lines[-1]
+        first_confidence = TesseractOcrProvider._token_confidence(first_line)
+        last_confidence = TesseractOcrProvider._token_confidence(last_line)
+        leading: list[str] = []
+        for token in first_line:
+            if not weak(token, first_confidence):
+                break
+            leading.append(str(token["text"]).strip())
+        trailing: list[str] = []
+        for token in reversed(last_line):
+            if not weak(token, last_confidence):
+                break
+            trailing.append(str(token["text"]).strip())
+        trailing.reverse()
+        return tuple(leading), tuple(trailing)
+
+    @staticmethod
     def _quality_evidence(
         text: str,
         confidence: float | None,
@@ -1345,9 +1858,13 @@ class TesseractOcrProvider:
             and str(word_tokens[0]["text"]).isupper()
             and len(str(word_tokens[0]["text"])) <= 3
         )
+        meaningful_tokens = sum(
+            int(token["alphabetic_characters"]) >= 2 for token in word_tokens
+        )
         clean_short = bool(
             text
-            and 1 <= len(word_tokens) <= 3
+            and 2 <= len(word_tokens) <= 3
+            and meaningful_tokens >= 2
             and len(line_keys) == 1
             and not dropped
             and confidence is not None
@@ -1369,6 +1886,52 @@ class TesseractOcrProvider:
                 if str(token.get("filter_reason", ""))
             }
         )
+        included_lines: dict[
+            tuple[int, int, int, int], list[dict[str, object]]
+        ] = {}
+        for token in included:
+            key = tuple(
+                int(token[name])
+                for name in ("page", "block", "paragraph", "line")
+            )
+            included_lines.setdefault(key, []).append(token)
+        selected_line_confidence = max(
+            (
+                value
+                for value in (
+                    TesseractOcrProvider._token_confidence(line)
+                    for line in included_lines.values()
+                )
+                if value is not None
+            ),
+            default=None,
+        )
+        quality_parts = [
+            (confidence, 0.65),
+            (selected_line_confidence, 0.25),
+            (minimum_confidence, 0.10),
+        ]
+        quality_weight = sum(
+            weight for value, weight in quality_parts if value is not None
+        )
+        quality_score = (
+            sum(float(value) * weight for value, weight in quality_parts if value is not None)
+            / quality_weight
+            if quality_weight
+            else None
+        )
+        if quality_score is not None and visible:
+            quality_score = max(
+                0.0,
+                min(
+                    1.0,
+                    quality_score
+                    - min(0.12, len(dropped) / len(visible) * 0.12),
+                ),
+            )
+        leading_low_quality, trailing_low_quality = (
+            TesseractOcrProvider._edge_low_quality_tokens(tokens)
+        )
         return {
             "token_count": len(visible),
             "included_token_count": len(included),
@@ -1378,6 +1941,10 @@ class TesseractOcrProvider:
             "geometry_coherent": geometry_coherent,
             "clean_short_phrase_evidence": clean_short,
             "filter_summary": ",".join(reasons) if reasons else "unchanged",
+            "selected_line_confidence": selected_line_confidence,
+            "quality_score": quality_score,
+            "leading_low_quality_tokens": leading_low_quality,
+            "trailing_low_quality_tokens": trailing_low_quality,
         }
 
     @staticmethod

@@ -1,27 +1,18 @@
-# OCR regression corpus
+# OCR regression fixtures
 
-Real Tesseract TSV output captured from a live narrator session (Batman, Polish),
-sanitised to the TSV only. Previously these artefacts lived in runtime state and
-were destroyed with every session, so every measurement restarted from zero.
+Small, sanitized Tesseract TSV fixtures exercise subtitle selection, low-confidence
+background rejection and malformed quote handling. They contain no screenshots,
+account information or runtime logs.
 
-Source session ROI: **1114x270**, processed **2228x540** (2x upscale), PSM 6,
-OEM 1, `pol` model, declared DPI 96.
+| Fixture | Purpose |
+| --- | --- |
+| `observation-03.tsv` | A clean Polish subtitle line |
+| `observation-01.tsv` | The same subtitle among low-confidence background lines |
+| `observation-12.tsv` | Background recognition without a subtitle |
 
-| file | content | expected text | why it is here |
-| --- | --- | --- | --- |
-| `observation-03.tsv` | one clean subtitle line | `„W obliczu śmierci nie ma się już czego bać. Twoja zemsta nadejdzie”.` | the good case: single line, phrase confidence 0.963 |
-| `observation-01.tsv` | real subtitle plus five background lines | same sentence as above, on TSV line 6 | the subtitle is read at 0.967 while the raw phrase scores 0.347 |
-| `observation-12.tsv` | background texture only, no subtitle | *(none)* | every line is weak, so the weak-line rule cannot fire |
+The original recognition used a 1114 × 270 region, a 2× resize, PSM 6, OEM 1 and
+the Polish language model. The unmatched quote in two fixtures is intentional:
+it checks that TSV parsing does not combine subsequent rows.
 
-`observation-01` and `observation-12` also cover the historical TSV parsing bug:
-their text column contains an unmatched ASCII double quote, which once caused
-following TSV rows to be absorbed into the parsed token. Re-parsing them with the
-current parser is a direct regression check for that fix.
-
-## Not included
-
-ROI/processed PNGs are deliberately excluded: three frames were 940 KB, which is
-too heavy to commit. The A/B preprocessing experiment needs those images, so it
-still requires a fresh capture. Prefer capturing that corpus from the **GTA V**
-session (ROI 960x76), because this session's geometry is much taller and does not
-reproduce the reported 480 ms recognition time.
+Keep larger capture datasets and session material outside the repository. These
+fixtures test text-processing regressions; they do not benchmark live capture or OCR.

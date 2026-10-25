@@ -252,17 +252,43 @@ class CompressionController:
             )
             return False
         try:
+            # Never pop up the Polkit password prompt on its own: not in Couch
+            # Mode and never for automatic compression (no user present), in
+            # any mode. The exact measurement is a separate, explicit action.
+            interactive = (
+                not automatic_authorized and self._app._interface_mode != "couch"
+            )
             task = self._app._task_service.enqueue_compression_plan(
                 game,
                 plan,
                 confirmed=bool(confirmed),
                 automatic_authorized=bool(automatic_authorized),
+                interactive_measurement=interactive,
             )
         except Exception as error:
             self._app._report_error(f"queuing compression for {game.name}", error)
             return False
         self._app._compression_plans.pop(normalized_id, None)
         self._app._pending_automatic_games.discard(game.id)
+        if automatic_authorized:
+            # One unattended compression per update event: remember which
+            # event was handled so the scheduler cannot queue it again, also
+            # after a restart. Manual compression is never blocked by this.
+            tracker = self._app._update_tracker
+            record = tracker.get(game.id) if tracker is not None else None
+            if record is not None:
+                identity = self._app._update_event_identity(record, game)
+                self._app._automatic_handled_events[game.id] = identity
+                persist = getattr(tracker, "record_automatic_attempt", None)
+                if callable(persist):
+                    try:
+                        persist(game.id, identity)
+                    except Exception as error:
+                        logger.warning(
+                            "Could not persist the automatic attempt for %s: %s",
+                            game.id,
+                            error,
+                        )
         self._app._reload_tasks()
         self._app._reload_updates()
         self._app._reload_system_info()

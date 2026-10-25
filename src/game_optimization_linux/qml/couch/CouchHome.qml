@@ -13,6 +13,32 @@ FocusScope {
     property var controller
     property var navigation
     property real couchScale: 1.0
+    // Vertical fit for short screens (720p TVs, 16:10 handhelds). Equal to
+    // couchScale on 16:9 screens at or above the 0.82 scale floor.
+    readonly property real fitScale: height > 0 ? Math.min(couchScale, height / 1080) : couchScale
+    // Layout metrics (1920x1080 reference, scaled by fitScale).
+    readonly property real edgeMargin: 48 * fitScale
+    readonly property real arrowSize: 48 * fitScale
+    readonly property real arrowGap: 12 * fitScale
+    readonly property real cardGap: 24 * fitScale
+    readonly property real cardPad: 22 * fitScale
+    readonly property int visibleCards: 6
+    readonly property real cardWidthByWidth: Math.max(120, (width - 2 * edgeMargin - 2 * (arrowSize + arrowGap)
+                                                            - 2 * cardPad - (visibleCards - 1) * cardGap) / visibleCards)
+    readonly property real cardHeightByHeight: carouselArea.height > 0
+            ? (carouselArea.height - 2 * cardPad) / 1.05 : cardWidthByWidth * 1.46
+    readonly property real cardHeight: Math.max(160, Math.min(cardWidthByWidth * 1.46, cardHeightByHeight))
+    readonly property real cardWidth: cardHeight / 1.46
+    // Width available for the strip between the arrows, and the number of
+    // whole covers that fit into it; the strip is sized to exactly that many
+    // so no cover (and no focus ring) is ever cut at an edge.
+    readonly property real stripMaxWidth: width - 2 * edgeMargin - 2 * (arrowSize + arrowGap)
+    readonly property int fittedCards: Math.max(1, Math.floor((stripMaxWidth - 2 * cardPad + cardGap)
+                                                              / (cardWidth + cardGap)))
+    readonly property real stripWidth: fittedCards * cardWidth + (fittedCards - 1) * cardGap + 2 * cardPad
+    // Hero text aligns with the first cover's left edge.
+    readonly property real contentLeft: edgeMargin + arrowSize + arrowGap + cardPad
+
     property var games: controller && controller.games ? controller.games : []
     property int focusZone: 0
     property int selectedTile: 0
@@ -24,11 +50,10 @@ FocusScope {
     property var updatesSummary: controller && controller.updatesSummary
                                  ? controller.updatesSummary : ({})
     readonly property var homeTiles: [
-        { "symbol": "▦", "icon": App.UiIcons.sidebarGames, "title": qsTr("Library") },
-        { "symbol": "◉", "icon": App.UiIcons.sidebarNarrator, "title": qsTr("Narrator") },
-        { "symbol": "↻", "icon": App.UiIcons.sidebarTasks, "title": qsTr("Tasks") },
-        { "symbol": "↓", "icon": App.UiIcons.sidebarUpdates, "title": qsTr("Updates") },
-        { "symbol": "⚙", "icon": App.UiIcons.sidebarSettings, "title": qsTr("Settings") }
+        { "id": "library", "icon": App.UiIcons.couchGlyphLibrary, "iconOnLight": App.UiIcons.couchGlyphLibraryOnLight, "title": qsTr("Library"), "subtitle": qsTr("Your games") },
+        { "id": "tasks", "icon": App.UiIcons.couchGlyphTasks, "iconOnLight": App.UiIcons.couchGlyphTasksOnLight, "title": qsTr("Tasks"), "subtitle": qsTr("Active and recent tasks") },
+        { "id": "updates", "icon": App.UiIcons.couchGlyphUpdates, "iconOnLight": App.UiIcons.couchGlyphUpdatesOnLight, "title": qsTr("Updates"), "subtitle": qsTr("File changes and re-analysis") },
+        { "id": "settings", "icon": App.UiIcons.couchGlyphSettings, "iconOnLight": App.UiIcons.couchGlyphSettingsOnLight, "title": qsTr("Settings"), "subtitle": qsTr("App configuration") }
     ]
     readonly property var displayGames: games || []
     property int selectedGameIndex: displayGames.length > 0
@@ -36,16 +61,20 @@ FocusScope {
     property var selectedGame: selectedGameIndex >= 0
             ? displayGames[selectedGameIndex] : ({})
     readonly property var heroActions: [
-        { "id": "launch", "icon": App.UiIcons.actionLaunch, "title": launchPending ? qsTr("Launching…") : qsTr("Launch"), "enabled": selectedGame.launchAllowed === true && !launchPending },
-        { "id": "details", "icon": App.UiIcons.actionAdvancedSettings, "title": qsTr("Details"), "enabled": selectedGameIndex >= 0 },
-        { "id": "more", "icon": App.UiIcons.actionSearch, "title": qsTr("More"), "enabled": selectedGameIndex >= 0 }
+        { "id": "launch", "icon": App.UiIcons.couchGlyphLaunch, "iconOnLight": App.UiIcons.couchGlyphLaunchOnLight, "title": launchPending ? qsTr("Launching…") : qsTr("Launch"), "enabled": selectedGame.launchAllowed === true && !launchPending },
+        { "id": "details", "icon": App.UiIcons.couchGlyphDetails, "iconOnLight": App.UiIcons.couchGlyphDetailsOnLight, "title": qsTr("Details"), "enabled": selectedGameIndex >= 0 },
+        { "id": "more", "icon": App.UiIcons.couchGlyphMore, "iconOnLight": App.UiIcons.couchGlyphMoreOnLight, "title": qsTr("More"), "enabled": selectedGameIndex >= 0 }
     ]
     readonly property var contextEntries: [
-        { "id": "launch", "icon": App.UiIcons.actionLaunch, "title": qsTr("Launch"), "enabled": selectedGame.launchAllowed === true && !launchPending },
-        { "id": "details", "icon": App.UiIcons.actionAdvancedSettings, "title": qsTr("Game details"), "enabled": selectedGameIndex >= 0 },
-        { "id": "updates", "icon": App.UiIcons.sidebarUpdates, "title": qsTr("Updates"), "enabled": selectedGameIndex >= 0 },
-        { "id": "close", "icon": App.UiIcons.actionCancel, "title": qsTr("Close menu"), "enabled": true }
+        { "id": "launch", "icon": App.UiIcons.couchGlyphLaunch, "iconOnLight": App.UiIcons.couchGlyphLaunchOnLight, "title": qsTr("Launch"), "enabled": selectedGame.launchAllowed === true && !launchPending },
+        { "id": "details", "icon": App.UiIcons.couchGlyphDetails, "iconOnLight": App.UiIcons.couchGlyphDetailsOnLight, "title": qsTr("Game details"), "enabled": selectedGameIndex >= 0 },
+        { "id": "updates", "icon": App.UiIcons.couchGlyphUpdates, "iconOnLight": App.UiIcons.couchGlyphUpdatesOnLight, "title": qsTr("Updates"), "enabled": selectedGameIndex >= 0 },
+        { "id": "close", "icon": App.UiIcons.couchGlyphPrevious, "iconOnLight": App.UiIcons.couchGlyphPreviousOnLight, "title": qsTr("Close menu"), "enabled": true }
     ]
+    // Space CouchMain must keep free at the bottom for controller hints so
+    // they sit in the footer row above the navigation, never on top of it.
+    readonly property real hintsBottomMargin: (bottomNavMargin + bottomNav.height + App.Theme.couchSpaceS * fitScale)
+    readonly property real bottomNavMargin: 40 * fitScale
     property int runtimeProbeSerial: 0
     readonly property var runtimeProbeMetrics: {
         runtimeProbeSerial
@@ -65,7 +94,7 @@ FocusScope {
                         ? Math.min(minimumActionHeight, action.height) : action.height
         }
         var cell = gameStrip.currentItem
-        var tile = tileRepeater.itemAt(0)
+        var tile = bottomNav.itemAt(0)
         var tilePoint = tile ? tile.mapToItem(page, 0, 0) : null
         return {
             "homeActionMinHeight": minimumActionHeight,
@@ -89,7 +118,7 @@ FocusScope {
             } else if (focusZone === 0)
                 gameStrip.forceActiveFocus()
             else if (focusZone === 1) {
-                var tile = tileRepeater.itemAt(selectedTile)
+                var tile = bottomNav.itemAt(selectedTile)
                 if (tile) tile.forceActiveFocus()
             } else {
                 var action = heroActionRepeater.itemAt(selectedHeroAction)
@@ -120,6 +149,53 @@ FocusScope {
     onGamesChanged: Qt.callLater(restoreRetainedSelection)
     onSelectedGameChanged: Qt.callLater(ensureHeroAction)
 
+    // Readiness is derived only from fields produced by presenters.game_to_qml.
+    function readinessTone() {
+        if (selectedGameIndex < 0)
+            return "neutral"
+        if (selectedGame.launchAllowed === true)
+            return "success"
+        var status = String(selectedGame.status || "")
+        if (selectedGame.libraryAvailable === false
+                || status === "Drive disconnected" || status === "Missing files")
+            return "danger"
+        return "warning"
+    }
+    function readinessText() {
+        var tone = readinessTone()
+        if (tone === "success")
+            return qsTr("Ready to launch")
+        if (tone === "danger")
+            return App.I18n.status(String(selectedGame.status || "")
+                                   || String(selectedGame.availabilityStatus || ""))
+        return qsTr("Launch unavailable")
+    }
+    function readinessReason() {
+        if (readinessTone() !== "warning")
+            return ""
+        return App.I18n.message(String(selectedGame.launchUnavailableReason || ""))
+    }
+    // Shown only when the game really records a runner (manual/Heroic/Lutris).
+    function runtimeText() {
+        var runner = String(selectedGame.runner || "").trim()
+        if (!runner.length)
+            return ""
+        var parts = runner.split("/")
+        return qsTr("Runtime: %1").arg(parts[parts.length - 1] || runner)
+    }
+
+    // Used when returning from game details: keep the game selected and put
+    // focus back on its cover in the carousel.
+    function focusGame(gameId) {
+        if (String(gameId || "").length)
+            retainedGameId = String(gameId)
+        if (contextMenuOpen)
+            closeContextMenu()
+        restoreRetainedSelection()
+        focusZone = 0
+        restoreActiveFocus()
+    }
+
     function restoreRetainedSelection() {
         if (displayGames.length === 0) {
             gameStrip.currentIndex = -1
@@ -144,8 +220,9 @@ FocusScope {
         if (index < 0 || index >= displayGames.length)
             return false
         var changed = gameStrip.currentIndex !== index
+        // The ListView highlight range keeps the selection inside the padded
+        // six-cover window; positionViewAtIndex(Contain) ignored that padding.
         gameStrip.currentIndex = index
-        gameStrip.positionViewAtIndex(index, ListView.Contain)
         retainedGameId = String(displayGames[index].id || "")
         if (navigation)
             navigation.rememberFocus("home", retainedGameId, index)
@@ -158,19 +235,14 @@ FocusScope {
             return true
         }
         if (selectedTile === 1 && controller) {
-            controller.navigate("narrator")
-            openNarrator()
-            return true
-        }
-        if (selectedTile === 2 && controller) {
             controller.navigate("tasks")
             return true
         }
-        if (selectedTile === 3 && controller) {
+        if (selectedTile === 2 && controller) {
             controller.navigate("updates")
             return true
         }
-        if (selectedTile === 4) {
+        if (selectedTile === 3) {
             openSettings()
             return true
         }
@@ -293,15 +365,21 @@ FocusScope {
         if (action === "Back") {
             return
         } else if (action === "NavigateUp" || action === "NavigateDown") {
+            // Visual order, top to bottom: hero actions (2), game carousel (0),
+            // navigation tiles (1).
             var previousZone = focusZone
             if (action === "NavigateUp") {
-                if (focusZone === 1 || focusZone === 2)
+                if (focusZone === 1)
                     focusZone = 0
-            } else if (focusZone === 0) {
-                focusZone = 2
+                else if (focusZone === 0 && selectedGameIndex >= 0)
+                    focusZone = 2
             } else if (focusZone === 2) {
+                focusZone = 0
+            } else if (focusZone === 0) {
                 focusZone = 1
             }
+            if (focusZone === 2)
+                ensureHeroAction()
             if (focusZone !== previousZone)
                 playSemanticSound("navigate")
         } else if (action === "NavigateLeft" && focusZone === 0 && gameStrip.count > 0) {
@@ -354,85 +432,133 @@ FocusScope {
 
     Timer { id: launchGuard; interval: 1800; onTriggered: page.launchPending = false }
 
-    Rectangle {
+    CouchHeroBackdrop {
+        id: heroBackdrop
         anchors.fill: parent
-        color: App.Theme.background
-        clip: true
-
-        Image {
-            id: heroBackground
-            anchors.fill: parent
-            source: String(page.selectedGame.headerArtwork
-                           || page.selectedGame.fallbackArtwork
-                           || page.selectedGame.effectiveArtworkUrl || "")
-            fillMode: Image.PreserveAspectCrop
-            asynchronous: true
-            cache: true
-            opacity: status === Image.Ready ? 0.68 : 0
-            Behavior on opacity { NumberAnimation { duration: 160 } }
-        }
-        Rectangle {
-            anchors.fill: parent
-            gradient: Gradient {
-                orientation: Gradient.Horizontal
-                GradientStop { position: 0.0; color: App.Theme.dark ? "#F20A0F17" : "#F2EEF3F8" }
-                GradientStop { position: 0.48; color: App.Theme.dark ? "#B80A0F17" : "#B8EEF3F8" }
-                GradientStop { position: 1.0; color: App.Theme.dark ? "#520A0F17" : "#60EEF3F8" }
-            }
-        }
-        Rectangle {
-            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-            height: parent.height * 0.38
-            gradient: Gradient {
-                GradientStop { position: 0.0; color: "#00000000" }
-                GradientStop { position: 1.0; color: App.Theme.dark ? "#F20A0F17" : "#F2EEF3F8" }
-            }
-        }
+        sources: page.selectedGameIndex >= 0 ? heroBackdrop.sourcesFor(page.selectedGame) : []
     }
 
+    // ---- Hero information and actions ------------------------------------
     ColumnLayout {
-        anchors.fill: parent
-        anchors.leftMargin: 70 * page.couchScale
-        anchors.rightMargin: 70 * page.couchScale
-        anchors.topMargin: 112 * page.couchScale
-        anchors.bottomMargin: 90 * page.couchScale
-        spacing: 12 * page.couchScale
+        id: heroColumn
+        objectName: "couchHomeHero"
+        anchors.left: parent.left
+        anchors.top: parent.top
+        anchors.leftMargin: page.contentLeft
+        anchors.topMargin: 112 * page.fitScale
+        width: Math.min(page.width * 0.56, 1080 * page.fitScale)
+        spacing: App.Theme.couchSpaceS * page.fitScale
 
-        ColumnLayout {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 116 * page.couchScale
-            spacing: 6 * page.couchScale
+        Row {
+            objectName: "couchHomeLauncherChip"
+            visible: page.selectedGameIndex >= 0
+                     && String(page.selectedGame.launcher || "").length > 0
+            spacing: App.Theme.couchSpaceS * page.fitScale
+            Rectangle {
+                anchors.verticalCenter: parent.verticalCenter
+                width: 38 * page.fitScale
+                height: width
+                radius: width / 2
+                color: Qt.rgba(App.Theme.surfaceRaised.r, App.Theme.surfaceRaised.g,
+                               App.Theme.surfaceRaised.b, 0.9)
+                border.width: 1
+                border.color: App.Theme.border
+                CouchIcon {
+                    objectName: "couchHomeLauncherIcon"
+                    readonly property url logo: App.UiIcons.launcherLogo(page.selectedGame.launcher)
+                    anchors.centerIn: parent
+                    size: App.Theme.couchIconSmall
+                    couchScale: page.fitScale
+                    source: String(logo).length ? logo : App.UiIcons.couchGlyphSource
+                    lightSource: String(logo).length ? logo : App.UiIcons.couchGlyphSourceOnLight
+                }
+            }
             Label {
-                objectName: "couchHomeHeroTitle"
-                Layout.fillWidth: true
-                text: String(page.selectedGame.name || qsTr("Your games"))
+                objectName: "couchHomeLauncherLabel"
+                anchors.verticalCenter: parent.verticalCenter
+                text: App.I18n.launcherName(page.selectedGame.launcher || "")
                 color: App.Theme.text
-                font.pixelSize: 46 * page.couchScale
-                font.weight: Font.Bold
-                elide: Text.ElideRight
-            }
-            Label {
-                Layout.fillWidth: true
-                text: page.selectedGameIndex >= 0
-                      ? qsTr("%1 · %2 · %3").arg(String(page.selectedGame.launcher || qsTr("Unknown"))).arg(String(page.selectedGame.status || qsTr("Unknown"))).arg(String(page.selectedGame.filesystem || qsTr("Unknown")))
-                      : qsTr("No games were detected")
-                color: App.Theme.textSecondary
-                font.pixelSize: 20 * page.couchScale
-                elide: Text.ElideRight
-            }
-            Label {
-                Layout.fillWidth: true
-                text: page.taskSummary()
-                color: App.Theme.accent
-                font.pixelSize: 16 * page.couchScale
+                font.pixelSize: 20 * page.fitScale
                 font.weight: Font.DemiBold
             }
         }
-
-        RowLayout {
+        Label {
+            objectName: "couchHomeHeroTitle"
             Layout.fillWidth: true
-            Layout.preferredHeight: 66 * page.couchScale
-            spacing: 14 * page.couchScale
+            text: String(page.selectedGame.name || qsTr("Your games"))
+            color: App.Theme.text
+            font.pixelSize: 56 * page.fitScale
+            font.weight: Font.Bold
+            lineHeight: 1.0
+            maximumLineCount: 2
+            wrapMode: Text.WordWrap
+            elide: Text.ElideRight
+        }
+        Label {
+            visible: page.selectedGameIndex < 0
+            Layout.fillWidth: true
+            text: qsTr("No games were detected")
+            color: App.Theme.textSecondary
+            font.pixelSize: 20 * page.fitScale
+        }
+        // Readiness: icon + colour + text, then runtime or the blocking reason.
+        Row {
+            id: readinessRow
+            objectName: "couchHomeReadiness"
+            readonly property string tone: page.readinessTone()
+            readonly property string text: page.readinessText()
+            visible: page.selectedGameIndex >= 0
+            spacing: App.Theme.couchSpaceS * page.fitScale
+            CouchIcon {
+                anchors.verticalCenter: parent.verticalCenter
+                size: App.Theme.couchIconSmall
+                couchScale: page.fitScale
+                source: readinessRow.tone === "success" ? App.UiIcons.couchGlyphStatusReady
+                        : readinessRow.tone === "danger" ? App.UiIcons.couchGlyphStatusError
+                        : App.UiIcons.couchGlyphStatusWarning
+                lightSource: readinessRow.tone === "success" ? App.UiIcons.couchGlyphStatusReadyOnLight
+                             : readinessRow.tone === "danger" ? App.UiIcons.couchGlyphStatusErrorOnLight
+                             : App.UiIcons.couchGlyphStatusWarningOnLight
+            }
+            Label {
+                anchors.verticalCenter: parent.verticalCenter
+                text: readinessRow.text
+                color: App.Theme.couchToneText(readinessRow.tone)
+                font.pixelSize: 20 * page.fitScale
+                font.weight: Font.Bold
+            }
+            Label {
+                visible: runtimeLabel.text.length > 0 || reasonLabel.text.length > 0
+                anchors.verticalCenter: parent.verticalCenter
+                text: "•"
+                color: App.Theme.textMuted
+                font.pixelSize: 20 * page.fitScale
+            }
+            Label {
+                id: runtimeLabel
+                objectName: "couchHomeRuntime"
+                visible: text.length > 0
+                anchors.verticalCenter: parent.verticalCenter
+                text: page.runtimeText()
+                color: App.Theme.textSecondary
+                font.pixelSize: 19 * page.fitScale
+            }
+            Label {
+                id: reasonLabel
+                objectName: "couchHomeReadinessReason"
+                visible: text.length > 0
+                anchors.verticalCenter: parent.verticalCenter
+                width: Math.min(implicitWidth, heroColumn.width * 0.6)
+                text: page.readinessReason()
+                color: App.Theme.textSecondary
+                font.pixelSize: 19 * page.fitScale
+                elide: Text.ElideRight
+            }
+        }
+
+        Row {
+            Layout.topMargin: App.Theme.couchSpaceL * page.fitScale
+            spacing: App.Theme.couchSpaceM * page.fitScale
             Repeater {
                 id: heroActionRepeater
                 model: page.heroActions
@@ -441,215 +567,259 @@ FocusScope {
                     objectName: "couchHomeHeroAction"
                     required property var modelData
                     required property int index
-                    couchScale: page.couchScale
+                    readonly property bool primaryAction: modelData.id === "launch"
+                    couchScale: page.fitScale
                     iconSource: modelData.icon || ""
+                    iconLightSource: modelData.iconOnLight || ""
+                    iconSize: App.Theme.couchIconSmall
                     text: modelData.title
                     enabled: modelData.enabled
                     focus: page.focusZone === 2 && page.selectedHeroAction === index
-                    implicitWidth: index === 0 ? 230 * page.couchScale : 205 * page.couchScale
-                    implicitHeight: 62 * page.couchScale
-                    font.pixelSize: 19 * page.couchScale
-                    font.weight: Font.Bold
+                    implicitWidth: primaryAction ? 232 * page.fitScale : 172 * page.fitScale
+                    implicitHeight: 58 * page.fitScale
+                    font.pixelSize: (primaryAction ? 21 : 18) * page.fitScale
+                    font.weight: primaryAction ? Font.Bold : Font.DemiBold
+                    font.capitalization: primaryAction ? Font.AllUppercase : Font.MixedCase
+                    font.letterSpacing: primaryAction ? 1.2 * page.fitScale : 0
                     onClicked: { page.selectedHeroAction = index; page.activateHeroAction() }
                     background: Rectangle {
-                        radius: 16 * page.couchScale
+                        radius: 14 * page.fitScale
                         color: heroButton.down ? App.Theme.surfacePressed
-                              : heroButton.activeFocus ? App.Theme.accent
-                              : App.Theme.surfaceRaised
-                        border.width: heroButton.activeFocus ? 4 * page.couchScale : 1
-                        border.color: heroButton.activeFocus ? "white" : App.Theme.borderStrong
-                        scale: heroButton.activeFocus ? 1.045 : 1.0
-                        Behavior on scale { NumberAnimation { duration: 140 } }
+                              : heroButton.primaryAction && heroButton.enabled ? App.Theme.accentSoft
+                              : heroButton.focusVisible ? App.Theme.couchFocusSurface
+                              : Qt.rgba(App.Theme.surfaceRaised.r, App.Theme.surfaceRaised.g,
+                                        App.Theme.surfaceRaised.b, 0.88)
+                        border.width: heroButton.primaryAction && heroButton.enabled ? 2 * page.fitScale : 1
+                        border.color: heroButton.primaryAction && heroButton.enabled
+                                      ? App.Theme.accent : App.Theme.borderStrong
+                        scale: heroButton.down ? App.Theme.couchPressScale
+                                               : heroButton.focusVisible ? 1.04 : 1.0
+                        Behavior on scale { NumberAnimation { duration: App.Theme.couchMotionDuration(150); easing.type: Easing.OutCubic } }
+                        Behavior on color { ColorAnimation { duration: App.Theme.couchFadeDuration(150) } }
+                        CouchFocusFrame {
+                            active: heroButton.focusVisible
+                            radius: parent.radius
+                            couchScale: page.fitScale
+                        }
                     }
                 }
             }
-            Item { Layout.fillWidth: true }
+        }
+    }
+
+    // ---- Carousel ------------------------------------------------------------
+    Item {
+        id: carouselArea
+        objectName: "couchHomeCarousel"
+        visible: gameStrip.count > 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: heroColumn.bottom
+        anchors.bottom: footerRow.top
+        anchors.topMargin: App.Theme.couchSpaceL * page.fitScale
+        anchors.leftMargin: page.edgeMargin
+        anchors.rightMargin: page.edgeMargin
+
+        CouchButton {
+            objectName: "couchHomePrevious"
+            visible: gameStrip.currentIndex > 0
+            anchors.left: parent.left
+            anchors.verticalCenter: gameStrip.verticalCenter
+            couchScale: page.fitScale
+            implicitWidth: page.arrowSize
+            implicitHeight: page.arrowSize
+            focusPolicy: Qt.NoFocus
+            iconSource: App.UiIcons.couchGlyphPrevious
+            iconLightSource: App.UiIcons.couchGlyphPreviousOnLight
+            iconSize: App.Theme.couchIconSmall
+            Accessible.name: qsTr("Previous game")
+            onClicked: page.selectGameIndex(gameStrip.currentIndex - 1)
+            background: Rectangle {
+                radius: height / 2
+                color: Qt.rgba(App.Theme.surfaceRaised.r, App.Theme.surfaceRaised.g, App.Theme.surfaceRaised.b, 0.86)
+                border.width: 1
+                border.color: App.Theme.border
+            }
+        }
+        CouchButton {
+            objectName: "couchHomeNext"
+            visible: gameStrip.currentIndex < gameStrip.count - 1
+            anchors.right: parent.right
+            anchors.verticalCenter: gameStrip.verticalCenter
+            couchScale: page.fitScale
+            implicitWidth: page.arrowSize
+            implicitHeight: page.arrowSize
+            focusPolicy: Qt.NoFocus
+            iconSource: App.UiIcons.couchGlyphNext
+            iconLightSource: App.UiIcons.couchGlyphNextOnLight
+            iconSize: App.Theme.couchIconSmall
+            Accessible.name: qsTr("Next game")
+            onClicked: page.selectGameIndex(gameStrip.currentIndex + 1)
+            background: Rectangle {
+                radius: height / 2
+                color: Qt.rgba(App.Theme.surfaceRaised.r, App.Theme.surfaceRaised.g, App.Theme.surfaceRaised.b, 0.86)
+                border.width: 1
+                border.color: App.Theme.border
+            }
         }
 
         ListView {
             id: gameStrip
             objectName: "couchGameStrip"
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            Layout.minimumHeight: 350 * page.couchScale
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: Math.min(page.stripWidth, parent.width - 2 * (page.arrowSize + page.arrowGap))
+            anchors.verticalCenter: parent.verticalCenter
+            height: Math.min(parent.height, page.cardHeight * 1.05 + 2 * page.cardPad)
+            // Exactly `fittedCards` whole covers fit; the edge pad keeps the
+            // scaled, ringed first/last card fully inside the view.
+            readonly property real availableWidth: width - 2 * page.cardPad
             orientation: ListView.Horizontal
-            spacing: 6 * page.couchScale
-            leftMargin: 18 * page.couchScale
-            rightMargin: 18 * page.couchScale
+            spacing: page.cardGap
+            leftMargin: page.cardPad
+            rightMargin: page.cardPad
             clip: true
-            visible: count > 0
             model: page.displayGames
             currentIndex: count > 0 ? 0 : -1
             onCountChanged: {
                 if (count === 0) currentIndex = -1
                 else Qt.callLater(page.restoreRetainedSelection)
             }
-            highlightMoveDuration: 150
-            preferredHighlightBegin: width * 0.07
-            preferredHighlightEnd: width * 0.74
+            highlightMoveDuration: App.Theme.couchMotionDuration(180)
+            highlightMoveVelocity: -1
+            preferredHighlightBegin: page.cardPad
+            preferredHighlightEnd: page.cardPad + (page.fittedCards - 1) * (page.cardWidth + page.cardGap) + page.cardWidth
             highlightRangeMode: ListView.ApplyRange
             boundsBehavior: Flickable.StopAtBounds
+            keyNavigationEnabled: false
 
             delegate: Item {
                 id: gameCell
                 required property var modelData
                 required property int index
-                width: 258 * page.couchScale
+                width: page.cardWidth
                 height: gameStrip.height
+                z: selected ? 2 : 1
                 readonly property bool selected: gameStrip.currentIndex === index
                 readonly property real probeCardWidth: gameCard.width * gameCard.scale
                 readonly property real probeCardHeight: gameCard.height * gameCard.scale
 
-                Rectangle {
-                    anchors.centerIn: gameCard
-                    width: gameCard.width + 18 * page.couchScale
-                    height: gameCard.height + 18 * page.couchScale
-                    radius: 25 * page.couchScale
-                    color: gameCell.selected ? Qt.rgba(App.Theme.accent.r, App.Theme.accent.g, App.Theme.accent.b, 0.24) : "transparent"
-                    visible: gameCell.selected
-                }
-                Button {
+                CouchGameCard {
                     id: gameCard
                     objectName: "couchHomeGameCard"
                     anchors.centerIn: parent
-                    width: 220 * page.couchScale
-                    height: 330 * page.couchScale
+                    width: page.cardWidth
+                    height: page.cardHeight
+                    couchScale: page.fitScale
+                    gameId: String(gameCell.modelData.id || "")
+                    title: String(gameCell.modelData.name || qsTr("Unknown game"))
+                    launcher: String(gameCell.modelData.launcher || "")
+                    launchable: gameCell.modelData.launchAllowed === true
+                    artworkSource: gameCell.modelData.portraitArtwork
+                                   || gameCell.modelData.effectiveArtworkUrl
+                                   || gameCell.modelData.fallbackArtwork
+                                   || gameCell.modelData.headerArtwork || ""
+                    selected: gameCell.selected
+                    carouselFocused: page.focusZone === 0 && !page.contextMenuOpen
                     focus: page.focusZone === 0 && gameCell.selected
-                    scale: gameCell.selected ? 1.13 : 0.98
-                    opacity: gameCell.selected ? 1.0 : 0.76
-                    z: gameCell.selected ? 2 : 1
                     onClicked: {
                         if (gameStrip.currentIndex === gameCell.index)
                             page.openGame(String(gameCell.modelData.id || ""))
                         else
                             page.selectGameIndex(gameCell.index)
                     }
-                    Behavior on scale { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
-                    Behavior on opacity { NumberAnimation { duration: 140 } }
-                    background: Rectangle {
-                        radius: 19 * page.couchScale
-                        clip: true
-                        color: App.Theme.surface
-                        border.width: gameCell.selected ? 4 * page.couchScale : 1
-                        border.color: gameCell.selected ? "white" : App.Theme.border
-                        GameArtwork {
-                            anchors.fill: parent
-                            gameId: String(gameCell.modelData.id || "")
-                            title: String(gameCell.modelData.name || "")
-                            launcher: String(gameCell.modelData.launcher || "Steam")
-                            artworkSource: gameCell.modelData.effectiveArtworkUrl
-                                           || gameCell.modelData.portraitArtwork
-                                           || gameCell.modelData.fallbackArtwork
-                                           || gameCell.modelData.headerArtwork || ""
-                            artworkFillMode: Image.PreserveAspectCrop
-                            cornerRadius: 19 * page.couchScale
-                        }
-                        Rectangle {
-                            anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-                            height: 70 * page.couchScale
-                            color: "#D80A0E14"
-                            Label {
-                                anchors.fill: parent
-                                anchors.margins: 11 * page.couchScale
-                                text: String(gameCell.modelData.name || qsTr("Unknown game"))
-                                color: "white"
-                                font.pixelSize: 16 * page.couchScale
-                                font.weight: Font.Bold
-                                maximumLineCount: 2
-                                wrapMode: Text.Wrap
-                                elide: Text.ElideRight
-                            }
-                        }
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 19 * page.couchScale
-                            color: "transparent"
-                            border.width: gameCell.selected ? 4 * page.couchScale : 1
-                            border.color: gameCell.selected ? "white" : App.Theme.border
-                            z: 5
-                        }
-                    }
                 }
             }
         }
+    }
+
+    Rectangle {
+        objectName: "couchHomeEmptyState"
+        visible: page.displayGames.length === 0
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: heroColumn.bottom
+        anchors.bottom: footerRow.top
+        anchors.margins: page.edgeMargin
+        radius: App.Theme.couchPanelRadius * page.fitScale
+        color: App.Theme.dark ? "#D5151D29" : "#EDFFFFFF"
+        border.width: 1
+        border.color: App.Theme.borderStrong
+        ColumnLayout {
+            anchors.centerIn: parent
+            width: Math.min(parent.width - 80 * page.fitScale, 720 * page.fitScale)
+            spacing: 12 * page.fitScale
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("No games found")
+                color: App.Theme.text
+                font.pixelSize: 30 * page.fitScale
+                font.weight: Font.Bold
+                horizontalAlignment: Text.AlignHCenter
+            }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Connect an available Steam library, then refresh the library from Desktop Mode.")
+                color: App.Theme.textSecondary
+                font.pixelSize: App.Theme.couchBodySize * page.fitScale
+                wrapMode: Text.WordWrap
+                horizontalAlignment: Text.AlignHCenter
+            }
+        }
+    }
+
+    // ---- Footer: real library position (hints from CouchMain sit at right) --
+    Item {
+        id: footerRow
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: bottomNav.top
+        anchors.bottomMargin: App.Theme.couchSpaceS * page.fitScale
+        height: 52 * page.fitScale
 
         Rectangle {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
-            visible: page.displayGames.length === 0
-            objectName: "couchHomeEmptyState"
-            radius: App.Theme.couchPanelRadius * page.couchScale
-            color: App.Theme.dark ? "#D5151D29" : "#EDFFFFFF"
-            border.width: 1
-            border.color: App.Theme.borderStrong
-
-            ColumnLayout {
-                anchors.centerIn: parent
-                width: Math.min(parent.width - 80 * page.couchScale,
-                                720 * page.couchScale)
-                spacing: 12 * page.couchScale
-                Label {
-                    Layout.fillWidth: true
-                    text: qsTr("No games found")
-                    color: App.Theme.text
-                    font.pixelSize: 30 * page.couchScale
-                    font.weight: Font.Bold
-                    horizontalAlignment: Text.AlignHCenter
-                }
-                Label {
-                    Layout.fillWidth: true
-                    text: qsTr("Connect an available Steam library, then refresh the library from Desktop Mode.")
-                    color: App.Theme.textSecondary
-                    font.pixelSize: App.Theme.couchBodySize * page.couchScale
-                    wrapMode: Text.WordWrap
-                    horizontalAlignment: Text.AlignHCenter
-                }
+            id: positionTrack
+            objectName: "couchHomePosition"
+            // A scroll position indicator, shown only when the library is wider
+            // than the visible covers: thumb = visible part, offset = position.
+            visible: gameStrip.count > 0 && gameStrip.contentWidth > gameStrip.width + 1
+            anchors.centerIn: parent
+            width: 200 * page.fitScale
+            height: 6 * page.fitScale
+            radius: height / 2
+            color: Qt.rgba(App.Theme.text.r, App.Theme.text.g, App.Theme.text.b, 0.16)
+            Rectangle {
+                readonly property real ratio: gameStrip.contentWidth > 0
+                                              ? Math.min(1, gameStrip.width / gameStrip.contentWidth) : 1
+                readonly property real progress: gameStrip.contentWidth > gameStrip.width
+                        ? Math.max(0, Math.min(1, (gameStrip.contentX - gameStrip.originX + gameStrip.leftMargin)
+                                                  / (gameStrip.contentWidth - gameStrip.width)))
+                        : 0
+                width: Math.max(parent.height * 3, parent.width * ratio)
+                height: parent.height
+                radius: parent.radius
+                x: (parent.width - width) * progress
+                color: App.Theme.accent
             }
         }
+    }
 
-        Rectangle {
-            objectName: "couchHomeNavigation"
-            Layout.fillWidth: true
-            Layout.preferredHeight: 68 * page.couchScale
-            radius: 18 * page.couchScale
-            color: App.Theme.dark ? "#B516202C" : "#C9FFFFFF"
-            border.width: 1
-            border.color: App.Theme.border
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 12 * page.couchScale
-                anchors.rightMargin: 12 * page.couchScale
-                spacing: 8 * page.couchScale
-                Repeater {
-                    id: tileRepeater
-                    model: page.homeTiles
-                    delegate: CouchButton {
-                        id: navigationButton
-                        objectName: "couchHomeTile"
-                        required property var modelData
-                        required property int index
-                        couchScale: page.couchScale
-                        Layout.fillWidth: true
-                        Layout.fillHeight: true
-                        iconSource: modelData.icon || ""
-                        iconSize: App.Theme.couchIconSizeNav
-                        text: modelData.title
-                        focus: page.focusZone === 1 && page.selectedTile === index
-                        font.pixelSize: 18 * page.couchScale
-                        font.weight: Font.DemiBold
-                        onClicked: { page.selectedTile = index; page.activateTile() }
-                        background: Rectangle {
-                            radius: 13 * page.couchScale
-                            color: navigationButton.activeFocus ? App.Theme.surfaceSelected : "transparent"
-                            border.width: navigationButton.activeFocus ? 4 * page.couchScale : 0
-                            border.color: navigationButton.activeFocus ? App.Theme.accent : "transparent"
-                            scale: navigationButton.activeFocus ? 1.035 : 1.0
-                            Behavior on scale { NumberAnimation { duration: 140 } }
-                        }
-                    }
-                }
-            }
-        }
+    // ---- Global section navigation ---------------------------------------------
+    CouchBottomNav {
+        id: bottomNav
+        objectName: "couchHomeNavigation"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.leftMargin: page.edgeMargin
+        anchors.rightMargin: page.edgeMargin
+        anchors.bottomMargin: page.bottomNavMargin
+        height: implicitHeight
+        couchScale: page.fitScale
+        model: page.homeTiles
+        activeIndex: 0
+        currentIndex: page.selectedTile
+        navFocused: page.focusZone === 1 && !page.contextMenuOpen
+        onActivated: function(index) { page.selectedTile = index; page.activateTile() }
     }
 
     CouchOverlayFrame {
@@ -695,6 +865,7 @@ FocusScope {
                         text: modelData.title
                         enabled: modelData.enabled
                         primary: modelData.id === "launch"
+                        showChevron: true
                         focus: page.contextMenuOpen
                                && page.contextMenuIndex === index
                         onClicked: {

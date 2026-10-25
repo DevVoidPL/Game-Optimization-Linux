@@ -245,6 +245,10 @@ def run(argv: Sequence[str] | None = None) -> int:
         context.setContextProperty("appController", controller)
         context.setContextProperty("translationManager", translation_manager)
         context.setContextProperty(
+            "gameOptiDeveloperUi",
+            os.environ.get("GAMEOPTI_DEVELOPER_UI", "").strip() == "1",
+        )
+        context.setContextProperty(
             "gameOptimizationDebugArtwork",
             os.environ.get("GAME_OPTIMIZATION_DEBUG_ARTWORK", "").strip() == "1",
         )

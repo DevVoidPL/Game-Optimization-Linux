@@ -19,12 +19,15 @@ from .config import STATE_DIR
 from .models import validate_game_key
 from .services.optimization_profiles import GameOptimizationProfileRepository
 from .services.optimization_runtime import OptimizationLaunchPlanner, RuntimeToolDetector
+from .services.post_processing import optional_launch_environment
+from .services.frame_generation import launch_settings as frame_generation_launch, load_profile as frame_generation_profile
 from .services.mangohud import MangoHudProfileRepository
 from .services.optiscaler import OptiScalerError, OptiScalerProfileRepository
 from .services.proton_tweaks import ProtonTweaksError, ProtonTweaksRepository
 from .services.host_service import HostServiceClient
 from .services.host_bootstrap import host_home_directory
 from .services.performance_session import BaselineSessionRepository
+from .services.gpu_memory import pressure_environment, launch_prefix as gpu_memory_prefix
 
 
 _STEAM_ENV_FILE = "GAME_OPTIMIZATION_STEAM_ENV_FILE"
@@ -305,6 +308,8 @@ def _shell_assignment(name: str, value: str) -> list[str]:
 def _host_launcher_payload(
     plan: object,
     environment_overrides: Mapping[str, str],
+    post_processing_log: Path | None = None,
+    gpu_prefix: Sequence[str] = (),
 ) -> bytes:
     command = [str(value) for value in getattr(plan, "command")]
     steam_command = tuple(str(value) for value in getattr(plan, "steam_command"))
@@ -314,8 +319,15 @@ def _host_launcher_payload(
         or tuple(command[-len(steam_command):]) != steam_command
     ):
         raise ValueError("the launch plan does not preserve the Steam command suffix")
-    prefix = command[:-len(steam_command)]
+    prefix = [*gpu_prefix, *command[:-len(steam_command)]]
     lines = ["#!/bin/sh", "set -eu"]
+    if post_processing_log is not None:
+        # Upstream vkBasalt truncates its file in every inherited helper.
+        # Open one private session stream in the parent and inherit stderr.
+        lines.extend(["umask 077", f"exec 2>{shlex.quote(str(post_processing_log))}"])
+        if environment_overrides.get("ENABLE_VKBASALT") == "1" or "VKBASALT_LOG_FILE" in environment_overrides:
+            environment_overrides = {**environment_overrides, "VKBASALT_LOG_FILE": "stderr"}
+            prefix = ["VKBASALT_LOG_FILE=stderr" if arg.startswith("VKBASALT_LOG_FILE=") else arg for arg in prefix]
     for key, value in sorted(environment_overrides.items()):
         lines.extend(_shell_assignment(str(key), str(value)))
     for key in getattr(plan, "wrapper_environment_removed"):
@@ -529,12 +541,22 @@ def main(
         measurement_environment: dict[str, str] = {}
         if baseline_session is not None:
             measurement_environment = sessions.environment(baseline_session)
+        fg_environment, fg_prefix = frame_generation_launch(app_id, profiles.root,
+            inherited={**steam_environment, **proton_environment}, gamescope=profile.gamescope_enabled and profile.gamescope_mode != "disabled" and gamescope.available)
         plan = OptimizationLaunchPlanner().build(
             profile, game_argv, gamemode=gamemode, gamescope=gamescope,
             mangohud_fps_limit=(
-                None if baseline_session is not None else mangohud_profile.fps_limit
+                None
+                if baseline_session is not None
+                or (profile.gamescope_enabled and profile.gamescope_mode != "disabled"
+                    and profile.target_fps_mode != "unlimited")
+                else mangohud_profile.fps_limit
             ),
             optiscaler_override=optiscaler_override,
+            post_processing_environment=optional_launch_environment(app_id, profiles.root),
+            frame_generation_environment=fg_environment,
+            frame_generation_prefix=fg_prefix,
+            gpu_memory_environment=pressure_environment(app_id, profiles.root, {**steam_environment, **proton_environment}, game_argv),
             existing_wine_overrides=steam_environment.get("WINEDLLOVERRIDES", ""),
             proton_environment=proton_environment,
             existing_environment=steam_environment,
@@ -542,6 +564,15 @@ def main(
                 "measurement_session" if baseline_session else mangohud_activation_owner
             ),
             measurement_environment=measurement_environment,
+            # With --mangoapp the generated per-game MangoHud profile is still
+            # the configuration MangoHud reads.
+            mangohud_config_path=(
+                mango_profiles.config_path(app_id)
+                if mangohud_profile.enabled and mango_profiles.config_path(app_id).is_file()
+                else ""
+            ),
+            # Steam games run inside the Steam Linux Runtime container.
+            gamemode_preload_client=True,
         )
         print(
             f"game-optimization-run: LaunchPlan AppID={app_id} Steam command: "
@@ -621,6 +652,26 @@ def main(
             ),
             "baselineCompletionReceived": False,
         }
+        post_processing_log = None
+        if plan.environment.get("ENABLE_VKBASALT") == "1" and host_launch_directory is not None:
+            config_path = Path(plan.environment.get("VKBASALT_CONFIG_FILE", ""))
+            if config_path.is_absolute() and config_path.parent.name == ".gameopti-post-processing" and config_path.is_file():
+                post_processing_log = config_path.parent / f"vkBasalt-session-{uuid4().hex}.log"
+                report["postProcessingLog"] = str(post_processing_log)
+                report["postProcessingLogTransport"] = "inherited_stderr"
+                report["environmentOverridesShell"] = shlex.join(
+                    f"{key}={value}" for key, value in sorted({**plan.environment, "VKBASALT_LOG_FILE": "stderr"}.items()))
+        if fg_environment and (fg_environment.get("AFMF_ENABLE") == "1" or fg_environment.get("ENABLE_MAKO") == "1" or fg_environment.get("LSFGVK_CONFIG")):
+            fg_directory = profiles.root / app_id / "frame-generation"
+            fg_directory.mkdir(parents=True, exist_ok=True)
+            # Reuse the existing stderr transport without losing vkBasalt's log.
+            if post_processing_log is None:
+                post_processing_log = fg_directory / f"session-{uuid4().hex}.log"
+            report["frameGenerationLog"] = str(post_processing_log)
+            report["frameGenerationRuntimeVerified"] = False
+            fg_profile = frame_generation_profile(app_id, profiles.root)
+            report["frameGenerationBackend"] = fg_profile["backend"]
+            report["frameGenerationConfiguredAt"] = fg_profile.get("configuredAt", "")
         _write_report(app_id, report, report_root or STATE_DIR / "launch-reports")
         if plan_only:
             if baseline_session is not None:
@@ -651,7 +702,13 @@ def main(
             ):
                 if key in steam_environment:
                     launch_environment[key] = steam_environment[key]
-            launcher = _host_launcher_payload(plan, launch_environment)
+            metrics = baseline_session.directory / "gpu-memory.jsonl" if baseline_session else None
+            gpu_prefix = gpu_memory_prefix(app_id, profiles.root, metrics=metrics)
+            report["gpuMemoryWrapper"] = gpu_prefix
+            if metrics:
+                report["gpuMemoryMetrics"] = str(metrics)
+            _write_report(app_id, report, report_root or STATE_DIR / "launch-reports")
+            launcher = _host_launcher_payload(plan, launch_environment, post_processing_log, gpu_prefix)
             _atomic_protocol_write(
                 host_launch_directory,
                 "launcher",
@@ -669,9 +726,14 @@ def main(
                 command_name=Path(plan.command[0]).name,
             )
         else:
+            if post_processing_log is not None:
+                # Native runner uses exec/Popen rather than the host bridge.
+                descriptor = os.open(post_processing_log, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                os.dup2(descriptor, 2)
+                os.close(descriptor)
             if baseline_session is not None:
                 process = subprocess.Popen(
-                    plan.command,
+                    [*gpu_memory_prefix(app_id, profiles.root, metrics=baseline_session.directory / "gpu-memory.jsonl"), *plan.command],
                     stdin=subprocess.DEVNULL,
                     shell=False,
                     env=process_environment,
@@ -713,7 +775,9 @@ def main(
                     baseline_session.runner_token,
                 )
             else:
-                result = os.execvpe(plan.executable, plan.command, process_environment)
+                gpu_prefix = gpu_memory_prefix(app_id, profiles.root)
+                full_command = [*gpu_prefix, *plan.command]
+                result = os.execvpe(full_command[0], full_command, process_environment)
         exit_code = int(result) if isinstance(result, int) else 0
         if baseline_session is not None:
             finished = sessions.finish(

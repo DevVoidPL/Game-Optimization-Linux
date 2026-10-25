@@ -90,8 +90,8 @@ SurfaceCard {
                                  ? qsTr("No") : qsTr("Unknown")))
                 color: App.Theme.text
             }
-            Label { text: qsTr("FSR"); color: App.Theme.textMuted }
-            Label { Layout.fillWidth: true; text: String(card.statusData.fidelityFxUpscalerVersion || card.statusData.availableFidelityFxUpscalerVersion || qsTr("Unknown")); color: App.Theme.text }
+            Label { text: qsTr("Installed FSR"); color: App.Theme.textMuted }
+            Label { Layout.fillWidth: true; text: String(card.statusData.fidelityFxUpscalerVersion || qsTr("None")); color: App.Theme.text }
             Label { text: qsTr("Configured"); color: App.Theme.textMuted }
             Label { Layout.fillWidth: true; text: card.configuredLabel(); color: App.Theme.text }
         }
@@ -99,7 +99,7 @@ SurfaceCard {
         Label {
             Layout.fillWidth: true
             visible: String(card.statusData.refreshError || card.statusData.operationError || "").length > 0
-            text: String(card.statusData.refreshError || card.statusData.operationError || "")
+            text: App.I18n.message(String(card.statusData.refreshError || card.statusData.operationError || ""))
             color: App.Theme.warning
             wrapMode: Text.WordWrap
         }

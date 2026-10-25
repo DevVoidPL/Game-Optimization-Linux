@@ -200,39 +200,54 @@ class UpdatesController:
         self._app._reload_updates()
         return True
 
-    def clearFinishedUpdates(self) -> int:
-        """Hide completed/error rows while preserving actionable active work."""
-
-        removable_statuses = {
+    _FINISHED_UPDATE_STATUSES = frozenset(
+        {
             GameUpdateStatus.INVENTORY.value,
             GameUpdateStatus.UP_TO_DATE.value,
             GameUpdateStatus.IGNORED.value,
             GameUpdateStatus.ERROR.value,
         }
-        rows = [
+    )
+
+    def _finished_update_rows(
+        self, rows: Sequence[Mapping[str, Any]] | None = None
+    ) -> list[Mapping[str, Any]]:
+        """Rows "Clear finished" hides: results and errors, never pending work."""
+
+        return [
             row
-            for row in self._app._updates
+            for row in (self._app._updates if rows is None else rows)
             if row.get("canDismiss") is True
             and (
                 row.get("sectionKey") == "recently_optimized"
-                or str(row.get("updateStatus", "")) in removable_statuses
+                or str(row.get("updateStatus", "")) in self._FINISHED_UPDATE_STATUSES
             )
         ]
-        return self._app._dismiss_update_rows(rows)
 
-    def clearUnavailableUpdates(self) -> int:
-        """Hide rows belonging to disconnected or already forgotten games."""
+    def _unavailable_update_rows(
+        self, rows: Sequence[Mapping[str, Any]] | None = None
+    ) -> list[Mapping[str, Any]]:
+        """Rows "Clear unavailable" hides: disconnected or forgotten games."""
 
-        rows = [
+        return [
             row
-            for row in self._app._updates
+            for row in (self._app._updates if rows is None else rows)
             if row.get("canDismiss") is True
             and (
                 row.get("libraryAvailable") is False
                 or str(row.get("gameId", "")) not in self._app._domain_games
             )
         ]
-        return self._app._dismiss_update_rows(rows)
+
+    def clearFinishedUpdates(self) -> int:
+        """Hide completed/error rows while preserving actionable active work."""
+
+        return self._app._dismiss_update_rows(self._finished_update_rows())
+
+    def clearUnavailableUpdates(self) -> int:
+        """Hide rows belonging to disconnected or already forgotten games."""
+
+        return self._app._dismiss_update_rows(self._unavailable_update_rows())
 
     def clearHiddenUpdatesHistory(self) -> int:
         """Forget presentation tombstones so hidden events may be shown again."""
@@ -398,8 +413,11 @@ class UpdatesController:
             ),
             "updatedAt": record.updated_at.isoformat(),
             "buildId": str(observation.build_id or "") if observation else "",
+            # Used only by the manual "Compress changed files" action, so it is
+            # the manual default. Unattended work reads
+            # automatic_compression_profile directly (_start_automatic_compression).
             "recommendedProfile": (
-                self._app._settings_model.automatic_compression_profile.value
+                self._app._settings_model.default_compression_profile.value
             ),
             "error": _display_text(record.last_error),
             "ignored": record.status is GameUpdateStatus.IGNORED,
@@ -546,6 +564,10 @@ class UpdatesController:
             "queuedCount": int(pending_count),
             "recentlyOptimizedCount": len(history_rows),
             "recentRecoveredBytes": int(recovered_bytes),
+            # Exactly what the bulk clear actions would hide right now, so the
+            # page can disable them instead of silently doing nothing.
+            "finishedClearableCount": len(self._finished_update_rows()),
+            "unavailableClearableCount": len(self._unavailable_update_rows()),
         }
         self._app._updates_dirty = False
         if emit_signal:
@@ -704,6 +726,12 @@ class UpdatesController:
             ):
                 continue
             game = self._app._domain_games.get(record.game_id)
+            if self._automatic_event_already_handled(record, game):
+                # Automatic compression was already queued for this exact
+                # update event. A warning, failure or cancellation leaves the
+                # record in "analysis required"; never compress it again
+                # unattended. A new build/change is a new event.
+                continue
             if (
                 game is None
                 or not self._app._game_actions_allowed(game)
@@ -743,6 +771,14 @@ class UpdatesController:
             # Analysis and compression share one bounded queue.  Waiting for
             # its result prevents a second game from being staged as a writer.
             available_slots -= 1
+
+    def _automatic_event_already_handled(
+        self, record: GameUpdateRecord, game: Game | None
+    ) -> bool:
+        identity = self._app._update_event_identity(record, game)
+        persisted = str(getattr(record, "automatic_attempt_event", "") or "")
+        in_memory = self._app._automatic_handled_events.get(record.game_id, "")
+        return identity in {persisted, in_memory} - {""}
 
     def _start_automatic_compression(self, record: GameUpdateRecord) -> bool:
         game = self._app._domain_games.get(record.game_id)

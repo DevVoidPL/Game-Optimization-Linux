@@ -2,12 +2,17 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import "../components"
+import "../dialogs"
 import ".." as App
 
 Item {
     id: page
+    readonly property bool developerUi: typeof gameOptiDeveloperUi !== "undefined" && gameOptiDeveloperUi === true
+    property bool lastTextExpanded: false
+    property bool componentsExpanded: false
 
     property var controller
     property var gamesData: controller && controller.games ? controller.games : []
@@ -27,6 +32,10 @@ Item {
     property string ttsProviderId: ""
     property string voiceId: ""
     property var voices: []
+    // Shared global setting, also edited in Couch mode settings.
+    property bool readSpeakerNames: false
+    property string expandedVoiceLicenseId: ""
+    property string customVoiceError: ""
     property real narratorVolume: 0.85
     property real speechRate: 1.0
     // Advanced articulation overrides. When articulationOverridden is false the
@@ -41,6 +50,10 @@ Item {
     property real cropWidth: 0.90
     property real cropHeight: 0.30
     property bool advancedRegionVisible: false
+    // App-wide Narrator OCR mode from settings.json ("automatic" / "classic").
+    readonly property string ocrMode: controller && controller.settings
+                                      && controller.settings.narratorOcrMode
+                                      ? String(controller.settings.narratorOcrMode) : "automatic"
     property bool regionPreviewLoading: false
     property string regionPreviewError: ""
     property url regionPreviewSource: ""
@@ -162,6 +175,7 @@ Item {
         ttsProviderId = String(value(settings, ["tts_provider_id", "ttsProviderId"], ""))
         voiceId = String(value(settings, ["voice_id", "voiceId"], ""))
         voices = value(settings, ["voices"], []) || []
+        readSpeakerNames = Boolean(value(settings, ["readSpeakerNames", "read_speaker_names"], false))
         narratorVolume = Number(value(settings, ["volume"], 0.85))
         speechRate = Number(value(settings, ["speech_rate", "speechRate"], 1.0))
         // A null/absent value means the voice's own articulation is in use.
@@ -208,9 +222,8 @@ Item {
         if (!selectedGameId.length || !controller
                 || typeof controller.saveNarratorGameSettings !== "function")
             return false
-        var saved = Boolean(controller.saveNarratorGameSettings(
-                                selectedGameId, settingsPayload()))
-        return saved
+        return Boolean(controller.saveNarratorGameSettings(
+                            selectedGameId, settingsPayload()))
     }
 
     function refreshSession() {
@@ -278,6 +291,8 @@ Item {
             regionPreviewSourceHeight = Number(value(values, ["sourceHeight"], 0))
             return
         }
+        if (state === "cancelled" || state === "stopped")
+            regionPreviewLoading = false
         if (!Boolean(value(values, ["success"], true))) {
             regionPreviewLoading = false
             regionPreviewError = String(value(
@@ -295,8 +310,16 @@ Item {
         cropY = Number(value(region, ["y"], cropY))
         cropWidth = Number(value(region, ["width"], cropWidth))
         cropHeight = Number(value(region, ["height"], cropHeight))
+        regionPreviewLoading = false
         regionPreviewError = ""
         refreshSession()
+    }
+
+    function componentRequired(component) {
+        var id = String(value(component, ["componentId", "component_id"], ""))
+        return id === "capture.portal-pipewire" || id === "audio.qt-pcm"
+               || id === (subtitleLanguageMode === "polish" ? "ocr.polish-local" : "ocr.english-local")
+               || (subtitleLanguageMode !== "polish" && id === "translation.opus-en-pl")
     }
 
     function requiredComponentsReady() {
@@ -373,6 +396,149 @@ Item {
         runComponentAction(component)
     }
 
+    // Voices are managed in "Voice and translation"; the optional component
+    // list keeps capture, OCR, translation and audio only.
+    function nonVoiceComponents() {
+        var result = []
+        var source = componentsData || []
+        for (var i = 0; i < source.length; ++i) {
+            if (String(value(source[i], ["kind"], "")) !== "tts")
+                result.push(source[i])
+        }
+        return result
+    }
+
+    function voiceState(voice) {
+        return String(value(voice, ["componentState"], ""))
+    }
+
+    function voiceStatusLabel(voice) {
+        var state = voiceState(voice)
+        if (state === "installing")
+            return qsTr("Downloading")
+        if (Boolean(value(voice, ["installed"], false)))
+            return qsTr("Installed")
+        return qsTr("Download %1").arg(formatBytes(value(voice, ["downloadSizeBytes"], null)))
+    }
+
+    function selectVoice(voice) {
+        if (sessionActive)
+            return
+        voiceId = String(value(voice, ["id"], ""))
+    }
+
+    function downloadVoice(voice) {
+        if (sessionActive)
+            return
+        voiceId = String(value(voice, ["id"], ""))
+        installSelectedVoice()
+    }
+
+    function removeVoice(voice) {
+        if (sessionActive || !controller)
+            return
+        var voiceIdentifier = String(value(voice, ["id"], ""))
+        if (voiceIdentifier === voiceId)
+            return
+        if (Boolean(value(voice, ["custom"], false))) {
+            if (typeof controller.removeNarratorCustomVoice === "function")
+                controller.removeNarratorCustomVoice(voiceIdentifier)
+            return
+        }
+        if (typeof controller.removeNarratorComponent === "function")
+            controller.removeNarratorComponent(
+                        String(value(voice, ["componentId", "component_id"], "")))
+    }
+
+    function customVoiceErrorText(code, detail) {
+        if (code === "missing_config")
+            return qsTr("The configuration file %1 was not found next to the model. Place the .onnx.json file with the same name next to the .onnx file.").arg(detail)
+        if (code === "config_invalid_json")
+            return qsTr("The voice configuration file is not valid JSON.")
+        if (code === "config_unreadable")
+            return qsTr("The voice configuration file could not be read.")
+        if (code === "config_not_piper")
+            return qsTr("The voice configuration is not a Piper voice.")
+        if (code === "already_exists")
+            return qsTr("A custom voice named %1 already exists.").arg(detail)
+        if (code === "copy_failed")
+            return qsTr("The voice files could not be copied.")
+        if (code === "session_active")
+            return qsTr("Stop the narrator before adding a voice.")
+        return qsTr("Choose a Piper voice model file (.onnx).")
+    }
+
+    function voiceLabel(voice) {
+        var name = String(value(voice, ["name", "id"], ""))
+        return Boolean(value(voice, ["custom"], false))
+                ? qsTr("Custom: %1").arg(name) : name
+    }
+
+    // Copies a user .onnx + .onnx.json pair; a non-Polish voice needs an
+    // explicit confirmation before it is imported.
+    function importCustomVoice(fileUrl, allowOtherLanguage) {
+        customVoiceError = ""
+        if (sessionActive || !controller
+                || typeof controller.importNarratorCustomVoice !== "function")
+            return
+        var result = controller.importNarratorCustomVoice(String(fileUrl), Boolean(allowOtherLanguage)) || {}
+        if (Boolean(value(result, ["needsLanguageConfirmation"], false))) {
+            customVoiceLanguageDialog.ask(
+                        qsTr("Voice is not Polish"),
+                        qsTr("This voice is for language \"%1\", not Polish. Import it anyway?")
+                            .arg(String(value(result, ["language"], "?"))),
+                        qsTr("Import"), false, String(fileUrl))
+            return
+        }
+        if (!Boolean(value(result, ["success"], false))) {
+            customVoiceError = customVoiceErrorText(
+                        String(value(result, ["errorCode"], "")),
+                        String(value(result, ["errorDetail"], "")))
+            return
+        }
+        voiceId = String(value(result, ["voiceId"], voiceId))
+        if (typeof controller.showToast === "function")
+            controller.showToast(qsTr("Custom voice added. You are responsible for its license."), "warning")
+    }
+
+    // The per-game switch is the autostart decision, so it is saved at once
+    // (only this field) instead of waiting for "Save settings".
+    function setNarratorEnabled(enabled) {
+        if (!selectedGameId.length || !controller
+                || typeof controller.saveNarratorGameSettings !== "function") {
+            narratorEnabled = !enabled
+            return
+        }
+        controller.saveNarratorGameSettings(selectedGameId, { "enabled": enabled })
+        // Show the value that was really saved (unchanged if saving failed).
+        refreshSession()
+        syncNarratorEnabled()
+    }
+
+    // The session state carries the saved switch; it is cheap to read on
+    // every narratorChanged (also when Couch mode changes it).
+    function syncNarratorEnabled() {
+        if (sessionData && typeof sessionData.enabled === "boolean")
+            narratorEnabled = sessionData.enabled
+    }
+
+    function cardStateText() {
+        var state = String(value(sessionData, ["cardState"], ""))
+        if (state === "error")
+            return qsTr("Error")
+        if (state === "running" && sessionStatus !== "listening" && sessionStatus !== "ocr"
+                && sessionStatus !== "translating" && sessionStatus !== "speaking")
+            return sessionLabel(sessionStatus)
+        return App.I18n.narratorState(sessionData).text
+    }
+
+    function setReadSpeakerNames(enabled) {
+        if (!controller || typeof controller.saveNarratorGlobalSettings !== "function")
+            return
+        if (controller.saveNarratorGlobalSettings({ "readSpeakerNames": enabled }))
+            readSpeakerNames = enabled
+    }
+
     function translationProfileLabels(options) {
         var labels = []
         for (var i = 0; i < (options || []).length; ++i) {
@@ -401,6 +567,8 @@ Item {
             return qsTr("Local Polish voice") + " - Gosia"
         if (componentId === "tts.polish-bass")
             return qsTr("Local Polish voice") + " - Bass"
+        if (componentId === "tts.polish-darkman")
+            return qsTr("Local Polish voice") + " - Darkman"
         if (componentId === "audio.qt-pcm")
             return qsTr("PCM audio output")
         return String(value(component, ["name"], componentId))
@@ -702,8 +870,11 @@ Item {
         ignoreUnknownSignals: true
 
         function onNarratorChanged(gameId) {
-            if (!gameId || String(gameId) === page.selectedGameId)
+            if (!gameId || String(gameId) === page.selectedGameId) {
                 page.refreshSession()
+                // The switch may also be changed in Couch mode.
+                page.syncNarratorEnabled()
+            }
         }
 
         function onNarratorComponentsChanged() {
@@ -720,9 +891,65 @@ Item {
         }
     }
 
+    // Fixed action bar: session status and start/stop stay visible while the
+    // settings below scroll.
+    Rectangle {
+        id: actionBar
+        objectName: "narratorActionBar"
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.top: parent.top
+        implicitHeight: actionBarRow.implicitHeight + 20
+        height: implicitHeight
+        color: App.Theme.backgroundElevated
+        z: 1
+
+        RowLayout {
+            id: actionBarRow
+            anchors.fill: parent
+            anchors.leftMargin: App.Theme.contentPadding
+            anchors.rightMargin: App.Theme.contentPadding
+            anchors.topMargin: 10
+            anchors.bottomMargin: 10
+            spacing: 12
+
+            StatusBadge {
+                objectName: "narratorActionBarStatus"
+                text: page.sessionLabel(page.sessionStatus)
+                status: page.sessionTone(page.sessionStatus)
+            }
+
+            Label {
+                Layout.fillWidth: true
+                text: String(page.value(page.sessionData, ["message"], ""))
+                color: App.Theme.textSecondary
+                font.pixelSize: App.Theme.fontCaption
+                elide: Text.ElideRight
+            }
+
+            AppButton {
+                objectName: "narratorStartStop"
+                text: page.sessionActive ? qsTr("Stop narrator")
+                      : page.sessionData.cardState === "error" ? qsTr("Retry") : qsTr("Start narrator")
+                kind: page.sessionActive ? "danger" : "primary"
+                enabled: page.sessionActive
+                         || (page.selectedGameId.length > 0
+                             && page.narratorEnabled
+                             && page.componentsReady
+                             && page.selectedVoiceReady)
+                toolTip: enabled ? "" : qsTr("Enable the narrator and install all required local narrator components first")
+                onClicked: page.sessionActive
+                           ? page.stopNarrator() : page.startNarrator()
+            }
+        }
+    }
+
     ScrollView {
         id: scroll
-        anchors.fill: parent
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.top: actionBar.bottom
         contentWidth: availableWidth
         ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
         ScrollBar.vertical.policy: ScrollBar.AsNeeded
@@ -764,7 +991,7 @@ Item {
 
                     Label {
                         Layout.fillWidth: true
-                        text: qsTr("Narrator settings are stored separately for each game. Models and voices are shared between games.")
+                        text: qsTr("These are global Narrator defaults. Subtitle capture regions remain specific to each game.")
                         color: App.Theme.textSecondary
                         font.pixelSize: App.Theme.fontCaption
                         wrapMode: Text.WordWrap
@@ -804,10 +1031,14 @@ Item {
                 rowSpacing: App.Theme.spacingLarge
 
                 SurfaceCard {
+                    objectName: "narratorSessionCard"
+                    // Natural height, top aligned: stretching it to the taller
+                    // voice card only spread its rows apart.
                     Layout.fillWidth: narratorSettingsGrid.columns === 1
-                    Layout.fillHeight: true
+                    Layout.alignment: Qt.AlignTop
                     Layout.minimumWidth: narratorSettingsGrid.columns === 2 ? 320 : 0
                     Layout.preferredWidth: narratorSettingsGrid.columns === 2 ? 340 : -1
+                    Layout.maximumWidth: narratorSettingsGrid.columns === 2 ? 340 : Number.POSITIVE_INFINITY
                     padding: 20
 
                     contentItem: ColumnLayout {
@@ -839,12 +1070,53 @@ Item {
                                 }
 
                                 AppSwitch {
+                                    objectName: "narratorEnabledSwitch"
                                     checked: page.narratorEnabled
-                                    enabled: page.selectedGameId.length > 0 && !page.sessionActive
-                                    onToggled: page.narratorEnabled = checked
+                                    // Saved immediately; switching it off also stops
+                                    // a running session of this game.
+                                    enabled: page.selectedGameId.length > 0
+                                    onToggled: page.setNarratorEnabled(checked)
                                 }
                             }
 
+                            // Honest state: does the Narrator really start?
+                            // The badge is a single line: long details (errors)
+                            // go to the wrapping label below so they stay inside
+                            // the card.
+                            StatusBadge {
+                                objectName: "narratorCardState"
+                                Layout.maximumWidth: parent.width
+                                visible: page.selectedGameId.length > 0
+                                text: page.cardStateText()
+                                status: {
+                                    var tone = App.I18n.narratorState(page.sessionData).tone
+                                    return tone === "success" ? "available" : tone === "danger" ? "failed"
+                                         : tone === "warning" ? "warning" : "paused"
+                                }
+                            }
+                            Label {
+                                objectName: "narratorCardError"
+                                Layout.fillWidth: true
+                                visible: page.selectedGameId.length > 0
+                                         && page.sessionData.cardState === "error"
+                                text: App.I18n.message(String(page.value(page.sessionData, ["message"], "")))
+                                      || qsTr("Unknown")
+                                color: App.Theme.danger
+                                font.pixelSize: App.Theme.fontCaption
+                                wrapMode: Text.Wrap
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                visible: page.selectedGameId.length > 0
+                                         && (page.sessionData.captureGrantSaved === false
+                                             || page.sessionData.captureGrantStale === true)
+                                text: page.sessionData.captureGrantStale === true
+                                      ? qsTr("Requires choosing the window again")
+                                      : qsTr("The first start asks you to choose the game window once; it is remembered")
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                                wrapMode: Text.WordWrap
+                            }
                             Label {
                                 Layout.fillWidth: true
                                 text: qsTr("The session processes subtitles only while the selected game is running")
@@ -998,16 +1270,167 @@ Item {
                             font.pixelSize: App.Theme.fontCaption
                         }
 
-                        AppComboBox {
-                            property var values: page.optionIds(page.voices)
+                        ColumnLayout {
+                            objectName: "narratorVoiceList"
                             Layout.fillWidth: true
-                            model: page.optionLabels(page.voices)
-                            currentIndex: page.indexOfValue(values, page.voiceId, 0)
-                            enabled: values.length > 0 && !page.sessionActive
-                            onActivated: function(index) {
-                                if (index >= 0 && index < values.length)
-                                    page.voiceId = values[index]
+                            spacing: 6
+
+                            Repeater {
+                                model: page.voices || []
+
+                                delegate: Rectangle {
+                                    id: voiceRow
+                                    required property var modelData
+                                    readonly property string voiceIdentifier: String(page.value(modelData, ["id"], ""))
+                                    readonly property bool selected: voiceIdentifier === page.voiceId
+                                    readonly property bool installed: Boolean(page.value(modelData, ["installed"], false))
+                                    readonly property bool installing: page.voiceState(modelData) === "installing"
+                                    readonly property bool licenseExpanded: page.expandedVoiceLicenseId === voiceIdentifier
+                                    Layout.fillWidth: true
+                                    implicitHeight: voiceRowColumn.implicitHeight + 16
+                                    radius: 8
+                                    color: selected ? App.Theme.backgroundElevated : "transparent"
+                                    border.width: 1
+                                    border.color: selected ? App.Theme.accent : App.Theme.border
+
+                                    ColumnLayout {
+                                        id: voiceRowColumn
+                                        anchors.left: parent.left
+                                        anchors.right: parent.right
+                                        anchors.top: parent.top
+                                        anchors.margins: 8
+                                        spacing: 6
+
+                                        RowLayout {
+                                            Layout.fillWidth: true
+                                            spacing: 10
+
+                                            RadioButton {
+                                                checked: voiceRow.selected
+                                                enabled: !page.sessionActive
+                                                text: page.voiceLabel(voiceRow.modelData)
+                                                onClicked: page.selectVoice(voiceRow.modelData)
+                                            }
+
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["quality"], "")).length > 0
+                                                text: String(page.value(voiceRow.modelData, ["quality"], ""))
+                                                color: App.Theme.textMuted
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+
+                                            Item { Layout.fillWidth: true }
+
+                                            StatusBadge {
+                                                text: page.voiceStatusLabel(voiceRow.modelData)
+                                                status: voiceRow.installed ? "success"
+                                                        : voiceRow.installing ? "info" : "neutral"
+                                            }
+
+                                            AppButton {
+                                                visible: voiceRow.selected && !voiceRow.installed && !voiceRow.installing
+                                                compact: true
+                                                text: qsTr("Download (%1)").arg(page.formatBytes(page.value(voiceRow.modelData, ["downloadSizeBytes"], null)))
+                                                iconSource: App.UiIcons.actionDownload
+                                                enabled: !page.sessionActive
+                                                         && Boolean(page.value(voiceRow.modelData, ["canInstall"], false))
+                                                onClicked: page.downloadVoice(voiceRow.modelData)
+                                            }
+
+                                            AppButton {
+                                                visible: !voiceRow.selected && voiceRow.installed
+                                                         && (Boolean(page.value(voiceRow.modelData, ["managed"], false))
+                                                             || Boolean(page.value(voiceRow.modelData, ["custom"], false)))
+                                                compact: true
+                                                kind: "danger"
+                                                text: qsTr("Remove")
+                                                iconSource: App.UiIcons.actionRemove
+                                                enabled: !page.sessionActive
+                                                onClicked: page.removeVoice(voiceRow.modelData)
+                                            }
+
+                                            AppButton {
+                                                compact: true
+                                                kind: "secondary"
+                                                text: qsTr("License and attribution")
+                                                onClicked: page.expandedVoiceLicenseId =
+                                                           voiceRow.licenseExpanded ? "" : voiceRow.voiceIdentifier
+                                            }
+                                        }
+
+                                        AppProgressBar {
+                                            visible: voiceRow.installing
+                                            Layout.fillWidth: true
+                                            indeterminateMode: true
+                                        }
+
+                                        Label {
+                                            visible: voiceRow.licenseExpanded
+                                                     && Boolean(page.value(voiceRow.modelData, ["custom"], false))
+                                            Layout.fillWidth: true
+                                            text: qsTr("Custom voice imported by you. It is not verified; you are responsible for its license.")
+                                            color: App.Theme.warning
+                                            font.pixelSize: App.Theme.fontCaption
+                                            wrapMode: Text.WordWrap
+                                        }
+
+                                        Flow {
+                                            visible: voiceRow.licenseExpanded
+                                            Layout.fillWidth: true
+                                            spacing: 14
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["licenseId"], "")).length > 0
+                                                text: qsTr("License: %1").arg(page.value(voiceRow.modelData, ["licenseId"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["runtimeLicenseId"], "")).length > 0
+                                                text: qsTr("Runtime license: %1").arg(page.value(voiceRow.modelData, ["runtimeLicenseId"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["artifactLicenseId"], "")).length > 0
+                                                text: qsTr("Model license: %1").arg(page.value(voiceRow.modelData, ["artifactLicenseId"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["attribution"], "")).length > 0
+                                                text: qsTr("Attribution: %1").arg(page.value(voiceRow.modelData, ["attribution"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                            Label {
+                                                visible: String(page.value(voiceRow.modelData, ["version"], "")).length > 0
+                                                text: qsTr("Version: %1").arg(page.value(voiceRow.modelData, ["version"], ""))
+                                                color: App.Theme.textSecondary
+                                                font.pixelSize: App.Theme.fontCaption
+                                            }
+                                        }
+                                    }
+                                }
                             }
+                        }
+
+                        AppButton {
+                            objectName: "narratorAddCustomVoice"
+                            compact: true
+                            kind: "secondary"
+                            text: qsTr("Add custom voice...")
+                            iconSource: App.UiIcons.actionInstall
+                            enabled: !page.sessionActive
+                            onClicked: customVoiceDialog.open()
+                        }
+
+                        Label {
+                            visible: page.customVoiceError.length > 0
+                            Layout.fillWidth: true
+                            text: page.customVoiceError
+                            color: App.Theme.danger
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
                         }
 
                         Label {
@@ -1019,31 +1442,32 @@ Item {
                             wrapMode: Text.WordWrap
                         }
 
-                        RowLayout {
-                            visible: page.voices.length > 0 && !page.selectedVoiceReady
+                        Label {
+                            visible: page.voices.length > 0 && page.selectedVoiceInstalled()
+                                     && !page.selectedVoiceReady
                             Layout.fillWidth: true
-                            spacing: 10
+                            text: String(page.value(page.selectedVoice(), ["name", "id"], ""))
+                                  + " - " + qsTr("Unavailable in this build")
+                            color: App.Theme.warning
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
+                        }
 
-                            Label {
-                                Layout.fillWidth: true
-                                text: String(page.value(page.selectedVoice(), ["name", "id"], ""))
-                                      + " - " + (page.selectedVoiceInstalled()
-                                                   ? qsTr("Unavailable in this build")
-                                                   : qsTr("Not installed"))
-                                color: App.Theme.warning
-                                font.pixelSize: App.Theme.fontCaption
-                                wrapMode: Text.WordWrap
-                            }
+                        AppSwitch {
+                            objectName: "narratorReadSpeakerNames"
+                            Layout.fillWidth: true
+                            text: qsTr("Read character names")
+                            checked: page.readSpeakerNames
+                            enabled: !page.sessionActive
+                            onToggled: page.setReadSpeakerNames(checked)
+                        }
 
-                            AppButton {
-                                visible: !page.selectedVoiceInstalled()
-                                compact: true
-                                text: qsTr("Install")
-                                iconSource: App.UiIcons.actionInstall
-                                enabled: !page.sessionActive
-                                         && page.selectedVoiceComponent() !== null
-                                onClicked: page.installSelectedVoice()
-                            }
+                        Label {
+                            Layout.fillWidth: true
+                            text: qsTr("Speak the character name label before a subtitle line.")
+                            color: App.Theme.textSecondary
+                            font.pixelSize: App.Theme.fontCaption
+                            wrapMode: Text.WordWrap
                         }
 
                         Divider { Layout.fillWidth: true }
@@ -1399,6 +1823,46 @@ Item {
                             onClicked: page.resetSubtitleRegion()
                         }
                     }
+
+                    // Application-wide OCR image preparation (settings.json).
+                    // GAME_OPTIMIZATION_NARRATOR_OCR_PREPROCESS overrides it.
+                    RowLayout {
+                        visible: page.advancedRegionVisible
+                        Layout.fillWidth: true
+                        spacing: 12
+
+                        ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 2
+                            Label {
+                                Layout.fillWidth: true
+                                text: qsTr("OCR mode")
+                                color: App.Theme.text
+                                font.pixelSize: App.Theme.fontBody
+                                font.weight: Font.DemiBold
+                            }
+                            Label {
+                                Layout.fillWidth: true
+                                text: qsTr("Automatic separates outlined subtitles from bright backgrounds. Classic uses the previous image preparation.")
+                                color: App.Theme.textSecondary
+                                font.pixelSize: App.Theme.fontCaption
+                                wrapMode: Text.WordWrap
+                            }
+                        }
+
+                        AppComboBox {
+                            id: ocrModeCombo
+                            property var values: ["automatic", "classic"]
+                            Layout.preferredWidth: 180
+                            model: [qsTr("Automatic"), qsTr("Classic")]
+                            currentIndex: page.indexOfValue(values, page.ocrMode, 0)
+                            Accessible.name: qsTr("OCR mode")
+                            onActivated: function(index) {
+                                if (page.controller && page.controller.saveSetting)
+                                    page.controller.saveSetting("narratorOcrMode", values[index])
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1409,10 +1873,17 @@ Item {
                 spacing: 10
 
                 Label {
-                    text: qsTr("Optional components")
+                    text: qsTr("Narrator components")
                     color: App.Theme.text
                     font.pixelSize: 20
                     font.weight: Font.Bold
+                }
+
+                AppButton {
+                    visible: page.requiredComponentsReady()
+                    text: page.componentsExpanded ? qsTr("Hide component management") : qsTr("Required components are ready · Manage")
+                    kind: "ghost"
+                    onClicked: page.componentsExpanded = !page.componentsExpanded
                 }
 
                 Label {
@@ -1424,13 +1895,15 @@ Item {
                 }
 
                 GridLayout {
+                    objectName: "narratorComponentsList"
+                    visible: page.componentsExpanded || !page.requiredComponentsReady()
                     Layout.fillWidth: true
                     columns: page.width >= 1050 ? 2 : 1
                     columnSpacing: 12
                     rowSpacing: 12
 
                     Repeater {
-                        model: page.componentsData || []
+                        model: page.nonVoiceComponents()
 
                         delegate: SurfaceCard {
                             id: componentCard
@@ -1466,6 +1939,11 @@ Item {
                                             font.pixelSize: App.Theme.fontBodyLarge
                                             font.weight: Font.Bold
                                             wrapMode: Text.WordWrap
+                                        }
+                                        Label {
+                                            text: page.componentRequired(componentCard.modelData) ? qsTr("Required for the selected mode") : qsTr("Not required for the selected mode")
+                                            color: page.componentRequired(componentCard.modelData) ? App.Theme.text : App.Theme.textMuted
+                                            font.pixelSize: App.Theme.fontCaption
                                         }
                                         Label {
                                             text: page.componentKind(String(page.value(componentCard.modelData, ["kind"], "")))
@@ -1611,7 +2089,16 @@ Item {
                         wrapMode: Text.WordWrap
                     }
 
+                    AppButton {
+                        objectName: "narratorLastTextToggle"
+                        Layout.fillWidth: true
+                        kind: "ghost"
+                        text: (page.lastTextExpanded ? "▾ " : "▸ ") + qsTr("Last read text")
+                        onClicked: page.lastTextExpanded = !page.lastTextExpanded
+                    }
                     GridLayout {
+                        objectName: "narratorLastText"
+                        visible: page.lastTextExpanded
                         Layout.fillWidth: true
                         columns: page.width >= 950 ? 3 : 1
                         columnSpacing: 18
@@ -1654,6 +2141,15 @@ Item {
                         }
                     }
 
+                    Loader {
+                        objectName: "narratorDeveloperDiagnostics"
+                        Layout.fillWidth: true
+                        active: page.developerUi
+                        visible: active
+                        sourceComponent: ColumnLayout {
+                            Layout.fillWidth: true
+                            spacing: 10
+                            Label { text: qsTr("Developer diagnostics"); color: App.Theme.text; font.weight: Font.Bold }
                     Divider { Layout.fillWidth: true }
 
                     GridLayout {
@@ -1945,6 +2441,9 @@ Item {
                         }
                     }
 
+                        }
+                    }
+
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 10
@@ -1955,16 +2454,17 @@ Item {
                             onClicked: page.saveSettings()
                         }
                         AppButton {
-                            text: page.sessionActive ? qsTr("Stop narrator") : qsTr("Start narrator")
-                            kind: page.sessionActive ? "danger" : "primary"
-                            enabled: page.sessionActive
-                                     || (page.selectedGameId.length > 0
-                                         && page.narratorEnabled
-                                         && page.componentsReady
-                                         && page.selectedVoiceReady)
-                            toolTip: enabled ? "" : qsTr("Enable the narrator and install all required local narrator components first")
-                            onClicked: page.sessionActive
-                                       ? page.stopNarrator() : page.startNarrator()
+                            objectName: "narratorChooseWindowAgain"
+                            text: qsTr("Choose window again")
+                            toolTip: qsTr("Forget the saved window for this game only")
+                            enabled: page.selectedGameId.length > 0
+                                     && (page.sessionData.captureGrantSaved === true
+                                         || page.sessionData.captureGrantStale === true)
+                            onClicked: {
+                                if (controller && typeof controller.chooseNarratorWindowAgain === "function")
+                                    controller.chooseNarratorWindowAgain(page.selectedGameId)
+                                page.refreshSession()
+                            }
                         }
                     }
                 }
@@ -1974,4 +2474,19 @@ Item {
         }
     }
 
+    FileDialog {
+        id: customVoiceDialog
+        objectName: "narratorCustomVoiceDialog"
+        title: qsTr("Choose a Piper voice model")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [qsTr("Piper voice models (*.onnx)")]
+        onAccepted: page.importCustomVoice(selectedFile.toString(), false)
+    }
+
+    ConfirmDialog {
+        id: customVoiceLanguageDialog
+        onConfirmed: function(fileUrl) {
+            page.importCustomVoice(String(fileUrl), true)
+        }
+    }
 }

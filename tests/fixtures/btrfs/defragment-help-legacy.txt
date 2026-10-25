@@ -1,0 +1,11 @@
+usage: btrfs filesystem defragment [options] <file>|<dir> [<file>|<dir>...]
+
+    Defragment a file or a directory
+
+    -v             be verbose
+    -r             defragment files recursively
+    -c[zlib,lzo]   compress the file while defragmenting
+    -f             flush data to disk immediately after defragmenting
+    -s start       defragment only from byte onward
+    -l len         defragment only up to len bytes
+    -t size        target extent size hint (default: 32M)

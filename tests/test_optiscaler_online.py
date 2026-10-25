@@ -701,3 +701,78 @@ def test_controller_reports_online_error_without_disabling_other_features(
         assert controller.games
     finally:
         controller.shutdown()
+
+
+def _nightly_payload(archive: bytes) -> list[dict]:
+    return [
+        {
+            "tag_name": "nightly-20261022",
+            "html_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/tag/nightly-20261022",
+            "published_at": "2026-10-22T09:15:24Z",
+            "prerelease": True,
+            "draft": False,
+            "assets": [
+                {
+                    "name": "OptiScaler_v10.0.0-pre1_20261022.7z",
+                    "browser_download_url": "https://github.com/optiscaler/OptiScaler-nightly/releases/download/nightly-20261022/OptiScaler_v10.0.0-pre1_20261022.7z",
+                    "size": len(archive),
+                    "digest": "sha256:" + sha256(archive).hexdigest(),
+                }
+            ],
+        }
+    ]
+
+
+def test_transient_empty_nightly_list_is_retried_and_succeeds(tmp_path: Path) -> None:
+    """22.10.2026 17:29: GitHub briefly listed no Nightly build; a retry works."""
+
+    from game_optimization_linux.services.optiscaler_online import OptiScalerNoReleaseError
+
+    replies = [b"[]", json.dumps(_nightly_payload(b"x" * 64)).encode()]
+    sleeps: list[float] = []
+
+    def opener(request, **_kwargs):
+        return _Response(replies.pop(0), url=request.full_url)
+
+    client = OptiScalerReleaseClient(
+        tmp_path / "cache", opener=opener, sleep=sleeps.append, no_release_retry_delay=1.5
+    )
+    release = client.latest_release(channel="edge", force_refresh=True)
+
+    assert release.tag_name == "nightly-20261022"
+    assert sleeps == [1.5]
+    assert client.cached_release("edge") is not None
+    # A list without builds is a distinct error type, not a generic metadata error.
+    with pytest.raises(OptiScalerNoReleaseError) as raised:
+        parse_release([], channel="edge")
+    assert raised.value.channel == "edge"
+
+
+def test_persistent_empty_nightly_list_keeps_cache_and_reports_friendly_reason(
+    tmp_path: Path,
+) -> None:
+    from game_optimization_linux.controllers.optiscaler_controller import friendly_online_error
+    from game_optimization_linux.services.optiscaler_online import OptiScalerNoReleaseError
+
+    calls: list[str] = []
+
+    def opener(request, **_kwargs):
+        calls.append(request.full_url)
+        return _Response(b"[]", url=request.full_url)
+
+    client = OptiScalerReleaseClient(tmp_path / "cache", opener=opener, sleep=lambda _s: None)
+    with pytest.raises(OptiScalerNoReleaseError) as raised:
+        client.latest_release(channel="edge", force_refresh=True)
+    assert len(calls) == 3
+    message = friendly_online_error(raised.value, time.time())
+    assert "Nightly" in message and "not changed" in message
+
+    # With a previously validated cache the stale release is returned instead.
+    good = json.dumps(_nightly_payload(b"y" * 64)).encode()
+    seeded = OptiScalerReleaseClient(
+        tmp_path / "cache",
+        opener=lambda request, **_k: _Response(good, url=request.full_url),
+    )
+    seeded.latest_release(channel="edge", force_refresh=True)
+    stale = client.latest_release(channel="edge", force_refresh=True)
+    assert stale.source == "cache" and stale.stale is True

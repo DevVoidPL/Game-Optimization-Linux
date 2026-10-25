@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from ..config import SETTINGS_FILE
-from ..models import AppSettings, AutomaticCompressionMode, ControllerMode
+from ..models import AppSettings, ControllerMode
 from .presenters import qml_value, settings_to_qml
 
 if TYPE_CHECKING:
@@ -54,6 +54,8 @@ class SettingsController:
             self._app.themeModeChanged.emit()
         if field_name == "log_level":
             self._app._apply_runtime_log_level(str(qml_value(converted_value)))
+        elif field_name == "narrator_ocr_mode":
+            self._app._apply_narrator_ocr_mode(str(converted_value))
         elif field_name == "steam_installation_directories" and not self._app._demo_mode:
             setter = getattr(self._app._game_provider, "set_additional_roots", None)
             try:
@@ -102,6 +104,8 @@ class SettingsController:
                 self._app._set_interface_mode("desktop")
             elif converted_value is ControllerMode.COUCH_ONLY:
                 self._app._set_interface_mode("couch")
+        elif field_name == "couch_show_system_usage":
+            self._app._system_usage.set_enabled(bool(converted_value))
         elif field_name == "interface_sounds":
             self._app._ui_sound_service.set_enabled(bool(converted_value))
         elif field_name in {
@@ -112,12 +116,17 @@ class SettingsController:
         }:
             self._app._configure_couch_audio()
         elif field_name.startswith("automatic_compression_"):
+            if field_name == "automatic_compression_delay_seconds":
+                # The running tracker owns the stability window; apply the
+                # new delay now instead of only after a restart.
+                setter = getattr(self._app._update_tracker, "set_stability_delay", None)
+                if callable(setter):
+                    setter(float(converted_value))
             self._app._reload_updates()
-            if (
-                field_name == "automatic_compression_mode"
-                and converted_value is not AutomaticCompressionMode.OFF
-            ):
-                self._app._queue_eligible_automatic_compression()
+            # Any filter, limit or mode change may make waiting work eligible.
+            # The scheduler itself is a no-op while the mode is Off and skips
+            # games that are pending or whose update event was already handled.
+            self._app._queue_eligible_automatic_compression()
         logger.info("Saved local setting %s", field_name)
         self._app._emit_toast(toast_message, toast_level)
         return True
@@ -170,12 +179,15 @@ class SettingsController:
             "navigationRepeatRateMs": "navigation_repeat_rate_ms",
             "hideCursorInCouchMode": "hide_cursor_in_couch_mode",
             "startCouchModeFullscreen": "start_couch_mode_fullscreen",
+            "couchShowSystemUsage": "couch_show_system_usage",
             "postLaunchBehavior": "post_launch_behavior",
             "interfaceSounds": "interface_sounds",
             "couchMenuSoundsEnabled": "couch_menu_sounds_enabled",
             "couchMenuSoundsVolume": "couch_menu_sounds_volume",
             "couchMusicEnabled": "couch_music_enabled",
             "couchMusicVolume": "couch_music_volume",
+            "couchMotionMode": "couch_motion_mode",
+            "narratorOcrMode": "narrator_ocr_mode",
         }
         requested = aliases.get(key, key)
         if not is_dataclass(self._app._settings_model):

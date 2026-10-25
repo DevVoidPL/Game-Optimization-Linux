@@ -79,6 +79,12 @@ ApplicationWindow {
                                             && visible
                                             && visibility !== Window.Minimized
                                             && active)
+        // System-usage sampling follows visibility, not keyboard focus.
+        if (controller && controller.setCouchVisible)
+            controller.setCouchVisible(interfaceMode === "couch"
+                                       && visible
+                                       && visibility !== Window.Minimized
+                                       && visibility !== Window.Hidden)
     }
 
     onInterfaceModeChanged: Qt.callLater(synchronizeWindowMode)
@@ -97,6 +103,7 @@ ApplicationWindow {
         updatesLoader.active = false
         tasksLoader.active = false
         systemLoader.active = false
+        donateLoader.active = false
         settingsLoader.active = false
         detailsLoader.active = false
         couchLoader.active = false
@@ -125,6 +132,8 @@ ApplicationWindow {
             return Qt.resolvedUrl("pages/TasksPage.qml")
         if (pageName === "system")
             return Qt.resolvedUrl("pages/SystemPage.qml")
+        if (pageName === "donate")
+            return Qt.resolvedUrl("pages/DonatePage.qml")
         if (pageName === "settings")
             return Qt.resolvedUrl("pages/SettingsPage.qml")
         if (pageName === "gameDetails" || pageName === "game" || pageName === "details")
@@ -141,10 +150,12 @@ ApplicationWindow {
             return 3
         if (pageName === "system")
             return 4
-        if (pageName === "settings")
+        if (pageName === "donate")
             return 5
-        if (pageName === "gameDetails" || pageName === "game" || pageName === "details")
+        if (pageName === "settings")
             return 6
+        if (pageName === "gameDetails" || pageName === "game" || pageName === "details")
+            return 7
         return 0
     }
 
@@ -155,6 +166,7 @@ ApplicationWindow {
             updatesLoader,
             tasksLoader,
             systemLoader,
+            donateLoader,
             settingsLoader,
             detailsLoader
         ]
@@ -249,6 +261,14 @@ ApplicationWindow {
                     objectName: "systemPageLoader"
                     asynchronous: false
                     source: Qt.resolvedUrl("pages/SystemPage.qml")
+                    onLoaded: if (item && item.hasOwnProperty("controller")) item.controller = window.controller
+                }
+
+                Loader {
+                    id: donateLoader
+                    objectName: "donatePageLoader"
+                    asynchronous: false
+                    source: Qt.resolvedUrl("pages/DonatePage.qml")
                     onLoaded: if (item && item.hasOwnProperty("controller")) item.controller = window.controller
                 }
 

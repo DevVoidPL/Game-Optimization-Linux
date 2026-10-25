@@ -92,7 +92,8 @@ SurfaceCard {
                 "header_artwork", "fallbackArtwork", "fallback_artwork"
             ], "")
             artworkFillMode: Image.PreserveAspectCrop
-            cornerRadius: App.Theme.radiusSmall
+            // Same rounding as the Games grid covers (GameGridCard).
+            cornerRadius: App.Theme.radiusLarge
         }
 
         ColumnLayout {

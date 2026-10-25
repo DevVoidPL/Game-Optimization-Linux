@@ -14,12 +14,12 @@ CouchOverlayFrame {
     property bool quitConfirmationOpen: false
     property int quitChoice: 0
     readonly property var entries: [
-        { "id": "resume", "symbol": "▶", "icon": App.UiIcons.actionLaunch, "title": qsTr("Resume") },
-        { "id": "library", "symbol": "▦", "icon": App.UiIcons.sidebarGames, "title": qsTr("Library") },
-        { "id": "tasks", "symbol": "↻", "icon": App.UiIcons.sidebarTasks, "title": qsTr("Tasks") },
-        { "id": "settings", "symbol": "⚙", "icon": App.UiIcons.sidebarSettings, "title": qsTr("Settings") },
-        { "id": "desktop", "symbol": "▣", "icon": App.UiIcons.sidebarSystem, "title": qsTr("Switch to Desktop Mode") },
-        { "id": "quit", "symbol": "×", "icon": App.UiIcons.actionCancel, "title": qsTr("Quit Game Optimization") }
+        { "id": "resume", "symbol": "▶", "icon": App.UiIcons.couchGlyphLaunch, "iconOnLight": App.UiIcons.couchGlyphLaunchOnLight, "title": qsTr("Resume") },
+        { "id": "library", "symbol": "▦", "icon": App.UiIcons.couchGlyphLibrary, "iconOnLight": App.UiIcons.couchGlyphLibraryOnLight, "title": qsTr("Library") },
+        { "id": "tasks", "symbol": "↻", "icon": App.UiIcons.couchGlyphTasks, "iconOnLight": App.UiIcons.couchGlyphTasksOnLight, "title": qsTr("Tasks") },
+        { "id": "settings", "symbol": "⚙", "icon": App.UiIcons.couchGlyphSettings, "iconOnLight": App.UiIcons.couchGlyphSettingsOnLight, "title": qsTr("Settings") },
+        { "id": "desktop", "symbol": "▣", "icon": App.UiIcons.couchGlyphDesktop, "iconOnLight": App.UiIcons.couchGlyphDesktopOnLight, "title": qsTr("Switch to Desktop Mode") },
+        { "id": "quit", "symbol": "×", "icon": App.UiIcons.couchGlyphCancel, "iconOnLight": App.UiIcons.couchGlyphCancelOnLight, "title": qsTr("Quit Game Optimization") }
     ]
 
     signal resumeRequested()
@@ -131,8 +131,8 @@ CouchOverlayFrame {
                     focusSelected()
                     playSemanticSound("confirm")
                 } else if (controller) {
-                    controller.requestWindowAction("close")
                     playSemanticSound("confirm")
+                    controller.requestWindowAction("close")
                 } else {
                     playSemanticSound("error")
                 }
@@ -160,8 +160,12 @@ CouchOverlayFrame {
             if (!selectedEntry) {
                 playSemanticSound("error")
             } else {
-                activate()
+                // Sound first: activate() may switch to Desktop Mode, which
+                // destroys this Couch item before a later call could run.
                 playSemanticSound(selectedEntry.id === "quit" ? "open" : "confirm")
+                activate()
+                if (selectedEntry.id === "desktop")
+                    return
             }
         }
         if (navigation && visible && !quitConfirmationOpen)
@@ -212,6 +216,7 @@ CouchOverlayFrame {
                     couchScale: menu.couchScale
                     symbol: modelData.symbol
                     iconSource: modelData.icon || ""
+                    iconLightSource: modelData.iconOnLight || ""
                     text: modelData.title
                     focus: menu.visible && !menu.quitConfirmationOpen
                            && menu.selectedIndex === index

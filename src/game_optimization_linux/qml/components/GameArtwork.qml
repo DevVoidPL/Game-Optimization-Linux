@@ -2,6 +2,7 @@ pragma ComponentBehavior: Bound
 
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import ".." as App
 
 Item {
@@ -13,6 +14,9 @@ Item {
     property url artworkSource: ""
     property int artworkFillMode: Image.PreserveAspectFit
     property real cornerRadius: App.Theme.radiusMedium
+    // Bottom corners default to the same radius; a cover that sits flush on
+    // top of a card body (Games grid) sets this to 0 so the card is continuous.
+    property real bottomCornerRadius: cornerRadius
     property color accentA: paletteFor(title, 0)
     property color accentB: paletteFor(title, 1)
     property bool compact: false
@@ -21,6 +25,10 @@ Item {
     property string diagnosticDelegateState: "active"
     property string lastDiagnosticSignature: ""
     property bool shuttingDown: false
+    readonly property int requestedPixelWidth: Math.min(1200, Math.max(64, Math.ceil(width * Screen.devicePixelRatio)))
+    readonly property real artworkAspectRatio: pendingReady && pendingImage.implicitHeight > 0
+        ? pendingImage.implicitWidth / pendingImage.implicitHeight
+        : currentReady && currentImage.implicitHeight > 0 ? currentImage.implicitWidth / currentImage.implicitHeight : 16 / 9
     readonly property bool diagnosticLoggingEnabled:
         typeof gameOptimizationDebugArtwork !== "undefined"
         && gameOptimizationDebugArtwork === true
@@ -331,10 +339,45 @@ Item {
         }
     }
 
+    // Rounded mask for the whole artwork stack (gradient, placeholder, image).
+    // `cornerRadius` used to be declared but never applied, so covers always
+    // had square corners above rounded card bodies. The mask is a plain
+    // Rectangle; the artwork keeps its own fill mode and proportions.
+    //
+    // The mask is a shader effect, which Qt's software scenegraph cannot run
+    // (it would render the artwork blank, as in offscreen test runs). On the
+    // software backend the artwork is drawn unmasked instead of disappearing.
+    readonly property bool shaderMaskAvailable: GraphicsInfo.api !== GraphicsInfo.Software
+                                                && GraphicsInfo.api !== GraphicsInfo.Unknown
+    readonly property bool roundedMaskActive: shaderMaskAvailable
+                                              && (cornerRadius > 0 || bottomCornerRadius > 0)
+
+    Rectangle {
+        id: artworkMask
+        anchors.fill: parent
+        radius: artworkRoot.cornerRadius
+        topLeftRadius: artworkRoot.cornerRadius
+        topRightRadius: artworkRoot.cornerRadius
+        bottomLeftRadius: artworkRoot.bottomCornerRadius
+        bottomRightRadius: artworkRoot.bottomCornerRadius
+        color: "black"
+        visible: false
+        layer.enabled: artworkRoot.roundedMaskActive
+        layer.smooth: true
+    }
+
     Item {
         id: artworkLayer
         anchors.fill: parent
         visible: true
+        layer.enabled: artworkRoot.roundedMaskActive
+        layer.smooth: true
+        layer.effect: MultiEffect {
+            maskEnabled: true
+            maskSource: artworkMask
+            maskThresholdMin: 0.5
+            maskSpreadAtMin: 1.0
+        }
 
         Rectangle {
             anchors.fill: parent
@@ -358,12 +401,7 @@ Item {
             property int requestId: 0
             property string requestGameId: ""
             anchors.fill: parent
-            sourceSize.width: Math.min(
-                                  1200,
-                                  Math.max(
-                                      64,
-                                      Math.ceil(artworkRoot.width
-                                                * Screen.devicePixelRatio)))
+            sourceSize.width: artworkRoot.requestedPixelWidth
             fillMode: artworkRoot.artworkFillMode
             horizontalAlignment: Image.AlignHCenter
             verticalAlignment: Image.AlignVCenter
@@ -390,7 +428,7 @@ Item {
             property int requestId: 0
             property string requestGameId: ""
             anchors.fill: parent
-            sourceSize.width: currentImage.sourceSize.width
+            sourceSize.width: artworkRoot.requestedPixelWidth
             fillMode: artworkRoot.artworkFillMode
             horizontalAlignment: Image.AlignHCenter
             verticalAlignment: Image.AlignVCenter

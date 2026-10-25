@@ -4,8 +4,8 @@ Tests must not read or modify a real Steam library. Use temporary XDG roots and
 synthetic game trees for controller, runner, OptiScaler and compression tests.
 
 This guide describes the development checkout. The current public download is
-**1.8 Alpha**; **2.0 Beta is announced and not yet available**. Local development
-version labels and test results do not establish public release readiness.
+**1.8 Alpha**. **GameOpti Beta 2.0 is being completed and polished**, with bug
+fixing and testing underway.
 See [ROADMAP.md](ROADMAP.md) for the release/development distinction.
 
 ## Local checks
@@ -81,9 +81,30 @@ Useful focused runs while changing a subsystem:
   tests/test_narrator_runtime_regressions.py \
   tests/test_narrator_subtitle_episode.py \
   tests/test_narrator_tts_text_filter.py
+
+# UI icons ("Facet" set, see docs/ui-icons.md); regenerate with
+# python3 scripts/build-facet-icons.py, verify drift with --check
+QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q \
+  tests/test_ui_icons.py \
+  tests/test_ui_icon_presentation.py \
+  tests/test_couch_glyphs.py \
+  tests/test_couch_design_system.py
 ```
 
 ### Narrator verification in games
+
+The normal Narrator page keeps playback controls, errors and an expandable last
+read text. OCR timings, raw recognition and decision history are only created
+when the developer UI is enabled for that process:
+
+```bash
+GAMEOPTI_DEVELOPER_UI=1 PYTHONPATH=src .venv/bin/python -m game_optimization_linux.main --desktop
+flatpak run --env=GAMEOPTI_DEVELOPER_UI=1 io.github.DevVoidPL.GameOptimizationLinux
+```
+
+The Flatpak command requires a build containing this UI change. Starting without
+the variable restores the normal view. This switch only reveals diagnostics;
+it does not change capture, OCR, translation or speech settings.
 
 Text replay tests exercise the decisions made from supplied OCR results; they
 do not establish capture, cropping, preprocessing, or Tesseract accuracy in a
@@ -167,6 +188,11 @@ component is not installed; the expected result is an explicit unavailable
 state, not a fabricated measurement.
 
 ## Reports
+
+Post-processing checks use disposable folders, never a real Steam library:
+`.venv/bin/python -m pytest -q tests/test_post_processing.py tests/test_post_processing_ui.py`.
+See [backend compatibility and in-game test procedures](docs/post-processing.md).
+An installation/hash check, a loaded module and a visibly verified effect are separate results.
 
 When reporting a failure, include the application version, distribution,
 Desktop/Couch mode, relevant test output and whether Steam is native or

@@ -38,10 +38,44 @@ LOGGER = logging.getLogger(__name__)
 _MANIFEST_NAME = re.compile(r"^appmanifest_.+\.acf$", re.IGNORECASE)
 _COVER_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
 _MAX_MANIFEST_BYTES = 16 * 1024 * 1024
-# Steam's low byte contains stable installation/runtime flags. Higher bits are
-# used by update, validation, staging, commit and related write phases. Treat
-# all of them conservatively as busy; a false positive merely delays work.
-_STEAM_ACTIVE_WRITE_STATE_MASK = ~0xFF
+# Paused, AppRunning and ComponentInUse are not content writes. Keep unknown
+# higher bits conservative, but do not report a paused fully-installed game as
+# updating (e.g. GTA's 0x204 after a stopped shader update).
+_STEAM_ACTIVE_WRITE_STATE_MASK = ~(0xFF | 512 | 8192 | 16384)
+
+
+def steam_state_has_active_writes(flags: int | None) -> bool:
+    if flags is None:
+        return False
+    return bool(flags & _STEAM_ACTIVE_WRITE_STATE_MASK or (flags & 512 and not flags & 4))
+
+
+def steam_update_activity(game: Game) -> dict:
+    """Read only this game's manifest now; cached scan state is not live evidence."""
+    path = game.steam_manifest_path
+    result = {"blocked": bool(game.update_in_progress), "state": "cached",
+              "appId": str(game.steam_app_id or ""), "manifest": str(path or ""),
+              "stateFlags": game.state_flags, "fresh": False}
+    if path is None:
+        return result
+    try:
+        before = path.stat()
+        if before.st_size > _MAX_MANIFEST_BYTES:
+            raise ValueError("manifest exceeds size limit")
+        document = load_keyvalues(path)
+        state = next(v for k, v in document.items() if k.casefold() == "appstate")
+        fields = {k.casefold(): v for k, v in state.items()}
+        if str(fields.get("appid")) != str(game.steam_app_id):
+            raise ValueError("manifest AppID does not match this game")
+        flags = int(fields["stateflags"])
+        after = path.stat()
+        if flags < 0 or (before.st_mtime_ns, before.st_size) != (after.st_mtime_ns, after.st_size):
+            raise ValueError("manifest changed during the check")
+        blocked = steam_state_has_active_writes(flags)
+        return {**result, "blocked": blocked, "fresh": True, "stateFlags": flags,
+                "state": "active" if blocked else "paused" if flags & 512 else "queued" if flags & 8 else "idle"}
+    except (OSError, ValueError, StopIteration, KeyError, AttributeError) as error:
+        return {**result, "blocked": True, "state": "unknown", "error": str(error)}
 
 
 @dataclass(frozen=True, slots=True)
@@ -213,6 +247,10 @@ class ScanReport:
     libraries: tuple[Path, ...] = ()
     configured_libraries: tuple[Path, ...] = ()
     inaccessible_paths: tuple[Path, ...] = ()
+    # Configured library paths whose directory is reachable but no longer
+    # contains ``steamapps``.  The filesystem is present, so the absence of
+    # installations is established evidence rather than a disconnected disk.
+    present_without_steamapps: tuple[Path, ...] = ()
     errors: tuple[str, ...] = ()
 
     @classmethod
@@ -264,12 +302,14 @@ class _ScanStats:
     steam_roots: list[Path] | None = None
     configured_libraries: list[Path] | None = None
     inaccessible_paths: list[Path] | None = None
+    present_without_steamapps: list[Path] | None = None
     errors: list[str] | None = None
 
     def __post_init__(self) -> None:
         self.steam_roots = []
         self.configured_libraries = []
         self.inaccessible_paths = []
+        self.present_without_steamapps = []
         self.errors = []
 
 
@@ -455,6 +495,9 @@ class SteamGameProvider(GameProvider):
                     stats.configured_libraries  # type: ignore[arg-type]
                 ),
                 inaccessible_paths=tuple(stats.inaccessible_paths),  # type: ignore[arg-type]
+                present_without_steamapps=tuple(
+                    stats.present_without_steamapps  # type: ignore[arg-type]
+                ),
                 errors=tuple(stats.errors),  # type: ignore[arg-type]
             )
             result = self.list_games()
@@ -578,7 +621,8 @@ class SteamGameProvider(GameProvider):
                 stats.duplicate_libraries += 1
                 return
             try:
-                available = normalized.is_dir() and (
+                directory_present = normalized.is_dir()
+                available = directory_present and (
                     normalized / "steamapps"
                 ).is_dir()
             except OSError as error:
@@ -586,7 +630,20 @@ class SteamGameProvider(GameProvider):
                 return
             if not available:
                 stats.inaccessible_paths.append(normalized)  # type: ignore[union-attr]
-                LOGGER.warning("Steam library is unavailable: %s", normalized)
+                if directory_present:
+                    # The directory is reachable, so the disk is mounted; the
+                    # library content itself is gone (for example after a
+                    # format).  Record this separately so cached games are not
+                    # preserved as if the disk were merely disconnected.
+                    stats.present_without_steamapps.append(  # type: ignore[union-attr]
+                        normalized
+                    )
+                    LOGGER.warning(
+                        "Steam library path exists but has no steamapps: %s",
+                        normalized,
+                    )
+                else:
+                    LOGGER.warning("Steam library is unavailable: %s", normalized)
                 return
             seen.add(key)
             libraries.append(_SteamLibrary(normalized, source))
@@ -835,9 +892,7 @@ class SteamGameProvider(GameProvider):
 
     @staticmethod
     def _steam_update_in_progress(state_flags: int | None) -> bool:
-        if state_flags is None:
-            return False
-        return bool(state_flags & _STEAM_ACTIVE_WRITE_STATE_MASK)
+        return steam_state_has_active_writes(state_flags)
 
     def _inspect_filesystem(
         self, path: Path, stats: _ScanStats

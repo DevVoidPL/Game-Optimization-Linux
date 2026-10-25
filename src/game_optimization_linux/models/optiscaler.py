@@ -8,7 +8,7 @@ from pathlib import PurePosixPath
 import re
 from typing import Any, Mapping
 
-from .mangohud import validate_app_id
+from .mangohud import validate_app_id, validate_game_key
 
 
 OPTISCALER_SCHEMA_VERSION = 3
@@ -34,12 +34,18 @@ OPTISCALER_STATES = (
 OPTISCALER_CHANNELS = ("stable", "edge")
 OPTISCALER_BACKENDS = ("none", "optiscaler", "dlss_enabler")
 OPTISCALER_COMPATIBILITY_STATES = ("supported", "unsupported", "unknown", "warning")
-OPTISCALER_FSR4_MODES = ("automatic", "normal", "force_int8", "disabled")
+OPTISCALER_FSR4_MODES = ("automatic", "normal", "force_int8", "lite", "disabled")
+# Upscaler DLL variant placed over OptiScaler's amd_fidelityfx_upscaler_dx12.dll.
+OPTISCALER_FSR_VARIANTS = ("official", "cyboman_exact", "cyboman_lossy2")
+OPTISCALER_LOG_MODES = ("auto", "info", "debug")
+OPTISCALER_FSR4_PRESETS = ("auto", "0", "1", "2", "3", "4", "5")
+OPTISCALER_OVERLAY_SHORTCUTS = ("auto", "0x2D", "0x24", "0x23", "0x79", "0x7B")
 OPTISCALER_SOURCE_IDENTITIES = ("", "official_optiscaler", "local_archive")
 OPTISCALER_RUNTIME_VERIFICATION_STATES = (
     "not_verified",
     "verified_fsr4",
     "verified_fsr4_int8",
+    "verified_fsr4_int8_lite",
     "verified_fsr3_fallback",
 )
 # These are the values used by supported upstream OptiScaler INI generations.
@@ -62,9 +68,12 @@ _LOCAL_GAME_ID = re.compile(r"^local-[0-9a-f]{24}$")
 
 
 def validate_optiscaler_game_id(value: object) -> str:
+    """Steam AppID, ``local-<hash>`` or a Heroic/Lutris game ID (file-name safe)."""
     text = str(value or "").strip()
     if _LOCAL_GAME_ID.fullmatch(text):
         return text
+    if text.startswith(("heroic-", "lutris-")):
+        return validate_game_key(text)
     return validate_app_id(text)
 
 
@@ -105,6 +114,11 @@ class OptiScalerProfile:
     dxgi_spoofing_mode: str = "auto"
     reflex_emulation: bool = False
     optipatcher_compatibility: str = "unknown"
+    fsr_variant: str = "official"
+    fsr4_preset: str = "auto"
+    sharpness: str = "auto"
+    log_mode: str = "auto"
+    overlay_shortcut: str = "auto"
     configuration_applied: bool = False
     runtime_verification_status: str = "not_verified"
     manifest_id: str = ""
@@ -160,6 +174,31 @@ class OptiScalerProfile:
         if compatibility not in OPTISCALER_COMPATIBILITY_STATES:
             raise ValueError("unsupported OptiPatcher compatibility state")
         object.__setattr__(self, "optipatcher_compatibility", compatibility)
+        for name, allowed in (
+            ("fsr_variant", OPTISCALER_FSR_VARIANTS),
+            ("fsr4_preset", OPTISCALER_FSR4_PRESETS),
+            ("log_mode", OPTISCALER_LOG_MODES),
+        ):
+            value = str(getattr(self, name) or "").strip().casefold()
+            if value not in allowed:
+                raise ValueError(f"unsupported OptiScaler {name}")
+            object.__setattr__(self, name, value)
+        shortcut = str(self.overlay_shortcut or "auto").strip()
+        if shortcut.casefold() == "auto":
+            shortcut = "auto"
+        if shortcut not in OPTISCALER_OVERLAY_SHORTCUTS:
+            raise ValueError("unsupported OptiScaler overlay shortcut")
+        object.__setattr__(self, "overlay_shortcut", shortcut)
+        sharpness = str(self.sharpness or "auto").strip().casefold()
+        if sharpness != "auto":
+            try:
+                number = float(sharpness)
+            except ValueError as error:
+                raise ValueError("unsupported OptiScaler sharpness") from error
+            if not 0.0 <= number <= 1.0:
+                raise ValueError("unsupported OptiScaler sharpness")
+            sharpness = f"{number:.2f}"
+        object.__setattr__(self, "sharpness", sharpness)
         for name in ("fake_nvapi_mode", "dxgi_spoofing_mode"):
             value = str(getattr(self, name) or "auto").strip().casefold()
             if value not in {"auto", "enabled", "disabled"}:
@@ -214,6 +253,11 @@ class OptiScalerProfile:
             "dxgi_spoofing_mode": self.dxgi_spoofing_mode,
             "reflex_emulation": self.reflex_emulation,
             "optipatcher_compatibility": self.optipatcher_compatibility,
+            "fsr_variant": self.fsr_variant,
+            "fsr4_preset": self.fsr4_preset,
+            "sharpness": self.sharpness,
+            "log_mode": self.log_mode,
+            "overlay_shortcut": self.overlay_shortcut,
             "configuration_applied": self.configuration_applied,
             "runtime_verification_status": self.runtime_verification_status,
             "manifest_id": self.manifest_id,
@@ -265,6 +309,7 @@ class OptiScalerProfile:
 __all__ = [
     "OPTISCALER_CHANNELS",
     "OPTISCALER_FSR4_MODES",
+    "OPTISCALER_FSR_VARIANTS",
     "OPTISCALER_PROXY_DLLS",
     "OPTISCALER_RUNTIME_VERIFICATION_STATES",
     "OPTISCALER_SCHEMA_VERSION",

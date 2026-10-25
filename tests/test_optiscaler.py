@@ -12,6 +12,7 @@ import pytest
 import game_optimization_linux.services.archive_reader as archive_reader_module
 
 from game_optimization_linux.models import FilesystemType, Game, Launcher
+from game_optimization_linux.services.optiscaler_online import OptiScalerReleaseClient
 from game_optimization_linux.controllers import AppController
 from game_optimization_linux.providers import DemoGameProvider
 from game_optimization_linux.services import (
@@ -1494,6 +1495,8 @@ def test_optiscaler_status_request_never_blocks_qml_on_detection(
         task_service=MockTaskService(),
         settings_store=SettingsStore(tmp_path / "settings-status.json"),
         optiscaler_service=service,
+        # Hermetic: never read the user's real release/archive cache.
+        optiscaler_release_client=OptiScalerReleaseClient(tmp_path / "release-cache"),
         initial_games=(game,),
         demo_mode=True,
         auto_refresh=False,

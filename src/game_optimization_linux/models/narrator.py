@@ -175,11 +175,18 @@ class NarratorGameSettings:
     noise_scale: float | None = None
     noise_w_scale: float | None = None
     subtitle_region: NormalizedRect = field(default_factory=NormalizedRect)
+    # Runtime-only provenance for the one-shot ROI diagnostic. It is omitted
+    # from to_dict(), so saving settings never changes the on-disk schema.
+    subtitle_region_source: str = field(
+        default="default", compare=False, repr=False
+    )
     capture_sampling_hz: float = 6.0
     visual_change_threshold: float = 0.08
     stabilization_ms: int = 240
     ocr_min_confidence: float = 0.62
     duplicate_cooldown_ms: int = 4500
+    # Speech only: when False a leading "Name:" speaker label is not read.
+    read_speaker_names: bool = False
     updated_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     def __post_init__(self) -> None:
@@ -188,6 +195,8 @@ class NarratorGameSettings:
             raise ValueError("unsupported narrator settings schema version")
         if not isinstance(self.enabled, bool):
             raise ValueError("enabled must be a boolean")
+        if not isinstance(self.read_speaker_names, bool):
+            raise ValueError("read_speaker_names must be a boolean")
         object.__setattr__(self, "source_mode", NarratorSourceMode(self.source_mode))
         object.__setattr__(self, "capture_source", CaptureSourceType(self.capture_source))
         object.__setattr__(
@@ -195,6 +204,8 @@ class NarratorGameSettings:
             "subtitle_language_mode",
             NarratorSubtitleLanguageMode(self.subtitle_language_mode),
         )
+        if self.subtitle_region_source not in {"default", "saved"}:
+            raise ValueError("subtitle_region_source must be default or saved")
         for name in (
             "subtitle_adapter_id",
             "ocr_provider_id",
@@ -320,11 +331,17 @@ class NarratorGameSettings:
                 if isinstance(values.get("subtitle_region"), Mapping)
                 else None
             ),
+            subtitle_region_source=(
+                "saved"
+                if isinstance(values.get("subtitle_region"), Mapping)
+                else "default"
+            ),
             capture_sampling_hz=values.get("capture_sampling_hz", 6.0),
             visual_change_threshold=values.get("visual_change_threshold", 0.08),
             stabilization_ms=values.get("stabilization_ms", 240),
             ocr_min_confidence=values.get("ocr_min_confidence", 0.62),
             duplicate_cooldown_ms=values.get("duplicate_cooldown_ms", 4500),
+            read_speaker_names=values.get("read_speaker_names", False),
             updated_at=parsed_updated_at,
         )
 
@@ -352,6 +369,7 @@ class NarratorGameSettings:
             "stabilization_ms": self.stabilization_ms,
             "ocr_min_confidence": self.ocr_min_confidence,
             "duplicate_cooldown_ms": self.duplicate_cooldown_ms,
+            "read_speaker_names": self.read_speaker_names,
             "updated_at": self.updated_at.isoformat(),
         }
 
@@ -460,6 +478,28 @@ class OcrResult:
     # from "a readable subtitle was present and still lost".
     strongest_line_confidence: float | None = None
     strongest_line_text: str = ""
+    selected_line_confidence: float | None = None
+    quality_score: float | None = None
+    input_width: int = 0
+    input_height: int = 0
+    preprocessed_width: int = 0
+    preprocessed_height: int = 0
+    # Image preparation actually used ("default" or "bright_mask") and, when an
+    # opt-in mode fell back to the default image, the reason.
+    preprocess: str = "default"
+    preprocess_fallback: str = ""
+    # Outline modes only: fraction of contrasted pixels >= 190 (the fallback
+    # signal) and the bright threshold actually used (190, or 220 when the
+    # adaptive mode switched). None / 0 for the other paths.
+    preprocess_bright_fraction: float | None = None
+    preprocess_threshold: int = 0
+    # Adaptive outline only: "yes"/"no" for the bright-background switch.
+    preprocess_switched: str = ""
+    # Image-veto shadow mode only: outline mask pooled to 4x4 blocks as
+    # (columns, rows, bits) - bit set when any pixel of the block is text.
+    preprocess_mask: tuple[int, int, int] | None = None
+    leading_low_quality_tokens: tuple[str, ...] = ()
+    trailing_low_quality_tokens: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -502,6 +542,13 @@ class OcrDecisionObservation:
     clean_short_phrase_evidence: bool = False
     visual_change_decision: str = ""
     filter_summary: str = ""
+    episode_id: int = 0
+    canonical_text: str = ""
+    selected_line_confidence: float | None = None
+    quality_score: float | None = None
+    char_similarity: float | None = None
+    token_similarity: float | None = None
+    reason_code: str = ""
 
     def to_dict(self, *, now: float | None = None) -> dict[str, Any]:
         current = time.monotonic() if now is None else float(now)
@@ -540,6 +587,13 @@ class OcrDecisionObservation:
             "cleanShortPhraseEvidence": self.clean_short_phrase_evidence,
             "visualChangeDecision": self.visual_change_decision,
             "filterSummary": self.filter_summary,
+            "episodeId": self.episode_id,
+            "canonicalText": self.canonical_text,
+            "selectedLineConfidence": self.selected_line_confidence,
+            "qualityScore": self.quality_score,
+            "charSimilarity": self.char_similarity,
+            "tokenSimilarity": self.token_similarity,
+            "reasonCode": self.reason_code,
         }
 
 

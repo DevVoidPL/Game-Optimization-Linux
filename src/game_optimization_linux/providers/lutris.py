@@ -265,7 +265,15 @@ class LutrisGameProvider(GameProvider):
         config_id = _clean(row.get("configpath"))
         if not config_id:
             return {}
-        path = root.config_dir / "games" / f"{config_id}.yml"
+        # Current Lutris uses its data directory as the config directory when
+        # ~/.config/lutris does not exist, so game YAML may live in either.
+        candidates = tuple(
+            dict.fromkeys(
+                directory / "games" / f"{config_id}.yml"
+                for directory in (root.config_dir, root.data_dir)
+            )
+        )
+        path = next((item for item in candidates if item.is_file()), candidates[0])
         try:
             if not path.is_file():
                 return {}
