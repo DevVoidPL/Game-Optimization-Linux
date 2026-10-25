@@ -1,68 +1,55 @@
-# GameOpti — development status and 2.0 Beta plans
+# GameOpti Beta 2.0
 
-Announcement updated: **13 October 2026**.
+Updated: **25 October 2026**.
 
-GameOpti is the short interface name of **Game Optimization Linux**.
+GameOpti Beta 2.0 is being completed and polished, with bug fixing and testing
+underway. The current public download is
+[1.8.0 Alpha](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v1.8.0-alpha).
+Beta 2.0 has not been released; there is no fixed release date.
 
-## Available now: 1.8 Alpha
+## Beta 2.0 scope
 
-The current public release is
-[Game Optimization Linux 1.8.0 Alpha](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v1.8.0-alpha).
-Use its release notes to distinguish shipped changes from development work.
-Installation instructions are in [README.md](README.md#flatpak-installation).
+- **Library and launch integration:** Steam, Heroic, Lutris and manual games;
+  per-game profiles, launcher configuration, previews, backup and restore.
+- **Graphics:** OptiScaler, FSR modes and variants including INT8 Lite,
+  DLSS Enabler, vkBasalt and ReShade.
+- **Frame generation:** per-game selection of lsfg-vk, standalone MAKO Renderer
+  or afmf-linux, with component management and backend-specific configuration.
+- **GPU-memory protection:** supported host setup, per-game priority,
+  capability-specific memory-pressure controls and effective-process diagnostics.
+- **Monitoring and analysis:** MangoHud profiles and logging, gameplay recording,
+  comparisons and explainable performance recommendations.
+- **Storage:** Btrfs compression and measurement, update-aware jobs, deep
+  analysis and reversible cleanup quarantine.
+- **Narrator:** local subtitle capture/OCR, optional English-to-Polish
+  translation and Polish speech, with per-game capture regions.
+- **Interface:** Desktop and controller-oriented Couch Mode, light/dark themes
+  and English, Polish and Spanish translations.
+- **Additional tweaks and custom commands:** expanded compatibility and launch
+  controls are part of the Beta scope; further implementation and polish remain.
 
-The Alpha includes experimental features and known limitations. In particular,
-Narrator accuracy and duplicate-dialogue prevention are still being improved.
-Graphics Remaster functionality and the DLSS Enabler backend are not completed
-features of 1.8 Alpha.
+This scope describes the development version, not the contents of the public
+Alpha download. The [README](README.md) presents the interface and integrations.
 
-## In development and verification
+## Work continuing before release
 
-- **Measured game optimization:** developing analysis-backed profiles and
-  recommendations, with before/after measurements and verification of effects.
-  The goal is real performance benefits, including potential FPS gains where
-  supported by the game and configuration; no gain is guaranteed.
-- **Polish Game Narrator / Lektor:** investigating OCR accuracy, subtitle-region
-  handling, the quality of the first spoken line, and repeated dialogue.
-  Passing unit tests alone does not establish correct behaviour in a game.
-- **Compatibility and usability:** continued work on Desktop/Couch workflows,
-  launcher integration, and Flatpak/host behaviour across Linux environments.
+The focus is on completing the remaining configuration workflows, fixing bugs,
+polishing layout and controller navigation, and testing real-game compatibility
+across launchers, graphics stacks and Flatpak environments. Performance analysis,
+Narrator accuracy and the interaction between graphics tools remain active areas
+of refinement. Compatibility and performance depend on the game and system.
 
-These areas are under development and testing. They are not a claim that all
-changes are finished, validated, or present in the public download.
+Expanded tweaks and custom commands are not marked complete. GPU-memory priority,
+upscaling and frame generation are separate mechanisms; no universal FPS or
+memory-saving result is promised.
 
-## Announced: GameOpti 2.0 Beta
+AI Graphics Remaster is postponed and is not part of Beta 2.0.
 
-**COMING IN ~1 MONTH** is an approximate planning estimate from this
-announcement, not a fixed release date. **2.0 Beta is not available for download.**
+## Follow development
 
-The planned update focuses on measured optimization, better Polish narration,
-and further improvements and new capabilities. Details will be revealed in
-subsequent development updates; the final scope depends on implementation and
-verification.
-
-Local source builds may already carry an internal `2.0.0-beta` label or draft
-release metadata. Neither is evidence of a public Beta release. Public
-availability will be announced through
+[Void_Developer_PL on YouTube](https://www.youtube.com/@Void_Developer_PL) shares
+progress and demonstrations. Public builds and release notes appear in
 [GitHub Releases](https://github.com/DevVoidPL/Game-Optimization-Linux/releases).
 
-## Planned and unfinished work
-
-- More explainable per-game recommendations and wider performance validation.
-- Extending measured FPS sessions beyond the current Steam runner workflow.
-- Further Narrator accuracy and duplicate-prevention improvements.
-- Further Couch Mode refinements and a refreshed public screenshot gallery.
-- Graphics Remaster and DLSS Enabler integration, with scope and availability
-  to be confirmed in future updates.
-- Other new capabilities to be announced as development progresses.
-
-This is a direction of work, not a guarantee that every item will ship in
-2.0 Beta. It is not a changelog of completed changes.
-
-## Follow the next updates
-
-**[Subscribe to Void_Developer_PL on YouTube](https://www.youtube.com/@Void_Developer_PL)**
-for progress reports, gameplay demonstrations, and upcoming reveals.
-
-For contributor checks and the distinction between automated tests and
-real-game verification, see [TESTING.md](TESTING.md).
+[Report a problem](https://github.com/DevVoidPL/Game-Optimization-Linux/issues) ·
+[Testing guide](TESTING.md) · [Support the project](README.md#support-gameopti)

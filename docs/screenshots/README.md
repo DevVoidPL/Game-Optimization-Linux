@@ -1,21 +1,29 @@
-# Public screenshot checklist
+# Public screenshots
 
-This directory is reserved for sanitized, public screenshots of Game
-Optimization Linux. Before adding an image, capture it with synthetic/demo data
-and verify that it contains no username, hostname, real library, local path,
-mount name, disk identifier, or personal configuration.
+Selected interface previews for the GameOpti Beta 2.0 README.
 
-Expected files:
+| File | View |
+| --- | --- |
+| `beta-2-library-dark.png` | Desktop library, Polish interface |
+| `beta-2-gpu-memory.png` | GPU-memory protection and optimization profiles |
+| `beta-2-frame-generation.png` | Per-game backend selection and setup |
+| `beta-2-post-processing.png` | Post-processing, presets and restore controls |
+| `couch-home.png` | Couch Mode with built-in demo data |
 
-- `games-library.png` — unified library with fictional games;
-- `game-overview.png` — overview of a synthetic game;
-- `optimization.png` — optimization profile for a synthetic game;
-- `graphics-remaster.png` — Graphics Remaster modes;
-- `optiscaler.png` — OptiScaler configuration with synthetic paths;
-- `narrator.png` — Narrator / Lektor configuration;
-- `storage.png` — Btrfs/storage analysis using synthetic values.
+The four Desktop images were supplied by the project owner on 25 October 2026.
+They are cropped interface excerpts: window decorations, desktop panels,
+installation paths and diagnostic command areas are outside the published crops.
+Image metadata has been removed. Interface text and status indicators have not
+been altered. These are interface previews, not gameplay or benchmark results.
 
-The existing `tests/couch_tv_screenshot_probe.py` is safe for Couch Mode visual
-inspection in its default mode. It does not produce this complete Desktop Mode
-set, so its output should not be copied here as a substitute. Never pass
-`--live` when preparing public screenshots.
+The Couch image was captured from the development application on 20 October 2026
+using built-in demo data and isolated settings. It contains sample game entries,
+with host resource monitoring disabled. Earlier Alpha images in this directory
+remain available as historical screenshots.
+
+Game artwork and third-party logos belong to their respective rights holders;
+they illustrate the application and do not imply endorsement.
+
+Before adding another screenshot, inspect both pixels and metadata. Exclude
+usernames, account identifiers, private paths, personal configuration, private
+voice/model identifiers and logs. Prefer demo data when capturing new examples.
