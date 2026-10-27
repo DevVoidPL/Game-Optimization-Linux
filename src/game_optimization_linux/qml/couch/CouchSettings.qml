@@ -299,6 +299,8 @@ FocusScope {
             return qsTr("Polish subtitle OCR")
         if (componentId === "translation.opus-en-pl")
             return qsTr("English to Polish translation")
+        if (componentId === "tts.voidek")
+            return qsTr("Polish voice - Voidek")
         if (componentId === "tts.polish-voice")
             return qsTr("Polish voice - Gosia")
         if (componentId === "tts.polish-bass")

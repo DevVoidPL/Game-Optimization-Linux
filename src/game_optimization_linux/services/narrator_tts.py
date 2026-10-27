@@ -47,6 +47,14 @@ PIPER_DARKMAN_CONFIG_RELATIVE_PATH = (
     Path("voices") / "pl_PL-darkman-medium.onnx.json"
 )
 # User-imported voices live next to the downloaded ones, in the same data dir.
+# Voidek (owner-created, epoch 991): the only catalog voice and the default.
+# On-demand component; the pinned files are in narrator_components.
+PIPER_VOIDEK_COMPONENT_ID = "tts.voidek"
+PIPER_VOIDEK_VOICE_ID = "voidek-pl-e991"
+PIPER_VOIDEK_VOICE_VERSION = "e991-ca2ad0a"
+PIPER_VOIDEK_MODEL_RELATIVE_PATH = Path("voices") / "voidek-pl-e991.onnx"
+PIPER_VOIDEK_CONFIG_RELATIVE_PATH = Path("voices") / "voidek-pl-e991.onnx.json"
+PIPER_DEFAULT_VOICE_ID = PIPER_VOIDEK_VOICE_ID
 PIPER_CUSTOM_COMPONENT_ID = "tts.custom-voices"
 PIPER_CUSTOM_VOICE_PREFIX = "custom-"
 _CUSTOM_VOICE_DIRECTORY = Path("voices")
@@ -172,7 +180,22 @@ class PiperSynthesis:
     voice_default_length_scale: float | None = None
 
 
-POLISH_VOICES = (
+VOIDEK_VOICE = PolishVoice(
+    voice_id=PIPER_VOIDEK_VOICE_ID,
+    name="Voidek",
+    language="pl",
+    version=PIPER_VOIDEK_VOICE_VERSION,
+    component_id=PIPER_VOIDEK_COMPONENT_ID,
+    model_relative_path=PIPER_VOIDEK_MODEL_RELATIVE_PATH,
+    config_relative_path=PIPER_VOIDEK_CONFIG_RELATIVE_PATH,
+)
+
+# Catalog voices offered for download and selection.
+POLISH_VOICES = (VOIDEK_VOICE,)
+
+# Former catalog voices. They are never offered, listed or selected; files a
+# user already downloaded are left on disk (cleanup is a separate explicit action).
+LEGACY_POLISH_VOICES = (
     PolishVoice(
         voice_id=PIPER_VOICE_ID,
         name="Gosia",
@@ -201,6 +224,9 @@ POLISH_VOICES = (
         config_relative_path=PIPER_DARKMAN_CONFIG_RELATIVE_PATH,
     ),
 )
+
+# Managed (component-installed) voice of each catalog TTS component.
+MANAGED_VOICE_COMPONENTS = {voice.component_id: voice.voice_id for voice in POLISH_VOICES}
 
 
 class PiperWorker(Protocol):
@@ -525,7 +551,7 @@ class PiperWorkerClient:
 
 class PiperPolishTtsProvider:
     provider_id = PIPER_PROVIDER_ID
-    default_voice_id = PIPER_VOICE_ID
+    default_voice_id = PIPER_DEFAULT_VOICE_ID
 
     def __init__(
         self,
@@ -547,7 +573,7 @@ class PiperPolishTtsProvider:
 
     def prepare(self, voice_id: str) -> None:
         """Load only the selected voice in the persistent worker."""
-        selected_voice = voice_id.strip() or PIPER_VOICE_ID
+        selected_voice = voice_id.strip() or PIPER_DEFAULT_VOICE_ID
         if not self._runtime_available() or not self.voice_installed(selected_voice):
             return
         with self._inference_lock:
@@ -566,6 +592,7 @@ class PiperPolishTtsProvider:
 
     @property
     def voices(self) -> tuple[PolishVoice, ...]:
+        """Selectable voices: the catalog voice (Voidek) and imported custom voices."""
         return POLISH_VOICES + self.custom_voices
 
     @property
@@ -725,16 +752,16 @@ class PiperPolishTtsProvider:
     def model_path(self) -> Path:
         return (
             self._component_root
-            / PIPER_COMPONENT_ID
-            / PIPER_MODEL_RELATIVE_PATH
+            / PIPER_VOIDEK_COMPONENT_ID
+            / PIPER_VOIDEK_MODEL_RELATIVE_PATH
         )
 
     @property
     def config_path(self) -> Path:
         return (
             self._component_root
-            / PIPER_COMPONENT_ID
-            / PIPER_CONFIG_RELATIVE_PATH
+            / PIPER_VOIDEK_COMPONENT_ID
+            / PIPER_VOIDEK_CONFIG_RELATIVE_PATH
         )
 
     @property
@@ -746,7 +773,7 @@ class PiperPolishTtsProvider:
         if not self._runtime_available():
             return "The Piper CPU runtime is unavailable"
         if not self.installed_voice_ids:
-            return "Install the verified Polish Piper voice"
+            return "Install the Voidek Polish voice or import your own Piper voice"
         return "Piper Polish speech synthesis is ready"
 
     @property
@@ -799,7 +826,7 @@ class PiperPolishTtsProvider:
             raise ValueError("Speech text must not be empty")
         if language.casefold() not in {"pl", "pl-pl"}:
             raise ValueError("The current Piper provider supports Polish only")
-        selected_voice = voice_id.strip() or PIPER_VOICE_ID
+        selected_voice = voice_id.strip() or PIPER_DEFAULT_VOICE_ID
         if selected_voice not in {voice.voice_id for voice in self.voices}:
             raise ValueError(f"Unsupported Polish voice: {selected_voice}")
         try:
@@ -937,6 +964,15 @@ class PiperPolishTtsProvider:
 
 
 __all__ = [
+    "LEGACY_POLISH_VOICES",
+    "MANAGED_VOICE_COMPONENTS",
+    "PIPER_DEFAULT_VOICE_ID",
+    "PIPER_VOIDEK_COMPONENT_ID",
+    "PIPER_VOIDEK_CONFIG_RELATIVE_PATH",
+    "PIPER_VOIDEK_MODEL_RELATIVE_PATH",
+    "PIPER_VOIDEK_VOICE_ID",
+    "PIPER_VOIDEK_VOICE_VERSION",
+    "VOIDEK_VOICE",
     "PIPER_COMPONENT_ID",
     "PIPER_BASS_COMPONENT_ID",
     "PIPER_BASS_CONFIG_RELATIVE_PATH",

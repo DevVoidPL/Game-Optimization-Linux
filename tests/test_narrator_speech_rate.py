@@ -22,10 +22,10 @@ from game_optimization_linux.services.narrator_piper_worker import (
     _voice_default_length_scale,
 )
 from game_optimization_linux.services.narrator_tts import (
-    PIPER_COMPONENT_ID,
-    PIPER_CONFIG_RELATIVE_PATH,
-    PIPER_MODEL_RELATIVE_PATH,
-    PIPER_VOICE_ID,
+    PIPER_VOIDEK_COMPONENT_ID,
+    PIPER_VOIDEK_CONFIG_RELATIVE_PATH,
+    PIPER_VOIDEK_MODEL_RELATIVE_PATH,
+    PIPER_DEFAULT_VOICE_ID,
     PiperPolishTtsProvider,
     PiperSynthesis,
 )
@@ -303,9 +303,9 @@ class _RecordingWorker:
 
 
 def _provider_with(worker: _RecordingWorker, root) -> PiperPolishTtsProvider:
-    component = root / PIPER_COMPONENT_ID
-    model = component / PIPER_MODEL_RELATIVE_PATH
-    config = component / PIPER_CONFIG_RELATIVE_PATH
+    component = root / PIPER_VOIDEK_COMPONENT_ID
+    model = component / PIPER_VOIDEK_MODEL_RELATIVE_PATH
+    config = component / PIPER_VOIDEK_CONFIG_RELATIVE_PATH
     model.parent.mkdir(parents=True, exist_ok=True)
     model.write_bytes(b"model fixture")
     config.write_text("{}", encoding="utf-8")
@@ -328,7 +328,7 @@ def test_effective_length_scale_is_logged_per_utterance(
         provider.synthesize(
             "Batman wraca.",
             language="pl",
-            voice_id=PIPER_VOICE_ID,
+            voice_id=PIPER_DEFAULT_VOICE_ID,
             speech_rate=1.30,
         )
 
@@ -350,13 +350,13 @@ def test_provider_omits_unset_articulation_and_forwards_set_values(
     provider.synthesize(
         "Batman wraca.",
         language="pl",
-        voice_id=PIPER_VOICE_ID,
+        voice_id=PIPER_DEFAULT_VOICE_ID,
         speech_rate=1.0,
     )
     provider.synthesize(
         "Batman wraca.",
         language="pl",
-        voice_id=PIPER_VOICE_ID,
+        voice_id=PIPER_DEFAULT_VOICE_ID,
         speech_rate=1.0,
         noise_scale=0.4,
         noise_w_scale=0.5,

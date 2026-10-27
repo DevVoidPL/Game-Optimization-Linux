@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import sys
 
 
 APP_NAME = "Game Optimization Linux"
@@ -63,6 +64,10 @@ CONFIG_DIR = CONFIG_HOME / _APP_DIRECTORY_NAME
 STATE_DIR = STATE_HOME / _APP_DIRECTORY_NAME
 CACHE_DIR = CACHE_HOME / _APP_DIRECTORY_NAME
 DATA_DIR = DATA_HOME / _APP_DIRECTORY_NAME
+# Narrator components shipped inside the application (Flatpak: /app/share/...).
+# <prefix>/lib/pythonX.Y/site-packages/game_optimization_linux -> <prefix>
+_INSTALL_PREFIX = Path(__file__).resolve().parents[4] if len(Path(__file__).resolve().parents) > 4 else Path(sys.prefix)
+BUNDLED_NARRATOR_COMPONENTS_DIR = _INSTALL_PREFIX / "share" / _APP_DIRECTORY_NAME / "narrator-components"
 SETTINGS_FILE = CONFIG_DIR / "settings.json"
 GAMEPAD_MAPPINGS_FILE = CONFIG_DIR / "gamecontrollerdb.txt"
 LIBRARY_CACHE_FILE = CACHE_DIR / "library-v1.json"
@@ -94,6 +99,7 @@ __all__ = [
     "APP_ICON_VARIANTS",
     "APP_NAME",
     "APP_VERSION",
+    "BUNDLED_NARRATOR_COMPONENTS_DIR",
     "ANALYSIS_CACHE_FILE",
     "CONFIG_DIR",
     "CONFIG_HOME",

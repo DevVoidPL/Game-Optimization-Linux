@@ -85,7 +85,7 @@ def test_global_page_owns_narrator_configuration_and_picker(tmp_path) -> None:
     home_tiles = couch_home[couch_home.index("homeTiles"):couch_home.index("displayGames")]
     assert '"title": qsTr("Lektor")' not in home_tiles
     assert '"id": "narrator"' in couch_details
-    assert 'qsTr("Lektor")' in couch_main
+    assert 'qsTr("Lektor")' not in couch_main  # the global Couch Narrator page was removed
     assert 'qsTr("Lektor")' in couch_details
     assert "narratorActions" in couch_details
     assert not (root / "pages" / "details" / "NarratorTab.qml").exists()

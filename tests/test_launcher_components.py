@@ -352,3 +352,40 @@ def test_service_alone_does_not_install_without_inspection() -> None:
         assert service.repair(HEROIC, ["mangohud"], launcher_running=lambda: False) == []
     finally:
         service.shutdown()
+
+
+def test_runtime_update_25_08_to_26_08_never_installs_the_cached_branch(tmp_path: Path) -> None:
+    """Heroic moved to 26.08 after the inspection was cached: the 25.08 ref is
+    not installed and the next check offers the 26.08 extension."""
+    host = _Host()
+    game, controller = _setup(tmp_path, host)
+    try:
+        first = _components(controller, game)
+        assert first["components"][0]["ref"] == MANGO_REF and first["branch"] == "25.08"
+        host.runtime, host.point_version = "org.freedesktop.Platform/x86_64/26.08", "26.08"
+        assert controller.repairLauncherComponents(game.id)["started"] == ["mangohud"]
+        failed = _wait(lambda: controller.getLauncherComponents(game.id),
+                       lambda value: value["components"][0]["state"] not in {"installing", "checking"})
+        item = failed["components"][0]
+        assert host.install_calls == []
+        assert item["state"] == "error" and item["kind"] == "runtime_changed" and "26.08" in item["message"]
+        refreshed = _wait(lambda: controller.getLauncherComponents(game.id),
+                          lambda value: value.get("branch") == "26.08" and not value["pending"])
+        assert refreshed["components"][0]["ref"] == MANGO_REF.replace("25.08", "26.08")
+        assert refreshed["runtime"] == "org.freedesktop.Platform/x86_64/26.08"
+    finally:
+        controller.shutdown()
+
+
+def test_sandbox_probe_reports_the_current_runtime_branch(tmp_path: Path) -> None:
+    host = _Host(runtime="org.freedesktop.Platform/x86_64/26.08", point_version="26.08")
+    game, controller = _setup(tmp_path, host)
+    try:
+        caps = _wait(lambda: controller.getGameCapabilities(game.id), lambda c: not c["pending"])
+        assert caps["mangohud"]["available"] is False
+        assert "(runtime 26.08)" in caps["tools"]["mangohud"]["reason"]
+        status = _components(controller, game)
+        assert status["components"][0]["ref"].endswith("/x86_64/26.08")
+        assert status["components"][0]["argv"].endswith("org.freedesktop.Platform.VulkanLayer.MangoHud/x86_64/26.08")
+    finally:
+        controller.shutdown()

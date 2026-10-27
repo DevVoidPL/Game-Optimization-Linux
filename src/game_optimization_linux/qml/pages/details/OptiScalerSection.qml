@@ -99,6 +99,24 @@ SurfaceCard {
         return qsTr("Not installed")
     }
 
+    // Ownership of the shared proxy file, independent of the saved profile state.
+    function removeAvailable() {
+        var ownership = section.statusData.ownership
+        if (ownership && ownership.canRemove !== undefined) return Boolean(ownership.canRemove)
+        return Boolean(section.statusData.installed)
+    }
+    function ownershipText() {
+        var o = section.statusData.ownership || ({})
+        var proxy = String(o.proxy || "dxgi.dll")
+        if (o.state === "parked") return qsTr("Parked by DLSS Enabler; OptiScaler files are kept aside")
+        if (o.state === "displaced") return qsTr("Displaced: %1 now belongs to %2. Other OptiScaler files are still installed.").arg(proxy).arg(String(o.ownerName || ""))
+        if (o.state === "modified") return qsTr("Modified or conflicting: %1 does not match the OptiScaler manifest").arg(proxy)
+        if (o.state === "removed" && o.owner && o.owner !== "absent" && o.owner !== "foreign")
+            return qsTr("Not installed. The remaining manifest is history only; %1 now belongs to %2 and will not be removed here.").arg(proxy).arg(String(o.ownerName || ""))
+        if (o.state === "removed") return qsTr("Not installed. The remaining manifest is history only.")
+        return ""
+    }
+
     function modeLabel(mode) {
         if (mode === "automatic") return qsTr("Automatic")
         if (mode === "normal") return qsTr("FSR 4.1.1")
@@ -463,6 +481,12 @@ SurfaceCard {
                     Label { text: qsTr("Status instalacji"); color: App.Theme.textMuted }
                     Label { Layout.fillWidth: true; text: section.stateLabel(section.displayState); color: App.Theme.text }
 
+                    Label { visible: section.ownershipText().length > 0; text: qsTr("Shared loader"); color: App.Theme.textMuted }
+                    Label { objectName: "optiScalerOwnershipLabel"; visible: text.length > 0; Layout.fillWidth: true; text: section.ownershipText(); color: App.Theme.textSecondary; wrapMode: Text.WordWrap }
+
+                    Label { visible: removeBlockerLabel.text.length > 0; text: qsTr("Removal"); color: App.Theme.textMuted }
+                    Label { id: removeBlockerLabel; objectName: "optiScalerRemoveBlocker"; visible: text.length > 0; Layout.fillWidth: true; text: String((section.statusData.ownership || {}).removeBlocker || ""); color: App.Theme.warning; wrapMode: Text.WordWrap }
+
                     Label { text: qsTr("Wersja zainstalowana"); color: App.Theme.textMuted }
                     Label { Layout.fillWidth: true; text: String(section.statusData.installedVersion || qsTr("Brak")); color: App.Theme.text }
 
@@ -513,8 +537,7 @@ SurfaceCard {
                         text: qsTr("Usuń")
                         iconSource: App.UiIcons.actionRemove
                         kind: "danger"
-                        enabled: Boolean(section.controller && section.controller.removeOptiScaler)
-                                 && Boolean(section.statusData.manifestId || section.statusData.installed)
+                        enabled: Boolean(section.controller && section.controller.removeOptiScaler) && section.removeAvailable()
                         onClicked: removeDialog.ask(qsTr("Remove OptiScaler?"), qsTr("GOL-created files will be removed and verified original game files will be restored. Unknown modified binaries are preserved and block removal for review."), qsTr("Remove"), true, "remove")
                     }
                 }
@@ -1215,7 +1238,7 @@ SurfaceCard {
                 AppButton { text: qsTr("Open directory"); iconSource: App.UiIcons.fileFolder; kind: "secondary"; enabled: Boolean(section.statusData.installDirectory); onClicked: section.controller.openOptiScalerDirectory(section.gameId) }
                 AppButton { text: qsTr("Show manifest"); iconSource: App.UiIcons.fileFile; kind: "secondary"; enabled: Boolean(section.statusData.manifestPath); onClicked: section.controller.openOptiScalerManifest(section.gameId) }
                 Item { Layout.fillWidth: true }
-                AppButton { text: qsTr("Remove OptiScaler"); iconSource: App.UiIcons.actionRemove; kind: "danger"; enabled: Boolean(section.statusData.manifestId); onClicked: removeDialog.ask(qsTr("Remove OptiScaler?"), qsTr("GOL-created files will be removed and verified original game files will be restored. Unknown modified binaries are preserved and block removal for review."), qsTr("Remove"), true, "remove") }
+                AppButton { text: qsTr("Remove OptiScaler"); iconSource: App.UiIcons.actionRemove; kind: "danger"; enabled: section.removeAvailable(); onClicked: removeDialog.ask(qsTr("Remove OptiScaler?"), qsTr("GOL-created files will be removed and verified original game files will be restored. Unknown modified binaries are preserved and block removal for review."), qsTr("Remove"), true, "remove") }
                 AppButton { text: qsTr("Restore previous files"); iconSource: App.UiIcons.actionRestore; kind: "secondary"; enabled: ["partial", "restore_required"].indexOf(String(section.statusData.installationState || "")) >= 0 && (section.statusData.replacedFiles || []).length > 0; onClicked: removeDialog.ask(qsTr("Restore previous files?"), qsTr("Backed-up files will replace the matching Game Optimization-managed OptiScaler files after hash verification."), qsTr("Restore"), true, "restore") }
             }
         }

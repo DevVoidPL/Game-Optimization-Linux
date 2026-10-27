@@ -55,6 +55,14 @@ class ProtonTweaksRepository:
         )
         return path
 
+    def environment(self, app_id: object) -> dict[str, str]:
+        profile = self.load(app_id)
+        result = profile.environment()
+        directory = profile.extra.get("log_directory", "")
+        if profile.states.get("proton_log") == "enabled" and directory:
+            result["PROTON_LOG_DIR"] = str(directory)
+        return result
+
     def from_payload(
         self, app_id: object, payload: Mapping[str, Any]
     ) -> ProtonTweaksProfile:
@@ -74,6 +82,14 @@ class ProtonTweaksRepository:
             ):
                 raise ProtonTweaksError("enabledTweaks must be a list")
             enabled = list(raw_enabled)
+        states = payload.get("states")
+        if states is not None and not isinstance(states, Mapping):
+            raise ProtonTweaksError("states must be an object")
+        if states is not None:
+            # The editor sends the entire draft, including Default removals.
+            enabled = []
+        elif "toggles" not in payload and "enabledTweaks" not in payload:
+            states = current.states
         fsr4 = payload.get(
             "optiscalerFsr4Update", current.optiscaler_fsr4_update
         )
@@ -84,6 +100,8 @@ class ProtonTweaksRepository:
                 enabled_tweaks=tuple(enabled),
                 optiscaler_fsr4_update=fsr4,
                 updated_at=datetime.now(UTC),
+                states=states or {},
+                extra=current.extra,
             )
         except (TypeError, ValueError) as error:
             raise ProtonTweaksError(str(error)) from error
@@ -111,6 +129,7 @@ class ProtonTweaksRepository:
             entry.update(
                 {
                     "enabled": definition.id in enabled,
+                    "state": profile.states.get(definition.id, "default"),
                     "hardwareState": self.hardware_state(
                         definition.id, gpu_vendor
                     ),
@@ -122,6 +141,7 @@ class ProtonTweaksRepository:
             "appId": profile.app_id,
             "schemaVersion": profile.schema_version,
             "enabledTweaks": list(profile.enabled_tweaks),
+            "states": dict(profile.states),
             "optiscalerFsr4Update": profile.optiscaler_fsr4_update,
             "entries": entries,
             "environment": profile.environment(),

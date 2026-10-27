@@ -34,6 +34,7 @@ FocusScope {
     property int fpsLimit: 0
     property string targetResolution: qsTr("Native")
     property var pendingPlan: ({})
+    property var launchDetailsItem: null
     property bool confirmationOpen: false
     property string confirmationKind: ""
     property int confirmationChoice: 0
@@ -66,6 +67,9 @@ FocusScope {
     property bool mangoHudMemory: false
     property bool optimizationOverlayOpen: false
     property bool gpuMemoryOverlayOpen: false
+    property bool tweaksOverlayOpen: false
+    property bool customLaunchOverlayOpen: false
+    property bool measuredOverlayOpen: false
     property int optimizationRow: 0
     property var optimizationData: ({})
     property string optimizationCategory: "unknown"
@@ -85,7 +89,7 @@ FocusScope {
     property var protonTweaksData: ({})
     property var narratorData: ({})
     property var narratorSession: ({})
-    readonly property var optimizationPresets: ["automatic", "maximum_performance", "balanced", "quiet", "custom"]
+    readonly property var optimizationPresets: ["automatic", "maximum_performance", "balanced", "low_power", "lowest_latency", "stable_image", "best_quality", "custom"]
     readonly property var optimizationCategories: ["competitive", "fast_action", "cinematic", "platformer_2d", "strategy_simulation", "retro", "unknown", "custom"]
     readonly property var optimizationFpsValues: [30, 45, 60, 90, 120, 144, 165, 200, 240]
     readonly property var optimizationGamescopeModes: ["disabled", "native", "performance", "quality"]
@@ -114,12 +118,30 @@ FocusScope {
         return loadedItem ? Number(loadedItem.implicitHeight || 0) : 0
     }
 
+    // Heroic/Lutris write a wrapper into their own settings; only Steam uses %command%.
+    function couchLauncherCommand(preview) {
+        var data = preview || ({})
+        var launcherData = data.launcherPreview || ({})
+        if (!launcherData.launcher)
+            return String(data.launchPlanText || "")
+        var part = launcherData.draft || launcherData.apply || ({})
+        var wrapper = part.wrapper || null
+        var text = wrapper ? (wrapper.exe !== undefined ? String(wrapper.exe) + " " + String(wrapper.args || "") : String(wrapper.text || "")) : ""
+        return text.length ? qsTr("%1 wrapper: %2").arg(launcherData.launcher).arg(text) : qsTr("%1: no wrapper").arg(launcherData.launcher)
+    }
+
     function restoreActiveFocus() {
         forceActiveFocus()
         Qt.callLater(function() {
             if (!page.visible)
                 return
-            var item = page.gpuMemoryOverlayOpen
+            var item = page.measuredOverlayOpen
+                    ? (measuredPanel.padFocusedItem || measuredPanel)
+                    : page.customLaunchOverlayOpen
+                    ? (customLaunchEditor.padFocusedItem || customLaunchEditor)
+                    : page.tweaksOverlayOpen
+                    ? (tweaksEditor.padFocusedItem || tweaksEditor)
+                    : page.gpuMemoryOverlayOpen
                     ? (gpuMemoryCard.padFocusedItem || gpuMemoryCard)
                     : page.gameModeOverlayOpen
                     ? gameModeOptions.itemAtIndex(page.gameModeRow)
@@ -128,7 +150,7 @@ FocusScope {
                     : page.optimizationOverlayOpen
                     ? optimizationOptions.itemAtIndex(page.optimizationRow)
                     : page.mangoHudOverlayOpen
-                    ? mangoHudOptions.itemAtIndex(page.mangoHudRow)
+                    ? (mangoHudVisualEditor.padFocusedItem || mangoHudVisualEditor)
                     : page.confirmationOpen
                     ? (page.confirmationChoice === 0
                        ? detailsCancelButton : detailsConfirmButton)
@@ -396,7 +418,8 @@ FocusScope {
     }
     function optimizationActions() {
         return [
-            { "id": "optimization-profile", "icon": App.UiIcons.couchGlyphTune, "iconOnLight": App.UiIcons.couchGlyphTuneOnLight, "symbol": "◐", "title": qsTr("Profile: %1").arg(optimizationPresetLabel()), "enabled": true },
+            { "id": "optimization-profile", "icon": App.UiIcons.couchGlyphTune, "iconOnLight": App.UiIcons.couchGlyphTuneOnLight, "symbol": "◐", "title": qsTr("Configuration: %1").arg(optimizationPresetLabel()), "enabled": true },
+            { "id": "measured-optimization", "icon": App.UiIcons.couchGlyphOptimization, "iconOnLight": App.UiIcons.couchGlyphOptimizationOnLight, "symbol": "◎", "title": qsTr("Measured optimization"), "subtitle": qsTr("Baseline, one change, comparison"), "enabled": true },
             { "id": "gamemode", "icon": App.UiIcons.couchGlyphGamemode, "iconOnLight": App.UiIcons.couchGlyphGamemodeOnLight, "symbol": "⚡", "title": "GameMode: " + (gameModeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
             { "id": "gamescope", "icon": App.UiIcons.couchGlyphGamescope, "iconOnLight": App.UiIcons.couchGlyphGamescopeOnLight, "symbol": "▣", "title": "Gamescope: " + (gamescopeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
             { "id": "mangohud-profile", "icon": App.UiIcons.couchGlyphMangohud, "iconOnLight": App.UiIcons.couchGlyphMangohudOnLight, "symbol": "◉", "title": qsTr("MangoHud"), "subtitle": mangoHudPresetLabel(), "enabled": true }
@@ -464,8 +487,13 @@ FocusScope {
                 actions.push({ "id": "dlss-enabler-enable", "icon": App.UiIcons.couchGlyphInstall, "iconOnLight": App.UiIcons.couchGlyphInstallOnLight, "symbol": "◇", "title": qsTr("Switch to DLSS Enabler"), "label": qsTr("DLSS Enabler"), "value": qsTr("Off · switch"), "description": ((couchEnabler.antiCheat || {}).detected === true ? qsTr("Single-player only: anti-cheat files found") : qsTr("Replaces OptiScaler and FSR 4 Lite; reversible")), "enabled": !optiScalerBusy })
             actions.push({ "id": "optiscaler-verify", "icon": App.UiIcons.couchGlyphVerify, "iconOnLight": App.UiIcons.couchGlyphVerifyOnLight, "symbol": "✓", "title": qsTr("Verify OptiScaler"), "label": qsTr("Verify"), "value": qsTr("Files only"), "description": qsTr("Check managed files without changing them"), "enabled": true })
             actions.push({ "id": "optiscaler-launch", "icon": App.UiIcons.couchGlyphLaunch, "iconOnLight": App.UiIcons.couchGlyphLaunchOnLight, "symbol": "▶", "title": qsTr("Launch with OptiScaler"), "subtitle": qsTr("Use the installed profile"), "enabled": true })
-            if (String(optiScalerData.manifestId || "").length > 0)
+            if ((optiScalerData.ownership || {}).canRemove === true || ((optiScalerData.ownership || {}).canRemove === undefined && optiScalerData.installed === true))
                 actions.push({ "id": "optiscaler-remove", "icon": App.UiIcons.couchGlyphRemove, "iconOnLight": App.UiIcons.couchGlyphRemoveOnLight, "symbol": "×", "title": qsTr("Remove OptiScaler"), "subtitle": qsTr("Requires confirmation"), "enabled": true })
+            var ownership = optiScalerData.ownership || ({})
+            if (["removed", "displaced", "modified", "parked"].indexOf(String(ownership.state || "")) >= 0 && (ownership.owner !== "absent" || ownership.removeBlocker))
+                actions.push({ "id": "optiscaler-ownership", "icon": App.UiIcons.couchGlyphInfo, "iconOnLight": App.UiIcons.couchGlyphInfoOnLight, "symbol": "i",
+                               "title": ownership.ownerName ? qsTr("%1 belongs to %2").arg(String(ownership.proxy || "dxgi.dll")).arg(String(ownership.ownerName)) : qsTr("Shared loader needs review"),
+                               "subtitle": String(ownership.removeBlocker || (ownership.state === "removed" ? qsTr("OptiScaler is not installed; the manifest is history only") : "")), "enabled": false })
         }
         if (actions.length === 0)
             actions.push({ "id": "unavailable", "icon": App.UiIcons.couchGlyphInfo, "iconOnLight": App.UiIcons.couchGlyphInfoOnLight, "symbol": "i", "title": qsTr("Checking OptiScaler status…"), "enabled": false })
@@ -722,6 +750,9 @@ FocusScope {
         return String(classification.label || classification.status || qsTr("Measurement unavailable"))
     }
     function mangoHudPresetLabel() {
+        if (mangoHudPreset === "gameopti") return qsTr("GameOpti green")
+        if (mangoHudPreset === "minimal") return qsTr("Minimal HUD")
+        if (mangoHudPreset === "diagnostic") return qsTr("Diagnostic")
         if (mangoHudPreset === "fps_only") return qsTr("FPS only")
         if (mangoHudPreset === "basic") return qsTr("Basic")
         if (mangoHudPreset === "extended") return qsTr("Extended")
@@ -729,7 +760,7 @@ FocusScope {
         return qsTr("Disabled")
     }
     function optimizationPresetLabel() {
-        var labels = [qsTr("Automatic"), qsTr("Maximum Performance"), qsTr("Balanced"), qsTr("Quiet"), qsTr("Custom")]
+        var labels = [qsTr("Automatic"), qsTr("Maximum Performance"), qsTr("Balanced"), qsTr("Low Power"), qsTr("Lowest Latency"), qsTr("Stable Image"), qsTr("Best Quality"), qsTr("Custom")]
         var index = optimizationPresets.indexOf(optimizationProfile)
         return labels[index >= 0 ? index : 0]
     }
@@ -740,7 +771,7 @@ FocusScope {
     // preview flags come from the separate gamemode/gamescope/mangohud keys).
     function legacyOptimizationProfileValue() {
         if (optimizationProfile === "maximum_performance") return "Maximum Performance"
-        if (optimizationProfile === "quiet") return "Quiet"
+        if (optimizationProfile === "low_power" || optimizationProfile === "quiet") return "Quiet"
         if (optimizationProfile === "custom") return "Custom"
         return "Balanced"
     }
@@ -960,6 +991,17 @@ FocusScope {
         if (navigation) navigation.openModal("optimization", "optimization-profile")
         restoreActiveFocus()
     }
+    function openMeasuredOverlay() {
+        measuredOverlayOpen = true
+        if (navigation) navigation.openModal("measuredOptimization", "measured-optimization")
+        measuredPanel.refresh()
+        measuredPanel.handlePadAction("Focus")
+    }
+    function closeMeasuredOverlay() {
+        measuredOverlayOpen = false
+        if (navigation) navigation.closeModal()
+        restoreActiveFocus()
+    }
     function closeOptimizationOverlay() {
         optimizationOverlayOpen = false
         optimizationRow = 0
@@ -1020,7 +1062,7 @@ FocusScope {
             var previousRow = optimizationRow
             optimizationRow = moveOverlayRow(
                 optimizationOptions, optimizationRow,
-                action === "NavigateUp" ? -1 : 1, 6)
+                action === "NavigateUp" ? -1 : 1, 8)
             if (optimizationRow !== previousRow)
                 playSemanticSound("navigate")
         } else if (action === "NavigateLeft" || action === "NavigateRight") {
@@ -1037,6 +1079,20 @@ FocusScope {
                 if (navigation) { navigation.closeModal(); navigation.openModal("gpuMemory", "gpu-memory") }
                 gpuMemoryCard.refresh()
                 gpuMemoryCard.handlePadAction("Focus")
+            }
+            else if (optimizationRow === 6) {
+                optimizationOverlayOpen = false
+                tweaksOverlayOpen = true
+                if (navigation) { navigation.closeModal(); navigation.openModal("tweaks", "proton-tweaks") }
+                tweaksEditor.load(false)
+                tweaksEditor.handlePadAction("Focus")
+            }
+            else if (optimizationRow === 7) {
+                optimizationOverlayOpen = false
+                customLaunchOverlayOpen = true
+                if (navigation) { navigation.closeModal(); navigation.openModal("customLaunch", "custom-launch") }
+                customLaunchEditor.load(false)
+                customLaunchEditor.handlePadAction("Focus")
             }
             else {
                 closeOptimizationOverlay()
@@ -1105,6 +1161,7 @@ FocusScope {
     function openMangoHudOverlay() {
         loadMangoHudProfile()
         mangoHudRow = mangoHudUsable ? 0 : mangoHudRows.length - 1
+        mangoHudVisualEditor.loadProfile()
         mangoHudOverlayOpen = true
         if (navigation) navigation.openModal("mangohud-profile", "mangohud-profile")
         restoreActiveFocus()
@@ -1242,26 +1299,8 @@ FocusScope {
         return false
     }
     function handleMangoHudAction(action) {
-        var row = mangoHudRows[mangoHudRow] || ({})
-        if (action === "Back") {
-            closeMangoHudOverlay()
-            playSemanticSound("back")
-        } else if (action === "NavigateUp" || action === "NavigateDown") {
-            var previousRow = mangoHudRow
-            mangoHudRow = moveOverlayRow(mangoHudOptions, mangoHudRow,
-                                         action === "NavigateUp" ? -1 : 1, mangoHudRows.length - 1)
-            if (mangoHudRow !== previousRow)
-                playSemanticSound("navigate")
-        } else if (row.id === "save" && action === "Confirm") {
-            playSemanticSound(saveCouchMangoHud() ? "confirm" : "error")
-        } else if (row.id === "cancel" && action === "Confirm") {
-            closeMangoHudOverlay()
-            playSemanticSound("back")
-        } else if (action === "NavigateLeft" || action === "NavigateRight" || action === "Confirm") {
-            if (!row.enabled || row.id === "save" || row.id === "cancel") { playSemanticSound("error"); return }
-            playSemanticSound(adjustMangoHud(row.id, action === "NavigateLeft" ? -1 : 1) ? "adjust" : "error")
-        }
-        restoreActiveFocus()
+        if (action === "Back" && !mangoHudVisualEditor.handlePadAction("Back")) closeMangoHudOverlay()
+        else if (action !== "Back") mangoHudVisualEditor.handlePadAction(action)
     }
     // ---- Dedicated GameMode and Gamescope menus ------------------------------
     // Values are canonical ids (e.g. "fullscreen", "fsr", "1920x1080"); labels
@@ -1740,6 +1779,10 @@ FocusScope {
             openGamescopeOverlay()
             return "open"
         }
+        if (id === "measured-optimization") {
+            openMeasuredOverlay()
+            return "open"
+        }
         if (id === "optimization-profile" || id === "fps" || id === "resolution") {
             openOptimizationOverlay()
             return "open"
@@ -1808,6 +1851,57 @@ FocusScope {
         return "error"
     }
     function handleAction(action) {
+        if (mangoHudKeyboard.opened) { mangoHudKeyboard.handleAction(action); return }
+        if (customLaunchKeyboard.opened) { customLaunchKeyboard.handleAction(action); return }
+
+        if (measuredOverlayOpen) {
+            if (action === "Back" && !measuredPanel.handlePadAction("Back")) {
+                closeMeasuredOverlay()
+                playSemanticSound("back")
+            } else if (action !== "Back") {
+                measuredPanel.handlePadAction(action)
+                var measuredFocus = measuredPanel.padFocusedItem
+                var measuredFlick = measuredScroll.contentItem as Flickable
+                if (measuredFocus && measuredFlick) {
+                    var measuredY = measuredFocus.mapToItem(measuredPanel, 0, 0).y
+                    measuredFlick.contentY = Math.max(0, Math.min(measuredFlick.contentHeight - measuredScroll.height, measuredY - measuredScroll.height / 3))
+                }
+            }
+            return
+        }
+
+        if (customLaunchOverlayOpen) {
+            if (action === "Back" && !customLaunchEditor.handlePadAction("Back")) {
+                customLaunchOverlayOpen = false
+                if (navigation) navigation.closeModal()
+                restoreActiveFocus()
+            } else if (action !== "Back") {
+                customLaunchEditor.handlePadAction(action)
+                var customFocus = customLaunchEditor.padFocusedItem
+                var customFlick = customLaunchScroll.contentItem as Flickable
+                if (customFocus && customFlick) {
+                    var customY = customFocus.mapToItem(customLaunchEditor, 0, 0).y
+                    customFlick.contentY = Math.max(0, Math.min(customFlick.contentHeight - customLaunchScroll.height, customY - customLaunchScroll.height / 3))
+                }
+            }
+            return
+        }
+
+        if (tweaksOverlayOpen) {
+            if (action === "Back") {
+                tweaksOverlayOpen=false
+                if (navigation) navigation.closeModal()
+                restoreActiveFocus()
+            } else {
+                tweaksEditor.handlePadAction(action)
+                var focusItem=tweaksEditor.padFocusedItem
+                if (focusItem && tweaksScroll.contentItem) {
+                    var focusY=focusItem.mapToItem(tweaksEditor,0,0).y
+                    tweaksScroll.contentItem.contentY=Math.max(0,Math.min(tweaksScroll.contentItem.contentHeight-tweaksScroll.height,focusY-tweaksScroll.height/3))
+                }
+            }
+            return
+        }
         if (gpuMemoryOverlayOpen) {
             if (action === "Back") {
                 gpuMemoryOverlayOpen = false
@@ -1957,6 +2051,9 @@ FocusScope {
             } else if (action === "Confirm") {
                 playSemanticSound(activateAction())
             }
+        } else if (action === "Confirm" && page.tabs[page.selectedTab].id === "optimization" && page.launchDetailsItem) {
+            page.launchDetailsItem.toggleDetails()
+            playSemanticSound("confirm")
         } else if (action === "NavigateUp") {
             // Scrollable content: scroll first, then return to the actions.
             var previousUpY = detailsContentFlick.contentY
@@ -1990,11 +2087,16 @@ FocusScope {
     Component.onCompleted: { applyDefaultProfile(); loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); loadNarrator(); restoreActiveFocus() }
     onVisibleChanged: if (visible) { loadMangoHudProfile(); loadNarrator(); restoreActiveFocus() }
     onGameChanged: {
+        if (mangoHudKeyboard && mangoHudKeyboard.opened) mangoHudKeyboard.close(false)
+        if (customLaunchKeyboard && customLaunchKeyboard.opened) customLaunchKeyboard.close(false)
         // Only a different game resets the profile; refreshed data for the
         // same game keeps an explicit choice.
         var gameId = String(game && game.id ? game.id : "")
         if (gameId !== profileGameId) {
             profileGameId = gameId
+            tweaksOverlayOpen = false
+            customLaunchOverlayOpen = false
+            measuredOverlayOpen = false
             profileChosenByUser = false
             applyDefaultProfile()
         }
@@ -2529,7 +2631,19 @@ FocusScope {
                 Label { text: page.gamescopeEnabled ? qsTr("On") : qsTr("Off"); color: App.Theme.text; font.pixelSize: 20 * page.couchScale; font.weight: Font.Bold }
                 Label { text: page.mangoHudEnabled ? qsTr("On") : qsTr("Off"); color: App.Theme.text; font.pixelSize: 20 * page.couchScale; font.weight: Font.Bold }
             }
-            Label { Layout.fillWidth: true; text: String(page.optimizationData.launchPlanText || "%command%"); color: App.Theme.textSecondary; font.family: "monospace"; font.pixelSize: 15 * page.couchScale; elide: Text.ElideMiddle }
+            Details.LaunchEnvironmentDetails {
+                id: launchDetails
+                Layout.fillWidth:true
+                couchMode:true
+                controllerFocused:page.contentFocus
+                plan:page.optimizationData.launchPlan || ({})
+                planSource:page.optimizationData.planSource || ({})
+                commandText:String(page.optimizationData.launchPlanText || "%command%")
+                launcherKind:["Heroic", "Lutris"].indexOf(String(page.game && page.game.launcher || "")) >= 0 ? String(page.game.launcher) : (page.game && page.game.localGame) ? "local" : "steam"
+                launcherPreview:page.optimizationData.launcherPreview || ({})
+                Component.onCompleted:page.launchDetailsItem=launchDetails
+                Component.onDestruction:if(page.launchDetailsItem===launchDetails) page.launchDetailsItem=null
+            }
             Item { Layout.fillHeight: true }
         }
     }
@@ -2746,6 +2860,11 @@ FocusScope {
             spacing: 10 * page.couchScale
             Label { Layout.fillWidth: true; text: qsTr("Optimization"); color: App.Theme.text; font.pixelSize: 30 * page.couchScale; font.weight: Font.Bold }
             Label { Layout.fillWidth: true; text: page.optimizationData.recommendation ? App.I18n.message(String(page.optimizationData.recommendation.status || "")) : qsTr("Preliminary recommendation - game measurement required"); color: App.Theme.warning; font.pixelSize: 16 * page.couchScale; wrapMode: Text.WordWrap }
+            Label { Layout.fillWidth: true; text: qsTr("Your saved launch setup. The optimization goal is chosen once in Measured optimization.")
+                    color: App.Theme.textMuted; font.pixelSize: 14 * page.couchScale; wrapMode: Text.WordWrap }
+            Label { objectName: "couchAutomaticNote"; Layout.fillWidth: true; visible: page.optimizationProfile === "automatic"
+                    text: qsTr("Automatic uses only compatible local results that you kept after a measured comparison for this game and system. Without such evidence it stays conservative and adds no runtime tools; it may recommend no change.")
+                    color: App.Theme.textSecondary; font.pixelSize: 15 * page.couchScale; wrapMode: Text.WordWrap }
             ListView {
                 id: optimizationOptions
                 Layout.fillWidth: true
@@ -2753,12 +2872,14 @@ FocusScope {
                 clip: true
                 spacing: 7 * page.couchScale
                 model: [
-                    { "symbol": "◐", "title": qsTr("Profile"), "value": page.optimizationPresetLabel(), "enabled": true },
+                    { "symbol": "◐", "title": qsTr("Current configuration"), "value": page.optimizationPresetLabel(), "enabled": true },
                     { "symbol": "◆", "title": qsTr("Game category"), "value": page.optimizationCategoryLabel(), "enabled": true },
                     { "symbol": "↯", "title": qsTr("Target FPS"), "value": String(page.fpsLimit), "enabled": true },
                     { "symbol": "□", "title": qsTr("Monitor"), "value": page.optimizationDisplayLabel(), "enabled": page.optimizationDisplays.length > 0 },
                     { "symbol": "✓", "title": qsTr("Save profile"), "value": "", "enabled": true },
                     { "symbol": "◆", "title": qsTr("GPU memory"), "value": "", "enabled": true },
+                    { "symbol": "◆", "title": qsTr("Proton Tweaks"), "value": "", "enabled": true },
+                    { "symbol": "◆", "title": qsTr("Custom launch"), "value": "", "enabled": true },
                     { "symbol": "‹", "title": qsTr("Cancel"), "value": "", "enabled": true }
                 ]
                 delegate: CouchTile {
@@ -2775,8 +2896,85 @@ FocusScope {
                 }
             }
             Label { Layout.fillWidth: true; text: page.optimizationReasons.length ? App.I18n.message(String(page.optimizationReasons[0])) : qsTr("No saved session measurements"); color: App.Theme.textSecondary; font.pixelSize: 15 * page.couchScale; wrapMode: Text.WordWrap }
-            Label { Layout.fillWidth: true; text: qsTr("Proton Tweaks: %1 active - edit advanced options in Desktop Mode").arg((page.protonTweaksData.enabledTweaks || []).length); color: App.Theme.textSecondary; font.pixelSize: 15 * page.couchScale; wrapMode: Text.WordWrap }
+
             Label { Layout.fillWidth: true; text: qsTr("Advanced Gamescope options remain available in Desktop Mode."); color: App.Theme.textMuted; font.pixelSize: 14 * page.couchScale; wrapMode: Text.WordWrap }
+        }
+    }
+
+    CouchOverlayFrame {
+        objectName: "couchMeasuredOverlay"
+        anchors.fill: parent
+        z: 219
+        visible: page.measuredOverlayOpen
+        couchScale: page.couchScale
+        maximumWidth: 1250 * page.couchScale
+        preferredHeight: 920 * page.couchScale
+        ScrollView {
+            id: measuredScroll
+            anchors.fill: parent
+            contentWidth: availableWidth
+            Details.MeasuredOptimizationPanel {
+                id: measuredPanel
+                objectName: "couchMeasuredPanel"
+                width: measuredScroll.availableWidth
+                controller: page.controller
+                gameData: page.game
+                couchMode: true
+            }
+        }
+    }
+
+    CouchOverlayFrame {
+        anchors.fill: parent
+        z: 219
+        visible: page.customLaunchOverlayOpen
+        couchScale: page.couchScale
+        maximumWidth: 1150 * page.couchScale
+        preferredHeight: 900 * page.couchScale
+        ScrollView {
+            id: customLaunchScroll
+            anchors.fill: parent
+            contentWidth: availableWidth
+            Details.CustomLaunchSection {
+                id: customLaunchEditor
+                objectName: "couchCustomLaunchEditor"
+                width: customLaunchScroll.availableWidth
+                controller: page.controller
+                gameData: page.game
+                couchMode: true
+                onTextInputRequested: function(field, heading) {
+                    page.customLaunchTextTarget = field
+                    customLaunchKeyboard.open(String(field.text), heading)
+                }
+            }
+        }
+    }
+
+    CouchOverlayFrame {
+        anchors.fill: parent
+        z: 219
+        visible: page.tweaksOverlayOpen
+        couchScale: page.couchScale
+        maximumWidth: 1150 * page.couchScale
+        preferredHeight: 900 * page.couchScale
+        ScrollView {
+            id: tweaksScroll
+            anchors.fill: parent
+            contentWidth: availableWidth
+            Details.ProtonTweaksSection {
+                id: tweaksEditor
+                objectName: "couchTweaksEditor"
+                width: tweaksScroll.availableWidth
+                controller: page.controller
+                gameData: page.game
+                couchMode: true
+                onIntegrationRequested: {
+                    page.tweaksOverlayOpen=false
+                    if (page.navigation) page.navigation.closeModal()
+                    page.selectedTab=0
+                    page.restoreActiveFocus()
+                }
+            }
         }
     }
 
@@ -2828,84 +3026,56 @@ FocusScope {
         z: 210
         visible: page.mangoHudOverlayOpen
         couchScale: page.couchScale
-        maximumWidth: 1000 * page.couchScale
-        preferredHeight: 880 * page.couchScale
-
+        maximumWidth: 1300 * page.couchScale
+        preferredHeight: 940 * page.couchScale
         ColumnLayout {
             anchors.fill: parent
-            spacing: App.Theme.couchSpaceM * page.couchScale
-            RowLayout {
-                Layout.fillWidth: true
-                spacing: App.Theme.couchSpaceM * page.couchScale
-                // Brand artwork: shown at the large tile size so the logo's own
-                // cream square reads as a badge next to the title (not cropped).
-                CouchIcon {
-                    size: App.Theme.couchIconLarge; couchScale: page.couchScale
-                    source: App.UiIcons.couchGlyphMangohud; lightSource: App.UiIcons.couchGlyphMangohudOnLight
+            spacing: 8
+            Label { Layout.fillWidth: true; color: App.Theme.textSecondary; wrapMode: Text.WordWrap
+                text: qsTr("D-pad: choose / adjust · A: confirm · B: close · changes need Apply") }
+            Details.MangoHudTab {
+                id: mangoHudVisualEditor
+                objectName: "couchMangoHudEditor"
+                Layout.fillWidth: true; Layout.fillHeight: true
+                controller: page.controller
+                gameData: page.game
+                couchMode: true
+                onOptimizationRequested: { page.closeMangoHudOverlay(); page.openOptimizationOverlay() }
+                onTextInputRequested: function(field, heading) {
+                    page.mangoHudTextTarget=field
+                    mangoHudKeyboard.open(String(field.text), heading)
                 }
-                Label { Layout.fillWidth: true; text: "MangoHud"; color: App.Theme.text; font.pixelSize: 30 * page.couchScale; font.weight: Font.Bold }
-                CouchStatePill {
-                    objectName: "couchMangoHudStatus"
-                    couchScale: page.couchScale
-                    tone: page.mangoHudUsable ? (page.mangoHudDraftEnabled ? "success" : "neutral") : "unavailable"
-                    text: page.mangoHudUsable
-                          ? (String(page.mangoHudProfile.version || "").length
-                             ? qsTr("Available · %1").arg(String(page.mangoHudProfile.version)) : qsTr("Available"))
-                          : (page.launcherIntegrationSupported ? qsTr("Unavailable") : qsTr("Unsupported for this launch method"))
-                    maximumTextWidth: 420 * page.couchScale
-                }
-            }
-            Label {
-                objectName: "couchMangoHudActivation"
-                Layout.fillWidth: true
-                text: page.mangoHudActivationText()
-                color: page.mangoHudUsable && String(page.mangoHudProfile.strategyStatus || "") !== "executable_missing"
-                       && String(page.mangoHudProfile.strategyStatus || "") !== "application_config_conflict"
-                       ? App.Theme.textSecondary : App.Theme.warning
-                font.pixelSize: 16 * page.couchScale
-                wrapMode: Text.WordWrap
-            }
-            ListView {
-                id: mangoHudOptions
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-                clip: true
-                spacing: 8 * page.couchScale
-                model: page.mangoHudRows
-                currentIndex: page.mangoHudRow
-                highlightMoveDuration: App.Theme.couchMotionDuration(120)
-                delegate: CouchTile {
-                    required property var modelData
-                    required property int index
-                    width: ListView.view.width
-                    height: 66 * page.couchScale
-                    compact: true
-                    couchScale: page.couchScale
-                    iconSource: modelData.icon
-                    iconLightSource: modelData.iconOnLight
-                    text: modelData.title
-                    subtitle: [modelData.value, modelData.detail].filter(function(v) { return String(v).length }).join(" · ")
-                    enabled: modelData.enabled
-                    focus: page.mangoHudOverlayOpen && page.mangoHudRow === index
-                    onClicked: { page.mangoHudRow = index; page.handleMangoHudAction("Confirm") }
-                }
-            }
-            Label {
-                objectName: "couchMangoHudLimiter"
-                Layout.fillWidth: true
-                text: page.mangoHudLimiterText()
-                color: App.Theme.text
-                font.pixelSize: 18 * page.couchScale
-                font.weight: Font.Bold
-            }
-            Label {
-                Layout.fillWidth: true
-                text: qsTr("More appearance, metrics, advanced and logging settings are available in Desktop Mode.")
-                color: App.Theme.textMuted
-                font.pixelSize: 14 * page.couchScale
-                wrapMode: Text.WordWrap
             }
         }
+    }
+
+    property var mangoHudTextTarget: null
+    property var customLaunchTextTarget: null
+    CouchOnScreenKeyboard {
+        id: customLaunchKeyboard
+        objectName: "couchCustomLaunchKeyboard"
+        anchors.fill: parent
+        couchScale: page.couchScale
+        onAccepted: function(value) {
+            if (page.customLaunchTextTarget) customLaunchEditor.commitPadText(page.customLaunchTextTarget, value)
+            page.customLaunchTextTarget = null
+            page.restoreActiveFocus()
+        }
+        onCancelled: { page.customLaunchTextTarget = null; page.restoreActiveFocus() }
+        onSemanticSound: function(kind) { page.playSemanticSound(kind) }
+    }
+    CouchOnScreenKeyboard {
+        id: mangoHudKeyboard
+        objectName: "couchMangoHudKeyboard"
+        anchors.fill: parent
+        couchScale: page.couchScale
+        onAccepted: function(value) {
+            if (page.mangoHudTextTarget) mangoHudVisualEditor.commitPadText(page.mangoHudTextTarget, value)
+            page.mangoHudTextTarget=null
+            page.restoreActiveFocus()
+        }
+        onCancelled: { page.mangoHudTextTarget=null; page.restoreActiveFocus() }
+        onSemanticSound: function(kind) { page.playSemanticSound(kind) }
     }
 
     // UI-side guard: never show "Checking…" forever if no result arrives.
@@ -3108,7 +3278,7 @@ FocusScope {
                 Layout.fillWidth: true
                 text: page.setupPreview && page.setupPreview.success === false
                       ? App.I18n.message(String(page.setupPreview.error || ""))
-                      : String((page.setupPreview && page.setupPreview.launchPlanText) || "")
+                      : page.couchLauncherCommand(page.setupPreview)
                 color: page.setupPreview && page.setupPreview.success === false ? App.Theme.warning : App.Theme.textMuted
                 font.family: "monospace"
                 font.pixelSize: 14 * page.couchScale

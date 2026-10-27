@@ -182,9 +182,27 @@ class LauncherComponentsService:
 
     # -- installation (worker only) -----------------------------------------
     def _install(self, app_id: str, tool: str, scope: str, remote: str, ref: str,
-                 launcher_running: Callable[[], bool | None]) -> None:
+                 launcher_running: Callable[[], bool | None], runtime: str = "") -> None:
         label = TOOLS[tool][0]
         key = (app_id, tool)
+        if runtime:
+            # The launcher may have moved to another runtime (25.08 -> 26.08)
+            # since the cached inspection: never install the old branch.
+            try:
+                current = str((self._host().flatpak_app_installation(app_id) or {}).get("runtime") or "")
+            except Exception:  # noqa: BLE001 - treated as unknown below
+                current = ""
+            if current != runtime:
+                with self._lock:
+                    for inspection_key in [k for k in self._inspections if k[0] == app_id]:
+                        self._inspections.pop(inspection_key, None)
+                self._set(key, _ToolState(
+                    "error",
+                    f"The launcher runtime changed ({runtime or 'unknown'} -> {current or 'unknown'}); "
+                    f"{label} was not installed. Check again to get the matching extension",
+                    "runtime_changed",
+                ))
+                return
 
         def progress(line: str) -> None:
             with self._lock:
@@ -330,7 +348,8 @@ class LauncherComponentsService:
                 "installing", f"Installing {TOOLS[tool][0]}", started_at=self._clock()
             ))
             self._submit(("install", app_id, tool), self._install, app_id, tool,
-                         inspection.scope, inspection.remote, facts["ref"], launcher_running)
+                         inspection.scope, inspection.remote, facts["ref"], launcher_running,
+                         inspection.runtime)
             started.append(tool)
         return started
 

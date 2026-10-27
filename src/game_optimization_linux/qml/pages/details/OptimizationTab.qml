@@ -11,6 +11,7 @@ Item {
     id: tab
     signal toastRequested(string message, string tone)
     signal optiScalerRequested()
+    signal integrationRequested()
     // Which part of the former single page this instance shows:
     // "performance" | "diagnostics" | "integrations", or "all" (the previous
     // single long page; default when embedded without a section). Cards of
@@ -180,6 +181,8 @@ Item {
     property var runnerStatus: ({ "installed": false })
     property string launchPlanText: "%command%"
     property var launchPlan: ({})
+    property var launcherPreview: ({})
+    property var planSource: ({})
     property string steamLaunchCommand: ""
     property string renderingSummary: ""
     property string fpsLimitOwner: "none"
@@ -190,8 +193,8 @@ Item {
     property var settingPreview: ({})
     property bool automaticPreviewOpen: false
 
-    readonly property var presetValues: ["automatic", "maximum_performance", "balanced", "quiet", "custom"]
-    readonly property var presetLabels: [qsTr("Automatic"), qsTr("Maximum Performance"), qsTr("Balanced"), qsTr("Quiet"), qsTr("Custom")]
+    readonly property var presetValues: ["automatic", "maximum_performance", "balanced", "low_power", "lowest_latency", "stable_image", "best_quality", "custom"]
+    readonly property var presetLabels: [qsTr("Automatic"), qsTr("Maximum Performance"), qsTr("Balanced"), qsTr("Low Power"), qsTr("Lowest Latency"), qsTr("Stable Image"), qsTr("Best Quality"), qsTr("Custom")]
     readonly property var categoryValues: ["competitive", "fast_action", "cinematic", "platformer_2d", "strategy_simulation", "retro", "unknown", "custom"]
     readonly property var categoryLabels: [qsTr("Competitive"), qsTr("Fast action"), qsTr("Cinematic single-player"), qsTr("Platformer / 2D"), qsTr("Strategy / simulation"), qsTr("Retro"), qsTr("Unknown"), qsTr("Custom")]
     readonly property var goalValues: ["lowest_latency", "stable_image", "best_quality", "low_power", "custom"]
@@ -505,6 +508,8 @@ Item {
         runnerStatus = result.runner || ({ "installed": false })
         launchPlanText = String(result.launchPlanText || "%command%")
         launchPlan = result.launchPlan || ({})
+        planSource = result.planSource || ({})
+        launcherPreview = result.launcherPreview || ({})
         steamLaunchCommand = String(result.steamLaunchCommand || "")
         renderingSummary = String(result.renderingSummary || "")
         fpsLimitOwner = String(result.fpsLimitOwner || result.launchPlan && result.launchPlan.fpsLimitOwner || "none")
@@ -535,6 +540,8 @@ Item {
             categoryClassification = result.categoryClassification || ({})
             launchPlanText = String(result.launchPlanText || "%command%")
             launchPlan = result.launchPlan || ({})
+            planSource = result.planSource || ({})
+            launcherPreview = result.launcherPreview || ({})
             renderingSummary = String(result.renderingSummary || "")
             fpsLimitOwner = String(result.fpsLimitOwner || "none")
             protonOverrides = result.protonOverrides ? Array.from(result.protonOverrides) : []
@@ -786,33 +793,19 @@ Item {
                 sourceComponent: Component {
                 ColumnLayout {
                 spacing: 14
-                SurfaceCard {
-                    objectName: "optimizationProfileCard"
-                    Layout.fillWidth: true; padding: 18
-                    contentItem: ColumnLayout {
-                        spacing: 10
-                        Label { text: qsTr("Profile"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
-                        GridLayout {
-                            Layout.fillWidth: true; columns: tab.width > 950 ? 5 : 2; columnSpacing: 8; rowSpacing: 8
-                            Repeater { model: tab.presetLabels; AppButton { required property int index; required property string modelData; Layout.fillWidth: true; text: modelData; kind: tab.preset === tab.presetValues[index] ? "primary" : "secondary"; onClicked: tab.choosePreset(tab.presetValues[index]) } }
-                        }
-                    }
-                }
-
+                // The saved launch configuration (preset) is shown as a compact
+                // status inside Measured optimization; the goal is chosen only there.
                 GridLayout {
                     objectName: "optimizationGoalAndFps"
                     Layout.fillWidth: true; columns: tab.width > 900 ? 2 : 1; columnSpacing: 12; rowSpacing: 12
                     SurfaceCard {
                         Layout.fillWidth: true; padding: 18
                         contentItem: ColumnLayout {
-                            Label { text: qsTr("Game and user goal"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
+                            Label { text: qsTr("Game category"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
                             SettingRow { Layout.fillWidth: true; title: qsTr("Game category"); description: qsTr("You can always correct this classification manually")
                                 AppComboBox { Layout.preferredWidth: 260; model: tab.categoryLabels; currentIndex: tab.indexOf(tab.categoryValues, tab.gameCategory, 6); onActivated: function(index) { tab.gameCategory = tab.categoryValues[index]; tab.preset = "custom"; tab.changed("category") } }
                             }
                             Label { Layout.fillWidth: true; text: qsTr("Classification source: %1, confidence: %2%").arg(String(tab.categoryClassification.source || qsTr("not detected"))).arg(Math.round(Number(tab.categoryClassification.confidence || 0) * 100)); color: App.Theme.textMuted; font.pixelSize: App.Theme.fontCaption; wrapMode: Text.WordWrap }
-                            SettingRow { Layout.fillWidth: true; title: qsTr("User goal")
-                                AppComboBox { Layout.preferredWidth: 260; model: tab.goalLabels; currentIndex: tab.indexOf(tab.goalValues, tab.userGoal, 1); onActivated: function(index) { tab.userGoal = tab.goalValues[index]; tab.preset = "custom"; tab.changed("goal") } }
-                            }
                         }
                     }
                     SurfaceCard {
@@ -875,7 +868,16 @@ Item {
                 }
 
                 ProtonTweaksSection {
+                    onIntegrationRequested: tab.integrationRequested()
                     objectName: "protonTweaksSection"
+                    Layout.fillWidth: true
+                    collapsible: true
+                    controller: tab.controller
+                    gameData: tab.gameData
+                }
+
+                CustomLaunchSection {
+                    objectName: "customLaunchSection"
                     Layout.fillWidth: true
                     collapsible: true
                     controller: tab.controller
@@ -1098,6 +1100,12 @@ Item {
                 sourceComponent: Component {
                     ColumnLayout {
                         spacing: 14
+                MeasuredOptimizationPanel {
+                    objectName: "measuredOptimizationPanel"
+                    Layout.fillWidth: true
+                    controller: tab.controller
+                    gameData: tab.gameData
+                }
                 SurfaceCard {
                     id: automaticOptimizationCard
                     objectName: "automaticOptimizationCard"
@@ -1623,14 +1631,9 @@ Item {
                     contentItem: ColumnLayout {
                         Label { text: qsTr("Launch plan preview"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
                         Label { Layout.fillWidth: true; text: tab.renderingSummary; visible: tab.gamescopeEnabled; color: App.Theme.warning; wrapMode: Text.WordWrap }
-                        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 110; radius: App.Theme.radiusMedium; color: App.Theme.input; clip: true
-                            ScrollView { anchors.fill: parent; anchors.margins: 10; contentWidth: availableWidth
-                                TextEdit { objectName: "launchPreviewText"; width: parent.width; readOnly: true; selectByMouse: true; text: tab.launchPlanText; color: App.Theme.text; font.family: "monospace"; wrapMode: TextEdit.WrapAnywhere }
-                            }
-                        }
+                        LaunchEnvironmentDetails { Layout.fillWidth:true; plan:tab.launchPlan; planSource:tab.planSource; draftActive:tab.dirty; commandText:tab.launchPlanText; launcherKind:tab.launcherGame ? String(tab.gameData.launcher) : tab.localGame ? "local" : "steam"; launcherPreview:tab.launcherPreview }
                         Label { Layout.fillWidth: true; text: qsTr("Wrapper order: %1").arg((tab.launchPlan.wrappers || []).join(" → ") || qsTr("none")); color: App.Theme.textSecondary }
                         Label { objectName: "fpsLimitOwnerLabel"; Layout.fillWidth: true; text: qsTr("FPS limit owner: %1").arg(tab.fpsOwnerLabel()); color: App.Theme.textSecondary; font.weight: Font.DemiBold }
-                        Label { Layout.fillWidth: true; text: qsTr("Final runtime environment: %1").arg(tab.protonOverrides.length ? tab.protonOverrides.join("; ") : qsTr("none")); color: App.Theme.textSecondary; wrapMode: Text.WordWrap }
                         Label { Layout.fillWidth: true; visible: (tab.launchPlan.warnings || []).length > 0; text: qsTr("Warnings: %1").arg((tab.launchPlan.warnings || []).join("; ")); color: App.Theme.warning; wrapMode: Text.WordWrap }
                         Label { Layout.fillWidth: true; visible: (tab.launchPlan.environmentConflicts || []).length > 0; text: qsTr("Environment conflicts: %1").arg((tab.launchPlan.environmentConflicts || []).join(", ")); color: App.Theme.warning; wrapMode: Text.WordWrap }
                         Label { Layout.fillWidth: true; visible: (tab.presetPlan.sources || []).length > 0; text: qsTr("Decision sources: %1").arg((tab.presetPlan.sources || []).join(", ")); color: App.Theme.textMuted; wrapMode: Text.WordWrap }

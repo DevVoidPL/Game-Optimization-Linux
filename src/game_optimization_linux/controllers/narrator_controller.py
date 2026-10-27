@@ -19,6 +19,8 @@ from game_optimization_linux.models.narrator import (
     NarratorSubtitleLanguageMode,
 )
 from game_optimization_linux.services.narrator_tts import (
+    MANAGED_VOICE_COMPONENTS,
+    PIPER_VOIDEK_COMPONENT_ID,
     CustomVoiceError,
     CustomVoiceLanguageError,
 )
@@ -333,9 +335,7 @@ class NarratorController:
             "ocr.english-local": "ocr_model_required",
             "ocr.polish-local": "polish_ocr_model_required",
             "translation.opus-en-pl": "translation_model_required",
-            "tts.polish-voice": "polish_voice_required",
-            "tts.polish-bass": "polish_voice_required",
-            "tts.polish-darkman": "polish_voice_required",
+            **{component_id: "polish_voice_required" for component_id in MANAGED_VOICE_COMPONENTS},
             "audio.qt-pcm": "audio_runtime",
         }
         result: list[dict[str, Any]] = []
@@ -353,6 +353,7 @@ class NarratorController:
                         component.managed and manager.can_install(component.component_id)
                     ),
                     "canRemove": component.managed,
+                    "legacy": manager.is_legacy(component.component_id),
                     "descriptionCode": descriptions.get(component.component_id, ""),
                 }
             )
@@ -764,7 +765,7 @@ class NarratorController:
         required_components = {
             "capture": "capture.portal-pipewire",
             "ocr": "ocr.polish-local" if polish_mode else "ocr.english-local",
-            "tts": voice_components.get(selected_voice, "tts.polish-voice"),
+            "tts": voice_components.get(selected_voice, PIPER_VOIDEK_COMPONENT_ID),
             "audio": "audio.qt-pcm",
         }
         if not polish_mode:
@@ -1210,9 +1211,7 @@ class NarratorController:
             "ocr.english-local": self._app._narrator_pipeline.ocr,
             "ocr.polish-local": self._app._narrator_pipeline.ocr,
             "translation.opus-en-pl": self._app._narrator_pipeline.translator,
-            "tts.polish-voice": self._app._narrator_pipeline.tts,
-            "tts.polish-bass": self._app._narrator_pipeline.tts,
-            "tts.polish-darkman": self._app._narrator_pipeline.tts,
+            **{component_id: self._app._narrator_pipeline.tts for component_id in MANAGED_VOICE_COMPONENTS},
             "audio.qt-pcm": self._app._narrator_pipeline.audio,
         }
         provider = providers.get(component_id)
@@ -1233,18 +1232,17 @@ class NarratorController:
                 if available
                 else f"Install the verified {language_name} OCR model"
             )
-        voice_ids = {
-            "tts.polish-voice": "pl_PL-gosia-medium",
-            "tts.polish-bass": "pl_PL-bass-high",
-            "tts.polish-darkman": "pl_PL-darkman-medium",
-        }
+        voice_ids = dict(MANAGED_VOICE_COMPONENTS)
         voice_id = voice_ids.get(component_id)
         if voice_id and hasattr(provider, "voice_available"):
             available = bool(provider.voice_available(voice_id))
+            manager = self._app._narrator_component_manager
             message = (
                 f"Piper Polish voice {voice_id} is ready"
                 if available
                 else f"Install the verified Polish voice {voice_id}"
+                if manager.can_install(component_id)
+                else manager.offer_message(component_id)
             )
         manager = self._app._narrator_component_manager
         component = manager.status(component_id)
@@ -1314,6 +1312,8 @@ class NarratorController:
             str(component.get("componentId", "")): component
             for component in self.components()
         }
+        manager = self._app._narrator_component_manager
+        is_legacy = getattr(manager, "is_legacy", None)
         for voice in tuple(getattr(tts, "voices", ())):
             if isinstance(voice, Mapping):
                 voice_id = str(voice.get("id", ""))
@@ -1330,6 +1330,13 @@ class NarratorController:
                 if isinstance(voice, Mapping)
                 else getattr(voice, "custom", False)
             )
+            legacy = bool(
+                callable(is_legacy) and component_id in getattr(manager, "_definitions", {})
+                and is_legacy(component_id)
+            )
+            # Former catalog voices are never offered for selection.
+            if legacy:
+                continue
             if voice_id:
                 installed = bool(
                     getattr(tts, "voice_installed", lambda _voice_id: False)(
@@ -1352,6 +1359,7 @@ class NarratorController:
                         "name": name or voice_id,
                         "componentId": component_id,
                         "custom": custom,
+                        "legacy": legacy,
                         "installed": installed,
                         "available": available,
                         "quality": quality if quality in {"low", "medium", "high"} else "",
@@ -1369,10 +1377,10 @@ class NarratorController:
                             if definition is not None
                             else str(component.get("version", ""))
                         ),
-                        "licenseId": str(component.get("licenseId", "")),
-                        "runtimeLicenseId": str(component.get("runtimeLicenseId", "")),
-                        "artifactLicenseId": str(component.get("artifactLicenseId", "")),
-                        "attribution": str(component.get("attribution", "")),
+                        "licenseId": str(component.get("licenseId") or (getattr(definition, "license_id", "") if definition is not None else "")),
+                        "runtimeLicenseId": str(component.get("runtimeLicenseId") or (getattr(definition, "runtime_license_id", "") if definition is not None else "")),
+                        "artifactLicenseId": str(component.get("artifactLicenseId") or (getattr(definition, "artifact_license_id", "") if definition is not None else "")),
+                        "attribution": str(component.get("attribution") or (getattr(definition, "attribution", "") if definition is not None else "")),
                     }
                 )
         default_voice = str(getattr(tts, "default_voice_id", ""))

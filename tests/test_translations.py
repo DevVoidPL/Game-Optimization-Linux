@@ -361,14 +361,10 @@ def test_couch_narrator_is_not_desktop_page() -> None:
     main = Path("src/game_optimization_linux/qml/couch/CouchMain.qml").read_text(
         encoding="utf-8"
     )
-    narrator = Path(
-        "src/game_optimization_linux/qml/couch/CouchNarratorPage.qml"
-    ).read_text(encoding="utf-8")
-    assert "CouchNarratorPage" in main
+    # The obsolete global Couch Narrator page was removed; the Narrator is per game.
+    assert "CouchNarratorPage" not in main
     assert "NarratorPage.qml" not in main
-    assert "saveNarratorGameSettings" in narrator
-    assert "startNarrator" in narrator
-    assert "requestNarratorRegionPreview" in narrator
+    assert not Path("src/game_optimization_linux/qml/couch/CouchNarratorPage.qml").exists()
 
 
 def test_language_aliases_and_unknown_language() -> None:

@@ -39,6 +39,10 @@ APP_ID = "242550"
 # (None = drives activation, not MangoHud.conf).  Logging cases enable logging.
 FIELD_CASES: list[tuple[str, Any, str, Any, str | None]] = [
     ("position", "bottom-right", "position", "bottom-right", "position=bottom-right"),
+    ("offsetX", -33, "offset_x", -33, "offset_x=-33"),
+    ("offsetY", 17, "offset_y", 17, "offset_y=17"),
+    ("cellPaddingY", 0.15, "cellpadding_y", 0.15, "cellpadding_y=0.15"),
+    ("graphs", ["gpu_load", "ram"], "graphs", ("gpu_load", "ram"), "graphs=gpu_load,ram"),
     ("fontSize", 30, "font_size", 30, "font_size=30"),
     ("backgroundAlpha", 0.25, "background_alpha", 0.25, "background_alpha=0.25"),
     ("roundCorners", 12, "round_corners", 12, "round_corners=12"),
@@ -240,7 +244,10 @@ def test_d_hidden_values_without_their_row_anchor_are_reported() -> None:
 
 def test_d_preview_label_is_honest() -> None:
     source = QML.read_text(encoding="utf-8")
-    assert 'qsTr("Layout preview - sample values")' in source
+    source += QML.with_name("MangoHudPreview.qml").read_text(encoding="utf-8")
+    assert 'qsTr("Illustrative preview")' in source
+    assert 'qsTr("Real Vulkan preview")' in source
+    assert "not measurements" in source
     assert "Visual preview" not in source
     assert "live measurement" not in source.casefold()
 

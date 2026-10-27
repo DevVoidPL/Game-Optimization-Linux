@@ -132,6 +132,11 @@ class NarratorGameActivityDetector:
         self._strict_cache[game_key] = (now, result)
         return result
 
+    def process_commands(self) -> tuple[str, ...] | None:
+        """Current process command lines (shared cache); None when unknown."""
+
+        return self._commands()
+
     # -- probing ---------------------------------------------------------------
     def _commands(self) -> tuple[str, ...] | None:
         """One process list (host ``ps`` or /proc) shared by all games."""

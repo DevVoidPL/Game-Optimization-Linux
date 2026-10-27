@@ -122,9 +122,7 @@ from ..services import (
     NarratorPipeline,
     NarratorSettingsRepository,
     ArgosCTranslate2TranslationProvider,
-    PIPER_BASS_VOICE_ID,
-    PIPER_DARKMAN_VOICE_ID,
-    PIPER_VOICE_ID,
+    MANAGED_VOICE_COMPONENTS,
     TESSERACT_POLISH_COMPONENT_ID,
     PiperPolishTtsProvider,
     PortalScreenCaptureProvider,
@@ -171,6 +169,7 @@ from ..services.deep_optimization import DeepAnalysisRepository, DeepOptimizatio
 from .narrator_controller import NarratorController
 from .narrator_region_selector import NarratorRegionSelectorCoordinator
 from .optimization_controller import OptimizationController
+from .custom_launch_controller import CustomLaunchController
 from .optiscaler_controller import OptiScalerController
 from .settings_controller import SettingsController
 from .system_controller import SystemController
@@ -420,6 +419,7 @@ class AppController(QObject):
         )
         self._optiscaler_controller = OptiScalerController(self)
         self._optimization_controller = OptimizationController(self)
+        self._custom_launch_controller = CustomLaunchController(self)
         self._launcher_integration = launcher_integration or LauncherIntegrationService(
             STATE_DIR, self._optimization_controller.launcher_plan
         )
@@ -733,12 +733,24 @@ class AppController(QObject):
         self._proton_tweaks_repository = (
             proton_tweaks_repository or ProtonTweaksRepository()
         )
+        from .measured_optimization_controller import MeasuredOptimizationController
+        self._measured_optimization = MeasuredOptimizationController(self)
         self._narrator_settings_repository = (
             narrator_settings_repository or NarratorSettingsRepository()
         )
         self._narrator_component_manager = (
             narrator_component_manager or NarratorComponentManager()
         )
+        if narrator_component_manager is None:
+            # The release bundles Voidek: install it once, hash-verified, so it
+            # works immediately without a download.
+            from ..config import BUNDLED_NARRATOR_COMPONENTS_DIR
+            try:
+                if self._narrator_component_manager.install_bundled(
+                        "tts.voidek", BUNDLED_NARRATOR_COMPONENTS_DIR):
+                    logger.info("Installed the bundled Voidek voice")
+            except (OSError, RuntimeError) as error:
+                logger.warning("Bundled Voidek voice could not be installed: %s", error)
         if narrator_pipeline is None:
             narrator_backend = QtPortalScreenCastBackend(parent=self)
             narrator_capture = PortalScreenCaptureProvider(narrator_backend)
@@ -815,48 +827,16 @@ class AppController(QObject):
             ),
         )
         voice_available = getattr(narrator_pipeline.tts, "voice_available", None)
-        gosia_available = bool(
-            voice_available(PIPER_VOICE_ID)
-            if callable(voice_available)
-            else narrator_pipeline.tts.available
-        )
-        bass_available = bool(
-            voice_available(PIPER_BASS_VOICE_ID)
-            if callable(voice_available)
-            else False
-        )
-        darkman_available = bool(
-            voice_available(PIPER_DARKMAN_VOICE_ID)
-            if callable(voice_available)
-            else False
-        )
-        self._narrator_component_manager.set_runtime_state(
-            "tts.polish-voice",
-            gosia_available,
-            (
-                "The Gosia Polish voice is ready"
-                if gosia_available
-                else "The Gosia Polish voice is not installed"
-            ),
-        )
-        self._narrator_component_manager.set_runtime_state(
-            "tts.polish-bass",
-            bass_available,
-            (
-                "The Bass Polish voice is ready"
-                if bass_available
-                else "The Bass Polish voice is not installed"
-            ),
-        )
-        self._narrator_component_manager.set_runtime_state(
-            "tts.polish-darkman",
-            darkman_available,
-            (
-                "The Darkman Polish voice is ready"
-                if darkman_available
-                else "The Darkman Polish voice is not installed"
-            ),
-        )
+        for component_id, voice_id in MANAGED_VOICE_COMPONENTS.items():
+            ready = bool(voice_available(voice_id)) if callable(voice_available) else False
+            self._narrator_component_manager.set_runtime_state(
+                component_id,
+                ready,
+                f"Piper Polish voice {voice_id} is ready" if ready
+                else f"Install the verified Polish voice {voice_id}"
+                if self._narrator_component_manager.can_install(component_id)
+                else self._narrator_component_manager.offer_message(component_id),
+            )
         self._narrator_component_manager.set_runtime_state(
             "audio.qt-pcm",
             narrator_pipeline.audio.available,
@@ -870,9 +850,7 @@ class AppController(QObject):
             "ocr.english-local",
             TESSERACT_POLISH_COMPONENT_ID,
             "translation.opus-en-pl",
-            "tts.polish-voice",
-            "tts.polish-bass",
-            "tts.polish-darkman",
+            *MANAGED_VOICE_COMPONENTS,
             "audio.qt-pcm",
         ):
             self._narrator_controller._refresh_component_runtime(component_id)
@@ -942,6 +920,7 @@ class AppController(QObject):
             thread_name_prefix="game-optimization-manual-launch",
         )
         self._manual_launch_jobs: dict[str, Future[Any]] = {}
+        self._manual_runtime_reports: dict[str, dict[str, Any]] = {}
         self._shutdown_requested = False
         self._consume_gamepad_action = ""
         # Gamepad input reaches the UI only while GameOpti's own window is
@@ -950,9 +929,13 @@ class AppController(QObject):
         # reports otherwise, so headless/desktop startup is unchanged.
         self._window_active = True
         self._last_launch_request: dict[str, float] = {}
+        from ..edition import couch_available
+        self._couch_available = couch_available()
         requested_interface_mode = str(initial_interface_mode or "").strip().casefold()
         self._interface_mode = (
-            requested_interface_mode
+            "desktop"
+            if not self._couch_available
+            else requested_interface_mode
             if requested_interface_mode in {"desktop", "couch"}
             else "couch"
             if self._settings_model.controller_mode is ControllerMode.COUCH_ONLY
@@ -1013,7 +996,10 @@ class AppController(QObject):
         self._scan_retry_pending = False
         self._scan_request_groups: dict[str, dict[str, Any]] = {}
 
-        self._gamepad_service.start()
+        # Desktop Edition: no controller navigation, so the controller backend
+        # is never started (saved controller settings are kept untouched).
+        if self._couch_available:
+            self._gamepad_service.start()
         self._couch_navigation.setControllerConnected(
             self._gamepad_service.controllerCount > 0
         )
@@ -1317,6 +1303,16 @@ class AppController(QObject):
     def interfaceMode(self) -> str:
         return self._interface_mode
 
+    @Property(bool, constant=True)
+    def couchAvailable(self) -> bool:
+        """False in the Desktop Edition: no Couch Mode or controller settings."""
+        return self._couch_available
+
+    @Property(str, constant=True)
+    def edition(self) -> str:
+        from ..edition import EDITION
+        return EDITION
+
     @Property("QVariantMap", notify=systemUsageChanged)
     def systemUsage(self) -> dict[str, Any]:
         """Only metrics that were really read; missing ones are absent."""
@@ -1344,6 +1340,8 @@ class AppController(QObject):
 
     @Slot(result=bool)
     def toggleInterfaceMode(self) -> bool:
+        if not self._couch_available:
+            return False
         self._set_interface_mode(
             "desktop" if self._interface_mode == "couch" else "couch"
         )
@@ -1352,7 +1350,7 @@ class AppController(QObject):
     @Slot(str, result=bool)
     def setInterfaceMode(self, mode: str) -> bool:
         normalized = str(mode).strip().casefold()
-        if normalized not in {"desktop", "couch"}:
+        if normalized not in {"desktop", "couch"} or (normalized == "couch" and not self._couch_available):
             return False
         self._set_interface_mode(normalized)
         return True
@@ -1764,20 +1762,9 @@ class AppController(QObject):
                 self._emit_toast(f"{game.name} is already being monitored", "info")
                 return False
             try:
-                plan = self._manual_game_launcher.prepare(configuration)
-                from ..services.post_processing import optional_launch_environment
-                from ..services.optiscaler import merge_wine_dll_overrides
-                environment = dict(plan.environment)
-                for key, value in optional_launch_environment(game.profile_key, self._post_processing_service.root).items():
-                    if key == "WINEDLLOVERRIDES":
-                        value = merge_wine_dll_overrides(environment.get(key, ""), value)
-                    elif key in {"VK_ADD_LAYER_PATH", "VK_INSTANCE_LAYERS"} and environment.get(key):
-                        value += ":" + environment[key]
-                    environment[key] = value
-                from ..services.gpu_memory import launch_prefix as gpu_memory_prefix, game_key as gpu_memory_key
-                prefix = gpu_memory_prefix(gpu_memory_key(game), self._gpu_memory_service.root)
-                plan = replace(plan, environment=tuple(sorted(environment.items())),
-                               game_command=(*prefix, *plan.game_command))
+                plan = self._manual_launch_plan(game, configuration)
+                for warning in plan.warnings:
+                    logger.warning("Manual game %s custom launch: %s", game.id, warning)
             except ManualLaunchError as error:
                 logger.warning("Could not prepare manual game %s: %s", game.id, error)
                 self._emit_toast(str(error), "error")
@@ -2268,6 +2255,31 @@ class AppController(QObject):
     ) -> dict[str, Any]:
         return self._optimization_controller.saveProtonTweaks(game_id, values)
 
+    @Slot(str, "QVariantMap", result="QVariantMap")
+    def previewProtonTweaks(self, game_id: str, values: Mapping[str, Any]) -> dict[str, Any]:
+        return self._optimization_controller.previewProtonTweaks(game_id, values)
+
+    @Slot(str, result="QVariantMap")
+    def getCustomLaunch(self, game_id: str) -> dict[str, Any]:
+        return self._custom_launch_controller.get(game_id)
+
+    @Slot(str, "QVariantMap", result="QVariantMap")
+    def previewCustomLaunch(self, game_id: str, values: Mapping[str, Any]) -> dict[str, Any]:
+        return self._custom_launch_controller.preview(game_id, values)
+
+    @Slot(str, "QVariantMap", bool, result="QVariantMap")
+    def saveCustomLaunch(self, game_id: str, values: Mapping[str, Any], confirmed: bool) -> dict[str, Any]:
+        result = self._custom_launch_controller.save(game_id, values, confirmed)
+        if result.get("success"):
+            self._emit_toast("Custom launch settings applied", "success")
+        elif not result.get("needsConfirmation"):
+            self._emit_toast(f"Could not apply custom launch settings: {result.get('error', '')}", "error")
+        return result
+
+    @Slot(str, result=bool)
+    def openProtonLogs(self, game_id: str) -> bool:
+        return self._optimization_controller.openProtonLogs(game_id)
+
     @Slot(str, result="QVariantMap")
     def getGameCapabilities(self, game_id: str) -> dict[str, Any]:
         return self._optimization_controller.getGameCapabilities(game_id)
@@ -2489,6 +2501,63 @@ class AppController(QObject):
         return self._optimization_controller.applyOptimizationCandidate(
             game_id, candidate_id
         )
+
+    @Slot(str, result="QVariantMap")
+    def getMeasuredOptimization(self, game_id: str) -> dict[str, Any]:
+        try:
+            return self._measured_optimization.status(game_id)
+        except Exception as error:  # noqa: BLE001 - status must never break the page
+            logger.exception("Measured optimization status failed for %s", game_id)
+            return {"success": False, "error": str(error) or type(error).__name__}
+
+    @Slot(str, result="QVariantMap")
+    def prepareMeasuredFingerprint(self, game_id: str) -> dict[str, Any]:
+        return self._measured_optimization.prepare_fingerprint(game_id)
+
+    @Slot(str, str, "QVariantMap", result="QVariantMap")
+    def startMeasuredOptimization(self, game_id: str, goal: str, options: Mapping[str, Any]) -> dict[str, Any]:
+        return self._measured_optimization.start(game_id, goal, options)
+
+    @Slot(str, result="QVariantMap")
+    def recordMeasuredBaseline(self, game_id: str) -> dict[str, Any]:
+        return self._measured_optimization.record_baseline(game_id)
+
+    @Slot(str, str, result="QVariantMap")
+    def applyMeasuredCandidate(self, game_id: str, candidate_id: str) -> dict[str, Any]:
+        return self._measured_optimization.apply_candidate(game_id, candidate_id)
+
+    @Slot(str, str, result="QVariantMap")
+    def skipMeasuredCandidate(self, game_id: str, candidate_id: str) -> dict[str, Any]:
+        return self._measured_optimization.skip_candidate(game_id, candidate_id)
+
+    @Slot(str, result="QVariantMap")
+    def finishMeasuredWithoutCandidate(self, game_id: str) -> dict[str, Any]:
+        return self._measured_optimization.finish_without_candidate(game_id)
+
+    @Slot(str, result="QVariantMap")
+    def recordMeasuredCandidate(self, game_id: str) -> dict[str, Any]:
+        return self._measured_optimization.record_candidate(game_id)
+
+    @Slot(str, str, "QVariantMap", result="QVariantMap")
+    def confirmMeasuredComparison(self, game_id: str, level: str, observations: Mapping[str, Any]) -> dict[str, Any]:
+        return self._measured_optimization.confirm(game_id, level, observations)
+
+    @Slot(str, result="QVariantMap")
+    @Slot(str, str, result="QVariantMap")
+    def keepMeasuredResult(self, game_id: str, quality_decision: str = "") -> dict[str, Any]:
+        return self._measured_optimization.keep(game_id, quality_decision)
+
+    @Slot(str, str, str, result="QVariantMap")
+    def recordMeasuredQuality(self, game_id: str, record_id: str, decision: str) -> dict[str, Any]:
+        return self._measured_optimization.record_quality(game_id, record_id, decision)
+
+    @Slot(str, result="QVariantMap")
+    def revertMeasuredResult(self, game_id: str) -> dict[str, Any]:
+        return self._measured_optimization.revert(game_id)
+
+    @Slot(str, result="QVariantMap")
+    def cancelMeasuredOptimization(self, game_id: str) -> dict[str, Any]:
+        return self._measured_optimization.cancel(game_id)
 
     @Slot(str, result="QVariantMap")
     @Slot(str, str, result="QVariantMap")
@@ -2975,7 +3044,8 @@ class AppController(QObject):
     def _on_gamepad_activity(self, action: str) -> None:
         self._couch_navigation.setInputModality("controller")
         if (
-            self._settings_model.controller_mode is ControllerMode.AUTOMATIC
+            self._couch_available
+            and self._settings_model.controller_mode is ControllerMode.AUTOMATIC
             and self._interface_mode == "desktop"
             and self._narrator_region_selector.active_window is None
         ):
@@ -3018,7 +3088,7 @@ class AppController(QObject):
             self.gamepadAction.emit(normalized.value)
 
     def _set_interface_mode(self, mode: str) -> None:
-        normalized = "couch" if mode == "couch" else "desktop"
+        normalized = "couch" if mode == "couch" and self._couch_available else "desktop"
         if normalized == self._interface_mode:
             return
         self._interface_mode = normalized
@@ -3582,6 +3652,84 @@ class AppController(QObject):
         self._optimization_controller._poll_analysis_jobs()
         self._narrator_controller.poll()
 
+    def _manual_launch_plan(self, game: Game, configuration: Any, *,
+                            measurement_environment: Mapping[str, str] | None = None,
+                            gpu_metrics: Path | None = None, require_tree: bool = False) -> Any:
+        """One Custom/Manual launch plan, shared by normal launches and measurements.
+
+        The user's configuration (runner, environment, arguments) and the
+        per-game custom launch profile stay user-owned; the GameOpti
+        optimization profile (GameMode/Gamescope/Proton Tweaks) is applied
+        through the same planner as Steam when this entry has one.
+        """
+        plan = self._manual_game_launcher.prepare(configuration)
+        from ..services.post_processing import optional_launch_environment
+        from ..services.optiscaler import merge_wine_dll_overrides
+        environment = dict(plan.environment)
+        for key, value in optional_launch_environment(game.profile_key, self._post_processing_service.root).items():
+            if key == "WINEDLLOVERRIDES":
+                value = merge_wine_dll_overrides(environment.get(key, ""), value)
+            elif key in {"VK_ADD_LAYER_PATH", "VK_INSTANCE_LAYERS"} and environment.get(key):
+                value += ":" + environment[key]
+            environment[key] = value
+        plan = replace(plan, environment=tuple(sorted(environment.items())))
+        plan = self._manual_runtime_plan(game, configuration, plan, measurement_environment)
+        from ..services.gpu_memory import launch_prefix as gpu_memory_prefix, game_key as gpu_memory_key
+        from ..services.custom_launch import CustomLaunchRepository, launch_key as custom_launch_key
+        prefix = gpu_memory_prefix(gpu_memory_key(game), self._gpu_memory_service.root, metrics=gpu_metrics)
+        custom = CustomLaunchRepository(self._post_processing_service.root).load(custom_launch_key(game))
+        if not custom.empty:
+            # The GPU-memory scope already waits for every game process; otherwise
+            # a private host scope tracks the tree for after-exit commands.
+            unit, tree = ("", []) if prefix else self._manual_game_launcher.tree_tracking()
+            plan = self._manual_game_launcher.apply_custom(plan, custom, tree_prefix=tree, tree_unit=unit)
+        if require_tree and not prefix and not plan.tree_unit:
+            unit, tree = self._manual_game_launcher.tree_tracking()
+            plan = replace(plan, game_command=(*tree, *plan.game_command), tree_unit=unit)
+        return replace(plan, game_command=(*prefix, *plan.game_command))
+
+    def _manual_runtime_plan(self, game: Game, configuration: Any, plan: Any,
+                             measurement_environment: Mapping[str, str] | None) -> Any:
+        from ..services.measured_optimization.manual import optimization_key, runner_info
+        key = optimization_key(game)
+        if not key:
+            return plan
+        has_profile = self._optimization_profile_repository.path(key).is_file()
+        runner = runner_info(configuration)
+        tweaks: dict[str, str] = {}
+        if runner["kind"] == "manual_proton":
+            try:
+                tweaks = dict(self._proton_tweaks_repository.environment(key))
+            except Exception as error:  # noqa: BLE001 - a broken tweak profile is reported, not applied
+                logger.warning("Proton Tweaks ignored for manual game %s: %s", game.id, error)
+        if not has_profile and not measurement_environment and not tweaks:
+            return plan  # unchanged behaviour for entries without GameOpti settings
+        profile = self._optimization_profile_repository.load(key)
+        gamemode, gamescope = self._runtime_tool_detector.detect()
+        user = dict(plan.environment)
+        runtime = self._optimization_launch_planner.build(
+            profile, list(plan.game_command), gamemode=gamemode, gamescope=gamescope,
+            proton_environment=tweaks, existing_environment={**os.environ, **user},
+            mangohud_activation_owner="measurement_session" if measurement_environment else "none",
+            measurement_environment=measurement_environment or {})
+        game_environment: dict[str, str] = {}
+        warnings = list(plan.warnings)
+        for name, value in runtime.environment.items():
+            if name in user and user[name] != value and runtime.environment_sources.get(name) != "baseline_measurement":
+                warnings.append(f"{name} is set by the manual game configuration; the optimization value is not applied")
+                continue
+            game_environment[name] = value
+        game_environment.update(runtime.wrapper_environment_overrides)
+        report = {"formatVersion": 1, "appId": key, "transport": "manual", "profile": profile.preset,
+                  "wrappers": list(runtime.wrappers), "environmentSources": dict(runtime.environment_sources),
+                  "fpsLimitOwner": runtime.fps_limit_owner, "fpsLimit": runtime.fps_limit or 0,
+                  "gamescopeWrapper": list(runtime.gamescope_wrapper), "gameModeWrapper": list(runtime.gamemode_wrapper),
+                  "warnings": [*runtime.warnings, *warnings]}
+        self._manual_runtime_reports[game.id] = report
+        return replace(plan, game_command=(runtime.executable, *runtime.arguments),
+                       game_environment=tuple(sorted(game_environment.items())),
+                       game_unset=tuple(runtime.wrapper_environment_removed), warnings=tuple(warnings))
+
     def _poll_manual_launch_jobs(self) -> None:
         for game_id, future in tuple(self._manual_launch_jobs.items()):
             if not future.done():
@@ -3594,10 +3742,14 @@ class AppController(QObject):
                 result = future.result()
             except Exception as error:
                 logger.exception("Manual game lifecycle failed for %s", game_id)
+                if game is not None:
+                    self._optimization_controller.manual_lifecycle_finished(game, None, str(error))
                 self._emit_toast(
                     f"{name}: {str(error).strip() or type(error).__name__}", "error"
                 )
                 continue
+            if game is not None:
+                self._optimization_controller.manual_lifecycle_finished(game, result, result.error)
             if result.error:
                 logger.warning("Manual game lifecycle for %s: %s", game_id, result.error)
                 self._emit_toast(f"{name}: {result.error}", "error")

@@ -11,7 +11,13 @@ from .mangohud import validate_game_key
 
 
 OPTIMIZATION_SCHEMA_VERSION = 1
-OPTIMIZATION_PRESETS = ("automatic", "maximum_performance", "balanced", "quiet", "custom")
+OPTIMIZATION_PRESETS = (
+    "automatic", "maximum_performance", "balanced", "low_power",
+    "lowest_latency", "stable_image", "best_quality", "custom",
+)
+# Saved names of earlier builds -> current preset. "quiet" became "low_power"
+# with identical runtime values; nothing else is reinterpreted.
+LEGACY_PRESET_ALIASES = {"quiet": "low_power"}
 GAME_CATEGORIES = (
     "competitive", "fast_action", "cinematic", "platformer_2d",
     "strategy_simulation", "retro", "unknown", "custom",
@@ -178,7 +184,8 @@ class GameOptimizationProfile:
         if self.schema_version != OPTIMIZATION_SCHEMA_VERSION:
             raise ValueError("unsupported optimization profile schema")
         object.__setattr__(self, "app_id", validate_game_key(self.app_id))
-        object.__setattr__(self, "preset", _choice(self.preset, OPTIMIZATION_PRESETS, "preset"))
+        preset = str(self.preset or "").strip().casefold()
+        object.__setattr__(self, "preset", _choice(LEGACY_PRESET_ALIASES.get(preset, preset), OPTIMIZATION_PRESETS, "preset"))
         object.__setattr__(self, "game_category", _choice(self.game_category, GAME_CATEGORIES, "game_category"))
         object.__setattr__(self, "user_goal", _choice(self.user_goal, USER_GOALS, "user_goal"))
         object.__setattr__(self, "target_fps_mode", _choice(self.target_fps_mode, FPS_MODES, "target_fps_mode"))
@@ -284,7 +291,8 @@ class GameOptimizationProfile:
             for old, new in aliases.items():
                 if old in migrated and new not in migrated:
                     migrated[new] = migrated[old]
-            preset_aliases = {"maximum performance": "maximum_performance", "balanced": "balanced", "quiet": "quiet", "custom": "custom", "automatic": "automatic"}
+            preset_aliases = {"maximum performance": "maximum_performance", "balanced": "balanced", "quiet": "low_power",
+                              "low power": "low_power", "custom": "custom", "automatic": "automatic"}
             migrated["preset"] = preset_aliases.get(str(migrated.get("preset", "automatic")).casefold(), "automatic")
             migrated["schema_version"] = OPTIMIZATION_SCHEMA_VERSION
         # Profiles saved before the explicit window mode existed only stored
@@ -330,6 +338,6 @@ __all__ = [
     "GAMESCOPE_FILTERS", "GAMESCOPE_MODES", "GAMESCOPE_PROFILE_FIELDS",
     "sharpness_cli_to_percent", "sharpness_percent_to_cli",
     "GAMESCOPE_SCALERS", "GAMESCOPE_SHARPNESS_DEFAULT", "GAMESCOPE_SHARPNESS_FILTERS",
-    "GAMESCOPE_WINDOW_MODES", "GameOptimizationProfile", "OPTIMIZATION_PRESETS",
+    "GAMESCOPE_WINDOW_MODES", "GameOptimizationProfile", "LEGACY_PRESET_ALIASES", "OPTIMIZATION_PRESETS",
     "OPTIMIZATION_SCHEMA_VERSION", "USER_GOALS",
 ]

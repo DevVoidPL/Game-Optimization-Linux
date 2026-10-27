@@ -802,6 +802,9 @@ Item {
             }
 
             SurfaceCard {
+                objectName: "controllerSettingsCard"
+                // Desktop Edition: no controller navigation, so no controller or Couch settings.
+                visible: Boolean(page.controller && page.controller.couchAvailable)
                 Layout.fillWidth: true
                 Layout.leftMargin: App.Theme.contentPadding
                 Layout.rightMargin: App.Theme.contentPadding

@@ -188,6 +188,9 @@ SurfaceCard {
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textMuted
             visible: card.loaded
             text: qsTr("Measured benefit: unverified until a controlled comparison. Gamescope or desktop protection can remain active in both Off and On.") }
+        Label { objectName: "gpuMemoryInterruptedSession"; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
+            visible: Boolean(card.statusData.interruptedSession)
+            text: qsTr("The last GameOpti session was interrupted before it saved a final state. Its protection data is historical and does not describe the current game.") }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
             visible: Boolean(card.statusData.busy || card.statusData.runtimePressureVerified || card.statusData.failedLaunch)
             text: card.statusData.busy ? qsTr("Applying GPU-memory operation…") : card.statusData.failedLaunch

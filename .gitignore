@@ -32,3 +32,6 @@ htmlcov/
 .idea/
 .vscode/
 *~
+
+# Voidek model files are release assets pinned in the Flatpak manifest, not tracked
+/flatpak/bundled/tts.voidek/

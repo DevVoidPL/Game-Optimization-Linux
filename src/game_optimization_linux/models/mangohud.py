@@ -15,7 +15,7 @@ from typing import Any, Mapping
 
 
 MANGOHUD_SCHEMA_VERSION = 1
-MANGOHUD_PRESETS = ("disabled", "fps_only", "basic", "extended", "custom")
+MANGOHUD_PRESETS = ("disabled", "fps_only", "basic", "extended", "gameopti", "minimal", "diagnostic", "custom")
 MANGOHUD_POSITIONS = (
     "top-left",
     "top-center",
@@ -46,6 +46,9 @@ MANGOHUD_METRICS = (
     "gamemode",
     "battery",
     "network",
+    "avg_fps", "fps_1_low", "frametime_detailed", "gpu_memory_clock",
+    "throttling", "disk_io", "swap", "graphics_api", "vulkan_driver",
+    "wine_sync", "present_mode", "vkbasalt",
 )
 
 PRESET_METRICS: dict[str, tuple[str, ...]] = {
@@ -81,6 +84,26 @@ PRESET_METRICS: dict[str, tuple[str, ...]] = {
         "gamemode",
     ),
     "custom": (),
+}
+
+MANGOHUD_GRAPHS = ("gpu_load", "cpu_load", "vram", "ram")
+PRESET_METRICS.update({
+    "minimal": PRESET_METRICS["fps_only"],
+    "gameopti": (*PRESET_METRICS["basic"], "avg_fps", "fps_1_low"),
+    "diagnostic": (*PRESET_METRICS["extended"], "avg_fps", "fps_1_low",
+                   "gpu_memory_clock", "throttling", "disk_io", "swap",
+                   "graphics_api", "vulkan_driver", "wine_sync", "present_mode", "vkbasalt"),
+})
+PRESET_APPEARANCE = {
+    "gameopti": dict(font_size=24, background_alpha=0.7, round_corners=10,
+        compact=False, horizontal=False, table_columns=3, frame_timing_graph=True, graphs=(),
+        text_color="E5F7F1", background_color="0B1720", gpu_color="4FE3B8",
+        cpu_color="8FD7EA", vram_color="BAA6FF", ram_color="EDB583", frametime_color="4FE3B8"),
+    "minimal": dict(font_size=22, background_alpha=0.35, round_corners=6,
+        compact=True, horizontal=False, table_columns=3, frame_timing_graph=False, graphs=()),
+    "diagnostic": dict(font_size=20, background_alpha=0.8, round_corners=8,
+        compact=True, horizontal=False, table_columns=4, frame_timing_graph=True,
+        graphs=("gpu_load", "cpu_load", "vram", "ram")),
 }
 
 # Defaults of MangoHud 0.8.4 (MangoHud.conf.example "Color customization").
@@ -239,6 +262,10 @@ class MangoHudProfile:
     toggle_logging_key: str = "Shift_L+F2"
     executable_path: str = ""
     frame_timing_graph: bool = False
+    offset_x: int = 0
+    offset_y: int = 0
+    cellpadding_y: float = -0.085
+    graphs: tuple[str, ...] = ()
     text_color: str = MANGOHUD_DEFAULT_COLORS["text_color"]
     gpu_color: str = MANGOHUD_DEFAULT_COLORS["gpu_color"]
     cpu_color: str = MANGOHUD_DEFAULT_COLORS["cpu_color"]
@@ -301,6 +328,12 @@ class MangoHudProfile:
             "frame_timing_graph",
             _boolean(self.frame_timing_graph, "frame_timing_graph"),
         )
+        object.__setattr__(self, "offset_x", _integer(self.offset_x, "offset_x", -4096, 4096))
+        object.__setattr__(self, "offset_y", _integer(self.offset_y, "offset_y", -4096, 4096))
+        object.__setattr__(self, "cellpadding_y", _number(self.cellpadding_y, "cellpadding_y", -0.2, 1.0))
+        if not isinstance(self.graphs, (list, tuple)) or any(g not in MANGOHUD_GRAPHS for g in self.graphs):
+            raise ValueError("unsupported MangoHud graphs")
+        object.__setattr__(self, "graphs", tuple(g for g in MANGOHUD_GRAPHS if g in self.graphs))
         for color_name in MANGOHUD_DEFAULT_COLORS:
             object.__setattr__(
                 self, color_name, _color(getattr(self, color_name), color_name)
@@ -358,6 +391,7 @@ class MangoHudProfile:
             enabled=preset != "disabled",
             preset=preset,
             metrics=metrics,
+            **PRESET_APPEARANCE.get(preset, {}),
             updated_at=datetime.now(UTC),
         )
 
@@ -387,6 +421,10 @@ class MangoHudProfile:
             "toggle_logging_key": self.toggle_logging_key,
             "executable_path": self.executable_path,
             "frame_timing_graph": self.frame_timing_graph,
+            "offset_x": self.offset_x,
+            "offset_y": self.offset_y,
+            "cellpadding_y": self.cellpadding_y,
+            "graphs": list(self.graphs),
             **{name: getattr(self, name) for name in MANGOHUD_DEFAULT_COLORS},
             "updated_at": self.updated_at.astimezone(UTC).isoformat(),
         }

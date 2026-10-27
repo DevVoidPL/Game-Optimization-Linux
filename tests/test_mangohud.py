@@ -12,6 +12,7 @@ from game_optimization_linux.controllers.app_controller import AppController
 from game_optimization_linux.models import FilesystemType, Game, GameStatus, Launcher, MangoHudProfile
 from game_optimization_linux.providers import DemoSystemProvider
 from game_optimization_linux.services import (
+    GameOptimizationProfileRepository,
     KNOWN_CONFIG_KEYS,
     GameExecutableResolver,
     MangoHudAvailability,
@@ -421,6 +422,7 @@ def _controller(
         task_service=MockTaskService(),
         settings_store=SettingsStore(tmp_path / "settings.json"),
         system_provider=DemoSystemProvider(),
+        optimization_profile_repository=GameOptimizationProfileRepository(tmp_path / "optimization-profiles"),
         mangohud_repository=repository,
         mangohud_detector=detector,  # type: ignore[arg-type]
         mangohud_launch_integration=integration,

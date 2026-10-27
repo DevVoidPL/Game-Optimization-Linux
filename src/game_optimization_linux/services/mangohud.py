@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import json
 import os
 from pathlib import Path
@@ -53,7 +53,20 @@ METRIC_CONFIG_KEYS: dict[str, str] = {
     "gamemode": "gamemode",
     "battery": "battery",
     "network": "network",
+    "avg_fps": "fps_metrics", "fps_1_low": "fps_metrics",
+    "frametime_detailed": "frame_timing_detailed", "gpu_memory_clock": "gpu_mem_clock",
+    "throttling": "throttling_status", "disk_io": "io_read", "swap": "swap",
+    "graphics_api": "engine_version", "vulkan_driver": "vulkan_driver",
+    "wine_sync": "winesync", "present_mode": "present_mode", "vkbasalt": "vkbasalt",
 }
+NEW_CONFIG_KEYS = frozenset({"fps_metrics", "frame_timing_detailed", "gpu_mem_clock",
+    "throttling_status", "io_read", "io_write", "swap", "engine_version", "vulkan_driver",
+    "winesync", "present_mode", "vkbasalt", "graphs", "offset_x", "offset_y", "cellpadding_y"})
+# mangoapp does not run inside the game's graphics process. Do not label its API,
+# driver, present mode or loaded-layer/process counters as game telemetry.
+MANGOAPP_PROCESS_METRICS = frozenset({"process_memory", "process_vram", "disk_io",
+    "graphics_api", "vulkan_driver", "present_mode", "vkbasalt"})
+
 
 # Every key emitted by Game Optimization is present in MangoHud 0.8.4's distributed
 # example file.  Runtime parsing narrows this set on systems shipping a
@@ -79,6 +92,7 @@ KNOWN_CONFIG_KEYS = frozenset(
         "permit_upload",
         "frame_timing",
         "throttling_status",
+        *NEW_CONFIG_KEYS,
         *MANGOHUD_DEFAULT_COLORS,
         *METRIC_CONFIG_KEYS.values(),
     }
@@ -91,7 +105,7 @@ KNOWN_CONFIG_KEYS = frozenset(
 HUD_ROWS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("gpu", "GPU", "gpu_color", ("gpu_usage", "gpu_temperature", "gpu_clock", "gpu_power")),
     ("cpu", "CPU", "cpu_color", ("cpu_usage", "cpu_temperature", "cpu_clock", "cpu_power")),
-    ("vram", "VRAM", "vram_color", ("vram",)),
+    ("vram", "VRAM", "vram_color", ("vram", "gpu_memory_clock")),
     ("ram", "RAM", "ram_color", ("ram",)),
     ("process_memory", "PROC", "ram_color", ("process_memory",)),
     ("process_vram", "PROC", "vram_color", ("process_vram",)),
@@ -101,8 +115,19 @@ HUD_ROWS: tuple[tuple[str, str, str, tuple[str, ...]], ...] = (
     ("gamemode", "GAMEMODE", "text_color", ("gamemode",)),
     ("resolution", "RES", "text_color", ("resolution",)),
     ("network", "NET", "text_color", ("network",)),
+    ("avg_fps", "AVG", "text_color", ("avg_fps",)),
+    ("fps_1_low", "1% LOW", "text_color", ("fps_1_low",)),
+    ("throttling", "LIMIT", "text_color", ("throttling",)),
+    ("disk_io", "IO R/W", "text_color", ("disk_io",)),
+    ("swap", "SWAP", "ram_color", ("swap",)),
+    ("api", "API", "text_color", ("graphics_api",)),
+    ("driver", "DRIVER", "text_color", ("vulkan_driver",)),
+    ("sync", "WINE SYNC", "text_color", ("wine_sync",)),
+    ("present", "PRESENT", "text_color", ("present_mode",)),
+    ("vkbasalt", "vkBasalt", "text_color", ("vkbasalt",)),
+    ("details", "FT MIN/AVG/MAX", "frametime_color", ("frametime_detailed",)),
 )
-_ANCHORED_ROWS = frozenset({"gpu", "cpu", "fps"})
+_ANCHORED_ROWS = frozenset({"gpu", "cpu", "fps", "vram"})
 # Fixed MangoHud 0.8.4 colours that Game Optimization does not configure.
 _ENGINE_COLOR = "EB5B5B"
 _WINE_COLOR = "EB5B5B"
@@ -126,6 +151,11 @@ HUD_SAMPLE_VALUES: dict[str, str] = {
     "gamemode": "ON",
     "battery": "86%",
     "network": "1.2 MiB/s",
+    "avg_fps": "62", "fps_1_low": "48", "frametime_detailed": "12 / 16 / 24 ms",
+    "gpu_memory_clock": "1750 MHz", "throttling": "PWR (example)",
+    "disk_io": "0.8 / 0.2 MiB/s", "swap": "0.4 GiB", "graphics_api": "Vulkan 1.3",
+    "vulkan_driver": "Example driver", "wine_sync": "NTSYNC", "present_mode": "FIFO",
+    "vkbasalt": "ON (example)",
 }
 _ALWAYS_WRITTEN_METRIC_KEYS = ("fps", "frametime", "gpu_stats", "cpu_stats")
 
@@ -207,9 +237,13 @@ def hud_layout(
                 {"text": "", "color": "", "label": False, "pad": True}
                 for _ in range(columns - remainder)
             )
-    graph = bool(profile.frame_timing_graph and "frame_timing" in supported)
+    graph = bool((profile.frame_timing_graph or "frametime_detailed" in profile.metrics) and "frame_timing" in supported)
     return {
         "position": profile.position,
+        "offsetX": profile.offset_x,
+        "offsetY": profile.offset_y,
+        "cellPaddingY": profile.cellpadding_y,
+        "graphs": list(profile.graphs) if "graphs" in supported else [],
         "horizontal": profile.horizontal,
         "compact": profile.compact,
         "tableColumns": columns,
@@ -245,6 +279,44 @@ def preset_metric_sets() -> dict[str, list[str]]:
     return {preset: list(metrics) for preset, metrics in PRESET_METRICS.items()}
 
 _EXAMPLE_KEY = re.compile(r"^\s*#?\s*([a-z][a-z0-9_]*)\s*(?:=|$)")
+
+
+PRESERVED_HEADER = "# Preserved user options"
+
+
+def _option_key(line: str) -> str:
+    return line.strip().split("=", 1)[0].strip()
+
+
+def preserved_options(rendered: str, existing: str) -> list[str]:
+    """Unknown options of ``existing`` that GameOpti keeps, each key exactly once.
+
+    Keys GameOpti manages (known keys and every key in ``rendered``) are never
+    preserved. MangoHud applies the last value of a repeated key, so the last
+    occurrence's line is kept, at the position where the key first appeared;
+    the result is deterministic and repeated writes do not change it.
+    """
+    managed = set(KNOWN_CONFIG_KEYS)
+    managed.update(_option_key(line) for line in rendered.splitlines()
+                   if line.strip() and not line.strip().startswith("#"))
+    order: list[str] = []
+    last: dict[str, str] = {}
+    for line in existing.splitlines():
+        clean = line.strip()
+        if not clean or clean.startswith("#"):
+            continue
+        key = _option_key(line)
+        if not key or key in managed:
+            continue
+        if key not in last:
+            order.append(key)
+        last[key] = clean
+    return [last[key] for key in order]
+
+
+def merge_preserved_options(rendered: str, existing: str) -> str:
+    unknown = preserved_options(rendered, existing)
+    return rendered + ("\n" + PRESERVED_HEADER + "\n" + "\n".join(unknown) + "\n" if unknown else "")
 
 
 def _atomic_write(path: Path, content: str) -> None:
@@ -358,6 +430,9 @@ class MangoHudConfigWriter:
 
         add("position", profile.position)
         add("font_size", profile.font_size)
+        if profile.offset_x: add("offset_x", profile.offset_x)
+        if profile.offset_y: add("offset_y", profile.offset_y)
+        if profile.cellpadding_y != -0.085: add("cellpadding_y", self._alpha(profile.cellpadding_y))
         add("background_alpha", self._alpha(profile.background_alpha))
         add("round_corners", profile.round_corners)
         if profile.compact:
@@ -386,12 +461,16 @@ class MangoHudConfigWriter:
         # custom profile faithfully reflect the user's metric selection.
         for key in _ALWAYS_WRITTEN_METRIC_KEYS:
             add(key, None if key in selected_keys else 0)
-        add("frame_timing", None if profile.frame_timing_graph else 0)
-        add("throttling_status", 0)
+        add("frame_timing", None if profile.frame_timing_graph or "frametime_detailed" in metrics else 0)
+        add("throttling_status", None if "throttling" in metrics else 0)
+        fps_metrics = [value for metric, value in (("avg_fps", "avg"), ("fps_1_low", "0.01")) if metric in metrics]
+        if fps_metrics: add("fps_metrics", ",".join(fps_metrics))
+        if profile.graphs: add("graphs", ",".join(profile.graphs))
         for metric in metrics:
             key = METRIC_CONFIG_KEYS[metric]
-            if key not in _ALWAYS_WRITTEN_METRIC_KEYS:
+            if key not in {*_ALWAYS_WRITTEN_METRIC_KEYS, "fps_metrics", "throttling_status"}:
                 add(key)
+            if metric == "disk_io": add("io_write")
 
         add("permit_upload", 0)
         if profile.logging_enabled:
@@ -411,8 +490,22 @@ class MangoHudConfigWriter:
         lines.extend(key if value is None else f"{key}={value}" for key, value in entries)
         return "\n".join(lines) + "\n"
 
+    @staticmethod
+    def validate_target(path: Path) -> None:
+        if path.is_file() and not path.read_text(encoding="utf-8").startswith(MANAGED_HEADER):
+            raise ValueError("Existing MangoHud configuration is not managed by GameOpti")
+
     def write(self, profile: MangoHudProfile, path: Path) -> Path:
-        _atomic_write(Path(path), self.render(profile))
+        self.validate_target(Path(path))
+        text = self.render(profile)
+        # Preserve user-added, unknown options in this owned file without exposing
+        # a custom-command editor or accepting arbitrary fields from a payload.
+        if Path(path).is_file():
+            existing = Path(path).read_text(encoding="utf-8")
+            if not existing.startswith(MANAGED_HEADER):
+                raise ValueError("Existing MangoHud configuration is not managed by GameOpti")
+            text = merge_preserved_options(text, existing)
+        _atomic_write(Path(path), text)
         return Path(path)
 
 
@@ -481,6 +574,41 @@ class MangoHudDetector:
             if supported:
                 return frozenset(supported)
         return KNOWN_CONFIG_KEYS
+
+    def for_game(self, game: Game) -> tuple[MangoHudAvailability, dict[str, Any]]:
+        """Capabilities of the launcher runtime, not of GameOpti's sandbox."""
+        flatpak_id = ({"Steam": FLATPAK_STEAM_APP_ID, "Heroic": "com.heroicgameslauncher.hgl",
+            "Lutris": "net.lutris.Lutris"}.get(game.launcher.value, "")
+            if game.launcher_variant == "flatpak" or uses_flatpak_steam(game) else "")
+        base = self.detect("flatpak" if flatpak_id else "native")
+        probe = getattr(self._host_service, "mangohud_runtime_info", None)
+        if flatpak_id and not callable(probe):
+            from .host_service import HostServiceClient
+            probe = HostServiceClient().mangohud_runtime_info
+        runtime = probe(flatpak_id) if callable(probe) else {}
+        version = str(runtime.get("version", base.version))
+        keys = base.supported_keys
+        example = str(runtime.get("example", ""))
+        if example:
+            keys = tuple(sorted({m.group(1) for line in example.splitlines()
+                if (m := _EXAMPLE_KEY.match(line))}.intersection(KNOWN_CONFIG_KEYS)))
+        match = re.search(r"(\d+)\.(\d+)\.(\d+)", version)
+        verified = bool(match and tuple(map(int, match.groups())) >= (0, 8, 4))
+        if not verified:
+            keys = tuple(key for key in keys if key not in NEW_CONFIG_KEYS)
+        available = bool(runtime.get("available", base.available))
+        if flatpak_id and not runtime.get("checked"):
+            available = False
+            keys = ()
+        message = base.message
+        if flatpak_id and not available:
+            message = "MangoHud is not available inside this launcher Flatpak. Install its matching MangoHud extension, then refresh."
+        return replace(base, available=available, version=version, supported_keys=keys, message=message), {
+            "environment": flatpak_id or "host / Steam Linux Runtime",
+            "versionVerified": verified, "checked": bool(runtime.get("checked", bool(version))),
+            "layer32": runtime.get("layer32", any(p.is_file() and p.name.endswith(".x86.json") for p in self.layer_paths)),
+            "layer64": runtime.get("layer64", base.layer_available),
+        }
 
     def _version(self, command: str) -> str:
         try:
@@ -798,7 +926,8 @@ class MangoHudLaunchIntegration:
             and status.resolution.reliable
             and not uses_flatpak_steam(game)
         ):
-            availability = self.detector.detect("native")
+            query = getattr(self.detector, "for_game", None)
+            availability = query(game)[0] if callable(query) else self.detector.detect("native")
             MangoHudConfigWriter(availability.supported_keys).write(profile, target)
         return status
 
@@ -813,7 +942,8 @@ class MangoHudLaunchIntegration:
                 steam_type=steam_type,
                 message="MangoHud disabled for this game",
             )
-        availability = self.detector.detect(steam_type)
+        query = getattr(self.detector, "for_game", None)
+        availability = query(game)[0] if callable(query) else self.detector.detect(steam_type)
         if not availability.available:
             return MangoHudLaunchActivation(
                 enabled=True,

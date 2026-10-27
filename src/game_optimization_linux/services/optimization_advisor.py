@@ -137,7 +137,11 @@ class OptimizationAdvisor:
         gamescope_available: bool,
         measurements: SessionPerformanceData | None = None,
         system_info: Mapping[str, Any] | None = None,
+        accepted_results: Mapping[str, Any] | None = None,
     ) -> OptimizationPresetPlan:
+        """``accepted_results`` are profile values kept after a verified,
+        controlled comparison for this game, system and the preset's goal
+        (see ``measured_optimization``). They are never applied to Custom."""
         preset = profile.preset
         recommendation = self.recommend(
             profile, display, measurements, system_info=system_info
@@ -158,17 +162,19 @@ class OptimizationAdvisor:
         conflicts: list[str] = []
 
         if preset == "automatic":
+            # The game category is a user hint, not evidence that a tool helps:
+            # without a verified local result Automatic adds no runtime tools.
             values.update(
                 target_fps_mode="automatic",
                 target_fps=recommendation.target_fps,
-                gamemode_enabled=(
-                    recommendation.gamemode_recommended and gamemode_available
-                ),
+                gamemode_enabled=False,
                 gamescope_enabled=False,
                 gamescope_mode="disabled",
             )
             reasons.extend(recommendation.reasons)
             reasons.append("Automatic does not enable Gamescope without an explicit user choice")
+            if not accepted_results:
+                reasons.append("No verified local measurement for this game and system; Automatic adds no runtime tools")
         elif preset == "maximum_performance":
             values.update(
                 user_goal="lowest_latency",
@@ -196,7 +202,8 @@ class OptimizationAdvisor:
             reasons.append("Balanced uses a stable target no higher than 60 FPS")
             reasons.append("GameMode is used only for categories likely to benefit from it")
             reasons.append("No scaling wrapper is added by default")
-        elif preset == "quiet":
+        elif preset == "low_power":
+            # Same runtime values as the former Quiet preset.
             values.update(
                 user_goal="low_power",
                 target_fps_mode="manual",
@@ -205,8 +212,24 @@ class OptimizationAdvisor:
                 gamescope_enabled=False,
                 gamescope_mode="disabled",
             )
-            reasons.append("Quiet disables GameMode and selects a lower 45 FPS target")
+            reasons.append("Low Power disables GameMode and selects a lower 45 FPS target")
             reasons.append("Gamescope remains disabled, so the target is advisory until a limiter is selected")
+        elif preset in {"lowest_latency", "stable_image", "best_quality"}:
+            values.update(
+                user_goal=preset,
+                target_fps_mode="automatic",
+                target_fps=min(refresh, 240) if preset == "lowest_latency" else min(refresh, 60),
+                gamemode_enabled=False,
+                gamescope_enabled=False,
+                gamescope_mode="disabled",
+            )
+            reasons.append("This goal adds no runtime tools until a measured comparison shows a benefit")
+            if not accepted_results:
+                reasons.append("No verified local measurement for this game and system; Automatic adds no runtime tools")
+        if accepted_results and preset != "custom":
+            values.update({key: value for key, value in accepted_results.items() if hasattr(profile, key)})
+            reasons.append("Applied results kept after a verified measured comparison for this game and system")
+            sources.append("verified local measurements")
 
         if values.get("gamemode_enabled") is False and not gamemode_available:
             conflicts.append("GameMode is unavailable and will not be added")

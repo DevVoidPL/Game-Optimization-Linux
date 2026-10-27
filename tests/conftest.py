@@ -43,3 +43,20 @@ assert isinstance(QT_APPLICATION, QApplication), (
     "as QGuiApplication.clipboard() segfault on such an instance. Find the "
     "import that constructs it and let it reuse the conftest application."
 )
+
+
+import pytest
+
+
+@pytest.fixture(autouse=True)
+def _hermetic_vulkan_layer_discovery(monkeypatch):
+    """Launch plans must not depend on Vulkan layers installed on the test machine.
+
+    Tests that exercise discovery pass explicit directories, or import the real
+    ``search_directories`` at module import time.
+    """
+    from game_optimization_linux.services import frame_generation_isolation as isolation
+    monkeypatch.setattr(isolation, "search_directories", lambda env, kind="implicit": [])
+    isolation.clear_discovery_cache()
+    yield
+    isolation.clear_discovery_cache()

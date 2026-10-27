@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
+import functools
 import json
 import os
 from pathlib import Path
@@ -13,6 +14,7 @@ import stat
 import subprocess
 import sys
 import time
+from typing import Any
 from uuid import uuid4
 
 from .config import STATE_DIR
@@ -20,10 +22,11 @@ from .models import validate_game_key
 from .services.optimization_profiles import GameOptimizationProfileRepository
 from .services.optimization_runtime import OptimizationLaunchPlanner, RuntimeToolDetector
 from .services.post_processing import optional_launch_environment
-from .services.frame_generation import launch_settings as frame_generation_launch, load_profile as frame_generation_profile
+from .services.frame_generation import resolve_launch as frame_generation_resolve, load_profile as frame_generation_profile
 from .services.mangohud import MangoHudProfileRepository
 from .services.optiscaler import OptiScalerError, OptiScalerProfileRepository
 from .services.proton_tweaks import ProtonTweaksError, ProtonTweaksRepository
+from .services.custom_launch import CustomLaunchError, CustomLaunchRepository, redact
 from .services.host_service import HostServiceClient
 from .services.host_bootstrap import host_home_directory
 from .services.performance_session import BaselineSessionRepository
@@ -305,6 +308,94 @@ def _shell_assignment(name: str, value: str) -> list[str]:
     return [f"{name}={shlex.quote(value)}", f"export {name}"]
 
 
+def run_hook(argv: Sequence[str], timeout: int, environment: Mapping[str, str], *, cwd: str | None = None,
+             run: Callable[..., Any] = subprocess.run) -> int:
+    """Run one user command directly (no shell); returns its status, 124 on timeout, 127 if missing."""
+    try:
+        return int(run(list(argv), env=dict(environment), cwd=cwd, stdin=subprocess.DEVNULL,
+                       timeout=timeout, check=False, shell=False).returncode)
+    except subprocess.TimeoutExpired:
+        return 124
+    except OSError:
+        return 127
+
+
+def _tree_scope(plan: object) -> tuple[str, list[str]]:
+    """Process-tree tracking for after-exit commands when Steam's reaper is absent.
+
+    Steam's reaper (inside %command%) returns only after every game
+    process has ended. Other commands (Local games) run in a private systemd
+    user scope that stays active until the last process of the tree exits.
+    """
+    steam_command = tuple(str(value) for value in getattr(plan, "steam_command", ()))
+    # Real %command% (launch reports 1774580/3240220): steam-launch-wrapper -- reaper SteamLaunch ...
+    if not getattr(plan, "post_exit", ()) or any(Path(value).name == "reaper" for value in steam_command[:4]):
+        return "", []
+    import uuid
+    unit = f"app-gameopti-launch-{uuid.uuid4().hex[:12]}.scope"
+    return unit, ["systemd-run", "--user", "--scope", "--collect", "--quiet", f"--unit={unit}",
+                  *_systemd_run_literal(), "--"]
+
+
+@functools.lru_cache(maxsize=1)
+def _systemd_run_literal() -> tuple[str, ...]:
+    """systemd >= 254 expands $NAME in the command; keep every argument literal where supported."""
+    try:
+        text = subprocess.run(["systemd-run", "--help"], capture_output=True, text=True, timeout=10, check=False).stdout
+    except (OSError, subprocess.TimeoutExpired):
+        return ()
+    return ("--expand-environment=no",) if "--expand-environment" in text else ()
+
+
+def _wait_scope(unit: str, run: Callable[..., Any] = subprocess.run) -> None:
+    import time
+    while unit:
+        try:
+            if run(["systemctl", "--user", "is-active", "--quiet", unit], stdin=subprocess.DEVNULL,
+                   check=False, shell=False, timeout=15).returncode != 0:
+                return
+        except (OSError, subprocess.TimeoutExpired):
+            return
+        time.sleep(1)
+
+
+def _run_pre(plan: object, environment: Mapping[str, str]) -> bool:
+    """Before-launch commands; False when one failed with the stop policy (the game must not start)."""
+    for index, entry in enumerate(getattr(plan, "pre_launch", ()), 1):
+        status = run_hook(entry.argv, entry.timeout, environment)
+        if status:
+            print(f"game-optimization-run: before-launch command {index} failed (status {status})", file=sys.stderr)
+            if entry.on_failure != "continue":
+                _run_post(plan, environment, started=False)
+                return False
+    return True
+
+
+def _run_post(plan: object, environment: Mapping[str, str], *, started: bool) -> None:
+    for index, entry in enumerate(getattr(plan, "post_exit", ()), 1):
+        if not started and not entry.run_if_not_started:
+            continue
+        status = run_hook(entry.argv, entry.timeout, environment)
+        if status:
+            print(f"game-optimization-run: after-exit command {index} failed (status {status})", file=sys.stderr)
+
+
+def _run_with_hooks(plan: object, command: Sequence[str], environment: Mapping[str, str]) -> int:
+    if not _run_pre(plan, environment):
+        return 1
+    unit, scope = _tree_scope(plan)
+    try:
+        process = subprocess.Popen([*scope, *command], env=dict(environment), stdin=None, shell=False)
+        game_status = int(process.wait())
+        _wait_scope(unit)
+    except OSError as error:
+        print(f"game-optimization-run: the game command could not start: {error}", file=sys.stderr)
+        _run_post(plan, environment, started=False)
+        return 127
+    _run_post(plan, environment, started=True)
+    return game_status
+
+
 def _host_launcher_payload(
     plan: object,
     environment_overrides: Mapping[str, str],
@@ -313,6 +404,11 @@ def _host_launcher_payload(
 ) -> bytes:
     command = [str(value) for value in getattr(plan, "command")]
     steam_command = tuple(str(value) for value in getattr(plan, "steam_command"))
+    custom_arguments = [str(value) for value in getattr(plan, "custom_arguments", ())]
+    if custom_arguments:
+        if command[-len(custom_arguments):] != custom_arguments:
+            raise ValueError("the launch plan does not end with its custom game arguments")
+        command = command[:-len(custom_arguments)]
     if (
         not steam_command
         or len(command) < len(steam_command)
@@ -327,7 +423,7 @@ def _host_launcher_payload(
         lines.extend(["umask 077", f"exec 2>{shlex.quote(str(post_processing_log))}"])
         if environment_overrides.get("ENABLE_VKBASALT") == "1" or "VKBASALT_LOG_FILE" in environment_overrides:
             environment_overrides = {**environment_overrides, "VKBASALT_LOG_FILE": "stderr"}
-            prefix = ["VKBASALT_LOG_FILE=stderr" if arg.startswith("VKBASALT_LOG_FILE=") else arg for arg in prefix]
+            prefix = [("VKBASALT_LOG_FILE=stderr" if arg.startswith("VKBASALT_LOG_FILE=") else arg) for arg in prefix]
     for key, value in sorted(environment_overrides.items()):
         lines.extend(_shell_assignment(str(key), str(value)))
     for key in getattr(plan, "wrapper_environment_removed"):
@@ -335,8 +431,63 @@ def _host_launcher_payload(
         lines.append(f"unset {key}")
     for key, value in sorted(getattr(plan, "wrapper_environment_overrides").items()):
         lines.extend(_shell_assignment(str(key), str(value)))
-    quoted_prefix = " ".join(shlex.quote(value) for value in prefix)
-    lines.append(f"exec {quoted_prefix} \"$@\"" if prefix else 'exec "$@"')
+    pre = tuple(getattr(plan, "pre_launch", ()))
+    post = tuple(getattr(plan, "post_exit", ()))
+
+    def hook(entry: Any, label: str) -> str:
+        # Every element is a separately quoted argument of GameOpti's own
+        # script; user text is never parsed as shell syntax.
+        argv = " ".join(shlex.quote(str(item)) for item in entry.argv)
+        return f"timeout -k 5 {int(entry.timeout)} {argv} </dev/null"
+
+    def post_lines(only_not_started: bool) -> list[str]:
+        result = []
+        for index, entry in enumerate(post, 1):
+            if only_not_started and not entry.run_if_not_started:
+                continue
+            result.extend([
+                f"if {hook(entry, 'after exit')}; then :; else",
+                f"  echo \"game-optimization-run: after-exit command {index} failed (status $?)\" >&2",
+                "fi",
+            ])
+        return result
+
+    for index, entry in enumerate(pre, 1):
+        if entry.on_failure == "continue":
+            lines.extend([
+                f"if {hook(entry, 'before launch')}; then :; else",
+                f"  echo \"game-optimization-run: before-launch command {index} failed (status $?); continuing\" >&2",
+                "fi",
+            ])
+        else:
+            lines.extend([
+                f"if {hook(entry, 'before launch')}; then :; else",
+                "  hook_status=$?",
+                f"  echo \"game-optimization-run: before-launch command {index} failed (status $hook_status); the game was not started\" >&2",
+                *("  " + line for line in post_lines(True)),
+                "  exit 1",
+                "fi",
+            ])
+    unit, scope = _tree_scope(plan)
+    if scope:
+        # Probed on the host where this script runs: keeps $NAME in arguments literal.
+        lines.append("scope_literal=; if systemd-run --help 2>/dev/null | grep -q -e --expand-environment; "
+                     "then scope_literal=--expand-environment=no; fi")
+        scope = [value for value in scope if value != "--expand-environment=no"]
+    quoted_scope = [shlex.quote(value) for value in scope]
+    if quoted_scope:
+        quoted_scope.insert(-1, "$scope_literal")
+    game = " ".join([*quoted_scope, *(shlex.quote(value) for value in prefix), '"$@"',
+                     *(shlex.quote(value) for value in custom_arguments)])
+    if post:
+        # Steam's reaper returns only after the whole game process tree ends;
+        # without it the private scope is awaited until its last process exits.
+        wait = [f"while systemctl --user is-active --quiet {shlex.quote(unit)}; do sleep 1; done"] if unit else []
+        lines.extend(["set +e", game, "game_status=$?", *wait, *post_lines(False), "exit \"$game_status\""])
+    elif prefix or custom_arguments:
+        lines.append(f"exec {game}")
+    else:
+        lines.append('exec "$@"')
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
@@ -520,10 +671,16 @@ def main(
         )
         proton_warning = ""
         try:
-            proton_environment = proton_profiles.load(app_id).environment()
+            proton_environment = proton_profiles.environment(app_id)
         except ProtonTweaksError as error:
             proton_environment = {}
             proton_warning = f"Proton Tweaks profile ignored: {error}"
+        custom_warning = ""
+        try:
+            custom_launch = CustomLaunchRepository(profiles.root).load(app_id)
+        except (OSError, ValueError, CustomLaunchError) as error:
+            custom_launch = None
+            custom_warning = f"Custom launch profile ignored: {error}"
         in_flatpak = bool(os.environ.get("FLATPAK_ID", "").strip())
         host_service = HostServiceClient() if in_flatpak and detector is None else None
         active_detector = detector or RuntimeToolDetector(host_service=host_service)
@@ -541,8 +698,9 @@ def main(
         measurement_environment: dict[str, str] = {}
         if baseline_session is not None:
             measurement_environment = sessions.environment(baseline_session)
-        fg_environment, fg_prefix = frame_generation_launch(app_id, profiles.root,
+        fg_resolved = frame_generation_resolve(app_id, profiles.root,
             inherited={**steam_environment, **proton_environment}, gamescope=profile.gamescope_enabled and profile.gamescope_mode != "disabled" and gamescope.available)
+        fg_environment, fg_prefix = fg_resolved.environment, fg_resolved.prefix
         plan = OptimizationLaunchPlanner().build(
             profile, game_argv, gamemode=gamemode, gamescope=gamescope,
             mangohud_fps_limit=(
@@ -556,6 +714,8 @@ def main(
             post_processing_environment=optional_launch_environment(app_id, profiles.root),
             frame_generation_environment=fg_environment,
             frame_generation_prefix=fg_prefix,
+            frame_generation_report=fg_resolved.report(),
+            custom_launch=custom_launch,
             gpu_memory_environment=pressure_environment(app_id, profiles.root, {**steam_environment, **proton_environment}, game_argv),
             existing_wine_overrides=steam_environment.get("WINEDLLOVERRIDES", ""),
             proton_environment=proton_environment,
@@ -591,7 +751,7 @@ def main(
         )
         environment_overrides_shell = (
             shlex.join(
-                f"{key}={value}" for key, value in sorted(plan.environment.items())
+                f"{key}={redact(key, value)}" for key, value in sorted(plan.environment.items())
             )
             if plan.environment
             else "none"
@@ -621,6 +781,7 @@ def main(
                 *plan.warnings,
                 *([optiscaler_warning] if optiscaler_warning else []),
                 *([proton_warning] if proton_warning else []),
+                *([custom_warning] if custom_warning else []),
             ],
             "fpsLimitOwner": plan.fps_limit_owner,
             "fpsLimit": plan.fps_limit or 0,
@@ -631,6 +792,13 @@ def main(
             "steamContextAppId": str(steam_environment.get("SteamAppId", "")),
             "steamContextGameId": str(steam_environment.get("SteamGameId", "")),
             "steamCommand": list(plan.steam_command),
+            "customLaunch": {
+                "arguments": len(plan.custom_arguments),
+                "wrapper": "custom" in plan.wrappers,
+                "preLaunch": [Path(c.argv[0]).name for c in plan.pre_launch],
+                "postExit": [Path(c.argv[0]).name for c in plan.post_exit],
+                "environmentKeys": sorted(k for k, v in plan.environment_sources.items() if v == "custom_launch"),
+            },
             "gameModeWrapper": list(plan.gamemode_wrapper),
             "gamescopeWrapper": list(plan.gamescope_wrapper),
             "diagnosticCommand": plan.diagnostic_command,
@@ -644,6 +812,9 @@ def main(
             ),
             "environmentOverridesShell": environment_overrides_shell,
             "wrapperEnvironmentRemoved": list(plan.wrapper_environment_removed),
+            "environmentUnsetForGame": list(plan.environment_unset_keys),
+            "frameGenerationResolvedBackend": fg_resolved.backend,
+            "frameGenerationIsolation": [dict(x) for x in plan.frame_generation.get("entries", ())],
             "baselineSessionId": baseline_session.id if baseline_session else "",
             "baselineRunnerPid": baseline_session.runner_pid if baseline_session else None,
             "baselineHandshakeAt": (
@@ -660,7 +831,7 @@ def main(
                 report["postProcessingLog"] = str(post_processing_log)
                 report["postProcessingLogTransport"] = "inherited_stderr"
                 report["environmentOverridesShell"] = shlex.join(
-                    f"{key}={value}" for key, value in sorted({**plan.environment, "VKBASALT_LOG_FILE": "stderr"}.items()))
+                    f"{key}={redact(key, value)}" for key, value in sorted({**plan.environment, "VKBASALT_LOG_FILE": "stderr"}.items()))
         if fg_environment and (fg_environment.get("AFMF_ENABLE") == "1" or fg_environment.get("ENABLE_MAKO") == "1" or fg_environment.get("LSFGVK_CONFIG")):
             fg_directory = profiles.root / app_id / "frame-generation"
             fg_directory.mkdir(parents=True, exist_ok=True)
@@ -732,6 +903,9 @@ def main(
                 os.dup2(descriptor, 2)
                 os.close(descriptor)
             if baseline_session is not None:
+                if not _run_pre(plan, process_environment):
+                    # Marks the measurement session failed instead of leaving it recording.
+                    raise ValueError("a before-launch command failed; the game was not started")
                 process = subprocess.Popen(
                     [*gpu_memory_prefix(app_id, profiles.root, metrics=baseline_session.directory / "gpu-memory.jsonl"), *plan.command],
                     stdin=subprocess.DEVNULL,
@@ -774,10 +948,14 @@ def main(
                     baseline_session.id,
                     baseline_session.runner_token,
                 )
+                _run_post(plan, process_environment, started=True)
             else:
                 gpu_prefix = gpu_memory_prefix(app_id, profiles.root)
                 full_command = [*gpu_prefix, *plan.command]
-                result = os.execvpe(full_command[0], full_command, process_environment)
+                if plan.pre_launch or plan.post_exit:
+                    result = _run_with_hooks(plan, full_command, process_environment)
+                else:
+                    result = os.execvpe(full_command[0], full_command, process_environment)
         exit_code = int(result) if isinstance(result, int) else 0
         if baseline_session is not None:
             finished = sessions.finish(

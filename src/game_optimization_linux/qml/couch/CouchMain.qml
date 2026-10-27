@@ -90,7 +90,6 @@ FocusScope {
     function pageForSection(name) {
         return name === "home" ? homePage
              : name === "library" ? libraryPage
-             : name === "narrator" ? narratorPage
              : name === "details" ? detailsPage
              : name === "updates" ? updatesPage
              : name === "tasks" ? tasksPage : settingsPage
@@ -115,7 +114,7 @@ FocusScope {
     function returnToPreviousSection() {
         var target = navigation ? String(navigation.previousScreen() || "home")
                                 : "home"
-        if (["home", "library", "narrator", "updates", "tasks", "settings"].indexOf(target) < 0)
+        if (["home", "library", "updates", "tasks", "settings"].indexOf(target) < 0)
             target = "home"
         section = target
         synchronizeControllerSection(target)
@@ -156,7 +155,9 @@ FocusScope {
         if (pageName === "gameDetails") setSection("details", "tab-overview")
         else if (pageName === "updates") setSection("updates", "")
         else if (pageName === "tasks") setSection("tasks", "")
-        else if (pageName === "narrator") setSection("narrator", "")
+        // The Narrator is per game in Couch (game details); the Desktop
+        // Narrator page has no Couch counterpart.
+        else if (pageName === "narrator" && ["home", "library"].indexOf(section) < 0) setSection("home", "")
         else if (pageName === "settings") setSection("settings", "")
         else if (pageName === "games" && ["home", "library"].indexOf(section) < 0) setSection("home", "")
     }
@@ -240,14 +241,13 @@ FocusScope {
         objectName: "couchContentStack"
         anchors.fill: parent
         currentIndex: couch.section === "home" ? 0 : couch.section === "library" ? 1
-                      : couch.section === "narrator" ? 2 : couch.section === "details" ? 3
-                      : couch.section === "updates" ? 4 : couch.section === "tasks" ? 5 : 6
+                      : couch.section === "details" ? 2
+                      : couch.section === "updates" ? 3 : couch.section === "tasks" ? 4 : 5
         CouchHome {
             id: homePage
             controller: couch.controller; navigation: couch.navigation; couchScale: couch.couchScale
             onOpenGame: function(gameId) { couch.openGameFrom("home", gameId) }
             onOpenLibrary: couch.setSection("library", "")
-            onOpenNarrator: { if (couch.controller) couch.controller.navigate("narrator"); couch.setSection("narrator", "") }
             onOpenSettings: { if (couch.controller) couch.controller.navigate("settings"); couch.setSection("settings", "") }
         }
         CouchLibrary {
@@ -259,13 +259,6 @@ FocusScope {
                 if (couch.controller) couch.controller.navigate(name)
                 couch.setSection(name, "")
             }
-        }
-        CouchNarratorPage {
-            id: narratorPage
-            controller: couch.controller
-            navigation: couch.navigation
-            couchScale: couch.couchScale
-            onBackRequested: couch.returnToPreviousSection()
         }
         CouchGameDetails {
             id: detailsPage
@@ -332,7 +325,7 @@ FocusScope {
         couchScale: couch.couchScale
         appName: couch.controller ? String(couch.controller.appName || qsTr("Game Optimization Linux")) : qsTr("Game Optimization Linux")
         appLogo: couch.controller ? String(couch.controller.appLogoUrl || "") : ""
-        sectionTitle: couch.section === "home" ? qsTr("Home") : couch.section === "library" ? qsTr("Library") : couch.section === "narrator" ? qsTr("Lektor") : couch.section === "details" ? qsTr("Game details") : couch.section === "updates" ? qsTr("Updates") : couch.section === "tasks" ? qsTr("Tasks") : qsTr("Settings")
+        sectionTitle: couch.section === "home" ? qsTr("Home") : couch.section === "library" ? qsTr("Library") : couch.section === "details" ? qsTr("Game details") : couch.section === "updates" ? qsTr("Updates") : couch.section === "tasks" ? qsTr("Tasks") : qsTr("Settings")
         inputIsController: Boolean(couch.controller && couch.controller.activeController
                                    && couch.controller.activeController.name)
         inputLabel: inputIsController ? String(couch.controller.activeController.name) : qsTr("Keyboard")

@@ -746,6 +746,104 @@ class OptiScalerService:
     def backup_root(self, app_id: str, manifest_id: str) -> Path:
         return self.data_root / app_id / "optiscaler" / "backups" / manifest_id
 
+    def _other_integration_owner(
+        self, app_id: str, install_root: Path, relative: str, live_hash: str
+    ) -> dict[str, str] | None:
+        """Another GameOpti integration that recorded exactly this live file, or None."""
+        if not live_hash:
+            return None
+        from .post_processing import load_profile as load_post_profile
+        try:
+            post = load_post_profile(app_id, self.profile_repository.root)
+            same_root = Path(str(post.get("directory", ""))).resolve() == Path(install_root).resolve()
+        except (OSError, ValueError, TypeError):
+            return None
+        owned = post.get("ownedHashes") if isinstance(post.get("ownedHashes"), Mapping) else {}
+        if (post.get("phase") == "installed" and post.get("backend") in {"reshade", "vkbasalt"}
+                and same_root and str(owned.get(relative, "")) == live_hash):
+            name = "ReShade" if post["backend"] == "reshade" else "vkBasalt"
+            return {"integration": "post_processing", "backend": str(post["backend"]), "name": name,
+                    "action": f"Turn post-processing Off on the {name} page first (its files and settings are kept), then remove OptiScaler"}
+        return None
+
+    def _parked_by_dlss_enabler(self, profile: OptiScalerProfile) -> bool:
+        path = self.data_root / profile.app_id / "dlss-enabler" / "state.json"
+        try:
+            state = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return False
+        return bool(isinstance(state, Mapping) and state.get("phase") != "inactive"
+                    and profile.manifest_id and state.get("optiscaler_manifest_id") == profile.manifest_id)
+
+    def ownership_status(self, profile: OptiScalerProfile, manifest: Mapping[str, Any]) -> dict[str, Any]:
+        """Distinguish installed, parked, displaced, modified and not installed; read only."""
+        result: dict[str, Any] = {"state": "not_installed", "proxy": profile.injection_dll, "liveHash": "",
+                                  "owner": "absent", "ownerName": "", "canRemove": False,
+                                  "removeBlocker": "", "leftoverFiles": []}
+        if not profile.manifest_id or not manifest or not profile.install_directory:
+            return result
+        root = Path(profile.install_directory)
+        def entries(key):
+            return [item for item in manifest.get(key, []) if isinstance(item, Mapping)]
+        created, replaced = entries("created_files"), entries("replaced_files")
+        if self._parked_by_dlss_enabler(profile):
+            result.update(state="parked", canRemove=False,
+                          removeBlocker="OptiScaler is parked by DLSS Enabler; switch back to OptiScaler on the DLSS Enabler page first")
+            return result
+        removed = profile.installation_state == "removed"
+        proxy_hash = ""
+        try:
+            proxy = self._target(root, profile.injection_dll) if profile.injection_dll else None
+            if proxy is not None and proxy.is_file() and not proxy.is_symlink():
+                proxy_hash = self._hash_file(proxy)
+        except (OSError, OptiScalerError):
+            proxy = None
+        result["liveHash"] = proxy_hash
+        expected = {str(i.get("relative_path", "")): str(i.get("after_sha256", "")) for i in (*created, *replaced)}
+        before = {str(i.get("relative_path", "")): str(i.get("before_sha256", "")) for i in replaced}
+        other = self._other_integration_owner(profile.app_id, root, profile.injection_dll, proxy_hash)
+        if not proxy_hash:
+            result["owner"] = "absent"
+        elif proxy_hash == expected.get(profile.injection_dll):
+            result["owner"] = "optiscaler"
+        elif other:
+            result.update(owner=other["backend"], ownerName=other["name"])
+        elif proxy_hash == before.get(profile.injection_dll):
+            result["owner"] = "original"
+        else:
+            result["owner"] = "foreign"
+        leftovers = []
+        for relative, digest_value in expected.items():
+            try:
+                target = self._target(root, relative)
+                if target.is_file() and not target.is_symlink() and not _is_mutable_configuration(relative):
+                    if relative == profile.injection_dll:
+                        if result["owner"] == "optiscaler":
+                            leftovers.append(relative)
+                    elif not removed or self._hash_file(target) == digest_value:
+                        leftovers.append(relative)
+            except (OSError, OptiScalerError):
+                continue
+        result["leftoverFiles"] = leftovers
+        if removed:
+            result["state"] = "removed" if not leftovers else "modified"
+            result["canRemove"] = bool(leftovers) and result["owner"] != "foreign"
+            if result["owner"] == "foreign" and leftovers:
+                result["removeBlocker"] = f"{profile.injection_dll} has unknown content; it is preserved and blocks removal"
+            return result
+        if result["owner"] in {"reshade", "vkbasalt"}:
+            result["state"] = "displaced"
+            if profile.injection_dll in before:
+                result["removeBlocker"] = (f"{profile.injection_dll} is now owned by {other['name']}. Restoring the original file "
+                                           f"would overwrite it. {other['action']}")
+            result["canRemove"] = not result["removeBlocker"]
+        elif result["owner"] == "foreign":
+            result.update(state="modified", canRemove=False,
+                          removeBlocker=f"{profile.injection_dll} has unknown content (not OptiScaler and not another GameOpti integration); it is preserved and blocks removal")
+        else:
+            result.update(state="installed" if result["owner"] == "optiscaler" else "modified", canRemove=True)
+        return result
+
     def _load_manifest(self, profile: OptiScalerProfile) -> dict[str, Any]:
         if not profile.manifest_id:
             raise OptiScalerError("OptiScaler installation manifest is unavailable")
@@ -2292,9 +2390,17 @@ class OptiScalerService:
             expected_hash = str(item.get("after_sha256", ""))
             mutable = _is_mutable_configuration(relative)
             if exists and observed_hash != expected_hash and not mutable:
-                raise OptiScalerConflictError(
-                    f"modified immutable managed file blocks removal: {relative}"
-                )
+                owner = self._other_integration_owner(profile.app_id, install_root, relative, observed_hash)
+                if owner is None:
+                    raise OptiScalerConflictError(
+                        f"modified immutable managed file blocks removal: {relative}"
+                    )
+                # The shared proxy now belongs to another GameOpti integration:
+                # it is not an OptiScaler file any more and is left untouched.
+                actions.append({"action": "displaced", "relative": relative, "target": target,
+                                "observed_hash": observed_hash, "mutable": False, "preserve": False,
+                                "owner": owner["backend"]})
+                continue
             actions.append(
                 {
                     "action": "remove",
@@ -2340,6 +2446,12 @@ class OptiScalerService:
                 and not mutable
                 and not already_restored
             ):
+                owner = self._other_integration_owner(profile.app_id, install_root, relative, observed_hash)
+                if owner is not None:
+                    raise OptiScalerConflictError(
+                        f"{relative} is now owned by {owner['name']}; restoring the original game file would "
+                        f"overwrite it. {owner['action']}"
+                    )
                 raise OptiScalerConflictError(
                     f"modified immutable managed file blocks restoration: {relative}"
                 )
@@ -2378,6 +2490,8 @@ class OptiScalerService:
                 for action in actions:
                     target = action["target"]
                     relative = str(action["relative"])
+                    if action["action"] == "displaced":
+                        continue  # never copied, rewritten or deleted by OptiScaler
                     exists = target.exists() or target.is_symlink()
                     observed_hash = str(action["observed_hash"])
                     if exists != bool(observed_hash):
@@ -2436,6 +2550,10 @@ class OptiScalerService:
                     "state": "removed",
                     "removed_at": now.isoformat(),
                     "preserved_configurations": preserved_records,
+                    "left_to_other_integrations": [
+                        {"relative_path": str(a["relative"]), "sha256": str(a["observed_hash"]), "owner": str(a["owner"])}
+                        for a in actions if a["action"] == "displaced"
+                    ],
                 }
                 if preserved_records:
                     history = manifest.setdefault("preserved_configurations", [])
@@ -2757,6 +2875,9 @@ class OptiScalerService:
                     else profile.installation_state
                 ),
                 "installLocation": location,
+                "ownership": self.ownership_status(profile, manifest) if manifest else
+                             {"state": "not_installed", "canRemove": False, "removeBlocker": manifest_error,
+                              "owner": "absent", "ownerName": "", "leftoverFiles": [], "proxy": profile.injection_dll, "liveHash": ""},
                 "installed": bool(
                     profile.enabled
                     and profile.manifest_id

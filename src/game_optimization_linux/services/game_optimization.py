@@ -358,6 +358,50 @@ class OptimizationChangeService:
         self._atomic_json(directory / "manifest.json", manifest)
         return manifest
 
+    def record_measured_change(
+        self, game: Game, *, candidate_id: str, workflow_id: str, game_running: bool = False
+    ) -> dict[str, Any]:
+        """Register a measured-optimization experiment as the active change.
+
+        The files themselves are restored by the measured-optimization store;
+        this manifest makes every existing guard (one change at a time, no
+        baseline while a test is pending) apply to it."""
+        if game_running or self._process_checker(game):
+            raise RuntimeError("The game is running")
+        if game.update_in_progress:
+            raise RuntimeError("Steam is updating the game")
+        if self.active_change(game) is not None:
+            raise RuntimeError(
+                "Finish the current comparison cycle before applying another change"
+            )
+        change_id = uuid4().hex
+        directory = self._data_root / str(game.steam_app_id or game.id) / change_id
+        directory.mkdir(parents=True, exist_ok=False)
+        manifest = {
+            "schema_version": 1, "id": change_id, "game_id": game.id,
+            "app_id": str(game.steam_app_id or game.id), "candidate_id": candidate_id,
+            "kind": "measured_experiment", "workflow_id": workflow_id,
+            "created_at": datetime.now(UTC).isoformat(), "state": "applied",
+        }
+        self._atomic_json(directory / "manifest.json", manifest)
+        return manifest
+
+    def finish_measured_change(self, game: Game, change_id: str, state: str) -> dict[str, Any]:
+        if state not in {"kept", "reverted"}:
+            raise ValueError("Unsupported measured change state")
+        path = self._data_root / str(game.steam_app_id or game.id) / str(change_id) / "manifest.json"
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+        if manifest.get("game_id") != game.id or manifest.get("kind") != "measured_experiment":
+            raise ValueError("Measured optimization change is not applicable")
+        if manifest.get("state") == state:
+            return manifest
+        if manifest.get("state") != "applied":
+            raise ValueError("Measured optimization change is already finished")
+        manifest["state"] = state
+        manifest[f"{state}_at"] = datetime.now(UTC).isoformat()
+        self._atomic_json(path, manifest)
+        return manifest
+
     def runtime_change(self, game: Game, change_id: str) -> dict[str, Any]:
         path = (
             self._data_root

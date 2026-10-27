@@ -28,54 +28,53 @@
 <context>
     <name>CouchGameDetails</name>
     <message>
-        <location filename="../qml/couch/CouchGameDetails.qml" line="+98" />
+        <location filename="../qml/couch/CouchGameDetails.qml" line="+100" />
         <source>Storage</source>
         <translation>Storage</translation>
     </message>
     <message>
-        <location line="+406" />
+        <location line="+408" />
         <source>Unavailable in this version</source>
         <translation>Unavailable in this version</translation>
     </message>
     <message>
-        <location line="-405" />
-        <location line="+2648" />
+        <location line="-407" />
+        <location line="+2674" />
         <source>Optimization</source>
         <translation>Optimization</translation>
     </message>
     <message>
-        <location line="-2712" />
-        <location line="+718" />
+        <location line="-2740" />
+        <location line="+725" />
         <source>Native</source>
         <translation>Native</translation>
     </message>
     <message>
-        <location line="-656" />
-        <location line="+2348" />
+        <location line="-661" />
+        <location line="+2365" />
         <source>Overview</source>
         <translation>Overview</translation>
     </message>
     <message>
-        <location line="-2345" />
+        <location line="-2362" />
         <source>OptiScaler</source>
         <translation>OptiScaler</translation>
     </message>
     <message>
-        <location line="+58" />
+        <location line="+60" />
         <location line="+66" />
         <location line="+287" />
         <location line="+15" />
-        <location line="+235" />
-        <location line="+372" />
-        <location line="+1341" />
+        <location line="+238" />
+        <location line="+380" />
+        <location line="+1345" />
         <location line="+17" />
         <location line="+2" />
-        <location line="+361" />
         <source>Unavailable</source>
         <translation>Unavailable</translation>
     </message>
     <message>
-        <location line="-2695" />
+        <location line="-2349" />
         <source>B</source>
         <translation>B</translation>
     </message>
@@ -147,12 +146,12 @@
     </message>
     <message>
         <location line="+1" />
-        <location line="+2412" />
+        <location line="+2436" />
         <source>Translating</source>
         <translation>Translating</translation>
     </message>
     <message>
-        <location line="-2411" />
+        <location line="-2435" />
         <source>Speaking</source>
         <translation>Speaking</translation>
     </message>
@@ -526,57 +525,57 @@
         <location line="+0" />
         <location line="+87" />
         <location line="+7" />
-        <location line="+606" />
+        <location line="+617" />
         <location line="+19" />
-        <location line="+182" />
+        <location line="+164" />
         <location line="+101" />
         <location line="+72" />
-        <location line="+1020" />
+        <location line="+1042" />
         <location line="+1" />
         <location line="+1" />
         <source>On</source>
         <translation>On</translation>
     </message>
     <message>
-        <location line="-2252" />
+        <location line="-2267" />
         <location line="+122" />
         <location line="+1" />
         <location line="+33" />
         <location line="+0" />
         <location line="+87" />
         <location line="+7" />
-        <location line="+606" />
+        <location line="+617" />
         <location line="+19" />
-        <location line="+182" />
+        <location line="+164" />
         <location line="+101" />
         <location line="+72" />
-        <location line="+1020" />
+        <location line="+1042" />
         <location line="+1" />
         <location line="+1" />
         <source>Off</source>
         <translation>Off</translation>
     </message>
     <message>
-        <location line="-2128" />
+        <location line="-2143" />
         <source>MangoHud</source>
         <translation>MangoHud</translation>
     </message>
     <message>
         <location line="+140" />
-        <location line="+2011" />
+        <location line="+2035" />
         <source>Installed</source>
         <translation>Installed</translation>
     </message>
     <message>
-        <location line="-2036" />
+        <location line="-2060" />
         <location line="+26" />
-        <location line="+772" />
-        <location line="+1238" />
+        <location line="+765" />
+        <location line="+1269" />
         <source>Not installed</source>
         <translation>Not installed</translation>
     </message>
     <message>
-        <location line="-2085" />
+        <location line="-2109" />
         <source>Remove OptiScaler</source>
         <translation>Remove OptiScaler</translation>
     </message>
@@ -586,7 +585,7 @@
         <translation>Requires confirmation</translation>
     </message>
     <message>
-        <location line="+257" />
+        <location line="+260" />
         <source>FPS only</source>
         <translation>FPS only</translation>
     </message>
@@ -608,24 +607,24 @@
         <translation>Custom</translation>
     </message>
     <message>
-        <location line="-502" />
+        <location line="-505" />
         <location line="+32" />
         <location line="+35" />
-        <location line="+416" />
+        <location line="+419" />
         <location line="+24" />
         <source>Disabled</source>
         <translation>Disabled</translation>
     </message>
     <message>
-        <location line="-565" />
+        <location line="-568" />
         <location line="+126" />
-        <location line="+418" />
-        <location line="+698" />
+        <location line="+421" />
+        <location line="+688" />
         <source>Automatic</source>
         <translation>Automatic</translation>
     </message>
     <message>
-        <location line="-698" />
+        <location line="-688" />
         <source>Maximum Performance</source>
         <translation>Maximum Performance</translation>
     </message>
@@ -680,15 +679,15 @@
         <translation>Quality</translation>
     </message>
     <message>
-        <location line="-561" />
-        <location line="+568" />
+        <location line="-564" />
+        <location line="+571" />
         <location line="+1" />
-        <location line="+1998" />
+        <location line="+2019" />
         <source>Monitor</source>
         <translation>Monitor</translation>
     </message>
     <message>
-        <location line="-2350" />
+        <location line="-2374" />
         <source>Retry: %1</source>
         <translation>Retry: %1</translation>
     </message>
@@ -705,8 +704,8 @@
         <translation>Retry</translation>
     </message>
     <message>
-        <location line="-318" />
-        <location line="+397" />
+        <location line="-320" />
+        <location line="+399" />
         <source>Post-processing</source>
         <translation>Post-processing</translation>
     </message>
@@ -795,15 +794,15 @@
         <translation>Local logs are used for runtime verification</translation>
     </message>
     <message>
-        <location line="-335" />
-        <location line="+332" />
+        <location line="-337" />
+        <location line="+334" />
         <location line="+67" />
-        <location line="+1933" />
+        <location line="+1948" />
         <source>Frame generation</source>
         <translation>Frame generation</translation>
     </message>
     <message>
-        <location line="-1999" />
+        <location line="-2014" />
         <source>Enabler FPS limit</source>
         <translation>Enabler FPS limit</translation>
     </message>
@@ -859,18 +858,18 @@
     </message>
     <message>
         <location line="+11" />
-        <location line="+1926" />
+        <location line="+1941" />
         <source>Configure ReShade / vkBasalt</source>
         <translation>Configure ReShade / vkBasalt</translation>
     </message>
     <message>
-        <location line="-1923" />
-        <location line="+1933" />
+        <location line="-1938" />
+        <location line="+1948" />
         <source>Configure lsfg-vk / MAKO / afmf-linux</source>
         <translation>Configure lsfg-vk / MAKO / afmf-linux</translation>
     </message>
     <message>
-        <location line="-1899" />
+        <location line="-1914" />
         <source>Inconsistent installation</source>
         <translation>Inconsistent installation</translation>
     </message>
@@ -885,7 +884,22 @@
         <translation>Voice: %1</translation>
     </message>
     <message>
-        <location line="+516" />
+        <location line="+171" />
+        <source>GameOpti green</source>
+        <translation>GameOpti green</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Minimal HUD</source>
+        <translation>Minimal HUD</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Diagnostic</source>
+        <translation>Diagnostic</translation>
+    </message>
+    <message>
+        <location line="+353" />
         <source>Top left</source>
         <translation>Top left</translation>
     </message>
@@ -936,7 +950,7 @@
     </message>
     <message>
         <location line="+0" />
-        <location line="+358" />
+        <location line="+341" />
         <source>Medium</source>
         <translation>Medium</translation>
     </message>
@@ -1011,8 +1025,8 @@
         <translation>Reinstall</translation>
     </message>
     <message>
-        <location line="-1220" />
-        <location line="+1221" />
+        <location line="-1213" />
+        <location line="+1214" />
         <source>Install</source>
         <translation>Install</translation>
     </message>
@@ -1022,7 +1036,7 @@
         <translation>Back up and replace</translation>
     </message>
     <message>
-        <location line="+383" />
+        <location line="+405" />
         <source>Game</source>
         <translation>Game</translation>
     </message>
@@ -1032,11 +1046,11 @@
         <translation>Game details</translation>
     </message>
     <message>
-        <location line="-1572" />
+        <location line="-1587" />
         <location line="+20" />
         <location line="+12" />
-        <location line="+201" />
-        <location line="+1704" />
+        <location line="+204" />
+        <location line="+1716" />
         <location line="+1" />
         <source>Unknown</source>
         <translation>Unknown</translation>
@@ -1097,17 +1111,17 @@
         <translation>Classification</translation>
     </message>
     <message>
-        <location line="-1770" />
+        <location line="-1785" />
         <source>Measurement unavailable</source>
         <translation>Measurement unavailable</translation>
     </message>
     <message>
-        <location line="+1789" />
+        <location line="+1804" />
         <source>Shared extents and snapshot risk are checked before a write operation.</source>
         <translation>Shared extents and snapshot risk are checked before a write operation.</translation>
     </message>
     <message>
-        <location line="+188" />
+        <location line="+197" />
         <source>This section shows the current shared backend state. No implementation is simulated when the backend is unavailable.</source>
         <translation>This section shows the current shared backend state. No implementation is simulated when the backend is unavailable.</translation>
     </message>
@@ -1137,22 +1151,26 @@
         <translation>GPU memory</translation>
     </message>
     <message>
+        <location line="+1" />
+        <source>Proton Tweaks</source>
+        <translation>Proton Tweaks</translation>
+    </message>
+    <message>
         <location line="+16" />
         <source>No saved session measurements</source>
         <translation>No saved session measurements</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Proton Tweaks: %1 active - edit advanced options in Desktop Mode</source>
-        <translation>Proton Tweaks: %1 active - edit advanced options in Desktop Mode</translation>
+        <translation type="vanished">Proton Tweaks: %1 active - edit advanced options in Desktop Mode</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="+2" />
         <source>Advanced Gamescope options remain available in Desktop Mode.</source>
         <translation>Advanced Gamescope options remain available in Desktop Mode.</translation>
     </message>
     <message>
-        <location line="-1614" />
+        <location line="-1628" />
         <source>MangoHud is unavailable.</source>
         <translation>MangoHud is unavailable.</translation>
     </message>
@@ -1172,7 +1190,7 @@
         <translation>Interface size</translation>
     </message>
     <message>
-        <location line="-80" />
+        <location line="-81" />
         <source>CPU and GPU temperatures</source>
         <translation>CPU and GPU temperatures</translation>
     </message>
@@ -1182,17 +1200,16 @@
         <translation>RAM and VRAM</translation>
     </message>
     <message>
-        <location line="+1697" />
+        <location line="+1711" />
         <source>Save profile</source>
         <translation>Save profile</translation>
     </message>
     <message>
-        <location line="+143" />
         <source>More appearance, metrics, advanced and logging settings are available in Desktop Mode.</source>
-        <translation>More appearance, metrics, advanced and logging settings are available in Desktop Mode.</translation>
+        <translation type="vanished">More appearance, metrics, advanced and logging settings are available in Desktop Mode.</translation>
     </message>
     <message>
-        <location line="-1264" />
+        <location line="-1152" />
         <source>Review compression plan</source>
         <translation>Review compression plan</translation>
     </message>
@@ -1207,31 +1224,36 @@
         <translation>Profile: %1. Review warnings before starting. No operation starts until explicit confirmation.</translation>
     </message>
     <message>
-        <location line="+1275" />
+        <location line="+1228" />
+        <source>D-pad: choose / adjust · A: confirm · B: close · changes need Apply</source>
+        <translation>D-pad: choose / adjust · A: confirm · B: close · changes need Apply</translation>
+    </message>
+    <message>
+        <location line="+65" />
         <source>The estimate does not guarantee the same change in free disk space.</source>
         <translation>The estimate does not guarantee the same change in free disk space.</translation>
     </message>
     <message>
         <location line="-1785" />
-        <location line="+181" />
+        <location line="+163" />
         <location line="+193" />
-        <location line="+1229" />
-        <location line="+186" />
+        <location line="+1261" />
+        <location line="+172" />
         <source>Cancel</source>
         <translation>Cancel</translation>
     </message>
     <message>
-        <location line="-1267" />
+        <location line="-1285" />
         <source>Start task</source>
         <translation>Start task</translation>
     </message>
     <message>
-        <location line="+794" />
+        <location line="+816" />
         <source>Path unavailable</source>
         <translation>Path unavailable</translation>
     </message>
     <message>
-        <location line="-1942" />
+        <location line="-1957" />
         <source>Checking…</source>
         <translation>Checking…</translation>
     </message>
@@ -1246,12 +1268,12 @@
         <translation>Launch game</translation>
     </message>
     <message>
-        <location line="+1552" />
+        <location line="+1567" />
         <source>Launch unavailable</source>
         <translation>Launch unavailable</translation>
     </message>
     <message>
-        <location line="-1586" />
+        <location line="-1601" />
         <source>Needs repair</source>
         <translation>Needs repair</translation>
     </message>
@@ -1271,7 +1293,7 @@
         <translation>Preset: %1</translation>
     </message>
     <message>
-        <location line="+1645" />
+        <location line="+1660" />
         <location line="+27" />
         <source>Preview</source>
         <translation>Preview</translation>
@@ -1282,17 +1304,17 @@
         <translation>Ready to launch</translation>
     </message>
     <message>
-        <location line="-1584" />
+        <location line="-1599" />
         <source>Repair from the OptiScaler tab</source>
         <translation>Repair from the OptiScaler tab</translation>
     </message>
     <message>
-        <location line="+1608" />
+        <location line="+1623" />
         <source>Runtime: %1</source>
         <translation>Runtime: %1</translation>
     </message>
     <message>
-        <location line="-1601" />
+        <location line="-1616" />
         <source>Settings not loaded</source>
         <translation>Settings not loaded</translation>
     </message>
@@ -1303,8 +1325,8 @@
         <translation>Status not loaded</translation>
     </message>
     <message>
-        <location line="+610" />
-        <location line="+289" />
+        <location line="+621" />
+        <location line="+271" />
         <location line="+58" />
         <source>%1 FPS</source>
         <translation>%1 FPS</translation>
@@ -1321,18 +1343,16 @@
     </message>
     <message>
         <location line="-72" />
-        <location line="+1539" />
         <source>Available</source>
         <translation>Available</translation>
     </message>
     <message>
-        <location line="+0" />
-        <location line="+207" />
+        <location line="+1764" />
         <source>Available · %1</source>
         <translation>Available · %1</translation>
     </message>
     <message>
-        <location line="-1625" />
+        <location line="-1643" />
         <source>Borderless</source>
         <translation>Borderless</translation>
     </message>
@@ -1367,12 +1387,12 @@
         <translation>Game render resolution</translation>
     </message>
     <message>
-        <location line="+1011" />
+        <location line="+1033" />
         <source>Launch configuration</source>
         <translation>Launch configuration</translation>
     </message>
     <message>
-        <location line="+22" />
+        <location line="+31" />
         <source>OptiScaler upscaling</source>
         <translation>OptiScaler upscaling</translation>
     </message>
@@ -1467,30 +1487,30 @@
         <translation>Last translation: %1</translation>
     </message>
     <message>
-        <location line="-259" />
-        <location line="+286" />
-        <location line="+100" />
+        <location line="-268" />
+        <location line="+295" />
+        <location line="+129" />
         <source>D-pad: choose / adjust · A: confirm · B: close</source>
         <translation>D-pad: choose / adjust · A: confirm · B: close</translation>
     </message>
     <message>
-        <location line="-83" />
-        <location line="+90" />
+        <location line="-112" />
+        <location line="+119" />
         <source>Close</source>
         <translation>Close</translation>
     </message>
     <message>
-        <location line="+166" />
+        <location line="+124" />
         <source>GameMode applies the system gamemode.ini configuration.</source>
         <translation>GameMode applies the system gamemode.ini configuration.</translation>
     </message>
     <message>
-        <location line="-1652" />
+        <location line="-1670" />
         <source>GameMode for this game</source>
         <translation>GameMode for this game</translation>
     </message>
     <message>
-        <location line="+1653" />
+        <location line="+1671" />
         <source>GameOpti does not promise a specific FPS gain.</source>
         <translation>GameOpti does not promise a specific FPS gain.</translation>
     </message>
@@ -1500,7 +1520,7 @@
         <translation>GameOpti uses gamemoderun when this game starts.</translation>
     </message>
     <message>
-        <location line="-1554" />
+        <location line="-1572" />
         <source>Gamescope default</source>
         <translation>Gamescope default</translation>
     </message>
@@ -1590,8 +1610,8 @@
         <translation>No FPS limit</translation>
     </message>
     <message>
-        <location line="-347" />
-        <location line="+289" />
+        <location line="-329" />
+        <location line="+271" />
         <source>No limit</source>
         <translation>No limit</translation>
     </message>
@@ -1606,8 +1626,8 @@
         <translation>Output resolution</translation>
     </message>
     <message>
-        <location line="-353" />
-        <location line="+181" />
+        <location line="-335" />
+        <location line="+163" />
         <location line="+193" />
         <source>Save</source>
         <translation>Save</translation>
@@ -1623,8 +1643,8 @@
         <translation>Scaling filter</translation>
     </message>
     <message>
-        <location line="-1051" />
-        <location line="+1054" />
+        <location line="-1044" />
+        <location line="+1047" />
         <source>Sharpness</source>
         <translation>Sharpness</translation>
     </message>
@@ -1685,12 +1705,12 @@
         <translation>gamemoderun would not be added: %1</translation>
     </message>
     <message>
-        <location line="-159" />
+        <location line="-141" />
         <source>An existing MangoHud configuration is not managed by GameOpti</source>
         <translation>An existing MangoHud configuration is not managed by GameOpti</translation>
     </message>
     <message>
-        <location line="-87" />
+        <location line="-88" />
         <source>Basic plus clocks, power, process memory, Proton, resolution and GameMode</source>
         <translation>Basic plus clocks, power, process memory, Proton, resolution and GameMode</translation>
     </message>
@@ -1705,18 +1725,18 @@
         <translation>Choose the metrics below</translation>
     </message>
     <message>
-        <location line="+62" />
+        <location line="+63" />
         <source>Controlled by Gamescope: %1 FPS</source>
         <translation>Controlled by Gamescope: %1 FPS</translation>
     </message>
     <message>
-        <location line="-87" />
+        <location line="-88" />
         <location line="+22" />
         <source>FPS and frametime</source>
         <translation>FPS and frametime</translation>
     </message>
     <message>
-        <location line="+64" />
+        <location line="+65" />
         <source>FPS limit in MangoHud</source>
         <translation>FPS limit in MangoHud</translation>
     </message>
@@ -1736,12 +1756,12 @@
         <translation>FPS limiter: none</translation>
     </message>
     <message>
-        <location line="-95" />
+        <location line="-96" />
         <source>FPS, frametime, CPU/GPU load, temperatures, RAM/VRAM</source>
         <translation>FPS, frametime, CPU/GPU load, temperatures, RAM/VRAM</translation>
     </message>
     <message>
-        <location line="+90" />
+        <location line="+91" />
         <source>MangoHud is off for this game</source>
         <translation>MangoHud is off for this game</translation>
     </message>
@@ -1767,12 +1787,11 @@
     </message>
     <message>
         <location line="-35" />
-        <location line="+1722" />
         <source>Unsupported for this launch method</source>
         <translation>Unsupported for this launch method</translation>
     </message>
     <message>
-        <location line="-1723" />
+        <location line="-1" />
         <source>Use MangoHud</source>
         <translation>Use MangoHud</translation>
     </message>
@@ -1782,8 +1801,8 @@
         <translation>Your %1 FPS limit is kept for later</translation>
     </message>
     <message>
-        <location line="-1046" />
-        <location line="+177" />
+        <location line="-1059" />
+        <location line="+179" />
         <location line="+307" />
         <source>Lektor</source>
         <translation>Lektor</translation>
@@ -1805,12 +1824,12 @@
     </message>
     <message>
         <location line="+1" />
-        <location line="+2333" />
+        <location line="+2357" />
         <source>Capture</source>
         <translation>Capture</translation>
     </message>
     <message>
-        <location line="-2332" />
+        <location line="-2356" />
         <source>Voice</source>
         <translation>Voice</translation>
     </message>
@@ -1857,7 +1876,7 @@
         <translation>Ready</translation>
     </message>
     <message>
-        <location line="-197" />
+        <location line="-200" />
         <location line="+0" />
         <location line="+7" />
         <location line="+0" />
@@ -1865,7 +1884,7 @@
         <translation>Not measured</translation>
     </message>
     <message>
-        <location line="+428" />
+        <location line="+431" />
         <source>Exact measurement (requires password and keyboard)</source>
         <translation>Exact measurement (requires password and keyboard)</translation>
     </message>
@@ -1880,7 +1899,7 @@
         <translation>Runs compsize only after you confirm; the system asks for your password</translation>
     </message>
     <message>
-        <location line="+1156" />
+        <location line="+1149" />
         <source>Start the exact measurement?</source>
         <translation>Start the exact measurement?</translation>
     </message>
@@ -1895,7 +1914,7 @@
         <translation>Measure</translation>
     </message>
     <message>
-        <location line="+813" />
+        <location line="+835" />
         <source>Additional potential (estimate)</source>
         <translation>Additional potential (estimate)</translation>
     </message>
@@ -1905,7 +1924,7 @@
         <translation>≈ %1</translation>
     </message>
     <message>
-        <location line="-2181" />
+        <location line="-2196" />
         <source>FSR 4.1.2 INT8 Lite</source>
         <translation>FSR 4.1.2 INT8 Lite</translation>
     </message>
@@ -2027,7 +2046,7 @@
         <translation>Files only</translation>
     </message>
     <message>
-        <location line="+1165" />
+        <location line="+1158" />
         <source>Switch to DLSS Enabler?</source>
         <translation>Switch to DLSS Enabler?</translation>
     </message>
@@ -2052,7 +2071,7 @@
         <translation>Restore</translation>
     </message>
     <message>
-        <location line="-1232" />
+        <location line="-1225" />
         <source>Restores the previous OptiScaler files and settings</source>
         <translation>Restores the previous OptiScaler files and settings</translation>
     </message>
@@ -2067,7 +2086,7 @@
         <translation>Replaces OptiScaler and FSR 4 Lite; reversible</translation>
     </message>
     <message>
-        <location line="+1182" />
+        <location line="+1175" />
         <source>DLSS Enabler 0.9.4 brings its own OptiScaler 0.9.4, so FSR 4 INT8 Lite is off while it is active. The current OptiScaler files and settings are kept aside and restored exactly when you switch back.</source>
         <translation>DLSS Enabler 0.9.4 brings its own OptiScaler 0.9.4, so FSR 4 INT8 Lite is off while it is active. The current OptiScaler files and settings are kept aside and restored exactly when you switch back.</translation>
     </message>
@@ -2216,6 +2235,70 @@
     <message>
         <source>DLSS Enabler 0.9.4 brings its own OptiScaler 0.9.4, so FSR 4 INT8 Lite is off while it is active. The current OptiScaler files and settings are kept aside and restored exactly when you switch back. Not for online games or games with anti-cheat.</source>
         <translation type="vanished">DLSS Enabler 0.9.4 brings its own OptiScaler 0.9.4, so FSR 4 INT8 Lite is off while it is active. The current OptiScaler files and settings are kept aside and restored exactly when you switch back. Not for online games or games with anti-cheat.</translation>
+    </message>
+    <message>
+        <source>%1 belongs to %2</source>
+        <translation>%1 belongs to %2</translation>
+    </message>
+    <message>
+        <source>OptiScaler is not installed; the manifest is history only</source>
+        <translation>OptiScaler is not installed; the manifest is history only</translation>
+    </message>
+    <message>
+        <source>Shared loader needs review</source>
+        <translation>Shared loader needs review</translation>
+    </message>
+    <message>
+        <source>Custom launch</source>
+        <translation>Custom launch</translation>
+    </message>
+    <message>
+        <source>%1 wrapper: %2</source>
+        <translation>%1 wrapper: %2</translation>
+    </message>
+    <message>
+        <source>%1: no wrapper</source>
+        <translation>%1: no wrapper</translation>
+    </message>
+    <message>
+        <source>Measured optimization</source>
+        <translation>Measured optimization</translation>
+    </message>
+    <message>
+        <source>Baseline, one change, comparison</source>
+        <translation>Baseline, one change, comparison</translation>
+    </message>
+    <message>
+        <source>Low Power</source>
+        <translation>Low Power</translation>
+    </message>
+    <message>
+        <source>Lowest Latency</source>
+        <translation>Lowest Latency</translation>
+    </message>
+    <message>
+        <source>Stable Image</source>
+        <translation>Stable Image</translation>
+    </message>
+    <message>
+        <source>Best Quality</source>
+        <translation>Best Quality</translation>
+    </message>
+    <message>
+        <source>Automatic uses only compatible local results that you kept after a measured comparison for this game and system. Without such evidence it stays conservative and adds no runtime tools; it may recommend no change.</source>
+        <translation>Automatic uses only compatible local results that you kept after a measured comparison for this game and system. Without such evidence it stays conservative and adds no runtime tools; it may recommend no change.</translation>
+    </message>
+    <message>
+        <source>Configuration: %1</source>
+        <translation>Configuration: %1</translation>
+    </message>
+    <message>
+        <source>Your saved launch setup. The optimization goal is chosen once in Measured optimization.</source>
+        <translation>Your saved launch setup. The optimization goal is chosen once in Measured optimization.</translation>
+    </message>
+    <message>
+        <source>Current configuration</source>
+        <translation>Current configuration</translation>
     </message>
 </context>
 <context>
@@ -4140,6 +4223,14 @@
     <message>
         <source>Show unfinished capabilities without bypassing safeguards.</source>
         <translation type="vanished">Show unfinished capabilities without bypassing safeguards.</translation>
+    </message>
+    <message>
+        <source>Polish voice - Voidek</source>
+        <translation>Polish voice - Voidek</translation>
+    </message>
+    <message>
+        <source>(no longer offered)</source>
+        <translation>(no longer offered)</translation>
     </message>
 </context>
 <context>
@@ -6595,294 +6686,236 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
 <context>
     <name>FrameGenerationMessages</name>
     <message>
-        <location filename="../services/frame_generation_messages.py" line="+5" />
         <source>Invalid frame-generation backend</source>
-        <translation>Invalid frame-generation backend</translation>
+        <translation type="vanished">Invalid frame-generation backend</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Invalid frame-generation settings</source>
-        <translation>Invalid frame-generation settings</translation>
+        <translation type="vanished">Invalid frame-generation settings</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>afmf-linux upstream does not support OptiScaler injectors. Preserve OptiScaler and choose lsfg-vk/MAKO, or restore it explicitly on its own page</source>
-        <translation>afmf-linux upstream does not support OptiScaler injectors. Preserve OptiScaler and choose lsfg-vk/MAKO, or restore it explicitly on its own page</translation>
+        <translation type="vanished">afmf-linux upstream does not support OptiScaler injectors. Preserve OptiScaler and choose lsfg-vk/MAKO, or restore it explicitly on its own page</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Existing VK_LOADER_LAYERS_DISABLE blocks the selected frame generator; remove that per-game conflict explicitly</source>
-        <translation>Existing VK_LOADER_LAYERS_DISABLE blocks the selected frame generator; remove that per-game conflict explicitly</translation>
+        <translation type="vanished">Existing VK_LOADER_LAYERS_DISABLE blocks the selected frame generator; remove that per-game conflict explicitly</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Selected frame generator requires Vulkan; PROTON_USE_WINED3D=1 selects OpenGL</source>
-        <translation>Selected frame generator requires Vulkan; PROTON_USE_WINED3D=1 selects OpenGL</translation>
+        <translation type="vanished">Selected frame generator requires Vulkan; PROTON_USE_WINED3D=1 selects OpenGL</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>MAKO + ReShade loader coexistence has not been verified; select Off on one page and Apply</source>
-        <translation>MAKO + ReShade loader coexistence has not been verified; select Off on one page and Apply</translation>
+        <translation type="vanished">MAKO + ReShade loader coexistence has not been verified; select Off on one page and Apply</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>MAKO supports vkBasalt or MangoHud in the game, not both. Disable one in its page, or select lsfg-vk</source>
-        <translation>MAKO supports vkBasalt or MangoHud in the game, not both. Disable one in its page, or select lsfg-vk</translation>
+        <translation type="vanished">MAKO supports vkBasalt or MangoHud in the game, not both. Disable one in its page, or select lsfg-vk</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Lossless Scaling files changed or were not validated for this backend</source>
-        <translation>Lossless Scaling files changed or were not validated for this backend</translation>
+        <translation type="vanished">Lossless Scaling files changed or were not validated for this backend</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Per-game frame-generation configuration is missing</source>
-        <translation>Per-game frame-generation configuration is missing</translation>
+        <translation type="vanished">Per-game frame-generation configuration is missing</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>This backend does not use Lossless Scaling</source>
-        <translation>This backend does not use Lossless Scaling</translation>
+        <translation type="vanished">This backend does not use Lossless Scaling</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Install the selected component before validating its proprietary models</source>
-        <translation>Install the selected component before validating its proprietary models</translation>
+        <translation type="vanished">Install the selected component before validating its proprietary models</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Unknown frame generator</source>
-        <translation>Unknown frame generator</translation>
+        <translation type="vanished">Unknown frame generator</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Invalid Vulkan launch path</source>
-        <translation>Invalid Vulkan launch path</translation>
+        <translation type="vanished">Invalid Vulkan launch path</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Discover/select and validate Lossless Scaling for this backend first</source>
-        <translation>Discover/select and validate Lossless Scaling for this backend first</translation>
+        <translation type="vanished">Discover/select and validate Lossless Scaling for this backend first</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Unknown frame-generation backend</source>
-        <translation>Unknown frame-generation backend</translation>
+        <translation type="vanished">Unknown frame-generation backend</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Invalid component ownership manifest</source>
-        <translation>Invalid component ownership manifest</translation>
+        <translation type="vanished">Invalid component ownership manifest</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Component download failed size/SHA-256 verification</source>
-        <translation>Component download failed size/SHA-256 verification</translation>
+        <translation type="vanished">Component download failed size/SHA-256 verification</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Package does not contain a Vulkan layer</source>
-        <translation>Package does not contain a Vulkan layer</translation>
+        <translation type="vanished">Package does not contain a Vulkan layer</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Installation cancelled; previous component preserved</source>
-        <translation>Installation cancelled; previous component preserved</translation>
+        <translation type="vanished">Installation cancelled; previous component preserved</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Unknown files in component directory; removal stopped</source>
-        <translation>Unknown files in component directory; removal stopped</translation>
+        <translation type="vanished">Unknown files in component directory; removal stopped</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Download cancelled; installation unchanged</source>
-        <translation>Download cancelled; installation unchanged</translation>
+        <translation type="vanished">Download cancelled; installation unchanged</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Download exceeds verified size</source>
-        <translation>Download exceeds verified size</translation>
+        <translation type="vanished">Download exceeds verified size</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Unsafe component archive member</source>
-        <translation>Unsafe component archive member</translation>
+        <translation type="vanished">Unsafe component archive member</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Invalid component archive</source>
-        <translation>Invalid component archive</translation>
+        <translation type="vanished">Invalid component archive</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Steam has no settings entry for this game; open its Properties once, close Steam, then retry</source>
-        <translation>Steam has no settings entry for this game; open its Properties once, close Steam, then retry</translation>
+        <translation type="vanished">Steam has no settings entry for this game; open its Properties once, close Steam, then retry</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Close Steam completely before automatic runner setup; Steam keeps launch options in memory</source>
-        <translation>Close Steam completely before automatic runner setup; Steam keeps launch options in memory</translation>
+        <translation type="vanished">Close Steam completely before automatic runner setup; Steam keeps launch options in memory</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Cannot select a unique Steam user configuration for this game</source>
-        <translation>Cannot select a unique Steam user configuration for this game</translation>
+        <translation type="vanished">Cannot select a unique Steam user configuration for this game</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Steam configuration changed while preparing runner setup</source>
-        <translation>Steam configuration changed while preparing runner setup</translation>
+        <translation type="vanished">Steam configuration changed while preparing runner setup</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Steam launch options changed independently; automatic restore stopped</source>
-        <translation>Steam launch options changed independently; automatic restore stopped</translation>
+        <translation type="vanished">Steam launch options changed independently; automatic restore stopped</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Close games before changing shared frame-generation components</source>
-        <translation>Close games before changing shared frame-generation components</translation>
+        <translation type="vanished">Close games before changing shared frame-generation components</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Unknown frame-generation operation</source>
-        <translation>Unknown frame-generation operation</translation>
+        <translation type="vanished">Unknown frame-generation operation</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>This launcher has no supported frame-generation runner setup</source>
-        <translation>This launcher has no supported frame-generation runner setup</translation>
+        <translation type="vanished">This launcher has no supported frame-generation runner setup</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>afmf-linux 1.3.1 has no published 32-bit layer</source>
-        <translation>afmf-linux 1.3.1 has no published 32-bit layer</translation>
+        <translation type="vanished">afmf-linux 1.3.1 has no published 32-bit layer</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>This integration requires Vulkan, DXVK or VKD3D-Proton; OpenGL is not enabled automatically</source>
-        <translation>This integration requires Vulkan, DXVK or VKD3D-Proton; OpenGL is not enabled automatically</translation>
+        <translation type="vanished">This integration requires Vulkan, DXVK or VKD3D-Proton; OpenGL is not enabled automatically</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Graphics API is inconclusive; confirm Vulkan, DXVK or VKD3D-Proton explicitly</source>
-        <translation>Graphics API is inconclusive; confirm Vulkan, DXVK or VKD3D-Proton explicitly</translation>
+        <translation type="vanished">Graphics API is inconclusive; confirm Vulkan, DXVK or VKD3D-Proton explicitly</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Vulkan compute/storage-image capabilities were not confirmed on the host</source>
-        <translation>Vulkan compute/storage-image capabilities were not confirmed on the host</translation>
+        <translation type="vanished">Vulkan compute/storage-image capabilities were not confirmed on the host</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Confirm internal/in-game frame generation is off before selecting an external generator; the upscaler is preserved</source>
-        <translation>Confirm internal/in-game frame generation is off before selecting an external generator; the upscaler is preserved</translation>
+        <translation type="vanished">Confirm internal/in-game frame generation is off before selecting an external generator; the upscaler is preserved</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Component/dependencies are not available inside the selected launch environment; see diagnostics</source>
-        <translation>Component/dependencies are not available inside the selected launch environment; see diagnostics</translation>
+        <translation type="vanished">Component/dependencies are not available inside the selected launch environment; see diagnostics</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Private component directory is occupied by unowned files</source>
-        <translation>Private component directory is occupied by unowned files</translation>
+        <translation type="vanished">Private component directory is occupied by unowned files</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Component belongs to another installer</source>
-        <translation>Component belongs to another installer</translation>
+        <translation type="vanished">Component belongs to another installer</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Unknown files in component directory; update/removal stopped</source>
-        <translation>Unknown files in component directory; update/removal stopped</translation>
+        <translation type="vanished">Unknown files in component directory; update/removal stopped</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Selected executable is missing or incompatible with the saved frame generator</source>
-        <translation>Selected executable is missing or incompatible with the saved frame generator</translation>
+        <translation type="vanished">Selected executable is missing or incompatible with the saved frame generator</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>This MAKO integration uses its supported SDR launcher. Disable HDR explicitly or select another generator; GameOpti will not lower it silently</source>
-        <translation>This MAKO integration uses its supported SDR launcher. Disable HDR explicitly or select another generator; GameOpti will not lower it silently</translation>
+        <translation type="vanished">This MAKO integration uses its supported SDR launcher. Disable HDR explicitly or select another generator; GameOpti will not lower it silently</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>The game is currently running</source>
-        <translation>The game is currently running</translation>
+        <translation type="vanished">The game is currently running</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Launcher Flatpak access setup failed; see the host permission error</source>
-        <translation>Launcher Flatpak access setup failed; see the host permission error</translation>
+        <translation type="vanished">Launcher Flatpak access setup failed; see the host permission error</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Launcher override location could not be verified; no automatic restore ownership recorded</source>
-        <translation>Launcher override location could not be verified; no automatic restore ownership recorded</translation>
+        <translation type="vanished">Launcher override location could not be verified; no automatic restore ownership recorded</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Invalid component transaction journal</source>
-        <translation>Invalid component transaction journal</translation>
+        <translation type="vanished">Invalid component transaction journal</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Unknown files in interrupted transaction; recovery stopped</source>
-        <translation>Unknown files in interrupted transaction; recovery stopped</translation>
+        <translation type="vanished">Unknown files in interrupted transaction; recovery stopped</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Modified files in interrupted transaction; recovery stopped</source>
-        <translation>Modified files in interrupted transaction; recovery stopped</translation>
+        <translation type="vanished">Modified files in interrupted transaction; recovery stopped</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Complex Steam launch options require review; nothing was overwritten</source>
-        <translation>Complex Steam launch options require review; nothing was overwritten</translation>
+        <translation type="vanished">Complex Steam launch options require review; nothing was overwritten</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Existing GameOpti runner options are invalid or use another AppID; nothing was overwritten</source>
-        <translation>Existing GameOpti runner options are invalid or use another AppID; nothing was overwritten</translation>
+        <translation type="vanished">Existing GameOpti runner options are invalid or use another AppID; nothing was overwritten</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Close the launcher before changing frame-generation access</source>
-        <translation>Close the launcher before changing frame-generation access</translation>
+        <translation type="vanished">Close the launcher before changing frame-generation access</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Required Vulkan API version was not confirmed for the selected backend</source>
-        <translation>Required Vulkan API version was not confirmed for the selected backend</translation>
+        <translation type="vanished">Required Vulkan API version was not confirmed for the selected backend</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Interrupted component transaction; retry installation to recover</source>
-        <translation>Interrupted component transaction; retry installation to recover</translation>
+        <translation type="vanished">Interrupted component transaction; retry installation to recover</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Selected frame generator is not installed</source>
-        <translation>Selected frame generator is not installed</translation>
+        <translation type="vanished">Selected frame generator is not installed</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>MAKO's launcher would select its independent MangoHud configuration. Preserve it and select another generator, or disable the in-game HUD explicitly</source>
-        <translation>MAKO's launcher would select its independent MangoHud configuration. Preserve it and select another generator, or disable the in-game HUD explicitly</translation>
+        <translation type="vanished">MAKO's launcher would select its independent MangoHud configuration. Preserve it and select another generator, or disable the in-game HUD explicitly</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Standalone MAKO's host MangoHud integration is unavailable inside a launcher Flatpak. Disable the in-game HUD explicitly or select another generator</source>
-        <translation>Standalone MAKO's host MangoHud integration is unavailable inside a launcher Flatpak. Disable the in-game HUD explicitly or select another generator</translation>
+        <translation type="vanished">Standalone MAKO's host MangoHud integration is unavailable inside a launcher Flatpak. Disable the in-game HUD explicitly or select another generator</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>A Steam update is currently active</source>
-        <translation>A Steam update is currently active</translation>
+        <translation type="vanished">A Steam update is currently active</translation>
     </message>
 </context>
 <context>
@@ -7679,6 +7712,50 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <location line="+6" />
         <source>Open configuration / logs</source>
         <translation>Open configuration / logs</translation>
+    </message>
+    <message>
+        <source>Apply is unavailable until the requirements in step 3 are met.</source>
+        <translation>Apply is unavailable until the requirements in step 3 are met.</translation>
+    </message>
+    <message>
+        <source>Apply is unavailable until the status check finishes.</source>
+        <translation>Apply is unavailable until the status check finishes.</translation>
+    </message>
+    <message>
+        <source>Apply is unavailable while Steam is writing this game's files (Steam state: %1).</source>
+        <translation>Apply is unavailable while Steam is writing this game's files (Steam state: %1).</translation>
+    </message>
+    <message>
+        <source>Apply is unavailable while another operation runs.</source>
+        <translation>Apply is unavailable while another operation runs.</translation>
+    </message>
+    <message>
+        <source>Not saved: %1 is only selected in this editor. The launch plan and the next game start still use the saved profile (%2).</source>
+        <translation>Not saved: %1 is only selected in this editor. The launch plan and the next game start still use the saved profile (%2).</translation>
+    </message>
+    <message>
+        <source>Off requests no generator. A guard is added only when the inherited environment concretely activates a generator. Installed components and each backend's saved values are kept.</source>
+        <translation>Off requests no generator. A guard is added only when the inherited environment concretely activates a generator. Installed components and each backend's saved values are kept.</translation>
+    </message>
+    <message>
+        <source>The last operation needed Steam to be closed and changed nothing. Close Steam completely, then try again.</source>
+        <translation>The last operation needed Steam to be closed and changed nothing. Close Steam completely, then try again.</translation>
+    </message>
+    <message>
+        <source>Installed · saved for this game</source>
+        <translation>Installed · saved for this game</translation>
+    </message>
+    <message>
+        <source>Installed · not applied to this game</source>
+        <translation>Installed · not applied to this game</translation>
+    </message>
+    <message>
+        <source>Already installed: %1. Nothing to download. This game's saved profile uses it.</source>
+        <translation>Already installed: %1. Nothing to download. This game's saved profile uses it.</translation>
+    </message>
+    <message>
+        <source>Already installed: %1. Nothing to download; use Apply below to use it for this game.</source>
+        <translation>Already installed: %1. Nothing to download; use Apply below to use it for this game.</translation>
     </message>
 </context>
 <context>
@@ -8744,6 +8821,10 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Measured improvement unverified · two valid recordings with different memory profiles are required.</source>
         <translation type="vanished">Measured improvement unverified · two valid recordings with different memory profiles are required.</translation>
     </message>
+    <message>
+        <source>The last GameOpti session was interrupted before it saved a final state. Its protection data is historical and does not describe the current game.</source>
+        <translation>The last GameOpti session was interrupted before it saved a final state. Its protection data is historical and does not describe the current game.</translation>
+    </message>
 </context>
 <context>
     <name>GraphicsTab</name>
@@ -9205,12 +9286,12 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+1" />
-        <location line="+323" />
+        <location line="+326" />
         <source>Not run</source>
         <translation>Not run</translation>
     </message>
     <message>
-        <location line="-322" />
+        <location line="-325" />
         <source>Optional</source>
         <translation>Optional</translation>
     </message>
@@ -9799,6 +9880,21 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <location line="+1" />
         <source>Done</source>
         <translation>Done</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>The game is 32-bit, but its launcher runtime has no 32-bit MangoHud layer. Install the matching MangoHud package or extension, then refresh.</source>
+        <translation>The game is 32-bit, but its launcher runtime has no 32-bit MangoHud layer. Install the matching MangoHud package or extension, then refresh.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>MangoHud is not available inside this launcher Flatpak. Install its matching MangoHud extension, then refresh.</source>
+        <translation>MangoHud is not available inside this launcher Flatpak. Install its matching MangoHud extension, then refresh.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Existing MangoHud configuration is not managed by GameOpti</source>
+        <translation>Existing MangoHud configuration is not managed by GameOpti</translation>
     </message>
     <message>
         <location line="+1" />
@@ -11341,7 +11437,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>not detected</translation>
     </message>
     <message>
-        <location line="-536" />
+        <location line="-539" />
         <source>Heroic Flatpak cannot be checked from here</source>
         <translation>Heroic Flatpak cannot be checked from here</translation>
     </message>
@@ -11351,7 +11447,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Lutris Flatpak cannot be checked from here</translation>
     </message>
     <message>
-        <location line="+537" />
+        <location line="+540" />
         <source>A MangoHud baseline with FPS, frametime, CPU and GPU metrics is required</source>
         <translation>A MangoHud baseline with FPS, frametime, CPU and GPU metrics is required</translation>
     </message>
@@ -11429,6 +11525,30 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Automatic recording works only for Steam games and local games: the measurement runner is started by Steam Launch Options, while Heroic and Lutris start the game themselves. Record a MangoHud log in the game (logging key) and use Import MangoHud log</source>
         <translation type="vanished">Automatic recording works only for Steam games and local games: the measurement runner is started by Steam Launch Options, while Heroic and Lutris start the game themselves. Record a MangoHud log in the game (logging key) and use Import MangoHud log</translation>
     </message>
+    <message>
+        <source>The launcher runtime changed (%1 -&gt; %2); %3 was not installed. Check again to get the matching extension</source>
+        <translation>The launcher runtime changed (%1 -&gt; %2); %3 was not installed. Check again to get the matching extension</translation>
+    </message>
+    <message>
+        <source>Install the Voidek Polish voice or import your own Piper voice</source>
+        <translation>Install the Voidek Polish voice or import your own Piper voice</translation>
+    </message>
+    <message>
+        <source>The Voidek voice is included with GameOpti</source>
+        <translation>The Voidek voice is included with GameOpti</translation>
+    </message>
+    <message>
+        <source>This voice is no longer offered; it can still be used or removed</source>
+        <translation>This voice is no longer offered; it can still be used or removed</translation>
+    </message>
+    <message>
+        <source>This voice is no longer offered for download</source>
+        <translation>This voice is no longer offered for download</translation>
+    </message>
+    <message>
+        <source>This voice is no longer offered</source>
+        <translation>This voice is no longer offered</translation>
+    </message>
 </context>
 <context>
     <name>LabeledValue</name>
@@ -11436,6 +11556,341 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <location filename="../qml/components/LabeledValue.qml" line="+9" />
         <source>Label</source>
         <translation>Label</translation>
+    </message>
+</context>
+<context>
+    <name>LaunchEnvironmentDetails</name>
+    <message>
+        <location filename="../qml/pages/details/LaunchEnvironmentDetails.qml" line="+24" />
+        <source>External frame generation</source>
+        <translation>External frame generation</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Steam Deck mode (requested)</source>
+        <translation>Steam Deck mode (requested)</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Proton FSR4 upgrade (requested)</source>
+        <translation>Proton FSR4 upgrade (requested)</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Default launch</source>
+        <translation>Default launch</translation>
+    </message>
+    <message>
+        <location line="+6" />
+        <source>%1 blocks %2: its discovered layer had an inherited activation request or could load automatically.</source>
+        <translation>%1 blocks %2: its discovered layer had an inherited activation request or could load automatically.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>VK_INSTANCE_LAYERS removes only a discovered generator's explicit request; other layers are retained.</source>
+        <translation>VK_INSTANCE_LAYERS removes only a discovered generator's explicit request; other layers are retained.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>%1 removes only the specific conflicting generator request; unrelated filters are retained.</source>
+        <translation>%1 removes only the specific conflicting generator request; unrelated filters are retained.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>VK_LOADER_LAYERS_DISABLE targets a discovered generator without a usable disable gate; existing filters are retained.</source>
+        <translation>VK_LOADER_LAYERS_DISABLE targets a discovered generator without a usable disable gate; existing filters are retained.</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>%1 belongs to post-processing, not frame generation: vkBasalt is suppressed while the other post-processing backend is selected.</source>
+        <translation>%1 belongs to post-processing, not frame generation: vkBasalt is suppressed while the other post-processing backend is selected.</translation>
+    </message>
+    <message>
+        <location line="+4" />
+        <source>Selected features: %1</source>
+        <translation>Selected features: %1</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Technical launch details</source>
+        <translation>Technical launch details</translation>
+    </message>
+    <message>
+        <location line="+3" />
+        <source>This is a template, not Steam's final command. Steam supplies the game command and runtime environment at launch. &lt;preserved&gt; marks values restored for the game.</source>
+        <translation>This is a template, not Steam's final command. Steam supplies the game command and runtime environment at launch. &lt;preserved&gt; marks values restored for the game.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Steam Runtime loader entries are isolated from host Gamescope and restored for Steam/Proton. Unrelated user libraries, driver settings and layers are preserved.</source>
+        <translation>Steam Runtime loader entries are isolated from host Gamescope and restored for Steam/Proton. Unrelated user libraries, driver settings and layers are preserved.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Missing or unrequested opt-in generators add no suppression. Saved Off never requests GameOpti generation. Targeted entries below only resolve concrete layer conflicts; they are not proof that generation is active.</source>
+        <translation>Missing or unrequested opt-in generators add no suppression. Saved Off never requests GameOpti generation. Targeted entries below only resolve concrete layer conflicts; they are not proof that generation is active.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>GameMode's client library is added beside existing preloads so Steam Runtime can import it. The game retains its original preload entries; the compositor does not receive this game injection.</source>
+        <translation>GameMode's client library is added beside existing preloads so Steam Runtime can import it. The game retains its original preload entries; the compositor does not receive this game injection.</translation>
+    </message>
+    <message>
+        <source>Off still needs suppression flags: they prevent known implicit frame-generation layers from activating in Gamescope or the game. These flags do not enable frame generation. Vulkan filters use plain glob patterns; shell quoting only groups each argument.</source>
+        <translation type="vanished">Off still needs suppression flags: they prevent known implicit frame-generation layers from activating in Gamescope or the game. These flags do not enable frame generation. Vulkan filters use plain glob patterns; shell quoting only groups each argument.</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Managed game environment (preview):</source>
+        <translation>Managed game environment (preview):</translation>
+    </message>
+    <message>
+        <source>Frame generation: %1</source>
+        <translation>Frame generation: %1</translation>
+    </message>
+    <message>
+        <source>Frame generation: saved profile %1, saved %2</source>
+        <translation>Frame generation: saved profile %1, saved %2</translation>
+    </message>
+    <message>
+        <source>Gamescope process</source>
+        <translation>Gamescope process</translation>
+    </message>
+    <message>
+        <source>Inherited value preserved</source>
+        <translation>Inherited value preserved</translation>
+    </message>
+    <message>
+        <source>Launcher/runtime boundary</source>
+        <translation>Launcher/runtime boundary</translation>
+    </message>
+    <message>
+        <source>No change</source>
+        <translation>No change</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Off</translation>
+    </message>
+    <message>
+        <source>Optimization settings: saved profile</source>
+        <translation>Optimization settings: saved profile</translation>
+    </message>
+    <message>
+        <source>Optimization settings: unsaved draft shown in this preview</source>
+        <translation>Optimization settings: unsaved draft shown in this preview</translation>
+    </message>
+    <message>
+        <source>Plan revision %1 · application %2</source>
+        <translation>Plan revision %1 · application %2</translation>
+    </message>
+    <message>
+        <source>Post-processing: saved profile %1</source>
+        <translation>Post-processing: saved profile %1</translation>
+    </message>
+    <message>
+        <source>Preview of the saved profiles. Unsaved editor selections on other pages are not included.</source>
+        <translation>Preview of the saved profiles. Unsaved editor selections on other pages are not included.</translation>
+    </message>
+    <message>
+        <source>Preview of the unsaved optimization draft. Frame generation and post-processing always come from their saved profiles.</source>
+        <translation>Preview of the unsaved optimization draft. Frame generation and post-processing always come from their saved profiles.</translation>
+    </message>
+    <message>
+        <source>Selected feature activation</source>
+        <translation>Selected feature activation</translation>
+    </message>
+    <message>
+        <source>Targeted conflict suppression</source>
+        <translation>Targeted conflict suppression</translation>
+    </message>
+    <message>
+        <source>The Steam Launch Options entry stays the same. At every launch the runner from the installed GameOpti Flatpak rebuilds this plan from the saved profiles, so a change takes effect after Apply and a fresh game start. This preview is not proof of the actual runtime environment.</source>
+        <translation>The Steam Launch Options entry stays the same. At every launch the runner from the installed GameOpti Flatpak rebuilds this plan from the saved profiles, so a change takes effect after Apply and a fresh game start. This preview is not proof of the actual runtime environment.</translation>
+    </message>
+    <message>
+        <source>Unresolved conflict</source>
+        <translation>Unresolved conflict</translation>
+    </message>
+    <message>
+        <source>game</source>
+        <translation>game</translation>
+    </message>
+    <message>
+        <source>no profile</source>
+        <translation>no profile</translation>
+    </message>
+    <message>
+        <source>source checkout</source>
+        <translation>source checkout</translation>
+    </message>
+    <message>
+        <source>Frame generation</source>
+        <translation>Frame generation</translation>
+    </message>
+    <message>
+        <source>Inherited activation request: %1</source>
+        <translation>Inherited activation request: %1</translation>
+    </message>
+    <message>
+        <source>Layer without an opt-in variable would load automatically: %1</source>
+        <translation>Layer without an opt-in variable would load automatically: %1</translation>
+    </message>
+    <message>
+        <source>VK_LOADER_LAYERS_ENABLE forces this layer: %1</source>
+        <translation>VK_LOADER_LAYERS_ENABLE forces this layer: %1</translation>
+    </message>
+    <message>
+        <source>Only this generator entry is removed from VK_INSTANCE_LAYERS: %1</source>
+        <translation>Only this generator entry is removed from VK_INSTANCE_LAYERS: %1</translation>
+    </message>
+    <message>
+        <source>Only this exact VK_LOADER_LAYERS_ENABLE entry is removed: %1</source>
+        <translation>Only this exact VK_LOADER_LAYERS_ENABLE entry is removed: %1</translation>
+    </message>
+    <message>
+        <source>Only this exact VK_LOADER_LAYERS_ALLOW entry is removed: %1</source>
+        <translation>Only this exact VK_LOADER_LAYERS_ALLOW entry is removed: %1</translation>
+    </message>
+    <message>
+        <source>Exact disable filter for a layer without a usable disable variable: %1</source>
+        <translation>Exact disable filter for a layer without a usable disable variable: %1</translation>
+    </message>
+    <message>
+        <source>Selected frame generator: %1</source>
+        <translation>Selected frame generator: %1</translation>
+    </message>
+    <message>
+        <source>Prevents a second implicit vkBasalt layer while the per-game layer is requested</source>
+        <translation>Prevents a second implicit vkBasalt layer while the per-game layer is requested</translation>
+    </message>
+    <message>
+        <source>Inherited ENABLE_VKBASALT=1 would activate vkBasalt</source>
+        <translation>Inherited ENABLE_VKBASALT=1 would activate vkBasalt</translation>
+    </message>
+    <message>
+        <source>Native-first DLL override for the ReShade loader</source>
+        <translation>Native-first DLL override for the ReShade loader</translation>
+    </message>
+    <message>
+        <source>Per-game vkBasalt layer</source>
+        <translation>Per-game vkBasalt layer</translation>
+    </message>
+    <message>
+        <source>Selected in %1</source>
+        <translation>Selected in %1</translation>
+    </message>
+    <message>
+        <source>Kept out of the Gamescope process and restored unchanged for the game</source>
+        <translation>Kept out of the Gamescope process and restored unchanged for the game</translation>
+    </message>
+    <message>
+        <source>Not passed to the Gamescope process</source>
+        <translation>Not passed to the Gamescope process</translation>
+    </message>
+    <message>
+        <source>Compositor-only guard is unset again for the game</source>
+        <translation>Compositor-only guard is unset again for the game</translation>
+    </message>
+    <message>
+        <source>game only, not Gamescope</source>
+        <translation>game only, not Gamescope</translation>
+    </message>
+    <message>
+        <source>Custom wrapper</source>
+        <translation>Custom wrapper</translation>
+    </message>
+    <message>
+        <source>Custom arguments: %1</source>
+        <translation>Custom arguments: %1</translation>
+    </message>
+    <message>
+        <source>Custom commands before/after</source>
+        <translation>Custom commands before/after</translation>
+    </message>
+    <message>
+        <source>Custom launch</source>
+        <translation>Custom launch</translation>
+    </message>
+    <message>
+        <source>Your custom launch variable</source>
+        <translation>Your custom launch variable</translation>
+    </message>
+    <message>
+        <source>Your custom value is not applied: GameOpti or the runtime already manages this variable</source>
+        <translation>Your custom value is not applied: GameOpti or the runtime already manages this variable</translation>
+    </message>
+    <message>
+        <source>(not set)</source>
+        <translation>(not set)</translation>
+    </message>
+    <message>
+        <source>Nothing</source>
+        <translation>Nothing</translation>
+    </message>
+    <message>
+        <source>%1 game configuration: %2</source>
+        <translation>%1 game configuration: %2</translation>
+    </message>
+    <message>
+        <source>Optimization profile saved %1 · Proton Tweaks saved %2</source>
+        <translation>Optimization profile saved %1 · Proton Tweaks saved %2</translation>
+    </message>
+    <message>
+        <source>Saved plan revision %1 · applied revision %2 at %3</source>
+        <translation>Saved plan revision %1 · applied revision %2 at %3</translation>
+    </message>
+    <message>
+        <source>GameOpti starts this local game through its own runner and rebuilds this plan from the saved profiles at every start. &lt;game executable&gt; stands for the selected executable. This preview is not proof of the actual runtime environment.</source>
+        <translation>GameOpti starts this local game through its own runner and rebuilds this plan from the saved profiles at every start. &lt;game executable&gt; stands for the selected executable. This preview is not proof of the actual runtime environment.</translation>
+    </message>
+    <message>
+        <source>%1 starts this game with its own settings file. GameOpti writes only the entries below with Apply to launcher and removes only its own entries with Restore.</source>
+        <translation>%1 starts this game with its own settings file. GameOpti writes only the entries below with Apply to launcher and removes only its own entries with Restore.</translation>
+    </message>
+    <message>
+        <source>Saved profile (written by Apply to launcher):</source>
+        <translation>Saved profile (written by Apply to launcher):</translation>
+    </message>
+    <message>
+        <source>Apply to launcher writes:</source>
+        <translation>Apply to launcher writes:</translation>
+    </message>
+    <message>
+        <source>Unsaved draft (written only after Save and Apply to launcher):</source>
+        <translation>Unsaved draft (written only after Save and Apply to launcher):</translation>
+    </message>
+    <message>
+        <source>The unsaved draft writes the same launcher entries.</source>
+        <translation>The unsaved draft writes the same launcher entries.</translation>
+    </message>
+    <message>
+        <source>Current %1 settings:</source>
+        <translation>Current %1 settings:</translation>
+    </message>
+    <message>
+        <source>Restore puts back:</source>
+        <translation>Restore puts back:</translation>
+    </message>
+    <message>
+        <source>The file is unchanged since Apply; Restore puts back the original file byte for byte.</source>
+        <translation>The file is unchanged since Apply; Restore puts back the original file byte for byte.</translation>
+    </message>
+    <message>
+        <source>Nothing; GameOpti has not changed this game in %1</source>
+        <translation>Nothing; GameOpti has not changed this game in %1</translation>
+    </message>
+    <message>
+        <source>GPU memory priority</source>
+        <translation>GPU memory priority</translation>
+    </message>
+    <message>
+        <source>%1 (enabled by %2)</source>
+        <translation>%1 (enabled by %2)</translation>
+    </message>
+    <message>
+        <source>Proton Tweaks</source>
+        <translation>Proton Tweaks</translation>
     </message>
 </context>
 <context>
@@ -11505,45 +11960,79 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
 </context>
 <context>
+    <name>MangoHudPreview</name>
+    <message>
+        <location filename="../qml/pages/details/MangoHudPreview.qml" line="+14" />
+        <source>Illustrative preview</source>
+        <translation>Illustrative preview</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Sample values · approximate layout · not measurements</source>
+        <translation>Sample values · approximate layout · not measurements</translation>
+    </message>
+    <message>
+        <location line="+91" />
+        <source>sample</source>
+        <translation>sample</translation>
+    </message>
+    <message>
+        <location line="+12" />
+        <source>MangoHud shows no metrics with these settings</source>
+        <translation>MangoHud shows no metrics with these settings</translation>
+    </message>
+    <message>
+        <location line="+6" />
+        <source>Some values need their GPU, CPU, VRAM or FPS row enabled.</source>
+        <translation>Some values need their GPU, CPU, VRAM or FPS row enabled.</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>Real Vulkan preview</source>
+        <translation>Real Vulkan preview</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Close</source>
+        <translation>Close</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>Opens host MangoHud + vkcube with this draft. No profile is saved; this is separate from the game's launcher runtime.</source>
+        <translation>Opens host MangoHud + vkcube with this draft. No profile is saved; this is separate from the game's launcher runtime.</translation>
+    </message>
+</context>
+<context>
     <name>MangoHudTab</name>
     <message>
-        <location filename="../qml/pages/details/MangoHudTab.qml" line="+77" />
-        <location line="+445" />
+        <location filename="../qml/pages/details/MangoHudTab.qml" line="+100" />
         <source>Presets</source>
         <translation>Presets</translation>
     </message>
     <message>
-        <location line="-445" />
-        <location line="+472" />
+        <location line="+0" />
         <source>Appearance</source>
         <translation>Appearance</translation>
     </message>
     <message>
-        <location line="-472" />
-        <location line="+530" />
+        <location line="+0" />
         <source>Metrics</source>
         <translation>Metrics</translation>
     </message>
     <message>
-        <location line="-529" />
-        <location line="+563" />
         <source>Performance</source>
-        <translation>Performance</translation>
+        <translation type="vanished">Performance</translation>
     </message>
     <message>
-        <location line="-563" />
-        <location line="+589" />
         <source>Logging</source>
-        <translation>Logging</translation>
+        <translation type="vanished">Logging</translation>
     </message>
     <message>
-        <location line="-589" />
-        <location line="+619" />
         <source>Advanced</source>
-        <translation>Advanced</translation>
+        <translation type="vanished">Advanced</translation>
     </message>
     <message>
-        <location line="-616" />
+        <location line="+7" />
         <source>Disabled</source>
         <translation>Disabled</translation>
     </message>
@@ -11664,11 +12153,12 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+1" />
+        <location line="+27" />
         <source>VRAM</source>
         <translation>VRAM</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="-26" />
         <source>CPU usage</source>
         <translation>CPU usage</translation>
     </message>
@@ -11689,11 +12179,12 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+1" />
+        <location line="+22" />
         <source>RAM</source>
         <translation>RAM</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="-21" />
         <source>Process memory</source>
         <translation>Process memory</translation>
     </message>
@@ -11728,7 +12219,127 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Network</translation>
     </message>
     <message>
-        <location line="+53" />
+        <location line="+1" />
+        <source>Average FPS</source>
+        <translation>Average FPS</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Rolling statistics from MangoHud samples.</source>
+        <translation>Rolling statistics from MangoHud samples.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>1% low (MangoHud)</source>
+        <translation>1% low (MangoHud)</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>MangoHud's documented 1% metric; needs enough samples.</source>
+        <translation>MangoHud's documented 1% metric; needs enough samples.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Detailed frametime</source>
+        <translation>Detailed frametime</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Minimum, average and maximum on the frametime graph.</source>
+        <translation>Minimum, average and maximum on the frametime graph.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>GPU memory clock</source>
+        <translation>GPU memory clock</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Needs the VRAM row and driver support.</source>
+        <translation>Needs the VRAM row and driver support.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>GPU throttling</source>
+        <translation>GPU throttling</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Shown only while a limit is active. No indicator does not mean measured zero.</source>
+        <translation>Shown only while a limit is active. No indicator does not mean measured zero.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Disk I/O</source>
+        <translation>Disk I/O</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Reads and writes of the monitored process, not the whole disk.</source>
+        <translation>Reads and writes of the monitored process, not the whole disk.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Swap usage</source>
+        <translation>Swap usage</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>System swap allocation.</source>
+        <translation>System swap allocation.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Graphics API / version</source>
+        <translation>Graphics API / version</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Vulkan driver</source>
+        <translation>Vulkan driver</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Wine synchronization</source>
+        <translation>Wine synchronization</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Wine synchronization method, not display VSync.</source>
+        <translation>Wine synchronization method, not display VSync.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Presentation mode</source>
+        <translation>Presentation mode</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Swapchain mode; not input latency.</source>
+        <translation>Swapchain mode; not input latency.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>vkBasalt status</source>
+        <translation>vkBasalt status</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Loaded-layer status, not proof of a visible effect.</source>
+        <translation>Loaded-layer status, not proof of a visible effect.</translation>
+    </message>
+    <message>
+        <location line="+3" />
+        <source>GPU load</source>
+        <translation>GPU load</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>CPU load</source>
+        <translation>CPU load</translation>
+    </message>
+    <message>
+        <location line="+57" />
         <source>Conflict with an existing MangoHud configuration</source>
         <translation>Conflict with an existing MangoHud configuration</translation>
     </message>
@@ -11753,7 +12364,7 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Steam environment profile - already active</translation>
     </message>
     <message>
-        <location line="+196" />
+        <location line="+213" />
         <source>Invalid MangoHud settings</source>
         <translation>Invalid MangoHud settings</translation>
     </message>
@@ -11763,53 +12374,92 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Could not save MangoHud profile</translation>
     </message>
     <message>
-        <location line="+55" />
-        <source>Per-game MangoHud profile · Steam AppID %1</source>
-        <translation>Per-game MangoHud profile · Steam AppID %1</translation>
+        <location line="+83" />
+        <source>Edit value</source>
+        <translation>Edit value</translation>
     </message>
     <message>
-        <location line="+5" />
-        <source>MangoHud detected</source>
-        <translation>MangoHud detected</translation>
+        <location line="+191" />
+        <source>Reset this section</source>
+        <translation>Reset this section</translation>
+    </message>
+    <message>
+        <location line="+8" />
+        <source>Unsaved · preview only</source>
+        <translation>Unsaved · preview only</translation>
     </message>
     <message>
         <location line="+0" />
-        <source>MangoHud unavailable</source>
-        <translation>MangoHud unavailable</translation>
+        <source>Profile saved · restart game to apply</source>
+        <translation>Profile saved · restart game to apply</translation>
     </message>
     <message>
-        <location line="+106" />
+        <location line="+1" />
+        <source>Reset editor</source>
+        <translation>Reset editor</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Apply</source>
+        <translation>Apply</translation>
+    </message>
+    <message>
+        <location line="+7" />
+        <source>Colour picker</source>
+        <translation>Colour picker</translation>
+    </message>
+    <message>
+        <location line="+13" />
+        <source>Hex colour</source>
+        <translation>Hex colour</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Done</source>
+        <translation>Done</translation>
+    </message>
+    <message>
+        <source>Per-game MangoHud profile · Steam AppID %1</source>
+        <translation type="vanished">Per-game MangoHud profile · Steam AppID %1</translation>
+    </message>
+    <message>
+        <source>MangoHud detected</source>
+        <translation type="vanished">MangoHud detected</translation>
+    </message>
+    <message>
+        <source>MangoHud unavailable</source>
+        <translation type="vanished">MangoHud unavailable</translation>
+    </message>
+    <message>
+        <location line="-120" />
         <source>Position</source>
         <translation>Position</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Choose the screen corner or edge for the overlay</source>
-        <translation>Choose the screen corner or edge for the overlay</translation>
+        <translation type="vanished">Choose the screen corner or edge for the overlay</translation>
     </message>
     <message>
-        <location line="+4" />
+        <location line="+9" />
         <source>Font size</source>
         <translation>Font size</translation>
     </message>
     <message>
-        <location line="+0" />
-        <location line="+8" />
         <source>%1 px</source>
-        <translation>%1 px</translation>
+        <translation type="vanished">%1 px</translation>
     </message>
     <message>
-        <location line="-4" />
+        <location line="+1" />
         <source>Background opacity</source>
         <translation>Background opacity</translation>
     </message>
     <message>
-        <location line="+4" />
+        <location line="+1" />
         <source>Rounded corners</source>
         <translation>Rounded corners</translation>
     </message>
     <message>
-        <location line="+3" />
+        <location line="+16" />
         <source>Compact layout</source>
         <translation>Compact layout</translation>
     </message>
@@ -11819,279 +12469,443 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Horizontal layout</translation>
     </message>
     <message>
-        <location line="+31" />
+        <location line="+1" />
         <source>Table columns</source>
         <translation>Table columns</translation>
     </message>
     <message>
-        <location line="+10" />
         <source>Only options supported by the detected MangoHud configuration are selectable.</source>
-        <translation>Only options supported by the detected MangoHud configuration are selectable.</translation>
+        <translation type="vanished">Only options supported by the detected MangoHud configuration are selectable.</translation>
     </message>
     <message>
-        <location line="+18" />
         <source>Unavailable in this MangoHud version</source>
-        <translation>Unavailable in this MangoHud version</translation>
+        <translation type="vanished">Unavailable in this MangoHud version</translation>
     </message>
     <message>
-        <location line="+17" />
         <source>FPS limit</source>
-        <translation>FPS limit</translation>
+        <translation type="vanished">FPS limit</translation>
     </message>
     <message>
-        <location line="+7" />
         <source>Limiter method</source>
-        <translation>Limiter method</translation>
+        <translation type="vanished">Limiter method</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Use only when required by the game</source>
-        <translation>Use only when required by the game</translation>
+        <translation type="vanished">Use only when required by the game</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Default</source>
-        <translation>Default</translation>
+        <translation type="vanished">Default</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Early</source>
-        <translation>Early</translation>
+        <translation type="vanished">Early</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Late</source>
-        <translation>Late</translation>
+        <translation type="vanished">Late</translation>
     </message>
     <message>
-        <location line="+3" />
         <source>Vulkan present mode</source>
-        <translation>Vulkan present mode</translation>
+        <translation type="vanished">Vulkan present mode</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Advanced override</source>
-        <translation>Advanced override</translation>
+        <translation type="vanished">Advanced override</translation>
     </message>
     <message>
-        <location line="+1" />
-        <location line="+4" />
         <source>Application default</source>
-        <translation>Application default</translation>
+        <translation type="vanished">Application default</translation>
     </message>
     <message>
-        <location line="-1" />
         <source>VSync override</source>
-        <translation>VSync override</translation>
+        <translation type="vanished">VSync override</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Advanced Vulkan option</source>
-        <translation>Advanced Vulkan option</translation>
+        <translation type="vanished">Advanced Vulkan option</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Driver default</source>
-        <translation>Driver default</translation>
+        <translation type="vanished">Driver default</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Adaptive</source>
-        <translation>Adaptive</translation>
+        <translation type="vanished">Adaptive</translation>
     </message>
     <message>
-        <location line="-14" />
-        <location line="+14" />
         <source>Off</source>
-        <translation>Off</translation>
+        <translation type="vanished">Off</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Mailbox</source>
-        <translation>Mailbox</translation>
+        <translation type="vanished">Mailbox</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>On</source>
-        <translation>On</translation>
+        <translation type="vanished">On</translation>
     </message>
     <message>
-        <location line="+9" />
         <source>Enable logging controls</source>
-        <translation>Enable logging controls</translation>
+        <translation type="vanished">Enable logging controls</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Logs remain local and are never uploaded automatically</source>
-        <translation>Logs remain local and are never uploaded automatically</translation>
+        <translation type="vanished">Logs remain local and are never uploaded automatically</translation>
     </message>
     <message>
-        <location line="+2" />
         <source>Log duration</source>
-        <translation>Log duration</translation>
+        <translation type="vanished">Log duration</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Seconds</source>
-        <translation>Seconds</translation>
+        <translation type="vanished">Seconds</translation>
     </message>
     <message>
-        <location line="+10" />
         <source>Log interval</source>
-        <translation>Log interval</translation>
+        <translation type="vanished">Log interval</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Seconds between samples</source>
-        <translation>Seconds between samples</translation>
+        <translation type="vanished">Seconds between samples</translation>
     </message>
     <message>
-        <location line="+9" />
+        <location line="+33" />
+        <location line="+1" />
         <source>Output folder</source>
         <translation>Output folder</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Game Optimization-owned log directory</source>
-        <translation>Game Optimization-owned log directory</translation>
+        <translation type="vanished">Game Optimization-owned log directory</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Start logging key</source>
-        <translation>Start logging key</translation>
+        <translation type="vanished">Start logging key</translation>
     </message>
     <message>
-        <location line="+10" />
+        <location line="+8" />
         <source>Main executable</source>
         <translation>Main executable</translation>
     </message>
     <message>
-        <location line="+2" />
         <source>No supported executable was found in the game directory</source>
-        <translation>No supported executable was found in the game directory</translation>
+        <translation type="vanished">No supported executable was found in the game directory</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Used for the official MangoHud per-application configuration</source>
-        <translation>Used for the official MangoHud per-application configuration</translation>
+        <translation type="vanished">Used for the official MangoHud per-application configuration</translation>
     </message>
     <message>
-        <location line="+31" />
         <source>Application configuration: %1</source>
-        <translation>Application configuration: %1</translation>
+        <translation type="vanished">Application configuration: %1</translation>
     </message>
     <message>
-        <location line="+10" />
         <source>Existing configuration kept: %1</source>
-        <translation>Existing configuration kept: %1</translation>
+        <translation type="vanished">Existing configuration kept: %1</translation>
     </message>
     <message>
-        <location line="+14" />
+        <location line="+5" />
         <source>Generated configuration</source>
         <translation>Generated configuration</translation>
     </message>
     <message>
-        <location line="+17" />
         <source>Profile: %1</source>
-        <translation>Profile: %1</translation>
+        <translation type="vanished">Profile: %1</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Configuration: %1</source>
-        <translation>Configuration: %1</translation>
+        <translation type="vanished">Configuration: %1</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="+8" />
         <source>Open directory</source>
         <translation>Open directory</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>No shell commands or global MangoHud configuration are edited.</source>
-        <translation>No shell commands or global MangoHud configuration are edited.</translation>
+        <translation type="vanished">No shell commands or global MangoHud configuration are edited.</translation>
     </message>
     <message>
-        <location line="+152" />
         <source>Preset: %1</source>
-        <translation>Preset: %1</translation>
+        <translation type="vanished">Preset: %1</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>%1 metrics selected</source>
-        <translation>%1 metrics selected</translation>
+        <translation type="vanished">%1 metrics selected</translation>
     </message>
     <message>
-        <location line="+16" />
         <source>Unsaved changes</source>
-        <translation>Unsaved changes</translation>
+        <translation type="vanished">Unsaved changes</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>Profile saved</source>
-        <translation>Profile saved</translation>
+        <translation type="vanished">Profile saved</translation>
     </message>
     <message>
-        <location line="+3" />
         <source>Reset Game Optimization settings</source>
-        <translation>Reset Game Optimization settings</translation>
+        <translation type="vanished">Reset Game Optimization settings</translation>
     </message>
     <message>
-        <location line="+6" />
         <source>Save profile</source>
-        <translation>Save profile</translation>
+        <translation type="vanished">Save profile</translation>
     </message>
     <message>
-        <location line="-692" />
+        <location line="-405" />
         <source>A live preview is already running</source>
         <translation>A live preview is already running</translation>
     </message>
     <message>
-        <location line="-108" />
+        <location line="-110" />
         <source>Background color</source>
         <translation>Background color</translation>
     </message>
     <message>
-        <location line="+635" />
         <source>Built from the current settings. Values are examples, not measurements, and the look is approximate.</source>
-        <translation>Built from the current settings. Values are examples, not measurements, and the look is approximate.</translation>
+        <translation type="vanished">Built from the current settings. Values are examples, not measurements, and the look is approximate.</translation>
     </message>
     <message>
-        <location line="-193" />
         <source>Cells per line in the vertical layout</source>
-        <translation>Cells per line in the vertical layout</translation>
+        <translation type="vanished">Cells per line in the vertical layout</translation>
     </message>
     <message>
-        <location line="+311" />
         <source>Close preview</source>
-        <translation>Close preview</translation>
+        <translation type="vanished">Close preview</translation>
     </message>
     <message>
-        <location line="-634" />
+        <location line="+121" />
         <source>Configuration copied</source>
         <translation>Configuration copied</translation>
     </message>
     <message>
-        <location line="+490" />
+        <location line="+352" />
+        <source>Unavailable in this runtime or MangoHud version. Your saved selection is preserved.</source>
+        <translation>Unavailable in this runtime or MangoHud version. Your saved selection is preserved.</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Monitoring graphs</source>
+        <translation>Monitoring graphs</translation>
+    </message>
+    <message>
+        <location line="+9" />
+        <source>Enable recording controls</source>
+        <translation>Enable recording controls</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Recordings stay local and work with Performance Analysis. Start logging with the shortcut; enabling controls does not start a recording.</source>
+        <translation>Recordings stay local and work with Performance Analysis. Start logging with the shortcut; enabling controls does not start a recording.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Recording duration</source>
+        <translation>Recording duration</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Sample interval</source>
+        <translation>Sample interval</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <location line="+1" />
+        <source>Logging shortcut</source>
+        <translation>Logging shortcut</translation>
+    </message>
+    <message>
+        <location line="+4" />
+        <source>Advanced / configuration</source>
+        <translation>Advanced / configuration</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>FPS limiting is managed in Optimization. Existing limiter and presentation preferences are preserved.</source>
+        <translation>FPS limiting is managed in Optimization. Existing limiter and presentation preferences are preserved.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Open Optimization</source>
+        <translation>Open Optimization</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <location line="+1" />
+        <source>HUD shortcut</source>
+        <translation>HUD shortcut</translation>
+    </message>
+    <message>
+        <location line="+4" />
+        <source>32-bit MangoHud layer not detected. A 32-bit game needs the matching layer in its launcher runtime.</source>
+        <translation>32-bit MangoHud layer not detected. A 32-bit game needs the matching layer in its launcher runtime.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>The new monitoring controls require verified MangoHud 0.8.4 or newer. Update the launcher environment, then refresh.</source>
+        <translation>The new monitoring controls require verified MangoHud 0.8.4 or newer. Update the launcher environment, then refresh.</translation>
+    </message>
+    <message>
+        <location line="+8" />
         <source>Copy</source>
         <translation>Copy</translation>
     </message>
     <message>
-        <location line="-497" />
+        <location line="-400" />
         <source>Could not start the live preview: %1</source>
         <translation>Could not start the live preview: %1</translation>
     </message>
     <message>
-        <location line="-116" />
+        <location line="-214" />
+        <source>Recording</source>
+        <translation>Recording</translation>
+    </message>
+    <message>
+        <location line="+3" />
+        <source>GameOpti green</source>
+        <translation>GameOpti green</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Mint accents, balanced telemetry and FPS statistics.</source>
+        <translation>Mint accents, balanced telemetry and FPS statistics.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Minimal HUD</source>
+        <translation>Minimal HUD</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>FPS and frametime with a light background.</source>
+        <translation>FPS and frametime with a light background.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Diagnostic</source>
+        <translation>Diagnostic</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Clocks, memory, graphs and rendering information.</source>
+        <translation>Clocks, memory, graphs and rendering information.</translation>
+    </message>
+    <message>
+        <location line="+91" />
         <source>CPU color</source>
         <translation>CPU color</translation>
     </message>
     <message>
-        <location line="+459" />
+        <location line="+366" />
+        <source>MangoHud editor</source>
+        <translation>MangoHud editor</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Runtime not checked</source>
+        <translation>Runtime not checked</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Version unknown</source>
+        <translation>Version unknown</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>Components detected · game runtime loading not verified</source>
+        <translation>Components detected · game runtime loading not verified</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>Apply the saved profile to the launcher from Overview.</source>
+        <translation>Apply the saved profile to the launcher from Overview.</translation>
+    </message>
+    <message>
+        <location line="+29" />
+        <source>Enable MangoHud for this game</source>
+        <translation>Enable MangoHud for this game</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Choose a starting style, then adjust it. Nothing changes on disk before Apply.</source>
+        <translation>Choose a starting style, then adjust it. Nothing changes on disk before Apply.</translation>
+    </message>
+    <message>
+        <location line="+13" />
+        <source>Other presets</source>
+        <translation>Other presets</translation>
+    </message>
+    <message>
+        <location line="+21" />
+        <source>Offsets are relative to this anchor.</source>
+        <translation>Offsets are relative to this anchor.</translation>
+    </message>
+    <message>
+        <location line="+4" />
+        <source>Horizontal offset</source>
+        <translation>Horizontal offset</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Vertical offset</source>
+        <translation>Vertical offset</translation>
+    </message>
+    <message>
+        <location line="+18" />
+        <source>Layout details</source>
+        <translation>Layout details</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Row spacing</source>
+        <translation>Row spacing</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Gamescope mangoapp monitors the compositor. Game API, driver, presentation, per-process memory/I/O and vkBasalt status are unavailable as game telemetry here; saved selections are kept.</source>
+        <translation>Gamescope mangoapp monitors the compositor. Game API, driver, presentation, per-process memory/I/O and vkBasalt status are unavailable as game telemetry here; saved selections are kept.</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>In-game telemetry depends on driver and process access. Missing counters are unavailable, not measured zero. An FPS counter does not identify generated frames or input latency.</source>
+        <translation>In-game telemetry depends on driver and process access. Missing counters are unavailable, not measured zero. An FPS counter does not identify generated frames or input latency.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Frame statistics</source>
+        <translation>Frame statistics</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>GPU</source>
+        <translation>GPU</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>CPU</source>
+        <translation>CPU</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Memory and I/O</source>
+        <translation>Memory and I/O</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>API and status</source>
+        <translation>API and status</translation>
+    </message>
+    <message>
+        <location line="+1" />
         <source>Frametime graph</source>
         <translation>Frametime graph</translation>
     </message>
     <message>
-        <location line="-456" />
+        <location line="-469" />
         <source>Frametime graph color</source>
         <translation>Frametime graph color</translation>
     </message>
@@ -12101,67 +12915,61 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>GPU color</translation>
     </message>
     <message>
-        <location line="+639" />
         <source>Layout preview - sample values</source>
-        <translation>Layout preview - sample values</translation>
+        <translation type="vanished">Layout preview - sample values</translation>
     </message>
     <message>
-        <location line="-178" />
         <source>Line graph of recent frame times</source>
-        <translation>Line graph of recent frame times</translation>
+        <translation type="vanished">Line graph of recent frame times</translation>
     </message>
     <message>
-        <location line="+289" />
         <source>Live preview</source>
-        <translation>Live preview</translation>
+        <translation type="vanished">Live preview</translation>
     </message>
     <message>
-        <location line="-639" />
+        <location line="+113" />
         <source>Live preview requires the vulkan-tools package</source>
         <translation>Live preview requires the vulkan-tools package</translation>
     </message>
     <message>
-        <location line="+620" />
         <source>MangoHud shows no metrics with these settings</source>
-        <translation>MangoHud shows no metrics with these settings</translation>
+        <translation type="vanished">MangoHud shows no metrics with these settings</translation>
     </message>
     <message>
-        <location line="-728" />
+        <location line="-110" />
         <source>RAM color</source>
         <translation>RAM color</translation>
     </message>
     <message>
-        <location line="+762" />
         <source>Runs mangohud vkcube with the current settings. Nothing is saved.</source>
-        <translation>Runs mangohud vkcube with the current settings. Nothing is saved.</translation>
+        <translation type="vanished">Runs mangohud vkcube with the current settings. Nothing is saved.</translation>
     </message>
     <message>
-        <location line="-651" />
+        <location line="+113" />
         <source>Select a preset with metrics first</source>
         <translation>Select a preset with metrics first</translation>
     </message>
     <message>
-        <location line="+625" />
         <source>Some GPU, CPU or frametime values are hidden: MangoHud shows them only with GPU usage, CPU usage or FPS enabled.</source>
-        <translation>Some GPU, CPU or frametime values are hidden: MangoHud shows them only with GPU usage, CPU usage or FPS enabled.</translation>
+        <translation type="vanished">Some GPU, CPU or frametime values are hidden: MangoHud shows them only with GPU usage, CPU usage or FPS enabled.</translation>
     </message>
     <message>
-        <location line="-740" />
+        <location line="-117" />
         <source>Text color</source>
         <translation>Text color</translation>
     </message>
     <message>
-        <location line="+117" />
+        <location line="+119" />
         <source>The live preview ended with an error: %1</source>
         <translation>The live preview ended with an error: %1</translation>
     </message>
     <message>
-        <location line="-114" />
+        <location line="-116" />
         <source>VRAM color</source>
         <translation>VRAM color</translation>
     </message>
     <message>
-        <location line="+227" />
+        <location line="+244" />
         <source>Profile saved - apply it to the launcher</source>
         <translation>Profile saved - apply it to the launcher</translation>
     </message>
@@ -12171,19 +12979,16 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <translation>Profile saved - the launcher config is being updated; it takes effect at the next game start</translation>
     </message>
     <message>
-        <location line="+38" />
         <source>%1 starts this game. Apply the saved profile using Launcher settings in Overview.</source>
-        <translation>%1 starts this game. Apply the saved profile using Launcher settings in Overview.</translation>
+        <translation type="vanished">%1 starts this game. Apply the saved profile using Launcher settings in Overview.</translation>
     </message>
     <message>
-        <location line="+224" />
         <source>The limiter is configured in Optimization; this page controls the overlay.</source>
-        <translation>The limiter is configured in Optimization; this page controls the overlay.</translation>
+        <translation type="vanished">The limiter is configured in Optimization; this page controls the overlay.</translation>
     </message>
     <message>
-        <location line="+3" />
         <source>Configure in Optimization</source>
-        <translation>Configure in Optimization</translation>
+        <translation type="vanished">Configure in Optimization</translation>
     </message>
     <message>
         <source>Supported by MangoHud %1</source>
@@ -13738,6 +14543,18 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>The subtitle area could not be saved.</source>
         <translation type="vanished">The subtitle area could not be saved.</translation>
     </message>
+    <message>
+        <source>(no longer offered)</source>
+        <translation>(no longer offered)</translation>
+    </message>
+    <message>
+        <source>Installed (no longer offered)</source>
+        <translation>Installed (no longer offered)</translation>
+    </message>
+    <message>
+        <source>Not published yet</source>
+        <translation>Not published yet</translation>
+    </message>
 </context>
 <context>
     <name>OptiScalerFsrOptions</name>
@@ -14866,6 +15683,34 @@ Current: %2</translation>
         <source>Reference: AMD FSR 4.1.1 (bundled with OptiScaler)</source>
         <translation type="vanished">Reference: AMD FSR 4.1.1 (bundled with OptiScaler)</translation>
     </message>
+    <message>
+        <source>Displaced: %1 now belongs to %2. Other OptiScaler files are still installed.</source>
+        <translation>Displaced: %1 now belongs to %2. Other OptiScaler files are still installed.</translation>
+    </message>
+    <message>
+        <source>Modified or conflicting: %1 does not match the OptiScaler manifest</source>
+        <translation>Modified or conflicting: %1 does not match the OptiScaler manifest</translation>
+    </message>
+    <message>
+        <source>Not installed. The remaining manifest is history only.</source>
+        <translation>Not installed. The remaining manifest is history only.</translation>
+    </message>
+    <message>
+        <source>Not installed. The remaining manifest is history only; %1 now belongs to %2 and will not be removed here.</source>
+        <translation>Not installed. The remaining manifest is history only; %1 now belongs to %2 and will not be removed here.</translation>
+    </message>
+    <message>
+        <source>Parked by DLSS Enabler; OptiScaler files are kept aside</source>
+        <translation>Parked by DLSS Enabler; OptiScaler files are kept aside</translation>
+    </message>
+    <message>
+        <source>Removal</source>
+        <translation>Removal</translation>
+    </message>
+    <message>
+        <source>Shared loader</source>
+        <translation>Shared loader</translation>
+    </message>
 </context>
 <context>
     <name>OptiScalerSummaryCard</name>
@@ -14995,13 +15840,13 @@ Current: %2</translation>
 <context>
     <name>OptimizationTab</name>
     <message>
-        <location filename="../qml/pages/details/OptimizationTab.qml" line="+2045" />
+        <location filename="../qml/pages/details/OptimizationTab.qml" line="+2042" />
         <source>Settings analysis</source>
         <translation>Settings analysis</translation>
     </message>
     <message>
-        <location line="-1749" />
-        <location line="+1758" />
+        <location line="-1745" />
+        <location line="+1754" />
         <source>Automatic graphics settings optimization is not available for this game yet.</source>
         <translation>Automatic graphics settings optimization is not available for this game yet.</translation>
     </message>
@@ -15011,8 +15856,8 @@ Current: %2</translation>
         <translation>Supported existing settings were detected.</translation>
     </message>
     <message>
-        <location line="-1756" />
-        <location line="+1757" />
+        <location line="-1752" />
+        <location line="+1753" />
         <source>No safely modifiable settings were found</source>
         <translation>No safely modifiable settings were found</translation>
     </message>
@@ -15022,7 +15867,7 @@ Current: %2</translation>
         <translation>Detected configuration: %1</translation>
     </message>
     <message>
-        <location line="-619" />
+        <location line="-614" />
         <source>Performance impact: %1</source>
         <translation>Performance impact: %1</translation>
     </message>
@@ -15048,19 +15893,19 @@ Current: %2</translation>
     </message>
     <message>
         <location line="+7" />
-        <location line="+750" />
+        <location line="+745" />
         <source>Apply and test</source>
         <translation>Apply and test</translation>
     </message>
     <message>
-        <location line="-718" />
-        <location line="+769" />
+        <location line="-713" />
+        <location line="+764" />
         <source>Keep change</source>
         <translation>Keep change</translation>
     </message>
     <message>
-        <location line="-1516" />
-        <location line="+755" />
+        <location line="-1512" />
+        <location line="+756" />
         <source>Change could not be kept</source>
         <translation>Change could not be kept</translation>
     </message>
@@ -15090,7 +15935,7 @@ Current: %2</translation>
         <translation>After</translation>
     </message>
     <message>
-        <location line="-1270" />
+        <location line="-1271" />
         <source>Likely ~%1 FPS</source>
         <translation>Likely ~%1 FPS</translation>
     </message>
@@ -15100,7 +15945,7 @@ Current: %2</translation>
         <translation>Not detected</translation>
     </message>
     <message>
-        <location line="+1683" />
+        <location line="+1679" />
         <source>Frame-rate limit</source>
         <translation>Frame-rate limit</translation>
     </message>
@@ -15115,7 +15960,7 @@ Current: %2</translation>
         <translation>Frame-limit evidence: %1</translation>
     </message>
     <message>
-        <location line="-1796" />
+        <location line="-1792" />
         <source>Maximum Performance</source>
         <translation>Maximum Performance</translation>
     </message>
@@ -15123,14 +15968,14 @@ Current: %2</translation>
         <location line="+0" />
         <location line="+6" />
         <location line="+626" />
-        <location line="+106" />
+        <location line="+107" />
         <location line="+13" />
         <location line="+36" />
         <source>Automatic</source>
         <translation>Automatic</translation>
     </message>
     <message>
-        <location line="-785" />
+        <location line="-786" />
         <source>Competitive</source>
         <translation>Competitive</translation>
     </message>
@@ -15162,7 +16007,7 @@ Current: %2</translation>
     <message>
         <location line="+0" />
         <location line="+94" />
-        <location line="+1428" />
+        <location line="+1424" />
         <location line="+7" />
         <location line="+9" />
         <location line="+14" />
@@ -15177,7 +16022,7 @@ Current: %2</translation>
         <translation>Unknown</translation>
     </message>
     <message>
-        <location line="-1609" />
+        <location line="-1605" />
         <source>Lowest latency</source>
         <translation>Lowest latency</translation>
     </message>
@@ -15312,14 +16157,14 @@ Current: %2</translation>
         <location line="+30" />
         <location line="+7" />
         <location line="+9" />
-        <location line="+1335" />
+        <location line="+1331" />
         <location line="+27" />
         <location line="+305" />
         <source>Unavailable</source>
         <translation>Unavailable</translation>
     </message>
     <message>
-        <location line="-1659" />
+        <location line="-1655" />
         <source>Performance headroom improved, FPS remained capped</source>
         <translation>Performance headroom improved, FPS remained capped</translation>
     </message>
@@ -15422,12 +16267,12 @@ Current: %2</translation>
     </message>
     <message>
         <location line="+10" />
-        <location line="+778" />
+        <location line="+779" />
         <source>Changes could not be reverted</source>
         <translation>Changes could not be reverted</translation>
     </message>
     <message>
-        <location line="+139" />
+        <location line="+134" />
         <source>Detected game</source>
         <translation>Detected game</translation>
     </message>
@@ -15568,7 +16413,7 @@ Current: %2</translation>
         <translation>Game analysis failed</translation>
     </message>
     <message>
-        <location line="-696" />
+        <location line="-691" />
         <source>Automatic Optimization</source>
         <translation>Automatic Optimization</translation>
     </message>
@@ -15719,7 +16564,7 @@ Current: %2</translation>
         <translation>%1 - %2 - %3</translation>
     </message>
     <message>
-        <location line="+437" />
+        <location line="+432" />
         <source>Performance analysis</source>
         <translation>Performance analysis</translation>
     </message>
@@ -15791,44 +16636,44 @@ Current: %2</translation>
         <translation>Duration</translation>
     </message>
     <message>
-        <location line="-378" />
-        <location line="+379" />
+        <location line="-373" />
+        <location line="+374" />
         <source>Average FPS</source>
         <translation>Average FPS</translation>
     </message>
     <message>
-        <location line="-375" />
-        <location line="+376" />
+        <location line="-370" />
+        <location line="+371" />
         <source>1% low</source>
         <translation>1% low</translation>
     </message>
     <message>
-        <location line="-372" />
-        <location line="+373" />
+        <location line="-367" />
+        <location line="+368" />
         <source>Frametime</source>
         <translation>Frametime</translation>
     </message>
     <message>
-        <location line="-369" />
-        <location line="+370" />
+        <location line="-364" />
+        <location line="+365" />
         <source>Frametime p95</source>
         <translation>Frametime p95</translation>
     </message>
     <message>
-        <location line="-366" />
-        <location line="+367" />
+        <location line="-361" />
+        <location line="+362" />
         <source>Frametime p99</source>
         <translation>Frametime p99</translation>
     </message>
     <message>
-        <location line="-359" />
-        <location line="+360" />
+        <location line="-354" />
+        <location line="+355" />
         <source>CPU usage</source>
         <translation>CPU usage</translation>
     </message>
     <message>
-        <location line="-364" />
-        <location line="+365" />
+        <location line="-359" />
+        <location line="+360" />
         <source>GPU usage</source>
         <translation>GPU usage</translation>
     </message>
@@ -15838,8 +16683,8 @@ Current: %2</translation>
         <translation>RAM usage</translation>
     </message>
     <message>
-        <location line="-358" />
-        <location line="+359" />
+        <location line="-353" />
+        <location line="+354" />
         <source>VRAM usage</source>
         <translation>VRAM usage</translation>
     </message>
@@ -15908,13 +16753,13 @@ Current: %2</translation>
         <translation>Bottleneck</translation>
     </message>
     <message>
-        <location line="-1318" />
+        <location line="-1314" />
         <source>Insufficient data</source>
         <translation>Insufficient data</translation>
     </message>
     <message>
-        <location line="+473" />
-        <location line="+852" />
+        <location line="+474" />
+        <location line="+847" />
         <source>Confidence</source>
         <translation>Confidence</translation>
     </message>
@@ -16035,8 +16880,8 @@ Current: %2</translation>
         <translation>Record comparison again</translation>
     </message>
     <message>
-        <location line="-769" />
-        <location line="+769" />
+        <location line="-764" />
+        <location line="+764" />
         <source>Record comparison</source>
         <translation>Record comparison</translation>
     </message>
@@ -16046,17 +16891,17 @@ Current: %2</translation>
         <translation>Revert now</translation>
     </message>
     <message>
-        <location line="-869" />
+        <location line="-864" />
         <source>Recommendations</source>
         <translation>Recommendations</translation>
     </message>
     <message>
-        <location line="-1091" />
+        <location line="-1092" />
         <source>No safe optimization recommendations were found</source>
         <translation>No safe optimization recommendations were found</translation>
     </message>
     <message>
-        <location line="+1524" />
+        <location line="+1520" />
         <source>Saved baseline - new measurement required before measured Automatic recommendations</source>
         <translation>Saved baseline - new measurement required before measured Automatic recommendations</translation>
     </message>
@@ -16076,7 +16921,7 @@ Current: %2</translation>
         <translation>Waiting for runner...</translation>
     </message>
     <message>
-        <location line="-404" />
+        <location line="-399" />
         <source>Reversible</source>
         <translation>Reversible</translation>
     </message>
@@ -16137,7 +16982,7 @@ Current: %2</translation>
         <translation>Change</translation>
     </message>
     <message>
-        <location line="-703" />
+        <location line="-704" />
         <source>Measured optimization recommendations</source>
         <translation>Measured optimization recommendations</translation>
     </message>
@@ -16197,7 +17042,7 @@ Current: %2</translation>
         <translation>Unlimited</translation>
     </message>
     <message>
-        <location line="+85" />
+        <location line="+86" />
         <source>Gamescope mode</source>
         <translation>Gamescope mode</translation>
     </message>
@@ -16212,25 +17057,23 @@ Current: %2</translation>
         <translation>Launch plan preview</translation>
     </message>
     <message>
-        <location line="+7" />
+        <location line="+3" />
         <source>Wrapper order: %1</source>
         <translation>Wrapper order: %1</translation>
     </message>
     <message>
         <location line="+0" />
-        <location line="+2" />
         <source>none</source>
         <translation>none</translation>
     </message>
     <message>
-        <location line="-1" />
+        <location line="+1" />
         <source>FPS limit owner: %1</source>
         <translation>FPS limit owner: %1</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Final runtime environment: %1</source>
-        <translation>Final runtime environment: %1</translation>
+        <translation type="vanished">Final runtime environment: %1</translation>
     </message>
     <message>
         <location line="+1" />
@@ -16274,7 +17117,7 @@ Current: %2</translation>
         <translation>MangoHud log could not be imported</translation>
     </message>
     <message>
-        <location line="-2222" />
+        <location line="-2218" />
         <source>No supported existing configuration file was found.</source>
         <translation>No supported existing configuration file was found.</translation>
     </message>
@@ -16314,7 +17157,7 @@ Current: %2</translation>
         <translation>No supported existing setting matches the measured bottleneck.</translation>
     </message>
     <message>
-        <location line="+2096" />
+        <location line="+2092" />
         <source>Steam connection</source>
         <translation>Steam connection</translation>
     </message>
@@ -16354,7 +17197,7 @@ Current: %2</translation>
         <translation>Steam → Properties → General → Launch Options</translation>
     </message>
     <message>
-        <location line="-2230" />
+        <location line="-2226" />
         <location line="+485" />
         <source>Balanced</source>
         <translation>Balanced</translation>
@@ -16369,7 +17212,7 @@ Current: %2</translation>
         <location line="+2" />
         <location line="+2" />
         <location line="+2" />
-        <location line="+732" />
+        <location line="+733" />
         <location line="+7" />
         <location line="+46" />
         <location line="+6" />
@@ -16392,12 +17235,12 @@ Current: %2</translation>
         <translation>0% = least, 100% = most sharpening</translation>
     </message>
     <message>
-        <location line="-555" />
+        <location line="-556" />
         <source>A Gamescope test is already running</source>
         <translation>A Gamescope test is already running</translation>
     </message>
     <message>
-        <location line="+581" />
+        <location line="+582" />
         <source>Adaptive Sync / VRR</source>
         <translation>Adaptive Sync / VRR</translation>
     </message>
@@ -16412,12 +17255,12 @@ Current: %2</translation>
         <translation>Auto</translation>
     </message>
     <message>
-        <location line="-584" />
+        <location line="-585" />
         <source>Auto lets Gamescope choose.</source>
         <translation>Auto lets Gamescope choose.</translation>
     </message>
     <message>
-        <location line="+574" />
+        <location line="+575" />
         <source>Automatic (recommended)</source>
         <translation>Automatic (recommended)</translation>
     </message>
@@ -16452,17 +17295,17 @@ Current: %2</translation>
         <translation>Copy Steam launch options</translation>
     </message>
     <message>
-        <location line="-653" />
+        <location line="-654" />
         <source>Could not start the Gamescope test: %1</source>
         <translation>Could not start the Gamescope test: %1</translation>
     </message>
     <message>
-        <location line="+2072" />
+        <location line="+2068" />
         <source>Default</source>
         <translation>Default</translation>
     </message>
     <message>
-        <location line="-1410" />
+        <location line="-1405" />
         <source>Display only. Game launches always use a safe argument list, never this text.</source>
         <translation>Display only. Game launches always use a safe argument list, never this text.</translation>
     </message>
@@ -16487,12 +17330,12 @@ Current: %2</translation>
         <translation>Fill / crop</translation>
     </message>
     <message>
-        <location line="-587" />
+        <location line="-588" />
         <source>Fill keeps the aspect ratio and crops the edges.</source>
         <translation>Fill keeps the aspect ratio and crops the edges.</translation>
     </message>
     <message>
-        <location line="+589" />
+        <location line="+590" />
         <source>Filter</source>
         <translation>Filter</translation>
     </message>
@@ -16502,12 +17345,12 @@ Current: %2</translation>
         <translation>Fit / keep aspect ratio</translation>
     </message>
     <message>
-        <location line="-588" />
+        <location line="-589" />
         <source>Fit keeps the aspect ratio and may add black bars.</source>
         <translation>Fit keeps the aspect ratio and may add black bars.</translation>
     </message>
     <message>
-        <location line="+587" />
+        <location line="+588" />
         <source>Fit method</source>
         <translation>Fit method</translation>
     </message>
@@ -16517,12 +17360,12 @@ Current: %2</translation>
         <translation>Force full-size game window inside Gamescope</translation>
     </message>
     <message>
-        <location line="-581" />
+        <location line="-582" />
         <source>FSR: good general-purpose upscaling.</source>
         <translation>FSR: good general-purpose upscaling.</translation>
     </message>
     <message>
-        <location line="+564" />
+        <location line="+565" />
         <source>Game render resolution</source>
         <translation>Game render resolution</translation>
     </message>
@@ -16537,12 +17380,12 @@ Current: %2</translation>
         <translation>Gamescope --help could not be read. Only the basic options are available; advanced options are disabled.</translation>
     </message>
     <message>
-        <location line="-505" />
+        <location line="-506" />
         <source>Gamescope is not installed</source>
         <translation>Gamescope is not installed</translation>
     </message>
     <message>
-        <location line="+570" />
+        <location line="+571" />
         <source>Gamescope may round the limit to a divisor of the refresh rate</source>
         <translation>Gamescope may round the limit to a divisor of the refresh rate</translation>
     </message>
@@ -16552,7 +17395,7 @@ Current: %2</translation>
         <translation>Gamescope output resolution</translation>
     </message>
     <message>
-        <location line="-553" />
+        <location line="-554" />
         <source>Gamescope WSI layer detected; its variable is set only while HDR is on.</source>
         <translation>Gamescope WSI layer detected; its variable is set only while HDR is on.</translation>
     </message>
@@ -16562,7 +17405,7 @@ Current: %2</translation>
         <translation>Gamescope WSI layer not found: HDR games may be shown as SDR.</translation>
     </message>
     <message>
-        <location line="+682" />
+        <location line="+683" />
         <source>Generated Gamescope arguments</source>
         <translation>Generated Gamescope arguments</translation>
     </message>
@@ -16603,12 +17446,12 @@ Current: %2</translation>
         <translation>Input and window behavior</translation>
     </message>
     <message>
-        <location line="-658" />
+        <location line="-659" />
         <source>Integer scales by whole numbers; best for pixel-art games.</source>
         <translation>Integer scales by whole numbers; best for pixel-art games.</translation>
     </message>
     <message>
-        <location line="+585" />
+        <location line="+586" />
         <source>Integer scaling</source>
         <translation>Integer scaling</translation>
     </message>
@@ -16623,18 +17466,18 @@ Current: %2</translation>
         <translation>Limit when unfocused</translation>
     </message>
     <message>
-        <location line="-619" />
+        <location line="-620" />
         <source>Linear: smooth default filtering.</source>
         <translation>Linear: smooth default filtering.</translation>
     </message>
     <message>
-        <location line="+596" />
+        <location line="+597" />
         <source>Maximum scale</source>
         <translation>Maximum scale</translation>
     </message>
     <message>
-        <location line="-892" />
-        <location line="+988" />
+        <location line="-893" />
+        <location line="+989" />
         <source>Missing</source>
         <translation>Missing</translation>
     </message>
@@ -16659,7 +17502,7 @@ Current: %2</translation>
         <translation>Native Wayland clients</translation>
     </message>
     <message>
-        <location line="-679" />
+        <location line="-680" />
         <source>Nearest / Pixel: best for pixel-art games.</source>
         <translation>Nearest / Pixel: best for pixel-art games.</translation>
     </message>
@@ -16679,7 +17522,7 @@ Current: %2</translation>
         <translation>NVIDIA: HDR requires working DRM kernel modesetting (nvidia-drm.modeset=1).</translation>
     </message>
     <message>
-        <location line="+602" />
+        <location line="+603" />
         <location line="+6" />
         <source>Off</source>
         <translation>Off</translation>
@@ -16745,12 +17588,12 @@ Current: %2</translation>
         <translation>SDR source brightness</translation>
     </message>
     <message>
-        <location line="-654" />
+        <location line="-655" />
         <source>SGSR: Snapdragon Game Super Resolution with sharpening.</source>
         <translation>SGSR: Snapdragon Game Super Resolution with sharpening.</translation>
     </message>
     <message>
-        <location line="+600" />
+        <location line="+601" />
         <source>Sharpness</source>
         <translation>Sharpness</translation>
     </message>
@@ -16765,22 +17608,22 @@ Current: %2</translation>
         <translation>Steam integration (advanced)</translation>
     </message>
     <message>
-        <location line="-628" />
+        <location line="-629" />
         <source>Steam launch options copied</source>
         <translation>Steam launch options copied</translation>
     </message>
     <message>
-        <location line="+539" />
+        <location line="+540" />
         <source>Stretch</source>
         <translation>Stretch</translation>
     </message>
     <message>
-        <location line="-586" />
+        <location line="-587" />
         <source>Stretch fills the screen and changes the aspect ratio.</source>
         <translation>Stretch fills the screen and changes the aspect ratio.</translation>
     </message>
     <message>
-        <location line="+651" />
+        <location line="+652" />
         <source>Target HDR brightness</source>
         <translation>Target HDR brightness</translation>
     </message>
@@ -16795,7 +17638,7 @@ Current: %2</translation>
         <translation>Test with HDR</translation>
     </message>
     <message>
-        <location line="-667" />
+        <location line="-668" />
         <source>The Gamescope test ended with an error: %1</source>
         <translation>The Gamescope test ended with an error: %1</translation>
     </message>
@@ -16815,7 +17658,7 @@ Current: %2</translation>
         <translation>The installed Gamescope has no --hdr-enabled: HDR is unavailable.</translation>
     </message>
     <message>
-        <location line="+587" />
+        <location line="+588" />
         <source>Used only by the FSR and NIS filters</source>
         <translation>Used only by the FSR and NIS filters</translation>
     </message>
@@ -16830,12 +17673,12 @@ Current: %2</translation>
         <translation>-w / -h: the size the game renders at</translation>
     </message>
     <message>
-        <location line="-550" />
+        <location line="-551" />
         <source>Wayland session: the basic requirement is met.</source>
         <translation>Wayland session: the basic requirement is met.</translation>
     </message>
     <message>
-        <location line="+553" />
+        <location line="+554" />
         <location line="+7" />
         <source>Width</source>
         <translation>Width</translation>
@@ -16871,17 +17714,17 @@ Current: %2</translation>
         <translation>MangoHud is drawn by Gamescope (--mangoapp) with this game's MangoHud profile; the game gets no second overlay.</translation>
     </message>
     <message>
-        <location line="+1243" />
+        <location line="+1238" />
         <source>%1 connection</source>
         <translation>%1 connection</translation>
     </message>
     <message>
-        <location line="-2206" />
+        <location line="-2202" />
         <source>%1 starts this game with the GameOpti settings</source>
         <translation>%1 starts this game with the GameOpti settings</translation>
     </message>
     <message>
-        <location line="+2209" />
+        <location line="+2205" />
         <source>Applied</source>
         <translation>Applied</translation>
     </message>
@@ -16906,12 +17749,12 @@ Current: %2</translation>
         <translation>Changed in launcher</translation>
     </message>
     <message>
-        <location line="-2213" />
+        <location line="-2209" />
         <source>Close %1 first; it can overwrite the game settings</source>
         <translation>Close %1 first; it can overwrite the game settings</translation>
     </message>
     <message>
-        <location line="+2212" />
+        <location line="+2208" />
         <source>Outdated</source>
         <translation>Outdated</translation>
     </message>
@@ -16921,12 +17764,12 @@ Current: %2</translation>
         <translation>Restore launcher settings</translation>
     </message>
     <message>
-        <location line="-2294" />
+        <location line="-2290" />
         <source>Saved, but not applied to %1</source>
         <translation>Saved, but not applied to %1</translation>
     </message>
     <message>
-        <location line="+2214" />
+        <location line="+2210" />
         <source>The saved settings are written into this game's own launcher configuration (environment and wrapper). Nothing else is changed, a backup is kept, and you can restore it here.</source>
         <translation>The saved settings are written into this game's own launcher configuration (environment and wrapper). Nothing else is changed, a backup is kept, and you can restore it here.</translation>
     </message>
@@ -16936,7 +17779,7 @@ Current: %2</translation>
         <translation>Not applied</translation>
     </message>
     <message>
-        <location line="-2241" />
+        <location line="-2237" />
         <source>Checking</source>
         <translation>Checking</translation>
     </message>
@@ -16961,7 +17804,7 @@ Current: %2</translation>
         <translation>Error</translation>
     </message>
     <message>
-        <location line="+2254" />
+        <location line="+2250" />
         <source>Missing components</source>
         <translation>Missing components</translation>
     </message>
@@ -16996,12 +17839,12 @@ Current: %2</translation>
         <translation>Fix missing components</translation>
     </message>
     <message>
-        <location line="-2312" />
+        <location line="-2308" />
         <source>Installed</source>
         <translation>Installed</translation>
     </message>
     <message>
-        <location line="+2282" />
+        <location line="+2278" />
         <source>Applied to the launcher</source>
         <translation>Applied to the launcher</translation>
     </message>
@@ -17016,13 +17859,13 @@ Current: %2</translation>
         <translation>Active in a game: not verified</translation>
     </message>
     <message>
-        <location line="-2259" />
+        <location line="-2255" />
         <source>Applied - configuration is current</source>
         <translation>Applied - configuration is current</translation>
     </message>
     <message>
         <location line="+2" />
-        <location line="+2212" />
+        <location line="+2208" />
         <source>Synchronizing...</source>
         <translation>Synchronizing...</translation>
     </message>
@@ -17037,12 +17880,12 @@ Current: %2</translation>
         <translation>Synchronize again</translation>
     </message>
     <message>
-        <location line="-2296" />
+        <location line="-2292" />
         <source>The MangoHud config is outdated</source>
         <translation>The MangoHud config is outdated</translation>
     </message>
     <message>
-        <location line="+2332" />
+        <location line="+2328" />
         <source>This game starts through the GameOpti runner; no launcher integration is needed.</source>
         <translation>This game starts through the GameOpti runner; no launcher integration is needed.</translation>
     </message>
@@ -17052,7 +17895,7 @@ Current: %2</translation>
         <translation>Measure FPS, frametimes and resource usage during gameplay, then compare runs. This records performance data, not video.</translation>
     </message>
     <message>
-        <location line="-1008" />
+        <location line="-1004" />
         <source>FPS limit</source>
         <translation>FPS limit</translation>
     </message>
@@ -17062,7 +17905,7 @@ Current: %2</translation>
         <translation>Recommendation target only; the actual limiter is configured below</translation>
     </message>
     <message>
-        <location line="+155" />
+        <location line="+156" />
         <source>Virtual refresh rate (Hz)</source>
         <translation>Virtual refresh rate (Hz)</translation>
     </message>
@@ -17072,7 +17915,7 @@ Current: %2</translation>
         <translation>Advanced Gamescope limit override</translation>
     </message>
     <message>
-        <location line="-120" />
+        <location line="-121" />
         <source>Why these settings?</source>
         <translation>Why these settings?</translation>
     </message>
@@ -17082,7 +17925,7 @@ Current: %2</translation>
         <translation>Advanced Gamescope settings override this target (%1 requested FPS).</translation>
     </message>
     <message>
-        <location line="+1040" />
+        <location line="+1036" />
         <source>Automatic recording is not available for Lutris games yet</source>
         <translation>Automatic recording is not available for Lutris games yet</translation>
     </message>
@@ -17154,6 +17997,38 @@ Current: %2</translation>
     <message>
         <source>Automatic recording is available for Steam and local games only</source>
         <translation type="vanished">Automatic recording is available for Steam and local games only</translation>
+    </message>
+    <message>
+        <source>Low Power</source>
+        <translation>Low Power</translation>
+    </message>
+    <message>
+        <source>Lowest Latency</source>
+        <translation>Lowest Latency</translation>
+    </message>
+    <message>
+        <source>Stable Image</source>
+        <translation>Stable Image</translation>
+    </message>
+    <message>
+        <source>Best Quality</source>
+        <translation>Best Quality</translation>
+    </message>
+    <message>
+        <source>Automatic uses only compatible local results that you kept after a measured comparison for this game and system. Without such evidence it stays conservative and adds no runtime tools; it may recommend no change.</source>
+        <translation>Automatic uses only compatible local results that you kept after a measured comparison for this game and system. Without such evidence it stays conservative and adds no runtime tools; it may recommend no change.</translation>
+    </message>
+    <message>
+        <source>Current configuration</source>
+        <translation>Current configuration</translation>
+    </message>
+    <message>
+        <source>Change configuration</source>
+        <translation>Change configuration</translation>
+    </message>
+    <message>
+        <source>Your saved launch setup. To measure an optimization goal, choose it once in Measured optimization; a kept result changes only the tested settings and keeps Custom settings.</source>
+        <translation>Your saved launch setup. To measure an optimization goal, choose it once in Measured optimization; a kept result changes only the tested settings and keeps Custom settings.</translation>
     </message>
 </context>
 <context>
@@ -17840,12 +18715,57 @@ Current: %2</translation>
 <context>
     <name>ProtonTweaksSection</name>
     <message>
-        <location filename="../qml/pages/details/ProtonTweaksSection.qml" line="+29" />
+        <location filename="../qml/pages/details/ProtonTweaksSection.qml" line="+34" />
+        <source>Display and input</source>
+        <translation>Display and input</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Latency</source>
+        <translation>Latency</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Diagnostics</source>
+        <translation>Diagnostics</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Native Wayland</source>
+        <translation>Native Wayland</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Disable HDR reporting</source>
+        <translation>Disable HDR reporting</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Prefer SDL controller input</source>
+        <translation>Prefer SDL controller input</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Low Latency Layer</source>
+        <translation>Low Latency Layer</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Expose Reflex through the layer</source>
+        <translation>Expose Reflex through the layer</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Disable ntsync</source>
+        <translation>Disable ntsync</translation>
+    </message>
+    <message>
+        <location line="+1" />
         <source>Use WineD3D</source>
         <translation>Use WineD3D</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="+0" />
         <source>Proton logging</source>
         <translation>Proton logging</translation>
     </message>
@@ -17855,7 +18775,7 @@ Current: %2</translation>
         <translation>Disable esync</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="+0" />
         <source>Disable fsync</source>
         <translation>Disable fsync</translation>
     </message>
@@ -17865,7 +18785,7 @@ Current: %2</translation>
         <translation>Disable NVAPI</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="+0" />
         <source>Hide NVIDIA GPU</source>
         <translation>Hide NVIDIA GPU</translation>
     </message>
@@ -17875,7 +18795,7 @@ Current: %2</translation>
         <translation>Force large-address awareness</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="+0" />
         <source>Use old OpenGL string</source>
         <translation>Use old OpenGL string</translation>
     </message>
@@ -17885,7 +18805,7 @@ Current: %2</translation>
         <translation>Steam Deck spoof</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="+0" />
         <source>FSR 4 upgrade</source>
         <translation>FSR 4 upgrade</translation>
     </message>
@@ -17895,134 +18815,437 @@ Current: %2</translation>
         <translation>RDNA3 WMMA workaround</translation>
     </message>
     <message>
+        <location line="+6" />
+        <source>Requires a Wayland session and winewayland in the selected runner. Keep Default with Gamescope. Some overlays and launchers may need XWayland.</source>
+        <translation>Requires a Wayland session and winewayland in the selected runner. Keep Default with Gamescope. Some overlays and launchers may need XWayland.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Workaround for incorrect HDR detection in DXVK/DXGI. Default keeps automatic detection. Configure HDR in the display, compositor and game; this switch cannot add HDR support.</source>
+        <translation>Workaround for incorrect HDR detection in DXVK/DXGI. Default keeps automatic detection. Configure HDR in the display, compositor and game; this switch cannot add HDR support.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Use the runner's SDL controller path instead of HIDRAW/Steam Input. Mappings, vibration and special controller features may change. Use for input compatibility.</source>
+        <translation>Use the runner's SDL controller path instead of HIDRAW/Steam Input. Mappings, vibration and special controller features may change. Use for input compatibility.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Requires the bundled Vulkan layer for the game's architecture and a game using Anti-Lag 2 or Reflex. Enable that option in the game. Layer loading alone does not prove lower latency.</source>
+        <translation>Requires the bundled Vulkan layer for the game's architecture and a game using Anti-Lag 2 or Reflex. Enable that option in the game. Layer loading alone does not prove lower latency.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Select Reflex instead of Anti-Lag 2 in Low Latency Layer. Requires the layer, compatible DXVK-NVAPI and game support. No GPU identity spoofing is applied; the game may not expose Reflex.</source>
+        <translation>Select Reflex instead of Anti-Lag 2 in Low Latency Layer. Requires the layer, compatible DXVK-NVAPI and game support. No GPU identity spoofing is applied; the game may not expose Reflex.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Synchronization workaround for runners supporting ntsync. Default lets the runner choose. Disabling fsync or esync alone does not disable ntsync; the kernel and /dev/ntsync must also support it.</source>
+        <translation>Synchronization workaround for runners supporting ntsync. Default lets the runner choose. Disabling fsync or esync alone does not disable ntsync; the kernel and /dev/ntsync must also support it.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>OpenGL fallback for Direct3D 9/10/11 instead of DXVK. Does not replace the Direct3D 12 renderer. Vulkan layers and external Vulkan frame generation cannot process this path.</source>
+        <translation>OpenGL fallback for Direct3D 9/10/11 instead of DXVK. Does not replace the Direct3D 12 renderer. Vulkan layers and external Vulkan frame generation cannot process this path.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Write steam-APPID.log for the next launch. Logging can reduce performance and logs may contain personal paths. Turn it back to Default after diagnosis.</source>
+        <translation>Write steam-APPID.log for the next launch. Logging can reduce performance and logs may contain personal paths. Turn it back to Default after diagnosis.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Disable esync for compatibility testing. Newer runners may prefer ntsync or fsync, so this override may not affect the chosen path.</source>
+        <translation>Disable esync for compatibility testing. Newer runners may prefer ntsync or fsync, so this override may not affect the chosen path.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Disable fsync for compatibility testing. Default keeps the runner's selection; newer runners may use ntsync instead.</source>
+        <translation>Disable fsync for compatibility testing. Default keeps the runner's selection; newer runners may use ntsync instead.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Disable NVAPI for compatibility testing. Conflicts with Reflex through NVAPI and can remove DLSS or other NVIDIA features.</source>
+        <translation>Disable NVAPI for compatibility testing. Conflicts with Reflex through NVAPI and can remove DLSS or other NVIDIA features.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Hide NVIDIA identity to work around a game's vendor-specific path. Can hide DLSS/Reflex. Not a general performance setting.</source>
+        <translation>Hide NVIDIA identity to work around a game's vendor-specific path. Can hide DLSS/Reflex. Not a general performance setting.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Legacy 32-bit compatibility option. Many Proton versions already enable large-address awareness. Keep Default unless diagnosing a specific game.</source>
+        <translation>Legacy 32-bit compatibility option. Many Proton versions already enable large-address awareness. Keep Default unless diagnosing a specific game.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Legacy OpenGL version-string workaround for old games. Relevant to WineD3D/OpenGL, not DXVK or Direct3D 12.</source>
+        <translation>Legacy OpenGL version-string workaround for old games. Relevant to WineD3D/OpenGL, not DXVK or Direct3D 12.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Existing experimental override: exposes SteamDeck=1 and can alter a game's interface or graphics choices. Does not turn this computer into a Steam Deck.</source>
+        <translation>Existing experimental override: exposes SteamDeck=1 and can alter a game's interface or graphics choices. Does not turn this computer into a Steam Deck.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Existing experimental profile option. Requires an independently verified runner, upscaler, driver and GPU combination. Configure working upscalers on their dedicated page.</source>
+        <translation>Existing experimental profile option. Requires an independently verified runner, upscaler, driver and GPU combination. Configure working upscalers on their dedicated page.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Existing experimental DXIL-SPIRV option. Use only with a documented RDNA3 shader issue and matching components. Other DXIL_SPIRV_CONFIG tokens are preserved.</source>
+        <translation>Existing experimental DXIL-SPIRV option. Use only with a documented RDNA3 shader issue and matching components. Other DXIL_SPIRV_CONFIG tokens are preserved.</translation>
+    </message>
+    <message>
+        <location line="+13" />
+        <source>Runner support found</source>
+        <translation>Runner support found</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Not found in selected runner</source>
+        <translation>Not found in selected runner</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Support not confirmed</source>
+        <translation>Support not confirmed</translation>
+    </message>
+    <message>
+        <location line="+4" />
+        <source>Native Wine Wayland conflicts with the managed Gamescope path. Keep Wayland at Default or change Gamescope in Optimization.</source>
+        <translation>Native Wine Wayland conflicts with the managed Gamescope path. Keep Wayland at Default or change Gamescope in Optimization.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Reflex mode requires Low Latency Layer to be Enabled.</source>
+        <translation>Reflex mode requires Low Latency Layer to be Enabled.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Low Latency Layer needs Vulkan. Return WineD3D to Default before enabling it.</source>
+        <translation>Low Latency Layer needs Vulkan. Return WineD3D to Default before enabling it.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Reflex mode conflicts with Disable NVAPI.</source>
+        <translation>Reflex mode conflicts with Disable NVAPI.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>The launch environment disables Low Latency Layer. Review DISABLE_LOW_LATENCY_LAYER in the launcher; GameOpti preserves that setting.</source>
+        <translation>The launch environment disables Low Latency Layer. Review DISABLE_LOW_LATENCY_LAYER in the launcher; GameOpti preserves that setting.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Another latency layer or external frame generator is selected. Test one latency path at a time before enabling this layer.</source>
+        <translation>Another latency layer or external frame generator is selected. Test one latency path at a time before enabling this layer.</translation>
+    </message>
+    <message>
+        <location line="+42" />
+        <source>Resolve the marked conflicts before applying</source>
+        <translation>Resolve the marked conflicts before applying</translation>
+    </message>
+    <message>
+        <location line="+33" />
+        <source>Unsaved changes</source>
+        <translation>Unsaved changes</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Saved settings</source>
+        <translation>Saved settings</translation>
+    </message>
+    <message>
         <location line="+5" />
+        <source>Per-game tweaks</source>
+        <translation>Per-game tweaks</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Default removes only GameOpti's override. Every change requires a fresh game launch. Compatibility workarounds and diagnostics are not general FPS improvements.</source>
+        <translation>Default removes only GameOpti's override. Every change requires a fresh game launch. Compatibility workarounds and diagnostics are not general FPS improvements.</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Selected runner unknown</source>
+        <translation>Selected runner unknown</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Launcher Flatpak</source>
+        <translation>Launcher Flatpak</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Host / Steam runtime</source>
+        <translation>Host / Steam runtime</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Components found in a runner do not prove that the game loaded them. Driver, architecture, game and sandbox requirements still apply.</source>
+        <translation>Components found in a runner do not prove that the game loaded them. Driver, architecture, game and sandbox requirements still apply.</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Launch integration configured · runtime not verified</source>
+        <translation>Launch integration configured · runtime not verified</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Launch integration needs attention. Use Overview → Launch integration before testing.</source>
+        <translation>Launch integration needs attention. Use Overview → Launch integration before testing.</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <location line="+20" />
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <location line="-19" />
+        <source>Launch integration</source>
+        <translation>Launch integration</translation>
+    </message>
+    <message>
+        <location line="+8" />
+        <source>Apply the saved profile to the launcher after Apply. Unsaved editor changes are not included.</source>
+        <translation>Apply the saved profile to the launcher after Apply. Unsaved editor changes are not included.</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>Steam → Properties → General → Launch Options. Keep your other launch arguments when configuring the existing runner.</source>
+        <translation>Steam → Properties → General → Launch Options. Keep your other launch arguments when configuring the existing runner.</translation>
+    </message>
+    <message>
+        <location line="+7" />
+        <source>Apply to launcher</source>
+        <translation>Apply to launcher</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Copy runner command</source>
+        <translation>Copy runner command</translation>
+    </message>
+    <message>
+        <location line="+18" />
+        <source>Game architecture: %1 · layer binaries: %2</source>
+        <translation>Game architecture: %1 · layer binaries: %2</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <location line="+0" />
+        <source>Unknown</source>
+        <translation>Unknown</translation>
+    </message>
+    <message>
+        <location line="+3" />
+        <source>Advanced compatibility options</source>
+        <translation>Advanced compatibility options</translation>
+    </message>
+    <message>
+        <location line="+16" />
+        <location line="+0" />
+        <location line="+26" />
+        <source>Default</source>
+        <translation>Default</translation>
+    </message>
+    <message>
+        <location line="-26" />
+        <location line="+0" />
+        <source>Enabled</source>
+        <translation>Enabled</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Disabled</source>
+        <translation>Disabled</translation>
+    </message>
+    <message>
+        <location line="+12" />
+        <source>Proton log folder: %1</source>
+        <translation>Proton log folder: %1</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Open log folder</source>
+        <translation>Open log folder</translation>
+    </message>
+    <message>
+        <location line="+3" />
+        <source>Reset this section</source>
+        <translation>Reset this section</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Reset all tweaks</source>
+        <translation>Reset all tweaks</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>Resets change the editor first. Review and Apply to save. Other integrations and launcher-owned variables are preserved.</source>
+        <translation>Resets change the editor first. Review and Apply to save. Other integrations and launcher-owned variables are preserved.</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Changes for the next launch</source>
+        <translation>Changes for the next launch</translation>
+    </message>
+    <message>
+        <location line="+0" />
+        <source>Saved GameOpti overrides</source>
+        <translation>Saved GameOpti overrides</translation>
+    </message>
+    <message>
+        <location line="+2" />
+        <source>Default (remove override)</source>
+        <translation>Default (remove override)</translation>
+    </message>
+    <message>
+        <location line="+4" />
+        <source>Launcher setting: %1=%2. Default preserves it.</source>
+        <translation>Launcher setting: %1=%2. Default preserves it.</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>These overrides are not supported by the selected runner: %1</source>
+        <translation>These overrides are not supported by the selected runner: %1</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Applying saves configuration; it does not verify runtime operation or a performance benefit. Heroic/Lutris also need Apply to launcher in Overview.</source>
+        <translation>Applying saves configuration; it does not verify runtime operation or a performance benefit. Heroic/Lutris also need Apply to launcher in Overview.</translation>
+    </message>
+    <message>
+        <location line="+5" />
+        <source>Preview changes</source>
+        <translation>Preview changes</translation>
+    </message>
+    <message>
+        <location line="+1" />
+        <source>Apply</source>
+        <translation>Apply</translation>
+    </message>
+    <message>
         <source>OpenGL compatibility fallback instead of DXVK. This is not an automatic performance boost.</source>
-        <translation>OpenGL compatibility fallback instead of DXVK. This is not an automatic performance boost.</translation>
+        <translation type="vanished">OpenGL compatibility fallback instead of DXVK. This is not an automatic performance boost.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Writes a Proton debug log for the next game session.</source>
-        <translation>Writes a Proton debug log for the next game session.</translation>
+        <translation type="vanished">Writes a Proton debug log for the next game session.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Compatibility and debugging option that disables esync.</source>
-        <translation>Compatibility and debugging option that disables esync.</translation>
+        <translation type="vanished">Compatibility and debugging option that disables esync.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Compatibility and debugging option that disables fsync.</source>
-        <translation>Compatibility and debugging option that disables fsync.</translation>
+        <translation type="vanished">Compatibility and debugging option that disables fsync.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Disables Proton NVAPI integration for compatibility testing.</source>
-        <translation>Disables Proton NVAPI integration for compatibility testing.</translation>
+        <translation type="vanished">Disables Proton NVAPI integration for compatibility testing.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Hides the NVIDIA GPU identity from the Windows game.</source>
-        <translation>Hides the NVIDIA GPU identity from the Windows game.</translation>
+        <translation type="vanished">Hides the NVIDIA GPU identity from the Windows game.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Enables Proton's large-address-aware compatibility option.</source>
-        <translation>Enables Proton's large-address-aware compatibility option.</translation>
+        <translation type="vanished">Enables Proton's large-address-aware compatibility option.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Uses Proton's older OpenGL version string for compatibility.</source>
-        <translation>Uses Proton's older OpenGL version string for compatibility.</translation>
+        <translation type="vanished">Uses Proton's older OpenGL version string for compatibility.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Exposes SteamDeck=1. This is not an official Proton variable.</source>
-        <translation>Exposes SteamDeck=1. This is not an official Proton variable.</translation>
+        <translation type="vanished">Exposes SteamDeck=1. This is not an official Proton variable.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Experimental and hardware-dependent Proton FSR 4 upgrade request.</source>
-        <translation>Experimental and hardware-dependent Proton FSR 4 upgrade request.</translation>
+        <translation type="vanished">Experimental and hardware-dependent Proton FSR 4 upgrade request.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Enable only after independently confirming RDNA3 and the required DXIL-SPIRV stack.</source>
-        <translation>Enable only after independently confirming RDNA3 and the required DXIL-SPIRV stack.</translation>
+        <translation type="vanished">Enable only after independently confirming RDNA3 and the required DXIL-SPIRV stack.</translation>
     </message>
     <message>
-        <location line="+5" />
         <source>Recommended</source>
-        <translation>Recommended</translation>
+        <translation type="vanished">Recommended</translation>
     </message>
     <message>
-        <location line="+1" />
+        <location line="-249" />
         <source>Compatibility</source>
         <translation>Compatibility</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Debug</source>
-        <translation>Debug</translation>
+        <translation type="vanished">Debug</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Experimental</source>
-        <translation>Experimental</translation>
+        <translation type="vanished">Experimental</translation>
     </message>
     <message>
-        <location line="+8" />
+        <location line="+75" />
         <source>Proton Tweaks are unavailable</source>
         <translation>Proton Tweaks are unavailable</translation>
     </message>
     <message>
-        <location line="+42" />
+        <location line="+18" />
+        <source>Could not preview changes</source>
+        <translation>Could not preview changes</translation>
+    </message>
+    <message>
+        <location line="+6" />
         <source>Could not save Proton Tweaks</source>
         <translation>Could not save Proton Tweaks</translation>
     </message>
     <message>
-        <location line="+8" />
+        <location line="+4" />
+        <source>No GameOpti overrides</source>
+        <translation>No GameOpti overrides</translation>
+    </message>
+    <message>
+        <location line="+28" />
         <source>Proton Tweaks</source>
         <translation>Proton Tweaks</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Per game</source>
-        <translation>Per game</translation>
+        <translation type="vanished">Per game</translation>
     </message>
     <message>
-        <location line="+17" />
         <source>All options are off by default. Compatibility and debug options are not general performance boosts.</source>
-        <translation>All options are off by default. Compatibility and debug options are not general performance boosts.</translation>
+        <translation type="vanished">All options are off by default. Compatibility and debug options are not general performance boosts.</translation>
     </message>
     <message>
-        <location line="+37" />
         <source>The detected GPU vendor does not match this option.</source>
-        <translation>The detected GPU vendor does not match this option.</translation>
+        <translation type="vanished">The detected GPU vendor does not match this option.</translation>
     </message>
     <message>
-        <location line="+1" />
         <source>Hardware compatibility must be verified manually; the GPU name alone is not sufficient.</source>
-        <translation>Hardware compatibility must be verified manually; the GPU name alone is not sufficient.</translation>
+        <translation type="vanished">Hardware compatibility must be verified manually; the GPU name alone is not sufficient.</translation>
     </message>
     <message>
-        <location line="+8" />
         <source>Final Proton environment: %1</source>
-        <translation>Final Proton environment: %1</translation>
+        <translation type="vanished">Final Proton environment: %1</translation>
     </message>
     <message>
-        <location line="+0" />
         <source>none</source>
-        <translation>none</translation>
+        <translation type="vanished">none</translation>
     </message>
     <message>
-        <location line="+5" />
         <source>Save Proton Tweaks</source>
-        <translation>Save Proton Tweaks</translation>
+        <translation type="vanished">Save Proton Tweaks</translation>
     </message>
     <message>
-        <location line="-61" />
         <source>Proton options (%1 enabled)</source>
-        <translation>Proton options (%1 enabled)</translation>
+        <translation type="vanished">Proton options (%1 enabled)</translation>
     </message>
     <message>
         <source>OptiScaler FSR 4 update</source>
@@ -20702,6 +21925,2083 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <location line="-377" />
         <source>Application updates will be delivered later through Flatpak or the system package manager.</source>
         <translation>Application updates will be delivered later through Flatpak or the system package manager.</translation>
+    </message>
+</context>
+<context>
+    <name>CustomLaunchSection</name>
+    <message>
+        <source>Custom launch settings are unavailable</source>
+        <translation>Custom launch settings are unavailable</translation>
+    </message>
+    <message>
+        <source>Could not preview changes</source>
+        <translation>Could not preview changes</translation>
+    </message>
+    <message>
+        <source>Fix the marked fields before applying</source>
+        <translation>Fix the marked fields before applying</translation>
+    </message>
+    <message>
+        <source>Saved. The next launch uses these settings.</source>
+        <translation>Saved. The next launch uses these settings.</translation>
+    </message>
+    <message>
+        <source>Nothing was changed: </source>
+        <translation>Nothing was changed: </translation>
+    </message>
+    <message>
+        <source>Could not apply custom launch settings</source>
+        <translation>Could not apply custom launch settings</translation>
+    </message>
+    <message>
+        <source>Use letters, digits and _; the name cannot start with a digit</source>
+        <translation>Use letters, digits and _; the name cannot start with a digit</translation>
+    </message>
+    <message>
+        <source>NUL characters are not allowed</source>
+        <translation>NUL characters are not allowed</translation>
+    </message>
+    <message>
+        <source>This variable is listed twice</source>
+        <translation>This variable is listed twice</translation>
+    </message>
+    <message>
+        <source>sudo, pkexec, doas, su and run0 are not allowed</source>
+        <translation>sudo, pkexec, doas, su and run0 are not allowed</translation>
+    </message>
+    <message>
+        <source>Shells are not accepted; point GameOpti at your own script file instead</source>
+        <translation>Shells are not accepted; point GameOpti at your own script file instead</translation>
+    </message>
+    <message>
+        <source>Use an absolute path or a program name from PATH</source>
+        <translation>Use an absolute path or a program name from PATH</translation>
+    </message>
+    <message>
+        <source>Enter the program to run</source>
+        <translation>Enter the program to run</translation>
+    </message>
+    <message>
+        <source>Timeout must be 1-600 seconds</source>
+        <translation>Timeout must be 1-600 seconds</translation>
+    </message>
+    <message>
+        <source>The value is too long</source>
+        <translation>The value is too long</translation>
+    </message>
+    <message>
+        <source>The program name cannot contain tabs or line breaks</source>
+        <translation>The program name cannot contain tabs or line breaks</translation>
+    </message>
+    <message>
+        <source>Game environment</source>
+        <translation>Game environment</translation>
+    </message>
+    <message>
+        <source>Game command line</source>
+        <translation>Game command line</translation>
+    </message>
+    <message>
+        <source>GameOpti runner on the host</source>
+        <translation>GameOpti runner on the host</translation>
+    </message>
+    <message>
+        <source>Host, started by GameOpti</source>
+        <translation>Host, started by GameOpti</translation>
+    </message>
+    <message>
+        <source>Written to the launcher configuration</source>
+        <translation>Written to the launcher configuration</translation>
+    </message>
+    <message>
+        <source>Launcher wrapper on the host</source>
+        <translation>Launcher wrapper on the host</translation>
+    </message>
+    <message>
+        <source>Inside the launcher Flatpak sandbox</source>
+        <translation>Inside the launcher Flatpak sandbox</translation>
+    </message>
+    <message>
+        <source>Unavailable</source>
+        <translation>Unavailable</translation>
+    </message>
+    <message>
+        <source>Steam Flatpak runs Launch Options inside its sandbox, which cannot reach the GameOpti host runner. Not verified: Steam Flatpak is not installed here.</source>
+        <translation>Steam Flatpak runs Launch Options inside its sandbox, which cannot reach the GameOpti host runner. Not verified: Steam Flatpak is not installed here.</translation>
+    </message>
+    <message>
+        <source>No Proton runner is configured for this Local Windows executable. Add the game as a Custom game with a Wine/Proton runner.</source>
+        <translation>No Proton runner is configured for this Local Windows executable. Add the game as a Custom game with a Wine/Proton runner.</translation>
+    </message>
+    <message>
+        <source>The launcher's game configuration is missing or cannot be read: %1</source>
+        <translation>The launcher's game configuration is missing or cannot be read: %1</translation>
+    </message>
+    <message>
+        <source>Heroic passes custom game arguments only for Epic (legendary) games in the verified version 2.22.4.</source>
+        <translation>Heroic passes custom game arguments only for Epic (legendary) games in the verified version 2.22.4.</translation>
+    </message>
+    <message>
+        <source>Lutris passes game arguments only for the wine and linux runners (this game: %1).</source>
+        <translation>Lutris passes game arguments only for the wine and linux runners (this game: %1).</translation>
+    </message>
+    <message>
+        <source>unknown</source>
+        <translation>unknown</translation>
+    </message>
+    <message>
+        <source>Heroic Flatpak starts Proton through UMU in a separate container outside the wrapper, so the end of the game cannot be awaited. Available when UMU is off for this game.</source>
+        <translation>Heroic Flatpak starts Proton through UMU in a separate container outside the wrapper, so the end of the game cannot be awaited. Available when UMU is off for this game.</translation>
+    </message>
+    <message>
+        <source>Lutris Flatpak is not installed here, so its sandbox and process tree were not verified.</source>
+        <translation>Lutris Flatpak is not installed here, so its sandbox and process tree were not verified.</translation>
+    </message>
+    <message>
+        <source>Custom launch settings are not available for this game.</source>
+        <translation>Custom launch settings are not available for this game.</translation>
+    </message>
+    <message>
+        <source>Runs: %1</source>
+        <translation>Runs: %1</translation>
+    </message>
+    <message>
+        <source>Unavailable: %1</source>
+        <translation>Unavailable: %1</translation>
+    </message>
+    <message>
+        <source>applied</source>
+        <translation>applied</translation>
+    </message>
+    <message>
+        <source>not applied: already set by GameOpti or the launcher</source>
+        <translation>not applied: already set by GameOpti or the launcher</translation>
+    </message>
+    <message>
+        <source>disabled</source>
+        <translation>disabled</translation>
+    </message>
+    <message>
+        <source>Variables: %1</source>
+        <translation>Variables: %1</translation>
+    </message>
+    <message>
+        <source>Arguments: %1</source>
+        <translation>Arguments: %1</translation>
+    </message>
+    <message>
+        <source>Wrapper</source>
+        <translation>Wrapper</translation>
+    </message>
+    <message>
+        <source>Before launch: %1</source>
+        <translation>Before launch: %1</translation>
+    </message>
+    <message>
+        <source>After exit: %1</source>
+        <translation>After exit: %1</translation>
+    </message>
+    <message>
+        <source>No custom launch settings</source>
+        <translation>No custom launch settings</translation>
+    </message>
+    <message>
+        <source>Saved profile: none</source>
+        <translation>Saved profile: none</translation>
+    </message>
+    <message>
+        <source>Saved profile: %1</source>
+        <translation>Saved profile: %1</translation>
+    </message>
+    <message>
+        <source>Edit value</source>
+        <translation>Edit value</translation>
+    </message>
+    <message>
+        <source>Enabled</source>
+        <translation>Enabled</translation>
+    </message>
+    <message>
+        <source>Program (absolute path or name in PATH)</source>
+        <translation>Program (absolute path or name in PATH)</translation>
+    </message>
+    <message>
+        <source>Program</source>
+        <translation>Program</translation>
+    </message>
+    <message>
+        <source>Remove wrapper</source>
+        <translation>Remove wrapper</translation>
+    </message>
+    <message>
+        <source>Remove</source>
+        <translation>Remove</translation>
+    </message>
+    <message>
+        <source>Argument %1</source>
+        <translation>Argument %1</translation>
+    </message>
+    <message>
+        <source>Remove argument</source>
+        <translation>Remove argument</translation>
+    </message>
+    <message>
+        <source>Add argument</source>
+        <translation>Add argument</translation>
+    </message>
+    <message>
+        <source>Timeout (s)</source>
+        <translation>Timeout (s)</translation>
+    </message>
+    <message>
+        <source>Continue if it fails</source>
+        <translation>Continue if it fails</translation>
+    </message>
+    <message>
+        <source>Also run if the game did not start</source>
+        <translation>Also run if the game did not start</translation>
+    </message>
+    <message>
+        <source>Custom launch</source>
+        <translation>Custom launch</translation>
+    </message>
+    <message>
+        <source>Unsaved changes</source>
+        <translation>Unsaved changes</translation>
+    </message>
+    <message>
+        <source>Saved settings</source>
+        <translation>Saved settings</translation>
+    </message>
+    <message>
+        <source>Environment, arguments, wrapper and commands</source>
+        <translation>Environment, arguments, wrapper and commands</translation>
+    </message>
+    <message>
+        <source>The editor shows an unsaved draft</source>
+        <translation>The editor shows an unsaved draft</translation>
+    </message>
+    <message>
+        <source>Commands run as your user. GameOpti never parses them as shell text and refuses sudo/pkexec, but a script you choose can do anything your account can. This is trusted command execution, not a sandbox. Preview and status never run a command.</source>
+        <translation>Commands run as your user. GameOpti never parses them as shell text and refuses sudo/pkexec, but a script you choose can do anything your account can. This is trusted command execution, not a sandbox. Preview and status never run a command.</translation>
+    </message>
+    <message>
+        <source>Environment</source>
+        <translation>Environment</translation>
+    </message>
+    <message>
+        <source>NAME</source>
+        <translation>NAME</translation>
+    </message>
+    <message>
+        <source>Variable name</source>
+        <translation>Variable name</translation>
+    </message>
+    <message>
+        <source>value</source>
+        <translation>value</translation>
+    </message>
+    <message>
+        <source>Variable value</source>
+        <translation>Variable value</translation>
+    </message>
+    <message>
+        <source>Add variable</source>
+        <translation>Add variable</translation>
+    </message>
+    <message>
+        <source>Arguments</source>
+        <translation>Arguments</translation>
+    </message>
+    <message>
+        <source>Each field is one argument, passed exactly as typed after the game's own arguments. Quotes, $ and ; are ordinary characters.</source>
+        <translation>Each field is one argument, passed exactly as typed after the game's own arguments. Quotes, $ and ; are ordinary characters.</translation>
+    </message>
+    <message>
+        <source>Runs the game through your program. Order: Gamescope → GameMode → your wrapper → frame generation → game. Gamescope, GameMode, MangoHud and MAKO are set in their own sections and are refused here.</source>
+        <translation>Runs the game through your program. Order: Gamescope → GameMode → your wrapper → frame generation → game. Gamescope, GameMode, MangoHud and MAKO are set in their own sections and are refused here.</translation>
+    </message>
+    <message>
+        <source>Add wrapper</source>
+        <translation>Add wrapper</translation>
+    </message>
+    <message>
+        <source>Before launch</source>
+        <translation>Before launch</translation>
+    </message>
+    <message>
+        <source>Runs before the game starts and waits until it ends or times out. By default a failure stops the launch.</source>
+        <translation>Runs before the game starts and waits until it ends or times out. By default a failure stops the launch.</translation>
+    </message>
+    <message>
+        <source>After exit</source>
+        <translation>After exit</translation>
+    </message>
+    <message>
+        <source>Runs after every game process has ended. A failure is reported and never changes the game's exit status. It does not run if the game never started, unless you allow it.</source>
+        <translation>Runs after every game process has ended. A failure is reported and never changes the game's exit status. It does not run if the game never started, unless you allow it.</translation>
+    </message>
+    <message>
+        <source>Add command</source>
+        <translation>Add command</translation>
+    </message>
+    <message>
+        <source>Next launch with this draft</source>
+        <translation>Next launch with this draft</translation>
+    </message>
+    <message>
+        <source>Next launch with the saved profile</source>
+        <translation>Next launch with the saved profile</translation>
+    </message>
+    <message>
+        <source>%1 is already set by GameOpti or the launcher; your value is not applied.</source>
+        <translation>%1 is already set by GameOpti or the launcher; your value is not applied.</translation>
+    </message>
+    <message>
+        <source>Launcher conflict: %1</source>
+        <translation>Launcher conflict: %1</translation>
+    </message>
+    <message>
+        <source>Not applied: %1</source>
+        <translation>Not applied: %1</translation>
+    </message>
+    <message>
+        <source>No conflicts</source>
+        <translation>No conflicts</translation>
+    </message>
+    <message>
+        <source>Technical details</source>
+        <translation>Technical details</translation>
+    </message>
+    <message>
+        <source>Exact argv (one quoted value per argument):</source>
+        <translation>Exact argv (one quoted value per argument):</translation>
+    </message>
+    <message>
+        <source>Wrapper order: %1</source>
+        <translation>Wrapper order: %1</translation>
+    </message>
+    <message>
+        <source>Written to the launcher: wrapper %1</source>
+        <translation>Written to the launcher: wrapper %1</translation>
+    </message>
+    <message>
+        <source>Preserved inherited variables: %1</source>
+        <translation>Preserved inherited variables: %1</translation>
+    </message>
+    <message>
+        <source>Profile file: %1</source>
+        <translation>Profile file: %1</translation>
+    </message>
+    <message>
+        <source>Copy diagnostics</source>
+        <translation>Copy diagnostics</translation>
+    </message>
+    <message>
+        <source>Write the %1 game configuration?</source>
+        <translation>Write the %1 game configuration?</translation>
+    </message>
+    <message>
+        <source>GameOpti saves this profile and updates the launcher's settings for this game. Close the launcher first. Restore in Launch integration removes only GameOpti's entries.</source>
+        <translation>GameOpti saves this profile and updates the launcher's settings for this game. Close the launcher first. Restore in Launch integration removes only GameOpti's entries.</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>Write and apply</source>
+        <translation>Write and apply</translation>
+    </message>
+    <message>
+        <source>Reset changes</source>
+        <translation>Reset changes</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>Refresh</translation>
+    </message>
+    <message>
+        <source>Apply</source>
+        <translation>Apply</translation>
+    </message>
+    <message>
+        <source>Fix the marked fields to see how the draft resolves.</source>
+        <translation>Fix the marked fields to see how the draft resolves.</translation>
+    </message>
+    <message>
+        <source>The host runner of the GameOpti Flatpak accepts only Steam AppIDs, so Local games cannot start through it yet.</source>
+        <translation>The host runner of the GameOpti Flatpak accepts only Steam AppIDs, so Local games cannot start through it yet.</translation>
+    </message>
+</context>
+<context>
+    <name>MeasuredOptimizationPanel</name>
+    <message>
+        <source>Unknown</source>
+        <translation>Unknown</translation>
+    </message>
+    <message>
+        <source>Maximum Performance</source>
+        <translation>Maximum Performance</translation>
+    </message>
+    <message>
+        <source>Balanced</source>
+        <translation>Balanced</translation>
+    </message>
+    <message>
+        <source>Low Power</source>
+        <translation>Low Power</translation>
+    </message>
+    <message>
+        <source>Lowest Latency</source>
+        <translation>Lowest Latency</translation>
+    </message>
+    <message>
+        <source>Stable Image</source>
+        <translation>Stable Image</translation>
+    </message>
+    <message>
+        <source>Best Quality</source>
+        <translation>Best Quality</translation>
+    </message>
+    <message>
+        <source>Not selected</source>
+        <translation>Not selected</translation>
+    </message>
+    <message>
+        <source>Rendered FPS and 1% low first; instability or a severe p99 regression rejects the change.</source>
+        <translation>Rendered FPS and 1% low first; instability or a severe p99 regression rejects the change.</translation>
+    </message>
+    <message>
+        <source>Better frame pacing without a large power, FPS or image-quality cost.</source>
+        <translation>Better frame pacing without a large power, FPS or image-quality cost.</translation>
+    </message>
+    <message>
+        <source>Lowest measured power while staying above your FPS floor.</source>
+        <translation>Lowest measured power while staying above your FPS floor.</translation>
+    </message>
+    <message>
+        <source>Rendered FPS and frame pacing; frame generation is penalized. Input latency itself is not measured.</source>
+        <translation>Rendered FPS and frame pacing; frame generation is penalized. Input latency itself is not measured.</translation>
+    </message>
+    <message>
+        <source>Penalizes generated frames, lossy upscaling and unstable presentation; uses your observations.</source>
+        <translation>Penalizes generated frames, lossy upscaling and unstable presentation; uses your observations.</translation>
+    </message>
+    <message>
+        <source>Keeps native or chosen high-quality rendering while staying above your minimum FPS.</source>
+        <translation>Keeps native or chosen high-quality rendering while staying above your minimum FPS.</translation>
+    </message>
+    <message>
+        <source>Native Linux</source>
+        <translation>Native Linux</translation>
+    </message>
+    <message>
+        <source>Wine</source>
+        <translation>Wine</translation>
+    </message>
+    <message>
+        <source>Proton</source>
+        <translation>Proton</translation>
+    </message>
+    <message>
+        <source>Recording</source>
+        <translation>Recording</translation>
+    </message>
+    <message>
+        <source>Valid</source>
+        <translation>Valid</translation>
+    </message>
+    <message>
+        <source>Invalid</source>
+        <translation>Invalid</translation>
+    </message>
+    <message>
+        <source>Not recorded</source>
+        <translation>Not recorded</translation>
+    </message>
+    <message>
+        <source>Waiting for the game to start</source>
+        <translation>Waiting for the game to start</translation>
+    </message>
+    <message>
+        <source>Recording - play, then exit the game normally</source>
+        <translation>Recording - play, then exit the game normally</translation>
+    </message>
+    <message>
+        <source>Analyzing the recording</source>
+        <translation>Analyzing the recording</translation>
+    </message>
+    <message>
+        <source>The recording failed: %1</source>
+        <translation>The recording failed: %1</translation>
+    </message>
+    <message>
+        <source>Starting</source>
+        <translation>Starting</translation>
+    </message>
+    <message>
+        <source>Average output FPS (includes generated frames)</source>
+        <translation>Average output FPS (includes generated frames)</translation>
+    </message>
+    <message>
+        <source>Average rendered FPS</source>
+        <translation>Average rendered FPS</translation>
+    </message>
+    <message>
+        <source>1% low output FPS</source>
+        <translation>1% low output FPS</translation>
+    </message>
+    <message>
+        <source>1% low rendered FPS</source>
+        <translation>1% low rendered FPS</translation>
+    </message>
+    <message>
+        <source>Frame time p50</source>
+        <translation>Frame time p50</translation>
+    </message>
+    <message>
+        <source>Frame time p95</source>
+        <translation>Frame time p95</translation>
+    </message>
+    <message>
+        <source>Frame time p99</source>
+        <translation>Frame time p99</translation>
+    </message>
+    <message>
+        <source>Stutters per minute</source>
+        <translation>Stutters per minute</translation>
+    </message>
+    <message>
+        <source>GPU load</source>
+        <translation>GPU load</translation>
+    </message>
+    <message>
+        <source>CPU load</source>
+        <translation>CPU load</translation>
+    </message>
+    <message>
+        <source>GPU clock</source>
+        <translation>GPU clock</translation>
+    </message>
+    <message>
+        <source>CPU clock</source>
+        <translation>CPU clock</translation>
+    </message>
+    <message>
+        <source>GPU temperature</source>
+        <translation>GPU temperature</translation>
+    </message>
+    <message>
+        <source>CPU temperature</source>
+        <translation>CPU temperature</translation>
+    </message>
+    <message>
+        <source>GPU power</source>
+        <translation>GPU power</translation>
+    </message>
+    <message>
+        <source>CPU power</source>
+        <translation>CPU power</translation>
+    </message>
+    <message>
+        <source>Not measured</source>
+        <translation>Not measured</translation>
+    </message>
+    <message>
+        <source>Not measured in either session</source>
+        <translation>Not measured in either session</translation>
+    </message>
+    <message>
+        <source>%1 → %2 (not comparable: missing in one session)</source>
+        <translation>%1 → %2 (not comparable: missing in one session)</translation>
+    </message>
+    <message>
+        <source>expected higher</source>
+        <translation>expected higher</translation>
+    </message>
+    <message>
+        <source>expected lower</source>
+        <translation>expected lower</translation>
+    </message>
+    <message>
+        <source>expected higher or unchanged</source>
+        <translation>expected higher or unchanged</translation>
+    </message>
+    <message>
+        <source>expected lower or unchanged</source>
+        <translation>expected lower or unchanged</translation>
+    </message>
+    <message>
+        <source>may be lower</source>
+        <translation>may be lower</translation>
+    </message>
+    <message>
+        <source>limited to the cap</source>
+        <translation>limited to the cap</translation>
+    </message>
+    <message>
+        <source>unknown effect</source>
+        <translation>unknown effect</translation>
+    </message>
+    <message>
+        <source>Lower render resolution with lossy upscaling (consent required)</source>
+        <translation>Lower render resolution with lossy upscaling (consent required)</translation>
+    </message>
+    <message>
+        <source>Presentation goes through Gamescope; compatibility depends on the game</source>
+        <translation>Presentation goes through Gamescope; compatibility depends on the game</translation>
+    </message>
+    <message>
+        <source>No image-quality change expected</source>
+        <translation>No image-quality change expected</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>On</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Off</translation>
+    </message>
+    <message>
+        <source>Keep</source>
+        <translation>Keep</translation>
+    </message>
+    <message>
+        <source>Revert</source>
+        <translation>Revert</translation>
+    </message>
+    <message>
+        <source>Inconclusive</source>
+        <translation>Inconclusive</translation>
+    </message>
+    <message>
+        <source>Controlled - same scene and settings</source>
+        <translation>Controlled - same scene and settings</translation>
+    </message>
+    <message>
+        <source>Approximately comparable</source>
+        <translation>Approximately comparable</translation>
+    </message>
+    <message>
+        <source>Not comparable</source>
+        <translation>Not comparable</translation>
+    </message>
+    <message>
+        <source>Not answered</source>
+        <translation>Not answered</translation>
+    </message>
+    <message>
+        <source>Valid for this game and system</source>
+        <translation>Valid for this game and system</translation>
+    </message>
+    <message>
+        <source>Hardware changed - record a new baseline</source>
+        <translation>Hardware changed - record a new baseline</translation>
+    </message>
+    <message>
+        <source>Game build changed - record a new baseline</source>
+        <translation>Game build changed - record a new baseline</translation>
+    </message>
+    <message>
+        <source>Driver or runtime changed - lower confidence</source>
+        <translation>Driver or runtime changed - lower confidence</translation>
+    </message>
+    <message>
+        <source>Configuration changed - lower confidence</source>
+        <translation>Configuration changed - lower confidence</translation>
+    </message>
+    <message>
+        <source>Scope partly unknown</source>
+        <translation>Scope partly unknown</translation>
+    </message>
+    <message>
+        <source>Other game</source>
+        <translation>Other game</translation>
+    </message>
+    <message>
+        <source>Measured optimization</source>
+        <translation>Measured optimization</translation>
+    </message>
+    <message>
+        <source>In progress</source>
+        <translation>In progress</translation>
+    </message>
+    <message>
+        <source>Ready</source>
+        <translation>Ready</translation>
+    </message>
+    <message>
+        <source>One change at a time, measured against a clean baseline of this game on this system. The result can be that the baseline is already better.</source>
+        <translation>One change at a time, measured against a clean baseline of this game on this system. The result can be that the baseline is already better.</translation>
+    </message>
+    <message>
+        <source>Measured optimization is not available: %1</source>
+        <translation>Measured optimization is not available: %1</translation>
+    </message>
+    <message>
+        <source>1. Optimization goal</source>
+        <translation>1. Optimization goal</translation>
+    </message>
+    <message>
+        <source>Selected goal</source>
+        <translation>Selected goal</translation>
+    </message>
+    <message>
+        <source>FPS floor</source>
+        <translation>FPS floor</translation>
+    </message>
+    <message>
+        <source>Minimum FPS</source>
+        <translation>Minimum FPS</translation>
+    </message>
+    <message>
+        <source>Allow candidates that lower image quality (upscaling)</source>
+        <translation>Allow candidates that lower image quality (upscaling)</translation>
+    </message>
+    <message>
+        <source>Allow explicit experiments (ntsync, GPU-memory priority, no_upload_hvv)</source>
+        <translation>Allow explicit experiments (ntsync, GPU-memory priority, no_upload_hvv)</translation>
+    </message>
+    <message>
+        <source>Start with this goal</source>
+        <translation>Start with this goal</translation>
+    </message>
+    <message>
+        <source>2. Game and system</source>
+        <translation>2. Game and system</translation>
+    </message>
+    <message>
+        <source>Custom game identity</source>
+        <translation>Custom game identity</translation>
+    </message>
+    <message>
+        <source>Executable</source>
+        <translation>Executable</translation>
+    </message>
+    <message>
+        <source>Runner</source>
+        <translation>Runner</translation>
+    </message>
+    <message>
+        <source>None configured</source>
+        <translation>None configured</translation>
+    </message>
+    <message>
+        <source>Measurement</source>
+        <translation>Measurement</translation>
+    </message>
+    <message>
+        <source>Supported: %1</source>
+        <translation>Supported: %1</translation>
+    </message>
+    <message>
+        <source>Source</source>
+        <translation>Source</translation>
+    </message>
+    <message>
+        <source>Runtime</source>
+        <translation>Runtime</translation>
+    </message>
+    <message>
+        <source>Engine</source>
+        <translation>Engine</translation>
+    </message>
+    <message>
+        <source>confidence %1</source>
+        <translation>confidence %1</translation>
+    </message>
+    <message>
+        <source>Rendering API</source>
+        <translation>Rendering API</translation>
+    </message>
+    <message>
+        <source>Game build</source>
+        <translation>Game build</translation>
+    </message>
+    <message>
+        <source>Hardware</source>
+        <translation>Hardware</translation>
+    </message>
+    <message>
+        <source>Driver</source>
+        <translation>Driver</translation>
+    </message>
+    <message>
+        <source>Display</source>
+        <translation>Display</translation>
+    </message>
+    <message>
+        <source>Engine, API and display stay Unknown until the game files are analyzed. Analysis only reads the game folder.</source>
+        <translation>Engine, API and display stay Unknown until the game files are analyzed. Analysis only reads the game folder.</translation>
+    </message>
+    <message>
+        <source>Detect engine and API</source>
+        <translation>Detect engine and API</translation>
+    </message>
+    <message>
+        <source>3. Baseline</source>
+        <translation>3. Baseline</translation>
+    </message>
+    <message>
+        <source>Status</source>
+        <translation>Status</translation>
+    </message>
+    <message>
+        <source>Gameplay measured</source>
+        <translation>Gameplay measured</translation>
+    </message>
+    <message>
+        <source>%1 s after %2 s warm-up, %3 samples</source>
+        <translation>%1 s after %2 s warm-up, %3 samples</translation>
+    </message>
+    <message>
+        <source>Configuration revision</source>
+        <translation>Configuration revision</translation>
+    </message>
+    <message>
+        <source>GameOpti starts the game now with private MangoHud logging and your current settings. Play a representative scene for at least 90 seconds, then exit normally.</source>
+        <translation>GameOpti starts the game now with private MangoHud logging and your current settings. Play a representative scene for at least 90 seconds, then exit normally.</translation>
+    </message>
+    <message>
+        <source>Record the baseline again</source>
+        <translation>Record the baseline again</translation>
+    </message>
+    <message>
+        <source>Launch and record baseline</source>
+        <translation>Launch and record baseline</translation>
+    </message>
+    <message>
+        <source>4. Proposed change</source>
+        <translation>4. Proposed change</translation>
+    </message>
+    <message>
+        <source>No compatible candidate is available. Keeping the current configuration is a valid result.</source>
+        <translation>No compatible candidate is available. Keeping the current configuration is a valid result.</translation>
+    </message>
+    <message>
+        <source>Requires</source>
+        <translation>Requires</translation>
+    </message>
+    <message>
+        <source>Conflicts with</source>
+        <translation>Conflicts with</translation>
+    </message>
+    <message>
+        <source>Expected</source>
+        <translation>Expected</translation>
+    </message>
+    <message>
+        <source>Cost</source>
+        <translation>Cost</translation>
+    </message>
+    <message>
+        <source>Restore</source>
+        <translation>Restore</translation>
+    </message>
+    <message>
+        <source>Evidence</source>
+        <translation>Evidence</translation>
+    </message>
+    <message>
+        <source>Expected directions describe the mechanism, not a promised result. Only the measured comparison decides.</source>
+        <translation>Expected directions describe the mechanism, not a promised result. Only the measured comparison decides.</translation>
+    </message>
+    <message>
+        <source>Apply with restore point</source>
+        <translation>Apply with restore point</translation>
+    </message>
+    <message>
+        <source>Propose another</source>
+        <translation>Propose another</translation>
+    </message>
+    <message>
+        <source>Keep the current configuration</source>
+        <translation>Keep the current configuration</translation>
+    </message>
+    <message>
+        <source>5. Candidate session</source>
+        <translation>5. Candidate session</translation>
+    </message>
+    <message>
+        <source>The change is applied and a restore point is saved. Record the same scene with the same in-game settings.</source>
+        <translation>The change is applied and a restore point is saved. Record the same scene with the same in-game settings.</translation>
+    </message>
+    <message>
+        <source>Launch and record candidate session</source>
+        <translation>Launch and record candidate session</translation>
+    </message>
+    <message>
+        <source>6. Was the scene comparable?</source>
+        <translation>6. Was the scene comparable?</translation>
+    </message>
+    <message>
+        <source>GameOpti cannot prove that you played the same scene. Your answer can only lower the confidence, never raise it.</source>
+        <translation>GameOpti cannot prove that you played the same scene. Your answer can only lower the confidence, never raise it.</translation>
+    </message>
+    <message>
+        <source>%1 differs: %2 → %3</source>
+        <translation>%1 differs: %2 → %3</translation>
+    </message>
+    <message>
+        <source>Not readable by GameOpti: %1</source>
+        <translation>Not readable by GameOpti: %1</translation>
+    </message>
+    <message>
+        <source>I confirm these did not change between the sessions</source>
+        <translation>I confirm these did not change between the sessions</translation>
+    </message>
+    <message>
+        <source>Image quality compared with the baseline</source>
+        <translation>Image quality compared with the baseline</translation>
+    </message>
+    <message>
+        <source>Same</source>
+        <translation>Same</translation>
+    </message>
+    <message>
+        <source>Better</source>
+        <translation>Better</translation>
+    </message>
+    <message>
+        <source>Worse</source>
+        <translation>Worse</translation>
+    </message>
+    <message>
+        <source>Not checked</source>
+        <translation>Not checked</translation>
+    </message>
+    <message>
+        <source>Stability compared with the baseline</source>
+        <translation>Stability compared with the baseline</translation>
+    </message>
+    <message>
+        <source>Crashed</source>
+        <translation>Crashed</translation>
+    </message>
+    <message>
+        <source>Update the answer</source>
+        <translation>Update the answer</translation>
+    </message>
+    <message>
+        <source>Compare the sessions</source>
+        <translation>Compare the sessions</translation>
+    </message>
+    <message>
+        <source>7. Measured comparison</source>
+        <translation>7. Measured comparison</translation>
+    </message>
+    <message>
+        <source>Recommendation: %1</source>
+        <translation>Recommendation: %1</translation>
+    </message>
+    <message>
+        <source>Comparability</source>
+        <translation>Comparability</translation>
+    </message>
+    <message>
+        <source>verified result</source>
+        <translation>verified result</translation>
+    </message>
+    <message>
+        <source>not a verified result</source>
+        <translation>not a verified result</translation>
+    </message>
+    <message>
+        <source>Frame generation was active: the FPS values are output FPS, rendered FPS was not measured.</source>
+        <translation>Frame generation was active: the FPS values are output FPS, rendered FPS was not measured.</translation>
+    </message>
+    <message>
+        <source>FPS values are rendered frames. Generated/output FPS is not measured separately in these sessions.</source>
+        <translation>FPS values are rendered frames. Generated/output FPS is not measured separately in these sessions.</translation>
+    </message>
+    <message>
+        <source>Baseline: %1 s, %2 samples. Candidate: %3 s, %4 samples. Stutter: %5.</source>
+        <translation>Baseline: %1 s, %2 samples. Candidate: %3 s, %4 samples. Stutter: %5.</translation>
+    </message>
+    <message>
+        <source>frame time at least twice the median and 8 ms above it</source>
+        <translation>frame time at least twice the median and 8 ms above it</translation>
+    </message>
+    <message>
+        <source>Keep the change</source>
+        <translation>Keep the change</translation>
+    </message>
+    <message>
+        <source>Revert to the baseline</source>
+        <translation>Revert to the baseline</translation>
+    </message>
+    <message>
+        <source>Keep saves the result for this game, build and system. Revert restores the saved files byte for byte.</source>
+        <translation>Keep saves the result for this game, build and system. Revert restores the saved files byte for byte.</translation>
+    </message>
+    <message>
+        <source>Cancel and restore</source>
+        <translation>Cancel and restore</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Cancel</translation>
+    </message>
+    <message>
+        <source>Saved results for this game (%1)</source>
+        <translation>Saved results for this game (%1)</translation>
+    </message>
+    <message>
+        <source>kept</source>
+        <translation>kept</translation>
+    </message>
+    <message>
+        <source>reverted</source>
+        <translation>reverted</translation>
+    </message>
+    <message>
+        <source>cancelled</source>
+        <translation>cancelled</translation>
+    </message>
+    <message>
+        <source>Technical details</source>
+        <translation>Technical details</translation>
+    </message>
+    <message>
+        <source>Other candidates and why they are not proposed:</source>
+        <translation>Other candidates and why they are not proposed:</translation>
+    </message>
+    <message>
+        <source>available</source>
+        <translation>available</translation>
+    </message>
+    <message>
+        <source>Configuration files: %1</source>
+        <translation>Configuration files: %1</translation>
+    </message>
+    <message>
+        <source>Engine evidence: %1</source>
+        <translation>Engine evidence: %1</translation>
+    </message>
+    <message>
+        <source>none</source>
+        <translation>none</translation>
+    </message>
+    <message>
+        <source>API evidence: %1</source>
+        <translation>API evidence: %1</translation>
+    </message>
+    <message>
+        <source>Support by launch path:</source>
+        <translation>Support by launch path:</translation>
+    </message>
+    <message>
+        <source>Automatic</source>
+        <translation>Automatic</translation>
+    </message>
+    <message>
+        <source>Custom</source>
+        <translation>Custom</translation>
+    </message>
+    <message>
+        <source>Improvement measured</source>
+        <translation>Improvement measured</translation>
+    </message>
+    <message>
+        <source>Worse performance measured</source>
+        <translation>Worse performance measured</translation>
+    </message>
+    <message>
+        <source>No measurable change</source>
+        <translation>No measurable change</translation>
+    </message>
+    <message>
+        <source>Not affected by this change</source>
+        <translation>Not affected by this change</translation>
+    </message>
+    <message>
+        <source>Same (your check)</source>
+        <translation>Same (your check)</translation>
+    </message>
+    <message>
+        <source>Better (your check)</source>
+        <translation>Better (your check)</translation>
+    </message>
+    <message>
+        <source>Worse (your check)</source>
+        <translation>Worse (your check)</translation>
+    </message>
+    <message>
+        <source>Not evaluated</source>
+        <translation>Not evaluated</translation>
+    </message>
+    <message>
+        <source>Fully verified result</source>
+        <translation>Fully verified result</translation>
+    </message>
+    <message>
+        <source>Performance improvement measured; image quality not evaluated</source>
+        <translation>Performance improvement measured; image quality not evaluated</translation>
+    </message>
+    <message>
+        <source>Not a verified result</source>
+        <translation>Not a verified result</translation>
+    </message>
+    <message>
+        <source>Detecting the game files in the background…</source>
+        <translation>Detecting the game files in the background…</translation>
+    </message>
+    <message>
+        <source>Not detected: %1</source>
+        <translation>Not detected: %1</translation>
+    </message>
+    <message>
+        <source>Detecting…</source>
+        <translation>Detecting…</translation>
+    </message>
+    <message>
+        <source>Not detected</source>
+        <translation>Not detected</translation>
+    </message>
+    <message>
+        <source>Current configuration</source>
+        <translation>Current configuration</translation>
+    </message>
+    <message>
+        <source>The goal is chosen only here. The current configuration is your saved launch setup; a kept result changes only the tested settings.</source>
+        <translation>The goal is chosen only here. The current configuration is your saved launch setup; a kept result changes only the tested settings.</translation>
+    </message>
+    <message>
+        <source>Detection only reads the game folder; it never starts or changes the game.</source>
+        <translation>Detection only reads the game folder; it never starts or changes the game.</translation>
+    </message>
+    <message>
+        <source>Retry detection</source>
+        <translation>Retry detection</translation>
+    </message>
+    <message>
+        <source>verified</source>
+        <translation>verified</translation>
+    </message>
+    <message>
+        <source>not verified</source>
+        <translation>not verified</translation>
+    </message>
+    <message>
+        <source>Performance</source>
+        <translation>Performance</translation>
+    </message>
+    <message>
+        <source>Not verified</source>
+        <translation>Not verified</translation>
+    </message>
+    <message>
+        <source>Image quality</source>
+        <translation>Image quality</translation>
+    </message>
+    <message>
+        <source>Overall</source>
+        <translation>Overall</translation>
+    </message>
+    <message>
+        <source>Keep as performance-only result</source>
+        <translation>Keep as performance-only result</translation>
+    </message>
+    <message>
+        <source>This change lowers the render resolution. Compare the image, answer the image-quality question above and update the answer to store a fully accepted result. A performance-only result is kept, but Automatic never applies it.</source>
+        <translation>This change lowers the render resolution. Compare the image, answer the image-quality question above and update the answer to store a fully accepted result. A performance-only result is kept, but Automatic never applies it.</translation>
+    </message>
+    <message>
+        <source>Image quality is acceptable</source>
+        <translation>Image quality is acceptable</translation>
+    </message>
+    <message>
+        <source>Image quality is worse</source>
+        <translation>Image quality is worse</translation>
+    </message>
+</context>
+<context>
+    <name>MeasuredOptimizationText</name>
+    <message>
+        <source>99th percentile frame time worsened by %1</source>
+        <translation>99th percentile frame time worsened by %1</translation>
+    </message>
+    <message>
+        <source>A compatible Proton runner has not been configured for this local Windows game</source>
+        <translation>A compatible Proton runner has not been configured for this local Windows game</translation>
+    </message>
+    <message>
+        <source>A measured cap uses the active Gamescope limiter; GameOpti recordings replace MangoHud's own limiter</source>
+        <translation>A measured cap uses the active Gamescope limiter; GameOpti recordings replace MangoHud's own limiter</translation>
+    </message>
+    <message>
+        <source>A measured optimization is already in progress for this game</source>
+        <translation>A measured optimization is already in progress for this game</translation>
+    </message>
+    <message>
+        <source>A measured session is missing</source>
+        <translation>A measured session is missing</translation>
+    </message>
+    <message>
+        <source>A recording is active for this game</source>
+        <translation>A recording is active for this game</translation>
+    </message>
+    <message>
+        <source>An explicit Gamescope refresh or frame limit is set; it would override the cap</source>
+        <translation>An explicit Gamescope refresh or frame limit is set; it would override the cap</translation>
+    </message>
+    <message>
+        <source>An explicit ntsync setting</source>
+        <translation>An explicit ntsync setting</translation>
+    </message>
+    <message>
+        <source>An explicit per-game GameMode choice</source>
+        <translation>An explicit per-game GameMode choice</translation>
+    </message>
+    <message>
+        <source>An explicit per-game Gamescope choice</source>
+        <translation>An explicit per-game Gamescope choice</translation>
+    </message>
+    <message>
+        <source>Apply the GameOpti launcher integration first so the change reaches the launcher</source>
+        <translation>Apply the GameOpti launcher integration first so the change reaches the launcher</translation>
+    </message>
+    <message>
+        <source>Automatic recording is not available for Lutris games yet; GameOpti can only import a MangoHud log</source>
+        <translation>Automatic recording is not available for Lutris games yet; GameOpti can only import a MangoHud log</translation>
+    </message>
+    <message>
+        <source>Average FPS %1, 1% low %2</source>
+        <translation>Average FPS %1, 1% low %2</translation>
+    </message>
+    <message>
+        <source>Average FPS %1, p99 frame time %2</source>
+        <translation>Average FPS %1, p99 frame time %2</translation>
+    </message>
+    <message>
+        <source>Average FPS fell by %1</source>
+        <translation>Average FPS fell by %1</translation>
+    </message>
+    <message>
+        <source>Average FPS is missing</source>
+        <translation>Average FPS is missing</translation>
+    </message>
+    <message>
+        <source>Baseline without other memory protection</source>
+        <translation>Baseline without other memory protection</translation>
+    </message>
+    <message>
+        <source>Changes are within %1 (FPS) and %2 (1% low)</source>
+        <translation>Changes are within %1 (FPS) and %2 (1% low)</translation>
+    </message>
+    <message>
+        <source>Choose whether the sessions were comparable</source>
+        <translation>Choose whether the sessions were comparable</translation>
+    </message>
+    <message>
+        <source>Desktop foreground boosters</source>
+        <translation>Desktop foreground boosters</translation>
+    </message>
+    <message>
+        <source>Direct3D 12 is not established for this game</source>
+        <translation>Direct3D 12 is not established for this game</translation>
+    </message>
+    <message>
+        <source>Direct3D 12 through vkd3d-proton with no_upload_hvv</source>
+        <translation>Direct3D 12 through vkd3d-proton with no_upload_hvv</translation>
+    </message>
+    <message>
+        <source>Disable ntsync</source>
+        <translation>Disable ntsync</translation>
+    </message>
+    <message>
+        <source>Disable ntsync (Proton)</source>
+        <translation>Disable ntsync (Proton)</translation>
+    </message>
+    <message>
+        <source>Display resolution</source>
+        <translation>Display resolution</translation>
+    </message>
+    <message>
+        <source>Enter an FPS value between 15 and 1000</source>
+        <translation>Enter an FPS value between 15 and 1000</translation>
+    </message>
+    <message>
+        <source>Existing GameOpti Gamescope launch plan (native mode = render size equals output size)</source>
+        <translation>Existing GameOpti Gamescope launch plan (native mode = render size equals output size)</translation>
+    </message>
+    <message>
+        <source>Existing Gamescope -r limiter owned by the GameOpti launch plan</source>
+        <translation>Existing Gamescope -r limiter owned by the GameOpti launch plan</translation>
+    </message>
+    <message>
+        <source>Existing upscaling</source>
+        <translation>Existing upscaling</translation>
+    </message>
+    <message>
+        <source>Explicit Gamescope refresh or frame limit</source>
+        <translation>Explicit Gamescope refresh or frame limit</translation>
+    </message>
+    <message>
+        <source>FPS limit</source>
+        <translation>FPS limit</translation>
+    </message>
+    <message>
+        <source>FPS limit mode</source>
+        <translation>FPS limit mode</translation>
+    </message>
+    <message>
+        <source>Filter</source>
+        <translation>Filter</translation>
+    </message>
+    <message>
+        <source>Finish the current comparison cycle before applying another change</source>
+        <translation>Finish the current comparison cycle before applying another change</translation>
+    </message>
+    <message>
+        <source>Frame generation</source>
+        <translation>Frame generation</translation>
+    </message>
+    <message>
+        <source>Frame generation adds latency and generated frames</source>
+        <translation>Frame generation adds latency and generated frames</translation>
+    </message>
+    <message>
+        <source>Frame generation is active, so rendered FPS is not measured</source>
+        <translation>Frame generation is active, so rendered FPS is not measured</translation>
+    </message>
+    <message>
+        <source>Frame generation is active; its Gamescope interaction is a separate experiment</source>
+        <translation>Frame generation is active; its Gamescope interaction is a separate experiment</translation>
+    </message>
+    <message>
+        <source>Frame pacing changed less than %1</source>
+        <translation>Frame pacing changed less than %1</translation>
+    </message>
+    <message>
+        <source>Frame pacing improved (p99 %1)</source>
+        <translation>Frame pacing improved (p99 %1)</translation>
+    </message>
+    <message>
+        <source>Frame pacing worsened (p99 %1)</source>
+        <translation>Frame pacing worsened (p99 %1)</translation>
+    </message>
+    <message>
+        <source>GPU</source>
+        <translation>GPU</translation>
+    </message>
+    <message>
+        <source>GPU-memory priority</source>
+        <translation>GPU-memory priority</translation>
+    </message>
+    <message>
+        <source>GPU-memory priority (dmem.low)</source>
+        <translation>GPU-memory priority (dmem.low)</translation>
+    </message>
+    <message>
+        <source>GPU-memory priority is already enabled</source>
+        <translation>GPU-memory priority is already enabled</translation>
+    </message>
+    <message>
+        <source>GPU-memory protection is not prepared or no memory region is selected</source>
+        <translation>GPU-memory protection is not prepared or no memory region is selected</translation>
+    </message>
+    <message>
+        <source>Game build</source>
+        <translation>Game build</translation>
+    </message>
+    <message>
+        <source>GameMode documentation: CPU governor, I/O and scheduling requests while the game runs</source>
+        <translation>GameMode documentation: CPU governor, I/O and scheduling requests while the game runs</translation>
+    </message>
+    <message>
+        <source>GameMode installed and its service reachable</source>
+        <translation>GameMode installed and its service reachable</translation>
+    </message>
+    <message>
+        <source>GameMode is an explicit per-game choice</source>
+        <translation>GameMode is an explicit per-game choice</translation>
+    </message>
+    <message>
+        <source>GameMode is not available on this system</source>
+        <translation>GameMode is not available on this system</translation>
+    </message>
+    <message>
+        <source>GameOpti Custom launch</source>
+        <translation>GameOpti Custom launch</translation>
+    </message>
+    <message>
+        <source>GameOpti Custom launch (Proton)</source>
+        <translation>GameOpti Custom launch (Proton)</translation>
+    </message>
+    <message>
+        <source>GameOpti Custom launch (Wine)</source>
+        <translation>GameOpti Custom launch (Wine)</translation>
+    </message>
+    <message>
+        <source>GameOpti GPU-memory host bridge; live protection must be observed during the session</source>
+        <translation>GameOpti GPU-memory host bridge; live protection must be observed during the session</translation>
+    </message>
+    <message>
+        <source>GameOpti applies no_upload_hvv only through the Steam runner, where the Proton/vkd3d of the launch is verified</source>
+        <translation>GameOpti applies no_upload_hvv only through the Steam runner, where the Proton/vkd3d of the launch is verified</translation>
+    </message>
+    <message>
+        <source>GameOpti runner</source>
+        <translation>GameOpti runner</translation>
+    </message>
+    <message>
+        <source>Gamescope (native size)</source>
+        <translation>Gamescope (native size)</translation>
+    </message>
+    <message>
+        <source>Gamescope FSR 1 filter documentation; image quality is reduced by design</source>
+        <translation>Gamescope FSR 1 filter documentation; image quality is reduced by design</translation>
+    </message>
+    <message>
+        <source>Gamescope FSR filter</source>
+        <translation>Gamescope FSR filter</translation>
+    </message>
+    <message>
+        <source>Gamescope FSR upscaling</source>
+        <translation>Gamescope FSR upscaling</translation>
+    </message>
+    <message>
+        <source>Gamescope active in the baseline</source>
+        <translation>Gamescope active in the baseline</translation>
+    </message>
+    <message>
+        <source>Gamescope active with an explicit size</source>
+        <translation>Gamescope active with an explicit size</translation>
+    </message>
+    <message>
+        <source>Gamescope already renders below the output size</source>
+        <translation>Gamescope already renders below the output size</translation>
+    </message>
+    <message>
+        <source>Gamescope chooses the render size automatically; set an explicit size first</source>
+        <translation>Gamescope chooses the render size automatically; set an explicit size first</translation>
+    </message>
+    <message>
+        <source>Gamescope installed</source>
+        <translation>Gamescope installed</translation>
+    </message>
+    <message>
+        <source>Gamescope is an explicit per-game choice</source>
+        <translation>Gamescope is an explicit per-game choice</translation>
+    </message>
+    <message>
+        <source>Gamescope is not available on this system</source>
+        <translation>Gamescope is not available on this system</translation>
+    </message>
+    <message>
+        <source>Gamescope mode</source>
+        <translation>Gamescope mode</translation>
+    </message>
+    <message>
+        <source>Gamescope must already be active in the baseline</source>
+        <translation>Gamescope must already be active in the baseline</translation>
+    </message>
+    <message>
+        <source>Gamescope rewrites dmem.low on focus changes, so protection cannot be isolated</source>
+        <translation>Gamescope rewrites dmem.low on focus changes, so protection cannot be isolated</translation>
+    </message>
+    <message>
+        <source>Heroic launcher measurement</source>
+        <translation>Heroic launcher measurement</translation>
+    </message>
+    <message>
+        <source>Image quality was not checked by you</source>
+        <translation>Image quality was not checked by you</translation>
+    </message>
+    <message>
+        <source>Image quality was reported worse</source>
+        <translation>Image quality was reported worse</translation>
+    </message>
+    <message>
+        <source>Image-quality consent</source>
+        <translation>Image-quality consent</translation>
+    </message>
+    <message>
+        <source>In-game graphics settings</source>
+        <translation>In-game graphics settings</translation>
+    </message>
+    <message>
+        <source>Keep the UPLOAD heap in system memory (VKD3D_CONFIG=no_upload_hvv)</source>
+        <translation>Keep the UPLOAD heap in system memory (VKD3D_CONFIG=no_upload_hvv)</translation>
+    </message>
+    <message>
+        <source>Known display resolution</source>
+        <translation>Known display resolution</translation>
+    </message>
+    <message>
+        <source>Launcher Flatpak sandbox</source>
+        <translation>Launcher Flatpak sandbox</translation>
+    </message>
+    <message>
+        <source>Limit FPS through the active Gamescope limiter at a value derived from the baseline</source>
+        <translation>Limit FPS through the active Gamescope limiter at a value derived from the baseline</translation>
+    </message>
+    <message>
+        <source>Lower render resolution with lossy upscaling</source>
+        <translation>Lower render resolution with lossy upscaling</translation>
+    </message>
+    <message>
+        <source>MangoHud did not produce a baseline log in the private session directory</source>
+        <translation>MangoHud did not produce a baseline log in the private session directory</translation>
+    </message>
+    <message>
+        <source>MangoHud did not write a log for this session</source>
+        <translation>MangoHud did not write a log for this session</translation>
+    </message>
+    <message>
+        <source>Measured FPS limit</source>
+        <translation>Measured FPS limit</translation>
+    </message>
+    <message>
+        <source>Measured power changed by %1</source>
+        <translation>Measured power changed by %1</translation>
+    </message>
+    <message>
+        <source>Measured power changed by %1 while staying above %2 FPS</source>
+        <translation>Measured power changed by %1 while staying above %2 FPS</translation>
+    </message>
+    <message>
+        <source>Measured power rose by %1</source>
+        <translation>Measured power rose by %1</translation>
+    </message>
+    <message>
+        <source>More performance headroom at the same image quality (FPS %1)</source>
+        <translation>More performance headroom at the same image quality (FPS %1)</translation>
+    </message>
+    <message>
+        <source>No click-to-photon latency was measured; FPS and frame time are proxies</source>
+        <translation>No click-to-photon latency was measured; FPS and frame time are proxies</translation>
+    </message>
+    <message>
+        <source>No host systemd user scope is available to track the game's process tree</source>
+        <translation>No host systemd user scope is available to track the game's process tree</translation>
+    </message>
+    <message>
+        <source>No measurable benefit at the same image quality</source>
+        <translation>No measurable benefit at the same image quality</translation>
+    </message>
+    <message>
+        <source>No measured optimization is in progress</source>
+        <translation>No measured optimization is in progress</translation>
+    </message>
+    <message>
+        <source>No optimization change is pending comparison</source>
+        <translation>No optimization change is pending comparison</translation>
+    </message>
+    <message>
+        <source>No standard cap fits the measured frame rate and selected floor</source>
+        <translation>No standard cap fits the measured frame rate and selected floor</translation>
+    </message>
+    <message>
+        <source>Not verified for this launcher</source>
+        <translation>Not verified for this launcher</translation>
+    </message>
+    <message>
+        <source>Other VKD3D_CONFIG owners</source>
+        <translation>Other VKD3D_CONFIG owners</translation>
+    </message>
+    <message>
+        <source>Output height</source>
+        <translation>Output height</translation>
+    </message>
+    <message>
+        <source>Output size</source>
+        <translation>Output size</translation>
+    </message>
+    <message>
+        <source>Output width</source>
+        <translation>Output width</translation>
+    </message>
+    <message>
+        <source>PROTON_NO_NTSYNC is read only by a Proton runner</source>
+        <translation>PROTON_NO_NTSYNC is read only by a Proton runner</translation>
+    </message>
+    <message>
+        <source>Power changed less than %1</source>
+        <translation>Power changed less than %1</translation>
+    </message>
+    <message>
+        <source>Power was not measured in both sessions</source>
+        <translation>Power was not measured in both sessions</translation>
+    </message>
+    <message>
+        <source>Prepared host dmem delegation</source>
+        <translation>Prepared host dmem delegation</translation>
+    </message>
+    <message>
+        <source>Presentation goes through another compositor</source>
+        <translation>Presentation goes through another compositor</translation>
+    </message>
+    <message>
+        <source>Proton Tweaks failed read-back verification</source>
+        <translation>Proton Tweaks failed read-back verification</translation>
+    </message>
+    <message>
+        <source>Proton documentation for PROTON_NO_NTSYNC (compatibility override, not a performance option)</source>
+        <translation>Proton documentation for PROTON_NO_NTSYNC (compatibility override, not a performance option)</translation>
+    </message>
+    <message>
+        <source>Proton runner that implements PROTON_NO_NTSYNC</source>
+        <translation>Proton runner that implements PROTON_NO_NTSYNC</translation>
+    </message>
+    <message>
+        <source>Proton/runtime</source>
+        <translation>Proton/runtime</translation>
+    </message>
+    <message>
+        <source>Ray tracing</source>
+        <translation>Ray tracing</translation>
+    </message>
+    <message>
+        <source>Record a baseline before the comparison</source>
+        <translation>Record a baseline before the comparison</translation>
+    </message>
+    <message>
+        <source>Record a comparison or revert the pending setting test first</source>
+        <translation>Record a comparison or revert the pending setting test first</translation>
+    </message>
+    <message>
+        <source>Recording cancelled</source>
+        <translation>Recording cancelled</translation>
+    </message>
+    <message>
+        <source>Recording through the GameOpti runner in Flatpak Steam has not been verified</source>
+        <translation>Recording through the GameOpti runner in Flatpak Steam has not been verified</translation>
+    </message>
+    <message>
+        <source>Refresh rate</source>
+        <translation>Refresh rate</translation>
+    </message>
+    <message>
+        <source>Render at about 77% of the output size and upscale with Gamescope FSR</source>
+        <translation>Render at about 77% of the output size and upscale with Gamescope FSR</translation>
+    </message>
+    <message>
+        <source>Render height</source>
+        <translation>Render height</translation>
+    </message>
+    <message>
+        <source>Render resolution</source>
+        <translation>Render resolution</translation>
+    </message>
+    <message>
+        <source>Render size</source>
+        <translation>Render size</translation>
+    </message>
+    <message>
+        <source>Render width</source>
+        <translation>Render width</translation>
+    </message>
+    <message>
+        <source>Renderer/API</source>
+        <translation>Renderer/API</translation>
+    </message>
+    <message>
+        <source>Representative baseline</source>
+        <translation>Representative baseline</translation>
+    </message>
+    <message>
+        <source>Restore the previous GPU-memory profile byte for byte</source>
+        <translation>Restore the previous GPU-memory profile byte for byte</translation>
+    </message>
+    <message>
+        <source>Restore the previous Proton Tweaks profile byte for byte</source>
+        <translation>Restore the previous Proton Tweaks profile byte for byte</translation>
+    </message>
+    <message>
+        <source>Restore the previous optimization profile byte for byte</source>
+        <translation>Restore the previous optimization profile byte for byte</translation>
+    </message>
+    <message>
+        <source>Run the game in a private systemd scope with dmem.low protection</source>
+        <translation>Run the game in a private systemd scope with dmem.low protection</translation>
+    </message>
+    <message>
+        <source>Select a minimum FPS for Best Quality</source>
+        <translation>Select a minimum FPS for Best Quality</translation>
+    </message>
+    <message>
+        <source>Select an FPS floor for Low Power</source>
+        <translation>Select an FPS floor for Low Power</translation>
+    </message>
+    <message>
+        <source>Select an optimization goal</source>
+        <translation>Select an optimization goal</translation>
+    </message>
+    <message>
+        <source>Set PROTON_NO_NTSYNC=1 so the runner falls back to its other synchronization method</source>
+        <translation>Set PROTON_NO_NTSYNC=1 so the runner falls back to its other synchronization method</translation>
+    </message>
+    <message>
+        <source>Shown only when explicit experiments are allowed</source>
+        <translation>Shown only when explicit experiments are allowed</translation>
+    </message>
+    <message>
+        <source>Steam is updating the game</source>
+        <translation>Steam is updating the game</translation>
+    </message>
+    <message>
+        <source>The Custom game configuration was not found</source>
+        <translation>The Custom game configuration was not found</translation>
+    </message>
+    <message>
+        <source>The Custom game files are missing or not runnable</source>
+        <translation>The Custom game files are missing or not runnable</translation>
+    </message>
+    <message>
+        <source>The FPS value must be a number</source>
+        <translation>The FPS value must be a number</translation>
+    </message>
+    <message>
+        <source>The Proton/vkd3d used by the launcher is not established, so no_upload_hvv is not applied</source>
+        <translation>The Proton/vkd3d used by the launcher is not established, so no_upload_hvv is not applied</translation>
+    </message>
+    <message>
+        <source>The UPLOAD system-memory profile is already enabled</source>
+        <translation>The UPLOAD system-memory profile is already enabled</translation>
+    </message>
+    <message>
+        <source>The baseline did not prove that the game ran without other memory protection</source>
+        <translation>The baseline did not prove that the game ran without other memory protection</translation>
+    </message>
+    <message>
+        <source>The baseline was too short or had too few samples</source>
+        <translation>The baseline was too short or had too few samples</translation>
+    </message>
+    <message>
+        <source>The candidate fell below the %1 FPS floor</source>
+        <translation>The candidate fell below the %1 FPS floor</translation>
+    </message>
+    <message>
+        <source>The candidate is not available for this game and system</source>
+        <translation>The candidate is not available for this game and system</translation>
+    </message>
+    <message>
+        <source>The candidate lowers the render resolution</source>
+        <translation>The candidate lowers the render resolution</translation>
+    </message>
+    <message>
+        <source>The candidate session crashed</source>
+        <translation>The candidate session crashed</translation>
+    </message>
+    <message>
+        <source>The candidate session ended with exit code %1</source>
+        <translation>The candidate session ended with exit code %1</translation>
+    </message>
+    <message>
+        <source>The cap is derived from the measured baseline</source>
+        <translation>The cap is derived from the measured baseline</translation>
+    </message>
+    <message>
+        <source>The change was not verified in the measured launch</source>
+        <translation>The change was not verified in the measured launch</translation>
+    </message>
+    <message>
+        <source>The configuration changed during the recording</source>
+        <translation>The configuration changed during the recording</translation>
+    </message>
+    <message>
+        <source>The configured game executable was never observed running</source>
+        <translation>The configured game executable was never observed running</translation>
+    </message>
+    <message>
+        <source>The configured runner is neither Wine nor a Proton script; GameOpti cannot verify how it starts the game</source>
+        <translation>The configured runner is neither Wine nor a Proton script; GameOpti cannot verify how it starts the game</translation>
+    </message>
+    <message>
+        <source>The display resolution is unknown, so a native Gamescope size cannot be set</source>
+        <translation>The display resolution is unknown, so a native Gamescope size cannot be set</translation>
+    </message>
+    <message>
+        <source>The game did not start within 300 seconds after Manual was opened</source>
+        <translation>The game did not start within 300 seconds after Manual was opened</translation>
+    </message>
+    <message>
+        <source>The game does not run through a detected Proton runner</source>
+        <translation>The game does not run through a detected Proton runner</translation>
+    </message>
+    <message>
+        <source>The game has no per-game profile key</source>
+        <translation>The game has no per-game profile key</translation>
+    </message>
+    <message>
+        <source>The game is not available in its library</source>
+        <translation>The game is not available in its library</translation>
+    </message>
+    <message>
+        <source>The game is running</source>
+        <translation>The game is running</translation>
+    </message>
+    <message>
+        <source>The game process left the tracked process tree; GameOpti cannot verify when it ends</source>
+        <translation>The game process left the tracked process tree; GameOpti cannot verify when it ends</translation>
+    </message>
+    <message>
+        <source>The host runner used by the GameOpti Flatpak accepts only Steam AppIDs, so local games cannot be recorded from it</source>
+        <translation>The host runner used by the GameOpti Flatpak accepts only Steam AppIDs, so local games cannot be recorded from it</translation>
+    </message>
+    <message>
+        <source>The installed Gamescope does not list the FSR filter</source>
+        <translation>The installed Gamescope does not list the FSR filter</translation>
+    </message>
+    <message>
+        <source>The launcher Flatpak cannot reach the host systemd scope</source>
+        <translation>The launcher Flatpak cannot reach the host systemd scope</translation>
+    </message>
+    <message>
+        <source>The local native game does not run through Proton</source>
+        <translation>The local native game does not run through Proton</translation>
+    </message>
+    <message>
+        <source>The optimization profile changed after the candidate was prepared</source>
+        <translation>The optimization profile changed after the candidate was prepared</translation>
+    </message>
+    <message>
+        <source>The optimization profile failed read-back verification</source>
+        <translation>The optimization profile failed read-back verification</translation>
+    </message>
+    <message>
+        <source>The selected Proton runner does not implement PROTON_NO_NTSYNC</source>
+        <translation>The selected Proton runner does not implement PROTON_NO_NTSYNC</translation>
+    </message>
+    <message>
+        <source>The selected Proton/vkd3d does not offer no_upload_hvv or ReBAR is not verified</source>
+        <translation>The selected Proton/vkd3d does not offer no_upload_hvv or ReBAR is not verified</translation>
+    </message>
+    <message>
+        <source>The sessions are not comparable</source>
+        <translation>The sessions are not comparable</translation>
+    </message>
+    <message>
+        <source>This Custom entry has no persistent UUID identity</source>
+        <translation>This Custom entry has no persistent UUID identity</translation>
+    </message>
+    <message>
+        <source>This Custom entry has no stable profile identity</source>
+        <translation>This Custom entry has no stable profile identity</translation>
+    </message>
+    <message>
+        <source>This Custom entry starts another launcher, so the real game process cannot be identified</source>
+        <translation>This Custom entry starts another launcher, so the real game process cannot be identified</translation>
+    </message>
+    <message>
+        <source>This Windows executable has no configured Wine or Proton runner; GameOpti does not guess one</source>
+        <translation>This Windows executable has no configured Wine or Proton runner; GameOpti does not guess one</translation>
+    </message>
+    <message>
+        <source>This game has no per-game optimization profile</source>
+        <translation>This game has no per-game optimization profile</translation>
+    </message>
+    <message>
+        <source>This step is not available in the current workflow state</source>
+        <translation>This step is not available in the current workflow state</translation>
+    </message>
+    <message>
+        <source>Toggle Gamescope at the display resolution without scaling</source>
+        <translation>Toggle Gamescope at the display resolution without scaling</translation>
+    </message>
+    <message>
+        <source>Toggle the GameMode wrapper for this game</source>
+        <translation>Toggle the GameMode wrapper for this game</translation>
+    </message>
+    <message>
+        <source>Unity boot configuration</source>
+        <translation>Unity boot configuration</translation>
+    </message>
+    <message>
+        <source>Unknown optimization goal</source>
+        <translation>Unknown optimization goal</translation>
+    </message>
+    <message>
+        <source>Upscaler</source>
+        <translation>Upscaler</translation>
+    </message>
+    <message>
+        <source>Upscaling lowers the render resolution; allow image-quality changes first</source>
+        <translation>Upscaling lowers the render resolution; allow image-quality changes first</translation>
+    </message>
+    <message>
+        <source>Verified discrete ReBAR GPU</source>
+        <translation>Verified discrete ReBAR GPU</translation>
+    </message>
+    <message>
+        <source>You reported less stable gameplay</source>
+        <translation>You reported less stable gameplay</translation>
+    </message>
+    <message>
+        <source>You reported worse image quality</source>
+        <translation>You reported worse image quality</translation>
+    </message>
+    <message>
+        <source>active engine configuration</source>
+        <translation>active engine configuration</translation>
+    </message>
+    <message>
+        <source>baseline_missing</source>
+        <translation>baseline_missing</translation>
+    </message>
+    <message>
+        <source>baseline_timestamps_missing</source>
+        <translation>baseline_timestamps_missing</translation>
+    </message>
+    <message>
+        <source>baseline_too_few_samples</source>
+        <translation>baseline_too_few_samples</translation>
+    </message>
+    <message>
+        <source>baseline_too_short</source>
+        <translation>baseline_too_short</translation>
+    </message>
+    <message>
+        <source>candidate_missing</source>
+        <translation>candidate_missing</translation>
+    </message>
+    <message>
+        <source>candidate_timestamps_missing</source>
+        <translation>candidate_timestamps_missing</translation>
+    </message>
+    <message>
+        <source>candidate_too_few_samples</source>
+        <translation>candidate_too_few_samples</translation>
+    </message>
+    <message>
+        <source>candidate_too_short</source>
+        <translation>candidate_too_short</translation>
+    </message>
+    <message>
+        <source>configuration_changed_during_session</source>
+        <translation>configuration_changed_during_session</translation>
+    </message>
+    <message>
+        <source>executable import table</source>
+        <translation>executable import table</translation>
+    </message>
+    <message>
+        <source>executable imports unavailable</source>
+        <translation>executable imports unavailable</translation>
+    </message>
+    <message>
+        <source>filesystem signatures</source>
+        <translation>filesystem signatures</translation>
+    </message>
+    <message>
+        <source>more_than_one_variable</source>
+        <translation>more_than_one_variable</translation>
+    </message>
+    <message>
+        <source>no graphics API in the import table (it may be loaded at runtime)</source>
+        <translation>no graphics API in the import table (it may be loaded at runtime)</translation>
+    </message>
+    <message>
+        <source>no reliable active API setting</source>
+        <translation>no reliable active API setting</translation>
+    </message>
+    <message>
+        <source>no reliable engine signature</source>
+        <translation>no reliable engine signature</translation>
+    </message>
+    <message>
+        <source>no reliable signature</source>
+        <translation>no reliable signature</translation>
+    </message>
+    <message>
+        <source>ntsync already has an explicit Proton Tweaks setting</source>
+        <translation>ntsync already has an explicit Proton Tweaks setting</translation>
+    </message>
+    <message>
+        <source>renderer-specific executable path</source>
+        <translation>renderer-specific executable path</translation>
+    </message>
+    <message>
+        <source>selected renderer-specific executable</source>
+        <translation>selected renderer-specific executable</translation>
+    </message>
+    <message>
+        <source>several graphics APIs imported</source>
+        <translation>several graphics APIs imported</translation>
+    </message>
+    <message>
+        <source>vkd3d-proton documentation for no_upload_hvv; verified by the existing GPU-memory checks</source>
+        <translation>vkd3d-proton documentation for no_upload_hvv; verified by the existing GPU-memory checks</translation>
+    </message>
+    <message>
+        <source>Already measured for this game and system: %1</source>
+        <translation>Already measured for this game and system: %1</translation>
+    </message>
+    <message>
+        <source>%1 is set in your launch configuration; GameOpti does not override it</source>
+        <translation>%1 is set in your launch configuration; GameOpti does not override it</translation>
+    </message>
+    <message>
+        <source>%1 is already part of your launch command</source>
+        <translation>%1 is already part of your launch command</translation>
+    </message>
+    <message>
+        <source>The game is already limited to %1 FPS</source>
+        <translation>The game is already limited to %1 FPS</translation>
+    </message>
+    <message>
+        <source>Close %1 first; it can overwrite the game settings</source>
+        <translation>Close %1 first; it can overwrite the game settings</translation>
+    </message>
+    <message>
+        <source>%1 changed after the candidate was applied</source>
+        <translation>%1 changed after the candidate was applied</translation>
+    </message>
+    <message>
+        <source>Executable</source>
+        <translation>Executable</translation>
+    </message>
+    <message>
+        <source>Driver</source>
+        <translation>Driver</translation>
+    </message>
+    <message>
+        <source>Game detection failed: %1</source>
+        <translation>Game detection failed: %1</translation>
+    </message>
+    <message>
+        <source>Image quality was not evaluated</source>
+        <translation>Image quality was not evaluated</translation>
+    </message>
+    <message>
+        <source>Image quality was not evaluated. Compare the image first, or keep it as a performance-only result</source>
+        <translation>Image quality was not evaluated. Compare the image first, or keep it as a performance-only result</translation>
+    </message>
+    <message>
+        <source>Image quality was not evaluated; this goal needs your image-quality decision</source>
+        <translation>Image quality was not evaluated; this goal needs your image-quality decision</translation>
+    </message>
+    <message>
+        <source>Performance improvement measured; image quality not evaluated</source>
+        <translation>Performance improvement measured; image quality not evaluated</translation>
+    </message>
+    <message>
+        <source>Several executables match; choose the main game executable on the OptiScaler page first</source>
+        <translation>Several executables match; choose the main game executable on the OptiScaler page first</translation>
+    </message>
+    <message>
+        <source>The game executable was not found</source>
+        <translation>The game executable was not found</translation>
+    </message>
+    <message>
+        <source>The game folder is missing or not readable</source>
+        <translation>The game folder is missing or not readable</translation>
+    </message>
+    <message>
+        <source>The game's library is disconnected or unavailable</source>
+        <translation>The game's library is disconnected or unavailable</translation>
+    </message>
+    <message>
+        <source>The saved result was not found</source>
+        <translation>The saved result was not found</translation>
+    </message>
+    <message>
+        <source>Unsupported image-quality decision</source>
+        <translation>Unsupported image-quality decision</translation>
     </message>
 </context>
 </TS>

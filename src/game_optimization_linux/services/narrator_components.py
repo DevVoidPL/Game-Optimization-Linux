@@ -84,6 +84,24 @@ class NarratorComponentArtifact:
 
 
 @dataclass(frozen=True, slots=True)
+class NarratorPinnedFile:
+    """A file of a component whose bytes are pinned before a download URL exists."""
+
+    target_relative_path: str
+    size_bytes: int
+    sha256: str
+
+    def __post_init__(self) -> None:
+        relative = Path(self.target_relative_path)
+        if not relative.parts or relative.is_absolute() or ".." in relative.parts:
+            raise ValueError("pinned files need a safe relative target")
+        if len(self.sha256) != 64 or any(c not in "0123456789abcdef" for c in self.sha256):
+            raise ValueError("pinned files need a lowercase SHA-256 digest")
+        if int(self.size_bytes) <= 0:
+            raise ValueError("pinned files need a positive size")
+
+
+@dataclass(frozen=True, slots=True)
 class NarratorComponentDefinition:
     component_id: str
     kind: NarratorComponentKind
@@ -100,6 +118,11 @@ class NarratorComponentDefinition:
     install_ready: bool = False
     message: str = ""
     artifacts: tuple[NarratorComponentArtifact, ...] = ()
+    # Former catalog entry: never offered for download; listed only while installed.
+    legacy: bool = False
+    # Exact files (size + SHA-256) accepted for this component; used when no
+    # immutable download URL exists yet and for verified local installation.
+    pinned_files: tuple[NarratorPinnedFile, ...] = ()
 
     def __post_init__(self) -> None:
         if not _COMPONENT_ID.fullmatch(self.component_id):
@@ -205,8 +228,36 @@ DEFAULT_NARRATOR_COMPONENTS = (
         ),
     ),
     NarratorComponentDefinition(
+        component_id="tts.voidek",
+        kind=NarratorComponentKind.TTS,
+        name="Piper Polish voice - Voidek",
+        license_id="LicenseRef-Voidek-Model",
+        runtime_license_id="GPL-3.0-or-later",
+        artifact_license_id="LicenseRef-Voidek-Model",
+        version="e991-ca2ad0a",
+        download_size_bytes=63_521_083,
+        attribution="Voidek, a Polish Piper voice created by DevVoidPL",
+        # Shipped inside the application packages and installed from there;
+        # never downloaded at runtime.
+        install_ready=False,
+        message="The Voidek voice is included with GameOpti",
+        pinned_files=(
+            NarratorPinnedFile(
+                "voices/voidek-pl-e991.onnx",
+                63_516_050,
+                "ca2ad0a22273e3850ce3def4d098f1993c2393c71584f474636afd08ab6af53b",
+            ),
+            NarratorPinnedFile(
+                "voices/voidek-pl-e991.onnx.json",
+                5_033,
+                "4b14423d0575b35bc4ace4dc83d639e9f8d0fa8eab3f238bd9597bfab50af5db",
+            ),
+        ),
+    ),
+    NarratorComponentDefinition(
         component_id="tts.polish-voice",
         kind=NarratorComponentKind.TTS,
+        legacy=True,
         name="Piper Polish voice - Gosia",
         license_id="MIT / CC0 source data",
         runtime_license_id="GPL-3.0-or-later",
@@ -242,6 +293,7 @@ DEFAULT_NARRATOR_COMPONENTS = (
     NarratorComponentDefinition(
         component_id="tts.polish-bass",
         kind=NarratorComponentKind.TTS,
+        legacy=True,
         name="Piper Polish voice - Bass",
         license_id="MIT",
         runtime_license_id="GPL-3.0-or-later",
@@ -277,6 +329,7 @@ DEFAULT_NARRATOR_COMPONENTS = (
     NarratorComponentDefinition(
         component_id="tts.polish-darkman",
         kind=NarratorComponentKind.TTS,
+        legacy=True,
         name="Piper Polish voice - Darkman",
         license_id="MIT / CC0 source data",
         runtime_license_id="GPL-3.0-or-later",
@@ -338,7 +391,21 @@ class NarratorComponentManager:
         self._runtime_states[component_id] = (bool(available), str(message))
 
     def list_components(self) -> tuple[NarratorComponent, ...]:
-        return tuple(self.status(component_id) for component_id in self._definitions)
+        """Catalog components. Former catalog voices are never listed; their files
+        stay on disk until a separate explicit cleanup action removes them."""
+        return tuple(
+            self.status(component_id)
+            for component_id, definition in self._definitions.items()
+            if not definition.legacy
+        )
+
+    def installed_legacy_components(self) -> tuple[str, ...]:
+        """Former catalog voices still present on disk (for a future explicit cleanup)."""
+        return tuple(
+            component_id
+            for component_id, definition in self._definitions.items()
+            if definition.legacy and self._read_manifest(component_id) is not None
+        )
 
     def status(self, component_id: str) -> NarratorComponent:
         definition = self._definition(component_id)
@@ -438,10 +505,23 @@ class NarratorComponentManager:
         )
 
     def can_install(self, component_id: str) -> bool:
-        return self._definition(component_id).install_ready
+        definition = self._definition(component_id)
+        return definition.install_ready and not definition.legacy
+
+    def is_legacy(self, component_id: str) -> bool:
+        return self._definition(component_id).legacy
+
+    def offer_message(self, component_id: str) -> str:
+        """Why a component cannot be downloaded in this build."""
+        definition = self._definition(component_id)
+        if definition.legacy:
+            return "This voice is no longer offered"
+        return definition.message or "This component has no verified download source in the current build"
 
     def install(self, component_id: str) -> None:
         definition = self._definition(component_id)
+        if definition.legacy:
+            raise RuntimeError("This voice is no longer offered for download")
         if not definition.install_ready:
             raise RuntimeError(
                 "This component has no verified download source in the current build"
@@ -644,6 +724,91 @@ class NarratorComponentManager:
             if digest != str(entry.get("sha256", "")):
                 return False, f"The component file failed verification: {relative.as_posix()}"
         return True, ""
+
+    def install_bundled(self, component_id: str, bundled_root: Path) -> bool:
+        """Install a component shipped inside the application (no download).
+
+        Used for Voidek: the release bundles its pinned ONNX and JSON files.
+        Nothing happens when the component is already installed and verified,
+        or when this build does not bundle it; the files are hash-verified by
+        ``install_local``.
+        """
+        definition = self._definition(component_id)
+        source = Path(bundled_root) / component_id
+        sources = {item.target_relative_path: source / item.target_relative_path for item in definition.pinned_files}
+        if not sources or not all(path.is_file() for path in sources.values()):
+            return False
+        if self._read_manifest(component_id) is not None:
+            return False
+        self.install_local(component_id, sources)
+        return True
+
+    def install_local(self, component_id: str, sources: Mapping[str, Path]) -> None:
+        """Install a component from local files that match its pinned size and SHA-256.
+
+        ``sources`` maps each pinned target path to a local file. Nothing is
+        downloaded; a file that does not match exactly is refused.
+        """
+        definition = self._definition(component_id)
+        if definition.legacy or not definition.pinned_files:
+            raise RuntimeError("This component has no pinned files for local installation")
+        expected = {item.target_relative_path: item for item in definition.pinned_files}
+        if set(sources) != set(expected):
+            raise RuntimeError("Local installation needs exactly the pinned files")
+        self.root.mkdir(parents=True, exist_ok=True)
+        staging = Path(tempfile.mkdtemp(prefix=f".{component_id}-", dir=self.root))
+        target = self._component_path(component_id)
+        backup = self.root / f".{component_id}.previous"
+        try:
+            files: list[dict[str, Any]] = []
+            for relative, pinned in sorted(expected.items()):
+                source = Path(sources[relative])
+                if source.is_symlink() or not source.is_file() or source.stat().st_size != pinned.size_bytes:
+                    raise RuntimeError(f"The local file does not match the pinned size: {relative}")
+                destination = staging / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                digest = hashlib.sha256()
+                with source.open("rb") as reader, destination.open("xb") as writer:
+                    for chunk in iter(lambda: reader.read(1024 * 1024), b""):
+                        digest.update(chunk)
+                        writer.write(chunk)
+                    writer.flush()
+                    os.fsync(writer.fileno())
+                if digest.hexdigest() != pinned.sha256:
+                    raise RuntimeError(f"The local file failed verification: {relative}")
+                os.chmod(destination, 0o644)
+                files.append({"path": relative, "size": pinned.size_bytes, "sha256": pinned.sha256})
+            _atomic_json_write(
+                staging / "component.json",
+                {
+                    "schema_version": NARRATOR_COMPONENT_SCHEMA_VERSION,
+                    "managed_by": "game-optimization-linux",
+                    "component_id": component_id,
+                    "kind": definition.kind.value,
+                    "version": definition.version,
+                    "license_id": definition.license_id,
+                    "runtime_license_id": definition.runtime_license_id,
+                    "artifact_license_id": definition.artifact_license_id,
+                    "source": "local-pinned",
+                    "attribution": definition.attribution,
+                    "files": files,
+                },
+            )
+            if backup.exists():
+                shutil.rmtree(backup)
+            if target.exists():
+                os.replace(target, backup)
+            try:
+                os.replace(staging, target)
+            except Exception:
+                if backup.exists() and not target.exists():
+                    os.replace(backup, target)
+                raise
+            if backup.exists():
+                shutil.rmtree(backup)
+        finally:
+            if staging.exists():
+                shutil.rmtree(staging)
 
     def update(self, component_id: str) -> None:
         if self._read_manifest(component_id) is None:

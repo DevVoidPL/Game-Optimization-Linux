@@ -339,6 +339,9 @@ QtObject {
         case "Gamescope is available": return qsTr("Gamescope is available")
         case "gamescope --help failed": return qsTr("gamescope --help failed")
         case "Done": return qsTr("Done")
+        case "The game is 32-bit, but its launcher runtime has no 32-bit MangoHud layer. Install the matching MangoHud package or extension, then refresh.": return qsTr("The game is 32-bit, but its launcher runtime has no 32-bit MangoHud layer. Install the matching MangoHud package or extension, then refresh.")
+        case "MangoHud is not available inside this launcher Flatpak. Install its matching MangoHud extension, then refresh.": return qsTr("MangoHud is not available inside this launcher Flatpak. Install its matching MangoHud extension, then refresh.")
+        case "Existing MangoHud configuration is not managed by GameOpti": return qsTr("Existing MangoHud configuration is not managed by GameOpti")
         case "MangoHud detected": return qsTr("MangoHud detected")
         case "MangoHud Flatpak layer detected":
             return qsTr("MangoHud Flatpak layer detected")
@@ -563,6 +566,14 @@ QtObject {
             return qsTr("The Piper CPU runtime is unavailable")
         case "Install the verified Polish Piper voice":
             return qsTr("Install the verified Polish Piper voice")
+        case "Install the Voidek Polish voice or import your own Piper voice":
+            return qsTr("Install the Voidek Polish voice or import your own Piper voice")
+        case "The Voidek voice is included with GameOpti":
+            return qsTr("The Voidek voice is included with GameOpti")
+        case "This voice is no longer offered":
+            return qsTr("This voice is no longer offered")
+        case "This voice is no longer offered for download":
+            return qsTr("This voice is no longer offered for download")
         case "The selected game is not running":
             return qsTr("The selected game is not running")
         case "Narrator is disabled for this game":
@@ -664,6 +675,9 @@ QtObject {
         match = original.match(/^(\S+) was installed, but the launcher sandbox still does not provide it$/)
         if (match)
             return qsTr("%1 was installed, but the launcher sandbox still does not provide it").arg(match[1])
+        match = original.match(/^The launcher runtime changed \((\S+) -> (\S+)\); (\S+) was not installed\. Check again to get the matching extension$/)
+        if (match)
+            return qsTr("The launcher runtime changed (%1 -> %2); %3 was not installed. Check again to get the matching extension").arg(match[1]).arg(match[2]).arg(match[3])
         match = original.match(/^Installing (\S+)$/)
         if (match)
             return qsTr("Installing %1").arg(match[1])

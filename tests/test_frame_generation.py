@@ -24,6 +24,17 @@ from game_optimization_linux.services.optiscaler import OptiScalerService, OptiS
 from game_optimization_linux.services.post_processing import PostProcessingService
 
 
+@pytest.fixture(autouse=True)
+def isolate_generator_discovery(monkeypatch):
+    # Only one explicitly requested, available competing layer in these fixtures.
+    from game_optimization_linux.services import frame_generation as fg
+    from game_optimization_linux.services import frame_generation_isolation as isolation
+    layers = [{"backend":"afmf","name":"VK_LAYER_AFMF","libraryPresent":True,"kind":"implicit","manifest":"/fixture.json",
+               "enable":["AFMF_ENABLE","1"],"disable":"DISABLE_AFMF"}]
+    monkeypatch.setattr(fg,"discover_layers",lambda env:layers)
+    monkeypatch.setattr(isolation,"discover_layers",lambda env:layers)
+
+
 def archive_bytes(backend="lsfg", payload=b"fixture layer"):
     output = io.BytesIO()
     with tarfile.open(fileobj=output, mode="w:xz") as archive:
@@ -147,8 +158,8 @@ def test_off_and_profile_isolation_preserve_upscaler(environment, monkeypatch):
     assert state["settings"]["mako"]["multiplier"] == 4
     assert load_profile("124", service.root)["settings"]["mako"]["multiplier"] == 2
     env, prefix = launch_settings("123", service.root, inherited={"VK_INSTANCE_LAYERS": "VK_LAYER_AFMF:VK_LAYER_other"})
-    assert env["DISABLE_LSFGVK"] == env["DISABLE_MAKO"] == env["DISABLE_AFMF"] == "1"
-    assert env["VK_INSTANCE_LAYERS"] == "VK_LAYER_other" and not prefix
+    # Removing the explicit request is sufficient: AFMF is opt-in and AFMF_ENABLE is absent.
+    assert env == {"VK_INSTANCE_LAYERS": "VK_LAYER_other"} and not prefix
     assert (game.install_path / "dxgi.dll").read_bytes() == b"working upscaler"
     assert launch_settings("124", service.root) == ({}, [])
 
@@ -188,7 +199,7 @@ def test_plan_preserves_postprocessing_and_isolates_gamescope(environment):
     assert list(plan.command[-4:]) == ["proton", "run", "Game.exe", "argument with spaces"]
     assert "/private/mako-launch" in plan.command
     assert "VK_LAYER_VKBASALT_post_processing" in plan.environment["VK_INSTANCE_LAYERS"]
-    assert plan.wrapper_environment_overrides["DISABLE_MAKO"] == "1"
+    assert "DISABLE_MAKO" not in plan.wrapper_environment_overrides
     assert "MAKO_CONFIG" in plan.wrapper_environment_removed
 
 
@@ -253,15 +264,17 @@ def test_backend_switching_unsets_selected_disable_gate_and_checks_mutable_confl
     _atomic_write(path, json.dumps(state))
     env, prefix = launch_settings("123", root, inherited={"DISABLE_LSFGVK": "1", "VK_INSTANCE_LAYERS": "VK_LAYER_AFMF:VK_LAYER_other"})
     assert "DISABLE_LSFGVK" not in env and prefix[:3] == ["env", "-u", "DISABLE_LSFGVK"]
-    assert env["DISABLE_MAKO"] == env["DISABLE_AFMF"] == "1"
+    assert "DISABLE_AFMF" not in env and "DISABLE_MAKO" not in env
     assert env["VK_INSTANCE_LAYERS"] == "VK_LAYER_other"
+    env, prefix = launch_settings("123", root, inherited={"AFMF_ENABLE": "1"})
+    assert env["DISABLE_AFMF"] == "1" and "LSFGVK_CONFIG" in env
     with pytest.raises(ValueError, match="VK_LOADER_LAYERS_DISABLE"):
         launch_settings("123", root, inherited={"VK_LOADER_LAYERS_DISABLE": "~implicit~"})
     with pytest.raises(ValueError, match="OpenGL"):
         launch_settings("123", root, inherited={"PROTON_USE_WINED3D": "1"})
     state["backend"] = "off"; _atomic_write(path, json.dumps(state))
     env, prefix = launch_settings("123", root)
-    assert env["DISABLE_LSFGVK"] == "1" and not prefix
+    assert env == {} and not prefix
     state["backend"] = "afmf"; _atomic_write(path, json.dumps(state))
     (path.parent / "optiscaler.json").write_text(json.dumps({"installation_state": "installed"}))
     with pytest.raises(ValueError, match="OptiScaler"): launch_settings("123", root)
@@ -304,7 +317,7 @@ def test_off_does_not_require_installed_component_or_existing_executable(environ
     (game.install_path / "Game.exe").unlink()
     monkeypatch.setattr(service, "status", lambda game: load_profile(game.profile_key, service.root))
     assert service.apply(game, {"backend": "off"})["backend"] == "off"
-    assert launch_settings("123", service.root)[0]["DISABLE_AFMF"] == "1"
+    assert launch_settings("123", service.root) == ({}, [])
 
 
 def test_frame_generation_stderr_transport_preserves_unrelated_vkbasalt_settings(tmp_path):

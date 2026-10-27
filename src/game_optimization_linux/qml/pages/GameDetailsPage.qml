@@ -483,6 +483,7 @@ Item {
             gameData: page.gameData
             onToastRequested: function(message, tone) { page.toastRequested(message, tone) }
             onOptiScalerRequested: tabBar.currentIndex = 3
+            onIntegrationRequested: tabBar.currentIndex = 0
         }
     }
 

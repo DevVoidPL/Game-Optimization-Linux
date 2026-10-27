@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any, Mapping
 
@@ -10,7 +10,7 @@ from .mangohud import validate_game_key
 
 
 PROTON_TWEAKS_SCHEMA_VERSION = 1
-PROTON_TWEAK_CATEGORIES = ("recommended", "compatibility", "debug", "experimental")
+PROTON_TWEAK_CATEGORIES = ("recommended", "compatibility", "debug", "experimental", "display", "latency")
 
 
 @dataclass(frozen=True, slots=True)
@@ -24,6 +24,7 @@ class ProtonTweakDefinition:
     requirements: str = ""
     official_proton: bool = True
     hardware_dependent: bool = False
+    disabled_value: str | None = "0"
 
     def __post_init__(self) -> None:
         if not self.id or not self.environment_key:
@@ -46,10 +47,36 @@ class ProtonTweakDefinition:
             "requirements": self.requirements,
             "officialProton": self.official_proton,
             "hardwareDependent": self.hardware_dependent,
+            "disabledValue": self.disabled_value,
         }
 
 
 PROTON_TWEAK_REGISTRY: tuple[ProtonTweakDefinition, ...] = (
+    ProtonTweakDefinition(
+        "wayland", "PROTON_ENABLE_WAYLAND", "1", "display",
+        "Native Wayland", "Use Wine's Wayland driver. Requires a Wayland session and winewayland in the selected Proton. Keep Default with Gamescope.",
+    ),
+    ProtonTweakDefinition(
+        "disable_hdr", "DXVK_NO_HDR", "1", "display",
+        "Disable HDR reporting", "Compatibility override for incorrect HDR detection. Default keeps the runner's HDR detection; it does not turn on HDR in the desktop or game.",
+        disabled_value=None,
+    ),
+    ProtonTweakDefinition(
+        "prefer_sdl", "PROTON_PREFER_SDL", "1", "display",
+        "Prefer SDL controller input", "Use the runner's SDL input path instead of HIDRAW/Steam Input. Controller features and mappings can change; use only to resolve an input problem.",
+    ),
+    ProtonTweakDefinition(
+        "low_latency", "LOW_LATENCY_LAYER", "1", "latency",
+        "Low Latency Layer", "Requires the runner's Vulkan layer and a game using Anti-Lag 2 or Reflex. Enable the matching in-game option. A loaded layer alone does not prove reduced latency.",
+    ),
+    ProtonTweakDefinition(
+        "latency_reflex", "LOW_LATENCY_LAYER_REFLEX", "1", "latency",
+        "Expose Reflex through the layer", "Select Reflex instead of Anti-Lag 2 for Low Latency Layer. Requires compatible DXVK-NVAPI and game support. No GPU identity spoofing is added.",
+    ),
+    ProtonTweakDefinition(
+        "no_ntsync", "PROTON_NO_NTSYNC", "1", "compatibility",
+        "Disable ntsync", "Synchronization workaround. Requires a runner that implements this override. Default leaves synchronization selection to the runner; disabling fsync alone does not disable ntsync.",
+    ),
     ProtonTweakDefinition(
         "use_wined3d", "PROTON_USE_WINED3D", "1", "compatibility",
         "Use WineD3D", "OpenGL compatibility fallback instead of DXVK. It is not a performance boost.",
@@ -97,7 +124,7 @@ PROTON_TWEAK_REGISTRY: tuple[ProtonTweakDefinition, ...] = (
         "rdna3_wmma_workaround", "DXIL_SPIRV_CONFIG", "wmma_rdna3_workaround", "experimental",
         "RDNA3 WMMA workaround", "Enable the DXIL-SPIRV RDNA3 WMMA workaround.",
         requirements="Use only after independently confirming RDNA3 and the required DXIL-SPIRV stack.",
-        hardware_dependent=True,
+        hardware_dependent=True, disabled_value=None,
     ),
 )
 PROTON_TWEAK_BY_ID = {definition.id: definition for definition in PROTON_TWEAK_REGISTRY}
@@ -110,6 +137,8 @@ class ProtonTweaksProfile:
     enabled_tweaks: tuple[str, ...] = ()
     optiscaler_fsr4_update: bool = False
     updated_at: datetime = datetime.min.replace(tzinfo=UTC)
+    states: Mapping[str, str] = field(default_factory=dict)
+    extra: Mapping[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.schema_version != PROTON_TWEAKS_SCHEMA_VERSION:
@@ -120,10 +149,20 @@ class ProtonTweaksProfile:
         unknown = set(self.enabled_tweaks).difference(PROTON_TWEAK_BY_ID)
         if unknown:
             raise ValueError("unknown Proton tweak: " + ", ".join(sorted(unknown)))
+        if not isinstance(self.states, Mapping):
+            raise ValueError("states must be an object")
+        for key, value in self.states.items():
+            if key not in PROTON_TWEAK_BY_ID or value not in {"default", "enabled", "disabled"}:
+                raise ValueError("invalid Proton tweak state")
+            if value == "disabled" and PROTON_TWEAK_BY_ID[key].disabled_value is None:
+                raise ValueError("this option supports Default or Enabled only")
+        effective = dict.fromkeys(self.enabled_tweaks, "enabled")
+        effective.update(self.states)
+        object.__setattr__(self, "states", {k: v for k, v in effective.items() if v != "default"})
         ordered = tuple(
             definition.id
             for definition in PROTON_TWEAK_REGISTRY
-            if definition.id in set(self.enabled_tweaks)
+            if effective.get(definition.id) == "enabled"
         )
         object.__setattr__(self, "enabled_tweaks", ordered)
         if self.updated_at.tzinfo is None:
@@ -134,16 +173,22 @@ class ProtonTweaksProfile:
         return cls(PROTON_TWEAKS_SCHEMA_VERSION, validate_game_key(app_id))
 
     def environment(self) -> dict[str, str]:
-        enabled = set(self.enabled_tweaks)
-        return {
-            definition.environment_key: definition.value
-            for definition in PROTON_TWEAK_REGISTRY
-            if definition.id in enabled
-        }
+        result = {}
+        for definition in PROTON_TWEAK_REGISTRY:
+            state = self.states.get(definition.id, "default")
+            if state != "default":
+                result[definition.environment_key] = definition.value if state == "enabled" else definition.disabled_value
+        # Vulkan loader disable switches are presence-based. Never add =0 to
+        # DISABLE_* on enable: an inherited user-owned veto must stay effective.
+        if self.states.get("low_latency") == "disabled":
+            result["DISABLE_LOW_LATENCY_LAYER"] = "1"
+        return result
 
     def to_dict(self) -> dict[str, Any]:
         return {
+            **self.extra,
             "schema_version": self.schema_version,
+            "states": dict(self.states),
             "app_id": self.app_id,
             "enabled_tweaks": list(self.enabled_tweaks),
             "optiscaler_fsr4_update": self.optiscaler_fsr4_update,
@@ -173,6 +218,8 @@ class ProtonTweaksProfile:
             enabled_tweaks=tuple(raw_enabled),
             optiscaler_fsr4_update=data.get("optiscaler_fsr4_update", False),
             updated_at=updated_at,
+            states=data.get("states", {}),
+            extra={k: v for k, v in data.items() if k not in {"schema_version", "app_id", "enabled_tweaks", "optiscaler_fsr4_update", "updated_at", "states"}},
         )
 
 

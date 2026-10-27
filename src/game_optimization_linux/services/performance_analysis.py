@@ -27,6 +27,11 @@ _ALIASES = {
     ),
     "gpu_temp": ("gputemp", "gpu_temp", "gputemperature"),
     "gpu_clock": ("gpuclock", "gpu_clock", "gpu_core_clock"),
+    # Logged by MangoHud in every CSV; used by measured comparisons.
+    "cpu_temp": ("cputemp", "cpu_temp"),
+    "gpu_power": ("gpupower", "gpu_power"),
+    "cpu_power": ("cpupower", "cpu_power"),
+    "cpu_clock": ("cpu_mhz", "cpumhz", "cpuclock", "cpu_clock"),
     "time": ("time", "elapsed", "elapsedseconds", "timestamp"),
 }
 
@@ -63,7 +68,9 @@ def _percentile(values: Iterable[float], fraction: float) -> float | None:
 
 
 class MangoHudLogParser:
-    def parse(self, path: Path) -> PerformanceMeasurement:
+    def read_samples(self, path: Path) -> tuple[Path, list[dict[str, float]]]:
+        """All logged rows with a frame value, normalized (MB, seconds)."""
+
         source = path.resolve(strict=True)
         if not source.is_file() or source.stat().st_size > 128 * 1024 * 1024:
             raise ValueError("MangoHud log is not a supported file")
@@ -96,6 +103,11 @@ class MangoHudLogParser:
             samples.append(sample)
         if not samples:
             raise ValueError("MangoHud log contains no performance samples")
+        return source, samples
+
+    def parse(self, path: Path) -> PerformanceMeasurement:
+        source, samples = self.read_samples(path)
+        headings = {key: key for key in _ALIASES}
         selected, representative, selection_reasons = self._representative_samples(
             samples
         )

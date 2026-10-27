@@ -18,11 +18,11 @@ from game_optimization_linux.services.narrator_persistence import (
 )
 from game_optimization_linux.services.narrator_tts import (
     PIPER_BASS_VOICE_ID,
-    PIPER_COMPONENT_ID,
-    PIPER_CONFIG_RELATIVE_PATH,
+    PIPER_VOIDEK_COMPONENT_ID,
+    PIPER_VOIDEK_CONFIG_RELATIVE_PATH,
     PIPER_DARKMAN_VOICE_ID,
-    PIPER_MODEL_RELATIVE_PATH,
-    PIPER_VOICE_ID,
+    PIPER_VOIDEK_MODEL_RELATIVE_PATH,
+    PIPER_DEFAULT_VOICE_ID,
     PiperPolishTtsProvider,
 )
 from tests.test_narrator_end_to_end import _ManualExecutor, _pipeline
@@ -34,10 +34,10 @@ QML = ROOT / "src/game_optimization_linux/qml"
 @pytest.fixture()
 def controller(tmp_path: Path):
     components = tmp_path / "components"
-    model = components / PIPER_COMPONENT_ID / PIPER_MODEL_RELATIVE_PATH
+    model = components / PIPER_VOIDEK_COMPONENT_ID / PIPER_VOIDEK_MODEL_RELATIVE_PATH
     model.parent.mkdir(parents=True)
     model.write_bytes(b"gosia")
-    (components / PIPER_COMPONENT_ID / PIPER_CONFIG_RELATIVE_PATH).write_text(
+    (components / PIPER_VOIDEK_COMPONENT_ID / PIPER_VOIDEK_CONFIG_RELATIVE_PATH).write_text(
         "{}", encoding="utf-8"
     )
     tts = PiperPolishTtsProvider(components, runtime_available=lambda: True)
@@ -61,7 +61,9 @@ def test_voice_list_contains_every_catalog_voice_with_metadata(controller) -> No
         voice["id"]: voice
         for voice in controller.getNarratorGameSettings(game_id)["voices"]
     }
-    assert set(voices) == {PIPER_VOICE_ID, PIPER_BASS_VOICE_ID, PIPER_DARKMAN_VOICE_ID}
+    # Voidek is the only catalog voice; former catalog voices are never offered.
+    assert set(voices) == {"voidek-pl-e991"}
+    assert voices["voidek-pl-e991"]["legacy"] is False
     definitions = {
         definition.component_id: definition
         for definition in DEFAULT_NARRATOR_COMPONENTS
@@ -74,12 +76,11 @@ def test_voice_list_contains_every_catalog_voice_with_metadata(controller) -> No
         assert voice["artifactLicenseId"] == definition.artifact_license_id
         assert voice["attribution"] == definition.attribution
         assert voice["version"] == definition.version
-    assert voices[PIPER_VOICE_ID]["installed"] is True
-    assert voices[PIPER_DARKMAN_VOICE_ID]["installed"] is False
-    assert voices[PIPER_DARKMAN_VOICE_ID]["canInstall"] is True
-    assert voices[PIPER_VOICE_ID]["quality"] == "medium"
-    assert voices[PIPER_BASS_VOICE_ID]["quality"] == "high"
-    assert voices[PIPER_DARKMAN_VOICE_ID]["quality"] == "medium"
+    assert voices["voidek-pl-e991"]["installed"] is True  # fixture: local Voidek files
+    assert voices["voidek-pl-e991"]["canInstall"] is False  # no download URL published
+    assert voices["voidek-pl-e991"]["downloadSizeBytes"] == 63_521_083
+    components = {c["componentId"] for c in controller._narrator_controller.components()}
+    assert "tts.voidek" in components and not components & {"tts.polish-voice", "tts.polish-bass", "tts.polish-darkman"}
 
 
 def test_speaker_name_toggle_is_one_shared_setting(controller) -> None:

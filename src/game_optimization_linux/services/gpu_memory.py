@@ -222,17 +222,29 @@ class GpuMemoryService:
         gpus = system["gpus"]
         rebar = any(g.get("type") == "PHYSICAL_DEVICE_TYPE_DISCRETE_GPU" and g.get("vramTotal")
                     and (g.get("visibleVram") or 0) >= g["vramTotal"] * .9 for g in gpus)
-        session = {}
+        session, session_state = {}, "none"
         path = profile_path(key, self.root).with_name("gpu-memory-session.json")
         if path.exists():
-            session = json.loads(path.read_text())
-            pid = int(session.get("pid", 0))
-            if pid > 0 and session.get("status") not in {"exited", "starting"}:
+            # Read-time recovery on the host: a record the wrapper never finalized
+            # (SIGINT/SIGTERM/kill) becomes "interrupted" once the game process and
+            # its scope are proven gone. Reads only /proc and cgroup files.
+            try:
+                view = host_call("reconcile", "--output", str(path), "--key", key)
+            except (OSError, ValueError, subprocess.SubprocessError):
+                view = {"state": "unverified", "record": {}}
+            session_state = str(view.get("state", "unverified"))
+            session = dict(view.get("record") or {})
+            pid = int(session.get("pid", 0) or 0)
+            if session_state == "running" and pid > 0:
                 current = host_call("snapshot", "--pid", str(pid), "--region", profile.get("region", ""))
-                if current.get("startTicks") != session.get("startTicks"):
-                    session = {**session, "status": "process_exited", "protectionVerified": False}
-                else:
+                if current.get("startTicks") == session.get("startTicks"):
                     session = {**session, **current}
+                else:  # the scope still runs, but not this process: nothing current to claim
+                    session = {**session, "protectionVerified": False}
+            elif session_state != "exited":
+                # Historical, interrupted or unverifiable: never current protection.
+                session = {**session, "protectionVerified": False}
+            session["sessionState"] = session_state
         # The wrapper PID alone proves only its scope. Match the actual selected
         # executable and its cgroup using the existing host process evidence.
         games = []
@@ -262,6 +274,8 @@ class GpuMemoryService:
                 "pressureSupported": bool(rebar and tool.get("noUploadHvv")), "dedicatedRebar": rebar,
                 "state": state, "session": session, "gameProcesses": games,
                 "runtimeProtectionVerified": effective, "failedLaunch": failed,
+                "sessionState": session_state,
+                "interruptedSession": session_state == "interrupted",
                 "runtimeState": runtime_state,
                 "protectionOrigin": ("managed_scope" if effective and all(g["scopeMatches"] for g in games)
                                      else "independent" if effective else "unverified"),

@@ -55,6 +55,20 @@ ScrollView {
     readonly property var otherBlockers: blockers.filter(function(value) { return !(panel.optiConflict && String(value).indexOf("OptiScaler") >= 0) })
     readonly property bool dependenciesReady: backend === "off" || (component.installed && modelsReady && apiReady && environmentReady && hardwareReady && !optiConflict && !otherBlockers.length)
     readonly property bool canApply: loaded && !statusData.busy && (backend === "off" || dependenciesReady && !(statusData.steamUpdate || {}).blocked)
+    readonly property bool applyAllowed: canApply && (!needsLossless || !statusData.optiScalerPresent || internalFgOff)
+    function savedBackendName() { return backendNames[Math.max(0, backendIds.indexOf(String(statusData.backend || "off")))] }
+    // The launch plan is always built from the saved profile, never from this draft.
+    function draftStateText() {
+        var text = qsTr("Not saved: %1 is only selected in this editor. The launch plan and the next game start still use the saved profile (%2).")
+            .arg(backendNames[Math.max(0, backendIds.indexOf(backend))]).arg(savedBackendName())
+        if (applyAllowed) return text
+        var update = statusData.steamUpdate || ({})
+        if (update.blocked) return text + "\n" + qsTr("Apply is unavailable while Steam is writing this game's files (Steam state: %1).").arg(String(update.state || "unknown"))
+        if (statusData.busy) return text + "\n" + qsTr("Apply is unavailable while another operation runs.")
+        if (!loaded) return text + "\n" + qsTr("Apply is unavailable until the status check finishes.")
+        if (String(operationError()).indexOf("Steam") >= 0) return text + "\n" + qsTr("The last operation needed Steam to be closed and changed nothing. Close Steam completely, then try again.")
+        return text + "\n" + qsTr("Apply is unavailable until the requirements in step 3 are met.")
+    }
     readonly property var summaries: [
         {label: qsTr("Installation"), value: backend === "off" ? qsTr("Not required") : !loaded ? qsTr("Checking…") : component.installed ? String(component.version) : qsTr("Missing")},
         {label: qsTr("Requirements"), value: !loaded ? qsTr("Checking…") : dependenciesReady ? qsTr("Ready") : qsTr("Action needed")},
@@ -253,7 +267,7 @@ ScrollView {
                                 spacing: 4
                                 Label { Layout.fillWidth: true; text: panel.backendNames[backendCard.index]; color: App.Theme.text; font.bold: true; font.pixelSize: panel.bodySize; wrapMode: Text.WordWrap }
                                 Label { Layout.fillWidth: true; text: backendCard.modelData === "off" ? qsTr("No managed generator") : backendCard.modelData === "lsfg" ? qsTr("Fixed multiplier · Lossless Scaling") : backendCard.modelData === "mako" ? qsTr("Fixed / adaptive · Lossless Scaling") : qsTr("Independent Vulkan layer · no purchase"); color: App.Theme.textSecondary; font.pixelSize: panel.couchMode ? 17 : App.Theme.fontCaption; wrapMode: Text.WordWrap }
-                                Label { id: backendState; Layout.fillWidth: true; text: backendCard.modelData === "off" ? qsTr("Off") : !panel.loaded ? qsTr("Checking…") : !((panel.statusData.components || {})[backendCard.modelData] || {}).installed ? qsTr("Component missing") : ((panel.statusData.components || {})[backendCard.modelData] || {}).optiScalerConflict ? qsTr("OptiScaler conflict") : backendCard.modelData !== "afmf" && !((panel.statusData.components || {})[backendCard.modelData] || {}).modelsValidated ? qsTr("Lossless Scaling required") : qsTr("Component installed"); color: App.Theme.textMuted; font.pixelSize: panel.couchMode ? 17 : App.Theme.fontCaption; wrapMode: Text.WordWrap }
+                                Label { id: backendState; Layout.fillWidth: true; text: backendCard.modelData === "off" ? qsTr("Off") : !panel.loaded ? qsTr("Checking…") : !((panel.statusData.components || {})[backendCard.modelData] || {}).installed ? qsTr("Component missing") : ((panel.statusData.components || {})[backendCard.modelData] || {}).optiScalerConflict ? qsTr("OptiScaler conflict") : backendCard.modelData !== "afmf" && !((panel.statusData.components || {})[backendCard.modelData] || {}).modelsValidated ? qsTr("Lossless Scaling required") : String(panel.statusData.backend || "off") === backendCard.modelData ? qsTr("Installed · saved for this game") : qsTr("Installed · not applied to this game"); color: App.Theme.textMuted; font.pixelSize: panel.couchMode ? 17 : App.Theme.fontCaption; wrapMode: Text.WordWrap }
                             }
                             onClicked: panel.chooseBackend(index)
                         }
@@ -275,7 +289,7 @@ ScrollView {
             contentItem: ColumnLayout {
                 spacing: 8
                 Label { Layout.fillWidth: true; text: qsTr("2 · Install the shared component"); color: App.Theme.text; font.bold: true; font.pixelSize: panel.bodySize; wrapMode: Text.WordWrap }
-                Label { Layout.fillWidth: true; text: panel.component.installed ? qsTr("Installed: %1. Downloading does not activate frame generation.").arg(String(panel.component.version)) : qsTr("Available version: %1 · Download: %2 MiB. Installation does not activate any game or global layer.").arg(String(panel.component.availableVersion || "—")).arg((Number(panel.component.downloadSize || 0) / 1048576).toFixed(2)); color: App.Theme.textSecondary; wrapMode: Text.WordWrap; font.pixelSize: panel.bodySize }
+                Label { Layout.fillWidth: true; objectName: "fgComponentState"; text: panel.component.installed ? (String(panel.statusData.backend || "off") === panel.backend ? qsTr("Already installed: %1. Nothing to download. This game's saved profile uses it.").arg(String(panel.component.version)) : qsTr("Already installed: %1. Nothing to download; use Apply below to use it for this game.").arg(String(panel.component.version))) : qsTr("Available version: %1 · Download: %2 MiB. Installation does not activate any game or global layer.").arg(String(panel.component.availableVersion || "—")).arg((Number(panel.component.downloadSize || 0) / 1048576).toFixed(2)); color: App.Theme.textSecondary; wrapMode: Text.WordWrap; font.pixelSize: panel.bodySize }
                 Flow { Layout.fillWidth: true; spacing: 8
                     AppButton { width: Math.min(implicitWidth, panel.availableWidth - 32); visible: !panel.component.installed; property string fgActionType: "button"; text: qsTr("Download and install"); textPixelSize: panel.bodySize; enabled: !panel.statusData.busy; onClicked: panel.ask("install") }
                     AppButton { width: Math.min(implicitWidth, panel.availableWidth - 32); visible: Boolean(panel.statusData.busy) && ["install", "download"].indexOf(String((panel.statusData.progress || {}).phase || "")) >= 0; property string fgActionType: "button"; text: qsTr("Cancel download"); textPixelSize: panel.bodySize; onClicked: panel.controller.cancelFrameGeneration() }
@@ -365,9 +379,10 @@ ScrollView {
                     Label { Layout.fillWidth: true; text: qsTr("I disabled in-game / OptiScaler / DLSS Enabler frame generation. Keep the working upscaler."); color: App.Theme.textSecondary; font.pixelSize: panel.bodySize; wrapMode: Text.WordWrap }
                 }
                 Label { visible: panel.backend === "afmf" && !panel.optiConflict; Layout.fillWidth: true; text: qsTr("Before testing afmf-linux, turn off the game's own frame generation."); color: App.Theme.textSecondary; font.pixelSize: panel.bodySize; wrapMode: Text.WordWrap }
-                AppButton { Layout.maximumWidth: panel.availableWidth - 32; objectName: "applyFrameGeneration"; property string fgActionType: "button"; text: panel.dirty ? qsTr("Apply changes") : qsTr("Apply"); textPixelSize: panel.bodySize; kind: "primary"; enabled: panel.canApply && (!panel.needsLossless || !panel.statusData.optiScalerPresent || panel.internalFgOff); onClicked: panel.run("apply") }
+                AppButton { Layout.maximumWidth: panel.availableWidth - 32; objectName: "applyFrameGeneration"; property string fgActionType: "button"; text: panel.dirty ? qsTr("Apply changes") : qsTr("Apply"); textPixelSize: panel.bodySize; kind: "primary"; enabled: panel.applyAllowed; onClicked: panel.run("apply") }
+                Label { objectName: "fgDraftState"; visible: panel.dirty; Layout.fillWidth: true; text: panel.draftStateText(); color: App.Theme.warning; wrapMode: Text.WordWrap; font.pixelSize: panel.bodySize }
                 Label { visible: panel.backend !== "off" && !panel.dependenciesReady; Layout.fillWidth: true; text: qsTr("Resolve the requirements in step 3 before Apply."); color: App.Theme.textMuted; wrapMode: Text.WordWrap; font.pixelSize: panel.couchMode ? 18 : App.Theme.fontCaption }
-                Label { visible: panel.backend === "off"; Layout.fillWidth: true; text: qsTr("Off prevents managed generators on the next launch. Installed components and each backend's saved values are kept."); color: App.Theme.textSecondary; wrapMode: Text.WordWrap; font.pixelSize: panel.bodySize }
+                Label { visible: panel.backend === "off"; Layout.fillWidth: true; text: qsTr("Off requests no generator. A guard is added only when the inherited environment concretely activates a generator. Installed components and each backend's saved values are kept."); color: App.Theme.textSecondary; wrapMode: Text.WordWrap; font.pixelSize: panel.bodySize }
                 Label { visible: !!panel.operationError(); Layout.fillWidth: true; text: panel.operationError(); color: App.Theme.danger; wrapMode: Text.WrapAnywhere; font.pixelSize: panel.bodySize }
                 Label { visible: panel.backend !== "off"; Layout.fillWidth: true; text: qsTr("Injection may conflict with anti-cheat or game policies. Use offline testing; GameOpti does not bypass anti-cheat."); color: App.Theme.textMuted; wrapMode: Text.WordWrap; font.pixelSize: panel.couchMode ? 18 : App.Theme.fontCaption }
             }

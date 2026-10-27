@@ -418,6 +418,8 @@ Item {
             return qsTr("Downloading")
         if (Boolean(value(voice, ["installed"], false)))
             return qsTr("Installed")
+        if (!Boolean(value(voice, ["canInstall"], false)))
+            return qsTr("Not published yet")
         return qsTr("Download %1").arg(formatBytes(value(voice, ["downloadSizeBytes"], null)))
     }
 
@@ -563,6 +565,8 @@ Item {
             return qsTr("Local Polish subtitle OCR")
         if (componentId === "translation.opus-en-pl")
             return qsTr("Local English to Polish translation")
+        if (componentId === "tts.voidek")
+            return qsTr("Local Polish voice") + " - Voidek"
         if (componentId === "tts.polish-voice")
             return qsTr("Local Polish voice") + " - Gosia"
         if (componentId === "tts.polish-bass")
@@ -1329,6 +1333,7 @@ Item {
 
                                             AppButton {
                                                 visible: voiceRow.selected && !voiceRow.installed && !voiceRow.installing
+                                                         && Boolean(page.value(voiceRow.modelData, ["canInstall"], false))
                                                 compact: true
                                                 text: qsTr("Download (%1)").arg(page.formatBytes(page.value(voiceRow.modelData, ["downloadSizeBytes"], null)))
                                                 iconSource: App.UiIcons.actionDownload

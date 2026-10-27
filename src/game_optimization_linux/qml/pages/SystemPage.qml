@@ -230,8 +230,9 @@ Item {
 
                             Label {
                                 Layout.fillWidth: true
-                                text: "%1 %2".arg(page.diagnosticValue("appName"))
+                                text: "%1 %2 · %3".arg(page.diagnosticValue("appName"))
                                       .arg(page.diagnosticValue("appVersion"))
+                                      .arg(page.diagnosticValue("edition"))
                                 color: App.Theme.text
                                 font.pixelSize: App.Theme.fontBodyLarge
                                 font.weight: Font.Bold

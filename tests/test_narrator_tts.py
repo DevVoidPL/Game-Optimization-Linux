@@ -28,29 +28,38 @@ from game_optimization_linux.services.narrator_tts import (
     PIPER_COMPONENT_ID,
     PIPER_CONFIG_RELATIVE_PATH,
     PIPER_MODEL_RELATIVE_PATH,
+    PIPER_DEFAULT_VOICE_ID,
     PIPER_PROVIDER_ID,
     PIPER_VOICE_ID,
+    PIPER_VOIDEK_COMPONENT_ID,
+    PIPER_VOIDEK_CONFIG_RELATIVE_PATH,
+    PIPER_VOIDEK_MODEL_RELATIVE_PATH,
     PiperPolishTtsProvider,
     PiperSynthesis,
 )
 
 
 def _install_voice(root: Path) -> tuple[Path, Path]:
-    component = root / PIPER_COMPONENT_ID
-    model = component / PIPER_MODEL_RELATIVE_PATH
-    config = component / PIPER_CONFIG_RELATIVE_PATH
+    """The default catalog voice (Voidek)."""
+    component = root / PIPER_VOIDEK_COMPONENT_ID
+    model = component / PIPER_VOIDEK_MODEL_RELATIVE_PATH
+    config = component / PIPER_VOIDEK_CONFIG_RELATIVE_PATH
     model.parent.mkdir(parents=True)
     model.write_bytes(b"model")
     config.write_text("{}", encoding="utf-8")
     return model, config
 
 
-def _install_bass_voice(root: Path) -> tuple[Path, Path]:
-    component = root / PIPER_BASS_COMPONENT_ID
-    model = component / PIPER_BASS_MODEL_RELATIVE_PATH
-    config = component / PIPER_BASS_CONFIG_RELATIVE_PATH
+SECOND_VOICE_ID = "custom-second-voice"
+
+
+def _install_second_voice(root: Path) -> tuple[Path, Path]:
+    """A second selectable voice: an imported custom voice next to Voidek."""
+    directory = root / "tts.custom-voices" / "voices"
+    model = directory / "second-voice.onnx"
+    config = directory / "second-voice.onnx.json"
     model.parent.mkdir(parents=True)
-    model.write_bytes(b"bass-model")
+    model.write_bytes(b"second-model")
     config.write_text("{}", encoding="utf-8")
     return model, config
 
@@ -101,7 +110,7 @@ def test_piper_provider_synthesizes_mono_s16_pcm_on_cpu_component(
     audio = provider.synthesize(
         "  Musimy się stąd   wydostać. ",
         language="pl",
-        voice_id=PIPER_VOICE_ID,
+        voice_id=PIPER_DEFAULT_VOICE_ID,
         speech_rate=1.2,
     )
 
@@ -122,7 +131,7 @@ def test_piper_provider_synthesizes_mono_s16_pcm_on_cpu_component(
 def test_piper_provider_prewarms_selected_worker_and_reuses_it(
     tmp_path: Path,
 ) -> None:
-    _install_bass_voice(tmp_path)
+    _install_second_voice(tmp_path)
     worker = _Worker()
     clock_values = iter((10.0, 10.0, 10.125))
     provider = PiperPolishTtsProvider(
@@ -132,11 +141,11 @@ def test_piper_provider_prewarms_selected_worker_and_reuses_it(
         clock=lambda: next(clock_values),
     )
 
-    provider.prepare(PIPER_BASS_VOICE_ID)
+    provider.prepare(SECOND_VOICE_ID)
     audio = provider.synthesize(
         "Uciekaj!",
         language="pl",
-        voice_id=PIPER_BASS_VOICE_ID,
+        voice_id=SECOND_VOICE_ID,
         speech_rate=1.1,
     )
 
@@ -160,14 +169,41 @@ def test_piper_provider_reports_runtime_and_voice_component_separately(
         runtime_available=lambda: True,
     )
     assert missing_voice.available is False
-    assert missing_voice.status_message == "Install the verified Polish Piper voice"
+    assert missing_voice.status_message == "Install the Voidek Polish voice or import your own Piper voice"
 
     _install_voice(tmp_path)
     assert missing_voice.available is True
     assert missing_voice.status_message == "Piper Polish speech synthesis is ready"
 
 
-def test_piper_provider_lists_gosia_and_bass_without_falling_back(
+def _install_gosia_voice(root: Path) -> tuple[Path, Path]:
+    component = root / PIPER_COMPONENT_ID
+    model = component / PIPER_MODEL_RELATIVE_PATH
+    config = component / PIPER_CONFIG_RELATIVE_PATH
+    model.parent.mkdir(parents=True)
+    model.write_bytes(b"gosia-model")
+    config.write_text("{}", encoding="utf-8")
+    return model, config
+
+
+def test_catalog_offers_only_voidek_and_hides_installed_former_voices(
+    tmp_path: Path,
+) -> None:
+    provider = PiperPolishTtsProvider(
+        tmp_path, worker_factory=lambda _model, _config: _Worker(), runtime_available=lambda: True,
+    )
+    assert [(voice.voice_id, voice.name) for voice in provider.voices] == [(PIPER_DEFAULT_VOICE_ID, "Voidek")]
+    assert provider.default_voice_id == "voidek-pl-e991"
+    # A former catalog voice a user already downloaded is left on disk but never listed.
+    model, config = _install_gosia_voice(tmp_path)
+    assert [voice.voice_id for voice in provider.voices] == [PIPER_DEFAULT_VOICE_ID]
+    assert provider.available_voice_ids == ()
+    with pytest.raises(ValueError, match="Unsupported Polish voice"):
+        provider.synthesize("Tekst", language="pl", voice_id=PIPER_VOICE_ID, speech_rate=1.0)
+    assert model.is_file() and config.is_file()
+
+
+def test_uninstalled_former_voice_is_not_offered_and_never_falls_back(
     tmp_path: Path,
 ) -> None:
     _install_voice(tmp_path)
@@ -178,14 +214,11 @@ def test_piper_provider_lists_gosia_and_bass_without_falling_back(
     )
 
     assert [(voice.voice_id, voice.name) for voice in provider.voices] == [
-        (PIPER_VOICE_ID, "Gosia"),
-        (PIPER_BASS_VOICE_ID, "Bass"),
-        (PIPER_DARKMAN_VOICE_ID, "Darkman"),
+        (PIPER_DEFAULT_VOICE_ID, "Voidek"),
     ]
-    assert provider.available_voice_ids == (PIPER_VOICE_ID,)
-    assert provider.voice_installed(PIPER_BASS_VOICE_ID) is False
+    assert provider.available_voice_ids == (PIPER_DEFAULT_VOICE_ID,)
 
-    with pytest.raises(RuntimeError, match="selected Polish voice is not installed"):
+    with pytest.raises(ValueError, match="Unsupported Polish voice"):
         provider.synthesize(
             "Bass nie jest zainstalowany",
             language="pl",
@@ -198,7 +231,7 @@ def test_piper_provider_closes_resident_worker_when_voice_changes(
     tmp_path: Path,
 ) -> None:
     gosia_paths = _install_voice(tmp_path)
-    bass_paths = _install_bass_voice(tmp_path)
+    second_paths = _install_second_voice(tmp_path)
     created: list[tuple[Path, Path, _Worker]] = []
 
     def factory(model_path: Path, config_path: Path) -> _Worker:
@@ -214,29 +247,29 @@ def test_piper_provider_closes_resident_worker_when_voice_changes(
     provider.synthesize(
         "Gosia",
         language="pl",
-        voice_id=PIPER_VOICE_ID,
+        voice_id=PIPER_DEFAULT_VOICE_ID,
         speech_rate=1.0,
     )
     provider.synthesize(
         "Gosia ponownie",
         language="pl",
-        voice_id=PIPER_VOICE_ID,
+        voice_id=PIPER_DEFAULT_VOICE_ID,
         speech_rate=1.0,
     )
 
     assert len(created) == 1
     assert created[0][:2] == gosia_paths
-    provider.select_voice(PIPER_BASS_VOICE_ID)
+    provider.select_voice(SECOND_VOICE_ID)
     assert created[0][2].close_count == 1
 
     provider.synthesize(
         "Bass",
         language="pl",
-        voice_id=PIPER_BASS_VOICE_ID,
+        voice_id=SECOND_VOICE_ID,
         speech_rate=1.0,
     )
     assert len(created) == 2
-    assert created[1][:2] == bass_paths
+    assert created[1][:2] == second_paths
     provider.close()
     assert created[1][2].close_count == 1
 
@@ -244,9 +277,9 @@ def test_piper_provider_closes_resident_worker_when_voice_changes(
 @pytest.mark.parametrize(
     ("language", "voice_id", "speech_rate", "message"),
     [
-        ("en", PIPER_VOICE_ID, 1.0, "supports Polish only"),
+        ("en", PIPER_DEFAULT_VOICE_ID, 1.0, "supports Polish only"),
         ("pl", "unknown", 1.0, "Unsupported Polish voice"),
-        ("pl", PIPER_VOICE_ID, 0.1, "between 0.5 and 2.0"),
+        ("pl", PIPER_DEFAULT_VOICE_ID, 0.1, "between 0.5 and 2.0"),
     ],
 )
 def test_piper_provider_rejects_unsupported_synthesis_values(
@@ -323,7 +356,7 @@ def test_piper_provider_rejects_invalid_worker_audio(tmp_path: Path) -> None:
         provider.synthesize(
             "Tekst",
             language="pl",
-            voice_id=PIPER_VOICE_ID,
+            voice_id=PIPER_DEFAULT_VOICE_ID,
             speech_rate=1.0,
         )
 
@@ -541,36 +574,16 @@ def _install_darkman_voice(root: Path) -> tuple[Path, Path]:
     return model, config
 
 
-def test_darkman_voice_is_loaded_through_the_same_piper_worker_path(
+def test_former_darkman_files_are_ignored_and_default_resolves_to_voidek(
     tmp_path: Path,
 ) -> None:
-    _install_voice(tmp_path)
     darkman_paths = _install_darkman_voice(tmp_path)
-    created: list[tuple[Path, Path, _Worker]] = []
-
-    def factory(model_path: Path, config_path: Path) -> _Worker:
-        worker = _Worker()
-        created.append((model_path, config_path, worker))
-        return worker
-
     provider = PiperPolishTtsProvider(
-        tmp_path,
-        worker_factory=factory,
-        runtime_available=lambda: True,
+        tmp_path, worker_factory=lambda _model, _config: _Worker(), runtime_available=lambda: True,
     )
-    assert PIPER_DARKMAN_VOICE_ID in provider.available_voice_ids
-    assert provider.default_voice_id == PIPER_VOICE_ID
-
-    provider.select_voice(PIPER_DARKMAN_VOICE_ID)
-    audio = provider.synthesize(
-        "Darkman mówi.",
-        language="pl",
-        voice_id=PIPER_DARKMAN_VOICE_ID,
-        speech_rate=1.0,
-    )
-
+    assert PIPER_DARKMAN_VOICE_ID not in provider.available_voice_ids
+    _install_voice(tmp_path)
+    assert provider.available_voice_ids == (PIPER_DEFAULT_VOICE_ID,)
+    audio = provider.synthesize("Domyślny głos.", language="pl", voice_id="", speech_rate=1.0)
     assert audio.samples
-    assert len(created) == 1
-    assert created[0][:2] == darkman_paths
-    assert created[0][2].calls == [("Darkman mówi.", 1.0)]
-    provider.close()
+    assert all(path.is_file() for path in darkman_paths)

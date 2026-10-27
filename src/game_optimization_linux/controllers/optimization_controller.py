@@ -18,7 +18,7 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from PySide6.QtCore import QUrl
-from PySide6.QtGui import QGuiApplication
+from PySide6.QtGui import QGuiApplication, QDesktopServices
 
 from ..models import (
     Game,
@@ -38,6 +38,7 @@ from ..services import (
     SessionPerformanceData,
     uses_flatpak_steam,
 )
+from ..models.proton_tweaks import PROTON_TWEAK_REGISTRY
 from ..models.optimization_profile import (
     GAMESCOPE_DESKTOP_FIELDS,
     GAMESCOPE_PROFILE_FIELDS,
@@ -53,6 +54,7 @@ from ..services.launcher_mangohud import (
     write_launcher_mangohud,
 )
 from ..services.launcher_components import TOOLS as LAUNCHER_COMPONENT_TOOLS, LauncherComponentsService
+from ..services.launcher_integration import launcher_argument_setting
 from ..services.launcher_integration import (
     LauncherPlan,
     LauncherSyncError,
@@ -60,11 +62,13 @@ from ..services.launcher_integration import (
 )
 from ..services.mangohud import CONFIG_FILE_NAME, MangoHudConfigWriter
 from ..services.performance_analysis import compare_measurements
+from ..services.tweaks_capabilities import runner_capabilities, log_directory, conflicts, merge_tweak_environment
+from ..services.launcher_integration import locate_config
 from ..services.narrator_activity import NarratorGameActivityDetector
 from ..services.performance_session import RUNNER_HEARTBEAT_STALE_SECONDS
 from ..services.automatic_optimization import verify_runtime_activation
 from ..services.post_processing import optional_launch_environment
-from ..services.frame_generation import launch_settings as frame_generation_launch
+from ..services.frame_generation import FrameGenerationLaunch, resolve_launch as frame_generation_resolve, load_profile as load_fg_profile
 
 if TYPE_CHECKING:
     from .app_controller import AppController
@@ -140,7 +144,9 @@ class OptimizationController:
     def _profile_key(game: Game | None) -> str:
         if game is None:
             return ""
-        return game.profile_key
+        # Custom/Manual entries: a key derived from their persistent UUID.
+        from ..services.measured_optimization.manual import optimization_key
+        return optimization_key(game)
 
     def buildLaunchPreview(self, game_id: str, options: Mapping[str, Any]) -> str:
         """Build a display-only Steam launch preview."""
@@ -192,31 +198,102 @@ class OptimizationController:
             profile, gpu_vendor=gpu_vendor
         )
 
+    def _tweaks_context(self, game: Game, profile) -> dict[str, Any]:
+        home = host_home_directory()
+        caps = runner_capabilities(game, home)
+        inherited = {}
+        if game.launcher in {Launcher.HEROIC, Launcher.LUTRIS}:
+            try:
+                config = locate_config(game, home)
+                inherited = config.env(config.load())
+            except (LauncherSyncError, OSError):
+                pass
+        elif game.launcher is Launcher.STEAM:
+            status = self._app._runner_integration.steam_launch_option_status(game)
+            # Parse only leading environment assignments; never execute shell text.
+            try:
+                for part in shlex.split(status.raw_launch_options):
+                    key, sep, value = part.partition("=")
+                    if not sep or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", key):
+                        break
+                    inherited[key] = value
+            except ValueError:
+                pass
+        opt = self._app._optimization_profile_repository.load(profile.app_id)
+        fg = load_fg_profile(profile.app_id, self._app._proton_tweaks_repository.root)
+        result = self._app._proton_tweaks_repository.to_qml(profile, gpu_vendor=str(self._app._system_info.get("gpuVendor", "")))
+        directory = log_directory(game, profile.app_id, home)
+        environment = profile.environment()
+        if profile.states.get("proton_log") == "enabled":
+            environment["PROTON_LOG_DIR"] = str(directory)
+        result.update({"capabilities": caps, "activation": self._launch_activation(game),
+                       "logDirectory": str(directory), "inheritedEnvironment": {k: v for k, v in inherited.items() if k in {d.environment_key for d in PROTON_TWEAK_REGISTRY} | {"PROTON_LOG_DIR", "DISABLE_LOW_LATENCY_LAYER"}},
+                       "environment": merge_tweak_environment(inherited, environment),
+                       "conflicts": conflicts(profile.states, inherited, gamescope=opt.gamescope_enabled and opt.gamescope_mode != "disabled", frame_generation=bool(fg.get("backend", "off") != "off")),
+                       "runtimeState": "unverified",
+                       "steamCommand": self._app._runner_integration.steam_command(profile.app_id) if game.launcher is Launcher.STEAM else ""})
+        return result
+
     def getProtonTweaks(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        app_id = self._profile_key(game)
-        if not app_id:
+        key = self._profile_key(game)
+        if not key:
             return {"success": False, "error": "Proton Tweaks require a supported game"}
         try:
-            return self._app._proton_tweaks_to_qml(app_id)
+            return self._tweaks_context(game, self._app._proton_tweaks_repository.load(key))
         except (OSError, ValueError, ProtonTweaksError) as error:
             return {"success": False, "error": str(error)}
 
-    def saveProtonTweaks(
-        self, game_id: str, values: Mapping[str, Any]
-    ) -> dict[str, Any]:
+    def previewProtonTweaks(self, game_id: str, values: Mapping[str, Any]) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
-        app_id = self._profile_key(game)
-        if game is None or not app_id:
-            return {"success": False, "error": "Proton Tweaks require a supported game"}
+        key = self._profile_key(game)
+        if not key:
+            return {"success": False, "error": "Select a supported game"}
         try:
-            updated = self._app._proton_tweaks_repository.from_payload(app_id, values)
-            self._app._proton_tweaks_repository.save(updated)
-            self._app.protonTweaksChanged.emit(app_id)
-            return self._app._proton_tweaks_to_qml(app_id)
-        except Exception as error:
-            logger.warning("Could not save Proton Tweaks for %s: %s", game.id, error)
+            repo = self._app._proton_tweaks_repository
+            current = repo.load(key)
+            draft = repo.from_payload(key, values)
+            result = self._tweaks_context(game, draft)
+            old = current.environment()
+            new = draft.environment()
+            result["changes"] = [{"key": k, "before": old.get(k), "after": new.get(k)} for k in sorted(old.keys() | new.keys()) if old.get(k) != new.get(k)]
+            # Do not block removal of a saved legacy override after a runner update.
+            result["unsupported"] = [k for k, v in draft.states.items() if v == "enabled" and current.states.get(k) != "enabled" and result["capabilities"]["support"].get(k) == "unsupported"]
+            return result
+        except (OSError, ValueError, ProtonTweaksError) as error:
             return {"success": False, "error": str(error)}
+
+    def saveProtonTweaks(self, game_id: str, values: Mapping[str, Any]) -> dict[str, Any]:
+        game = self._app._resolve_game(game_id, show_error=False)
+        key = self._profile_key(game)
+        if game is None or not key:
+            return {"success": False, "error": "Select a supported game"}
+        try:
+            preview = self.previewProtonTweaks(game_id, values)
+            if not preview.get("success"):
+                return preview
+            if preview.get("conflicts") or preview.get("unsupported"):
+                return {**preview, "success": False, "error": "Resolve the marked conflicts before applying"}
+            repo = self._app._proton_tweaks_repository
+            updated = repo.from_payload(key, values)
+            directory = log_directory(game, key, host_home_directory())
+            if updated.states.get("proton_log") == "enabled":
+                directory.mkdir(parents=True, exist_ok=True)
+            updated = replace(updated, extra={**updated.extra, "log_directory": str(directory)})
+            repo.save(updated)
+            self._app.protonTweaksChanged.emit(key)
+            return self.getProtonTweaks(game_id)
+        except (OSError, ValueError, ProtonTweaksError) as error:
+            return {"success": False, "error": str(error)}
+
+    def openProtonLogs(self, game_id: str) -> bool:
+        game = self._app._resolve_game(game_id, show_error=False)
+        key = self._profile_key(game)
+        if not key:
+            return False
+        path = log_directory(game, key, host_home_directory())
+        path.mkdir(parents=True, exist_ok=True)
+        return QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
     def getOptimizationProfile(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
@@ -229,6 +306,7 @@ class OptimizationController:
             result = self._app._optimization_profile_to_qml(profile)
             result["gameAnalysis"] = self.getGameOptimizationAnalysis(game_id)
             result["launchActivation"] = self._launch_activation(game)
+            result["launcherPreview"] = self._launcher_preview(game)
             return result
         except Exception as error:
             logger.warning("Could not load optimization profile for %s: %s", game.id, error)
@@ -269,7 +347,16 @@ class OptimizationController:
             "steamLaunchCommand": status.command,
         }
 
-    def launcher_plan(self, game: Game, *, write: bool = False) -> LauncherPlan:
+    @staticmethod
+    def _launcher_tweaks_environment(game: Game) -> dict[str, str]:
+        try:
+            config = locate_config(game, host_home_directory())
+            return config.env(config.load())
+        except (LauncherSyncError, OSError):
+            return {}
+
+    def launcher_plan(self, game: Game, *, write: bool = False, custom_launch: Any = None,
+                      profile_draft: Any = None) -> LauncherPlan:
         """Wrapper prefix and environment of the saved profiles for a Heroic/Lutris game.
 
         Every feature (GameMode, Gamescope, MangoHud, OptiScaler, Proton
@@ -283,7 +370,8 @@ class OptimizationController:
             raise LauncherSyncError("The game has no stable profile key")
         app = self._app
         launcher = game.launcher.value
-        profile = app._optimization_profile_repository.load(key)
+        # An unsaved optimization draft is only previewed; Apply always uses the saved profile.
+        profile = profile_draft if profile_draft is not None and not write else app._optimization_profile_repository.load(key)
         gamemode, gamescope = app._runtime_tool_detector.detect()
         if game.launcher_variant == "flatpak":
             # The wrapper runs inside the launcher's Flatpak: resolve it on
@@ -391,7 +479,7 @@ class OptimizationController:
         mangohud_config = ""
         environment: dict[str, str] = {}
         if want_mangohud:
-            availability = app._mangohud_detector.detect("native")
+            availability, _runtime = app._mangohud_controller._availability(game, mangohud_profile)
             if not availability.available:
                 use_mangohud = feature(
                     "mangohud", True, False, availability.message or "MangoHud is not available"
@@ -470,7 +558,7 @@ class OptimizationController:
             feature("optiscaler", False, False)
             optiscaler_override = ""
         try:
-            proton_environment = app._proton_tweaks_repository.load(key).environment()
+            proton_environment = app._proton_tweaks_repository.environment(key)
         except (OSError, ValueError, ProtonTweaksError):
             proton_environment = {}
         # Proton tweaks are PROTON_* variables: only meaningful when the
@@ -481,11 +569,14 @@ class OptimizationController:
         ):
             proton_environment = {}
         try:
-            fg_environment, fg_prefix = frame_generation_launch(key, app._optiscaler_service.profile_repository.root,
+            fg_resolved = frame_generation_resolve(key, app._optiscaler_service.profile_repository.root,
                 gamescope=use_gamescope)
         except (OSError, ValueError) as error:
             blockers.append(str(error))
-            fg_environment, fg_prefix = {}, []
+            fg_resolved = FrameGenerationLaunch({}, [])
+        fg_environment, fg_prefix = fg_resolved.environment, fg_resolved.prefix
+        # A draft is only previewed; write=True always uses the saved profile.
+        custom_profile = custom_launch if custom_launch is not None and not write else self._custom_launch(key, blockers)
         plan = app._optimization_launch_planner.build(
             plan_profile, ["%command%"], gamemode=gamemode, gamescope=gamescope,
             mangohud_fps_limit=(
@@ -497,8 +588,10 @@ class OptimizationController:
             post_processing_environment=self._post_environment(key),
             frame_generation_environment=fg_environment,
             frame_generation_prefix=fg_prefix,
+            frame_generation_report=fg_resolved.report(),
+            custom_launch=custom_profile,
             proton_environment=proton_environment,
-            existing_environment={},
+            existing_environment=self._launcher_tweaks_environment(game),
             mangohud_activation_owner=mangohud_owner,
             allow_placeholder=True,
             mangohud_config_path=mangohud_config,
@@ -539,8 +632,31 @@ class OptimizationController:
             if session and session.status in {"waiting_for_launcher", "recording", "waiting_for_game_exit"}:
                 metrics = session.directory / "gpu-memory.jsonl"
             gpu_prefix = gpu_memory_prefix(key, app._optiscaler_service.profile_repository.root, metrics=metrics)
+        command = list(plan.command)
+        marker = command.index("%command%") if "%command%" in command else len(command)
+        if plan.custom_arguments:
+            setting = launcher_argument_setting(game)
+            if setting:
+                settings[setting] = shlex.join(plan.custom_arguments)
+            else:
+                warnings.append(f"Custom game arguments are not supported for this {launcher} game type; they are not applied")
+        hooks_prefix: list[str] = []
+        if plan.pre_launch or plan.post_exit:
+            from ..services import launch_hooks
+            umu = False if settings.get("disableUMU") is True else facts.umu_active
+            available, where, reason = launch_hooks.support(game, umu_active=umu)
+            if available:
+                home = Path(getattr(app._launcher_integration, "_home", None) or Path.home())
+                hooks_prefix = launch_hooks.prefix(game, custom_profile, home, write=write)
+                if game.launcher_variant == "flatpak":
+                    warnings.append(f"Before-launch and after-exit commands run in the {where}; "
+                                    "their programs must exist there")
+            else:
+                warnings.append(f"Before-launch and after-exit commands are not applied: {reason}")
+        if "custom" in plan.wrappers and game.launcher_variant == "flatpak":
+            warnings.append(f"The custom wrapper runs inside the {launcher} Flatpak sandbox; its executable must exist there")
         return LauncherPlan(
-            prefix=(*gpu_prefix, *plan.command[:-1]),
+            prefix=(*hooks_prefix, *gpu_prefix, *command[:marker]),
             environment=environment,
             warnings=tuple(dict.fromkeys((*plan.warnings, *warnings))),
             blockers=tuple(blockers),
@@ -555,9 +671,133 @@ class OptimizationController:
         "Lutris": "net.lutris.Lutris",
     }
 
+    def _custom_launch(self, key: str, blockers: list[str] | None = None) -> Any:
+        """Saved custom launch profile, or None. An unreadable file blocks launcher Apply."""
+        from ..services.custom_launch import CustomLaunchError, CustomLaunchRepository
+        try:
+            return CustomLaunchRepository(self._app._optiscaler_service.profile_repository.root).load(key)
+        except (OSError, ValueError, CustomLaunchError) as error:
+            if blockers is not None:
+                blockers.append(f"The custom launch profile cannot be read: {error}")
+            return None
+
     def _post_environment(self, key: str) -> dict[str, str]:
         service = getattr(self._app, "_post_processing_service", None)
         return optional_launch_environment(key, service.root) if service is not None else {}
+
+    def _launcher_preview(self, game: Game, profile_draft: Any = None) -> dict[str, Any]:
+        """Heroic/Lutris preview in the launcher's own terms; never Steam Launch Options.
+
+        Read only: builds the plan, reads the launcher file and the GameOpti
+        ownership record. ``profile_draft`` previews an unsaved optimization
+        draft next to the saved plan.
+        """
+        if game.launcher not in {Launcher.HEROIC, Launcher.LUTRIS}:
+            return {}
+        app = self._app
+        service = app._launcher_integration
+        heroic = game.launcher is Launcher.HEROIC
+        names = ({"environment": "enviromentOptions", "wrapper": "wrapperOptions", "arguments": "launcherArgs"}
+                 if heroic else {"environment": "system.env", "wrapper": "system.prefix_command", "arguments": "game.args"})
+        result: dict[str, Any] = {"launcher": game.launcher.value, "variant": game.launcher_variant or "native",
+                                  "fields": names, "configPath": "", "current": {}, "apply": {}, "restore": {},
+                                  "draft": None, "error": ""}
+
+        def describe(plan: LauncherPlan, config: Any) -> dict[str, Any]:
+            try:
+                wrapper = config.wrapper_for(plan.prefix) if plan.prefix and config is not None else None
+            except LauncherSyncError as error:
+                wrapper = {"text": shlex.join(plan.prefix), "error": str(error)}
+            return {"environment": {k: str(v) for k, v in sorted(plan.environment.items())},
+                    "wrapper": wrapper, "settings": {k: v for k, v in sorted(plan.settings.items())},
+                    "warnings": list(plan.warnings), "blockers": list(plan.blockers), "pending": bool(plan.pending),
+                    "revision": plan.digest(), "empty": plan.empty, "included": list(plan.included),
+                    "skipped": {name: item.get("reason", "") for name, item in plan.features.items()
+                                if item.get("enabled") and not item.get("available")}}
+        try:
+            saved_plan = self.launcher_plan(game)
+        except (LauncherSyncError, OSError, ValueError) as error:
+            return {**result, "error": str(error)}
+        config = None
+        try:
+            config = locate_config(game, getattr(service, "_home", None))
+            document = config.load()
+            settings = {}
+            for key in ("disableUMU", "launcherArgs") if heroic else ("args",):
+                try:
+                    value = config.setting(document, key)
+                except LauncherSyncError:
+                    continue
+                settings[key] = None if value == "__gameopti_missing__" else value
+            result["configPath"] = str(config.path)
+            result["current"] = {"environment": config.env(document), "wrapper": config.wrapper_text(document),
+                                 "settings": settings, "builtins": dict(config.builtin_features(document))}
+        except (LauncherSyncError, OSError, ValueError) as error:
+            result["error"] = str(error)
+        result["apply"] = describe(saved_plan, config)
+        record = service._load_record(game) if hasattr(service, "_load_record") else None
+        if record:
+            result["restore"] = {"environment": {k: v.get("previous") for k, v in sorted(record.get("env", {}).items())},
+                                 "dll": {k: v.get("previous") for k, v in sorted(record.get("dll", {}).items())},
+                                 "settings": {k: (None if v.get("previous") == "__gameopti_missing__" else v.get("previous"))
+                                              for k, v in sorted(record.get("settings", {}).items())},
+                                 "wrapper": record.get("wrapper"), "appliedAt": record.get("appliedAt", ""),
+                                 "appliedRevision": record.get("planDigest", ""),
+                                 "byteIdentical": bool(record.get("appliedDigest")) and bool(config)
+                                 and hashlib.sha256(config.text.encode()).hexdigest() == record.get("appliedDigest")}
+        key = game.profile_key
+        stamps = {}
+        for name, repository in (("optimization", app._optimization_profile_repository),
+                                 ("protonTweaks", app._proton_tweaks_repository)):
+            try:
+                path = repository.path(key)
+                stamps[name] = datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat() if path.is_file() else ""
+            except (OSError, ValueError, AttributeError):
+                stamps[name] = ""
+        result["savedAt"] = stamps
+        result["state"] = ("not_applied" if not record else
+                           "applied" if record.get("planDigest") == saved_plan.digest() else "outdated")
+        if profile_draft is not None:
+            try:
+                draft_plan = self.launcher_plan(game, profile_draft=profile_draft)
+                draft = describe(draft_plan, config)
+                result["draft"] = draft if draft["revision"] != result["apply"]["revision"] else None
+            except (LauncherSyncError, OSError, ValueError) as error:
+                result["draft"] = {"error": str(error)}
+        return result
+
+    def _plan_source(self, app_id: str, plan: Any) -> dict[str, Any]:
+        """What the preview was built from: saved profiles only, never an editor draft."""
+        from ..services.frame_generation import profile_path as fg_profile_path
+        root = self._app._optiscaler_service.profile_repository.root
+        path = fg_profile_path(app_id, root) if app_id else None
+        saved, configured, modified = "", "", ""
+        try:
+            if path is not None and path.is_file():
+                state = load_fg_profile(app_id, root)
+                saved, configured = str(state.get("backend", "")), str(state.get("configuredAt", ""))
+                modified = datetime.fromtimestamp(path.stat().st_mtime, UTC).isoformat()
+        except (OSError, ValueError):
+            saved = "invalid"
+        post = {}
+        try:
+            from ..services.post_processing import load_profile as load_post_profile
+            post = load_post_profile(app_id, root)
+        except (OSError, ValueError):
+            pass
+        commit = ""
+        try:
+            info = Path("/.flatpak-info").read_text(encoding="utf-8")
+            commit = next((line.split("=", 1)[1].strip() for line in info.splitlines() if line.startswith("app-commit=")), "")
+        except OSError:
+            pass
+        digest = hashlib.sha256(json.dumps(plan.to_dict(), sort_keys=True, default=str).encode()).hexdigest()
+        return {"source": "saved_profiles", "savedFrameGenerationBackend": saved,
+                "frameGenerationConfiguredAt": configured, "frameGenerationProfileModifiedAt": modified,
+                "postProcessingBackend": str(post.get("backend", "off")) if post.get("phase") == "installed" else "off",
+                "planRevision": digest[:12], "generatedAt": datetime.now(UTC).isoformat(),
+                "applicationCommit": commit[:12],
+                "runnerSource": "installed Flatpak at launch time (flatpak run --command=game-optimization-run)"}
     _SANDBOX_LAYER_EXTENSIONS = {"gamescope": "gamescope", "mangohud": "MangoHud"}
 
     _SANDBOX_TOOLS = ("gamemoderun", "gamescope", "mangohud")
@@ -727,9 +967,19 @@ class OptimizationController:
             facts = launcher_facts(game, getattr(service, "_home", None))
             writable = service.config_access(game) if facts.config_found else None
             tools = self._launcher_tool_environments(game)
-        return game_capabilities(
+        result = game_capabilities(
             game, launcher_facts=facts, launcher_writable=writable, launcher_tools=tools
         )
+        from ..services.measured_optimization.manual import is_manual
+        if is_manual(game):
+            # Custom games: the optimization profile and measured workflow are
+            # available exactly when the launch path can be measured.
+            from ..services.measured_optimization.capabilities import REASONS
+            support = self.manual_measurement_support(game)
+            reason = support.get("reason") or REASONS.get(support.get("code", ""), "")
+            result["optimization"] = {"available": bool(support["supported"]),
+                                      "reason": "" if support["supported"] else reason}
+        return result
 
     _TOOL_LABELS = {"gamemoderun": "GameMode", "gamescope": "Gamescope", "mangohud": "MangoHud"}
 
@@ -811,8 +1061,9 @@ class OptimizationController:
         profile = self._app._mangohud_repository.load(key)
         if not profile.enabled:
             return None
-        availability = self._app._mangohud_detector.detect("native")
-        return launcher_mangohud_path(key), MangoHudConfigWriter(availability.supported_keys).render(profile)
+        availability, _runtime = self._app._mangohud_controller._availability(game, profile)
+        effective = self._app._effective_mangohud_profile(profile)
+        return launcher_mangohud_path(key), MangoHudConfigWriter(availability.supported_keys).render(effective)
 
     def schedule_launcher_mangohud_sync(self, game: Game) -> dict[str, str]:
         """After a MangoHud profile save: refresh the host config the launcher
@@ -911,6 +1162,16 @@ class OptimizationController:
         with self._mangohud_sync_lock:
             # Apply wrote the latest profile; Restore makes old sync state moot.
             self._mangohud_sync.pop(game.id, None)
+        try:
+            from ..services import launch_hooks
+            home = Path(getattr(service, "_home", None) or Path.home())
+            record = service._load_record(game) if action == "apply" else None
+            text = " ".join(str(v) for v in ((record or {}).get("wrapper") or {}).values())
+            directory = launch_hooks.location(game, home)
+            keep = [path for path in directory.iterdir() if str(path) in text] if text and directory.is_dir() else []
+            launch_hooks.prune(game, home, keep)
+        except (OSError, ValueError) as error:
+            logger.warning("Could not tidy GameOpti launch hook files for %s: %s", game.id, error)
         return {**self._with_mangohud_config_state(game, result), "success": True}
 
     def applyLauncherIntegration(self, game_id: str) -> dict[str, Any]:
@@ -930,6 +1191,7 @@ class OptimizationController:
             profile = self._app._optimization_profile_from_payload(app_id, values)
             result = self._app._optimization_profile_to_qml(profile)
             result["launchActivation"] = self._launch_activation(game)
+            result["launcherPreview"] = self._launcher_preview(game, profile)
             return result
         except Exception as error:
             return {"success": False, "error": str(error)}
@@ -1180,6 +1442,7 @@ class OptimizationController:
     HEROIC_MEASUREMENT_FOLDER = "Games/Heroic/.gameopti-measurements"
     LAUNCHER_EXIT_CONFIRMATIONS = 3
     LAUNCHER_PROCESS_CHECK_SECONDS = 5.0
+    MANUAL_PROCESS_CHECK_SECONDS = 2.0
 
     def _launcher_measurement_root(self, game: Game) -> Path | None:
         if game.launcher_variant != "flatpak":
@@ -1290,12 +1553,19 @@ class OptimizationController:
         now = time.monotonic()
         if now < self._launcher_next_check.get(game.id, 0.0):
             return session
-        self._launcher_next_check[game.id] = now + self.LAUNCHER_PROCESS_CHECK_SECONDS
+        manual = session.launcher == "Manual"
+        self._launcher_next_check[game.id] = now + (self.MANUAL_PROCESS_CHECK_SECONDS if manual
+                                                    else self.LAUNCHER_PROCESS_CHECK_SECONDS)
         detector = self._process_detector()
-        running = detector.game_process_running(game.id) if detector is not None else None
+        if manual:
+            if detector is not None:
+                detector.invalidate()  # a short game must not be missed behind the shared cache
+            running, match = self._manual_game_running(game)
+        else:
+            running = detector.game_process_running(game.id) if detector is not None else None
+            match = getattr(detector, "last_match", {}).get(game.id, "") if detector is not None else ""
         if running is True:
             self._launcher_negative_reads.pop(game.id, None)
-            match = getattr(detector, "last_match", {}).get(game.id, "")
             return sessions.mark_launcher_game_running(app_id, session.id, match) or session
         if session.status == "waiting_for_launcher":
             if datetime.now(UTC) - session.created_at > timedelta(seconds=session.handshake_timeout_seconds):
@@ -1317,6 +1587,120 @@ class OptimizationController:
                 app_id, "Baseline recording exceeded the four-hour MangoHud limit", session.id,
             ) or session
         return session
+
+    def manual_measurement_support(self, game: Game) -> dict[str, Any]:
+        """Whether this Custom/Manual entry can be measured, with the exact reason."""
+        from ..services.measured_optimization import manual
+        getter = getattr(self._app._game_provider, "manual_config", None)
+        configuration = getter(game.id) if callable(getter) else None
+        if configuration is None:
+            return {"supported": False, "code": "manual_config_missing", "runner": {}}
+        if not manual.optimization_key(game):
+            return {"supported": False, "code": "manual_identity_invalid", "runner": {}}
+        runner = manual.runner_info(configuration)
+        if runner["code"]:
+            return {"supported": False, "code": runner["code"], "runner": runner, "configuration": configuration}
+        if not manual.tree_tracking_available():
+            return {"supported": False, "code": "manual_tree_unverified", "runner": runner, "configuration": configuration}
+        if not game.launch_available:
+            return {"supported": False, "code": "manual_unavailable", "runner": runner, "configuration": configuration,
+                    "reason": game.launch_unavailable_reason}
+        return {"supported": True, "code": "", "runner": runner, "configuration": configuration}
+
+    def _manual_game_running(self, game: Game) -> tuple[bool | None, str]:
+        from ..services.measured_optimization.manual import ManualProcessMatcher
+        support = self.manual_measurement_support(game)
+        detector = self._process_detector()
+        if detector is None or "configuration" not in support:
+            return None, ""
+        matcher = ManualProcessMatcher(support["configuration"], support["runner"].get("kind", ""))
+        commands = detector.process_commands()
+        if commands is None:
+            return None, ""
+        match = next((line for line in commands if matcher.matches(line)), "")
+        return bool(match), match
+
+    def _record_manual_measurement(self, game: Game, app_id: str, kind: str) -> dict[str, Any]:
+        """Baseline/comparison for a Custom/Manual game through its own launch path.
+
+        The launch is the normal Manual lifecycle (same runner, environment,
+        custom launch and pre/post commands) inside a tracked host scope; only
+        the game command gets private MangoHud logging variables.
+        """
+        from ..services.measured_optimization.capabilities import REASONS
+        game_id = game.id
+        support = self.manual_measurement_support(game)
+        if not support["supported"]:
+            return self._measurement_rejection(game_id, app_id, kind, support["code"],
+                                               support.get("reason") or REASONS.get(support["code"], support["code"]))
+        availability = self._app._mangohud_detector.detect("native")
+        if not availability.available:
+            return self._measurement_rejection(game_id, app_id, kind, "mangohud_unavailable", availability.message)
+        if self._process_detector() is None:
+            return self._measurement_rejection(
+                game_id, app_id, kind, "process_list_unavailable",
+                "GameOpti cannot see running games here, so it could not tell when the game ends")
+        if game.id in getattr(self._app, "_manual_launch_jobs", {}) or self._manual_game_running(game)[0]:
+            return self._measurement_rejection(game_id, app_id, kind, "game_running", "The game is running")
+        session = None
+        try:
+            session = self._app._baseline_sessions.create(app_id, game_id, kind=kind, launcher="Manual")
+            if kind == "baseline":
+                self._app._optimization_comparisons.pop(game_id, None)
+            plan = self._app._manual_launch_plan(
+                game, support["configuration"],
+                measurement_environment=self._app._baseline_sessions.environment(session),
+                gpu_metrics=session.directory / "gpu-memory.jsonl", require_tree=True)
+            report = dict(self._app._manual_runtime_reports.get(game_id) or {})
+            from ..services.gpu_memory import launch_prefix as gpu_prefix, game_key as gpu_key
+            if gpu_prefix(gpu_key(game), self._app._gpu_memory_service.root):
+                report["gpuMemoryMetrics"] = str(session.directory / "gpu-memory.jsonl")
+            report.update(baselineSessionId=session.id, timestamp=datetime.now(UTC).isoformat(),
+                          runner=support["runner"].get("kind", ""))
+            path = self._app._runner_report_path(app_id)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            self._app._manual_launch_jobs[game_id] = self._app._manual_launch_executor.submit(
+                self._app._manual_game_launcher.execute, plan)
+            session = self._app._baseline_sessions.mark_launcher_started(
+                app_id, session.id, shlex.join(str(part) for part in plan.game_command)) or session
+        except Exception as error:  # noqa: BLE001 - reported to the user
+            if session is not None:
+                try:
+                    self._app._baseline_sessions.fail(app_id, str(error), session.id)
+                except Exception:  # noqa: BLE001
+                    pass
+            return self._measurement_rejection(game_id, app_id, kind, "manual_launch_failed",
+                                               str(error) or type(error).__name__)
+        self._app._active_baseline_games.add(game_id)
+        self._app._baseline_statuses[game_id] = session.status
+        self._app.optimizationAnalysisChanged.emit(game_id)
+        logger.info("Manual measurement started: kind=%s gameId=%s session=%s runner=%s",
+                    kind, game_id, session.id, support["runner"].get("kind", ""))
+        return {"success": True, "status": session.status, "baselineSession": session.to_dict()}
+
+    def manual_lifecycle_finished(self, game: Game, result: Any, error: str) -> None:
+        """The tracked Manual process tree ended: finish or fail its measurement."""
+        app_id = self._profile_key(game)
+        session = self._app._baseline_sessions.load(app_id) if app_id else None
+        if session is None or session.launcher != "Manual" or session.status not in {
+            "waiting_for_launcher", "recording", "waiting_for_game_exit",
+        }:
+            return
+        sessions = self._app._baseline_sessions
+        detector = self._process_detector()
+        if detector is not None:
+            detector.invalidate()  # the cached list may predate the end of the tree
+        running, _match = self._manual_game_running(game)
+        if running:
+            sessions.fail(app_id, "The game process left the tracked process tree; GameOpti cannot verify when it ends",
+                          session.id)
+        elif session.status == "waiting_for_launcher":
+            sessions.fail(app_id, error or "The configured game executable was never observed running", session.id)
+        else:
+            sessions.finish_launcher_session(app_id, session.id)
+        self._launcher_negative_reads.pop(game.id, None)
+        self._app.optimizationAnalysisChanged.emit(game.id)
 
     def _cleanup_launcher_measurements(self) -> None:
         """Remove measurement variables from launcher settings once the
@@ -1358,7 +1742,7 @@ class OptimizationController:
         }:
             return {"success": False, "error": "No measurement is running for this game"}
         self._app._baseline_sessions.fail(app_id, "Recording cancelled", session.id)
-        if session.launcher:
+        if session.launcher and session.launcher != "Manual":
             try:
                 self._app._launcher_integration.end_measurement(game)
             except Exception as error:  # noqa: BLE001 - retried by the poller
@@ -1443,6 +1827,9 @@ class OptimizationController:
             )
         if game.launcher is Launcher.HEROIC:
             return self._record_launcher_measurement(game, app_id, kind)
+        from ..services.measured_optimization.manual import is_manual
+        if is_manual(game):
+            return self._record_manual_measurement(game, app_id, kind)
         if game.launcher is Launcher.LUTRIS:
             # The Steam runner never sees Lutris launches and the launcher
             # measurement below has only been built and checked for Heroic.
@@ -1958,6 +2345,9 @@ class OptimizationController:
                             "no performance samples"
                         )
                         toast_level = "error"
+                measured = getattr(self._app, "_measured_optimization", None)
+                if measured is not None and game is not None and session is not None and session.status == "processing":
+                    measured.on_measurement_processed(game, app_id, session)
                 if app_id and getattr(
                     self._app, "_optimization_analysis_persistence_enabled", False
                 ):
@@ -2323,6 +2713,11 @@ class OptimizationController:
                 "success": False,
                 "error": "Finish the current comparison cycle before starting Automatic Optimization",
             }
+        measured = getattr(self._app, "_measured_optimization", None)
+        if measured is not None:
+            from ..services.measured_optimization import ACTIVE
+            if measured.store.workflow(app_id).get("state") in ACTIVE:
+                return {"success": False, "error": "A measured optimization is already in progress for this game"}
         profile = self._app._optimization_profile_repository.load(app_id)
         gamemode, gamescope = self._app._runtime_tool_detector.detect()
         document = self._app._automatic_optimization_repository.load(app_id)
@@ -2564,8 +2959,13 @@ class OptimizationController:
         game = self._app._resolve_game(game_id, show_error=False)
         if game is None:
             return {"success": False, "error": "Game is unavailable"}
+        active = self._active_optimization_change(game) or {}
+        measured = getattr(self._app, "_measured_optimization", None)
+        if active.get("kind") == "measured_experiment" and measured is not None:
+            workflow = measured.store.workflow(self._profile_key(game))
+            return (measured.revert(game_id) if workflow.get("state") == "result_ready"
+                    else measured.cancel(game_id))
         try:
-            active = self._active_optimization_change(game) or {}
             if active.get("kind") == "runtime_profile":
                 manifest = self._app._optimization_change_service.runtime_change(
                     game, change_id
@@ -2616,6 +3016,8 @@ class OptimizationController:
         active = self._active_optimization_change(game) or {}
         if active.get("id") != change_id or active.get("state") != "applied":
             return {"success": False, "error": "No matching active change exists"}
+        if active.get("kind") == "measured_experiment" and getattr(self._app, "_measured_optimization", None) is not None:
+            return self._app._measured_optimization.keep(game_id, "keep_unevaluated")
         app_id = self._profile_key(game)
         automatic_repository = getattr(
             self._app, "_automatic_optimization_repository", None
@@ -2855,7 +3257,26 @@ class OptimizationController:
             gamescope_available=gamescope.available,
             measurements=self._saved_session_performance(app_id),
             system_info=self._app._system_info,
+            accepted_results=self._accepted_results(app_id, profile.preset),
         ).profile
+
+    def _accepted_results(self, app_id: str, preset: str) -> dict[str, Any]:
+        """Kept, verified local results for the goal of this preset (never Custom)."""
+        measured = getattr(self._app, "_measured_optimization", None)
+        if measured is None or preset == "custom":
+            return {}
+        from ..services.measured_optimization import GOALS
+        goal = preset if preset in GOALS else ""
+        try:
+            if preset == "automatic":
+                # The goal of the newest result the owner kept for this game.
+                history = measured.store.load(app_id)["history"]
+                goal = next((str(item.get("goal")) for item in reversed(history)
+                             if item.get("userAction") == "kept" and item.get("goal") in GOALS), "")
+            return measured.accepted_for(app_id, goal) if goal else {}
+        except Exception as error:  # noqa: BLE001 - evidence is optional
+            logger.warning("Could not read measured results for %s: %s", app_id, error)
+            return {}
 
     def _saved_session_performance(
         self, app_id: str
@@ -2879,7 +3300,7 @@ class OptimizationController:
         )
 
     def _optimization_profile_to_qml(
-        self, profile: GameOptimizationProfile
+        self, profile: GameOptimizationProfile, custom_launch: Any = None
     ) -> dict[str, Any]:
         displays = self._app._optimization_displays()
         display = self._app._optimization_display_for(profile.target_display_id)
@@ -2898,6 +3319,7 @@ class OptimizationController:
             gamescope_available=gamescope.available,
             measurements=measurements,
             system_info=self._app._system_info,
+            accepted_results=self._accepted_results(profile.app_id, profile.preset),
         )
         mangohud_activation_owner = "none"
         mangohud_config_path = ""
@@ -2943,13 +3365,11 @@ class OptimizationController:
             optiscaler_override = ""
         proton_tweaks_error = ""
         try:
-            proton_environment = self._app._proton_tweaks_repository.load(
-                profile.app_id
-            ).environment()
+            proton_environment = self._app._proton_tweaks_repository.environment(profile.app_id)
         except (OSError, ValueError, ProtonTweaksError) as error:
             proton_environment = {}
             proton_tweaks_error = str(error)
-        fg_environment, fg_prefix = frame_generation_launch(profile.app_id,
+        fg_resolved = frame_generation_resolve(profile.app_id,
             self._app._optiscaler_service.profile_repository.root, inherited=os.environ,
             gamescope=profile.gamescope_enabled and profile.gamescope_mode != "disabled")
         plan = self._app._optimization_launch_planner.build(
@@ -2957,10 +3377,12 @@ class OptimizationController:
             mangohud_fps_limit=mangohud_fps_limit,
             optiscaler_override=optiscaler_override,
             post_processing_environment=self._post_environment(profile.app_id),
-            frame_generation_environment=fg_environment,
-            frame_generation_prefix=fg_prefix,
+            frame_generation_environment=fg_resolved.environment,
+            frame_generation_prefix=fg_resolved.prefix,
+            frame_generation_report=fg_resolved.report(),
             existing_wine_overrides=os.environ.get("WINEDLLOVERRIDES", ""),
             proton_environment=proton_environment,
+            custom_launch=custom_launch if custom_launch is not None else self._custom_launch(profile.app_id),
             existing_environment=os.environ,
             mangohud_activation_owner=mangohud_activation_owner,
             allow_placeholder=True,
@@ -3027,7 +3449,8 @@ class OptimizationController:
             },
             "gamemode": gamemode.to_dict(), "gamescope": gamescope.to_dict(),
             "launchPlan": plan.to_dict(),
-            "launchPlanText": shlex.join(plan.command),
+            "planSource": self._plan_source(profile.app_id, plan),
+            "launchPlanText": shlex.join(plan.diagnostic_command),
             "fpsLimitOwner": plan.fps_limit_owner,
             "steamLaunchCommand": (
                 self._app._runner_integration.steam_command(profile.app_id)

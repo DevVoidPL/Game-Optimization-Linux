@@ -1,6 +1,7 @@
 """Per-game frame generation: profiles, prerequisites and launch contracts."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC, datetime
 import json
 import math
@@ -12,6 +13,7 @@ from ..config import GAMES_CONFIG_DIR, STATE_DIR
 from ..models.mangohud import validate_game_key
 from .frame_generation_artifacts import FrameGenerationArtifacts, LAYER_NAMES, VERSIONS, file_hash
 from .host_bootstrap import host_home_directory
+from .frame_generation_isolation import GATE_KEYS, backend_for_layer, discover_layers, isolation_plan, selected_blocker
 from .mangohud import _atomic_write
 from .post_processing import inspect_binary
 
@@ -25,14 +27,29 @@ DEFAULTS = {
     "afmf": {"performance_mode": "auto", "search_mode": "auto", "fast_motion_response": "blend",
              "pacing": True, "governor": True, "min_fps": 30, "hud_detect": True},
 }
-DISABLED = {"DISABLE_LSFG": "1", "DISABLE_LSFGVK": "1", "DISABLE_MAKO": "1",
-            "DISABLE_MAKO_SPATIAL_SCALING": "1", "DISABLE_AFMF": "1",
-            "ENABLE_MAKO": "0", "ENABLE_MAKO_SPATIAL_SCALING": "0", "AFMF_ENABLE": "0"}
-ALLOWED_ENV = {*DISABLED, "LSFGVK_CONFIG", "LSFGVK_PROFILE", "MAKO_CONFIG", "MAKO_PROFILE",
-               "MAKO_LAUNCH_CONFIG", "VK_ADD_IMPLICIT_LAYER_PATH", "VK_INSTANCE_LAYERS",
-               "VK_LOADER_LAYERS_DISABLE", "AFMF_LOG", "AFMF_PERFORMANCE_MODE", "AFMF_SEARCH_MODE",
-               "AFMF_FAST_MOTION_RESPONSE", "AFMF_PACING", "AFMF_GOVERNOR", "AFMF_MIN_FPS",
-               "AFMF_HUD_DETECT", "AFMF_GAMESCOPE", "LSFGVK_ENV", "MAKO_ENV"}
+# Keys a frame-generation plan may set. Disable gates are added only for a
+# concrete activation (see frame_generation_isolation); MAKO spatial scaling
+# is an upscaler and has no entry here.
+ALLOWED_ENV = {*GATE_KEYS, "ENABLE_MAKO", "AFMF_ENABLE", "LSFGVK_CONFIG", "LSFGVK_PROFILE", "MAKO_CONFIG",
+               "MAKO_PROFILE", "MAKO_LAUNCH_CONFIG", "VK_ADD_IMPLICIT_LAYER_PATH", "VK_INSTANCE_LAYERS",
+               "VK_LOADER_LAYERS_DISABLE", "VK_LOADER_LAYERS_ENABLE", "VK_LOADER_LAYERS_ALLOW", "AFMF_LOG",
+               "AFMF_PERFORMANCE_MODE", "AFMF_SEARCH_MODE", "AFMF_FAST_MOTION_RESPONSE", "AFMF_PACING",
+               "AFMF_GOVERNOR", "AFMF_MIN_FPS", "AFMF_HUD_DETECT", "AFMF_GAMESCOPE", "LSFGVK_ENV", "MAKO_ENV"}
+
+
+@dataclass(frozen=True)
+class FrameGenerationLaunch:
+    """Resolved per-game contract: environment, wrapper and the reason for each guard."""
+    environment: dict
+    prefix: list
+    backend: str = ""  # "" = no GameOpti frame-generation profile for this game
+    entries: tuple = ()
+    warnings: tuple = ()
+    detected: tuple = ()
+
+    def report(self) -> dict:
+        return {"backend": self.backend, "entries": [dict(x) for x in self.entries],
+                "warnings": list(self.warnings), "detected": [dict(x) for x in self.detected]}
 
 
 def profile_path(key, root=GAMES_CONFIG_DIR):
@@ -115,19 +132,31 @@ def session_evidence(key, state, root=STATE_DIR):
 
 
 def launch_settings(key, root=GAMES_CONFIG_DIR, *, inherited=None, gamescope=False):
-    """Read only. Invalid selected integration blocks launch instead of falling back."""
-    if not profile_path(key, root).exists(): return {}, []
+    """Compatibility wrapper: (environment, wrapper prefix)."""
+    resolved = resolve_launch(key, root, inherited=inherited, gamescope=gamescope)
+    return resolved.environment, resolved.prefix
+
+
+def resolve_launch(key, root=GAMES_CONFIG_DIR, *, inherited=None, gamescope=False) -> FrameGenerationLaunch:
+    """Read only. Invalid selected integration blocks launch instead of falling back.
+
+    Off never activates a generator. A guard is added only for a discovered
+    generator with a concrete request in ``inherited``; each guard has a reason.
+    """
+    if not profile_path(key, root).exists(): return FrameGenerationLaunch({}, [])
     state = load_profile(key, root)
     backend = state["backend"]
-    environment = dict(DISABLED)
-    layers = str((inherited or {}).get("VK_INSTANCE_LAYERS", "")).split(":")
-    foreign = [x for x in layers if x and not any(part in x.upper() for part in ("LSFG", "MAKO", "AFMF"))]
-    environment["VK_INSTANCE_LAYERS"] = ":".join(foreign)
+    inherited = {str(k): str(v) for k, v in (inherited or {}).items()}
+    isolation = isolation_plan(inherited, discover_layers(inherited), selected=backend)
+    environment = dict(isolation["environment"])
+    def result(prefix):
+        return FrameGenerationLaunch(environment, prefix, backend, tuple(isolation["entries"]),
+                                     tuple(isolation["warnings"]), tuple(isolation["detected"]))
     if backend == "off":
-        environment["VK_LOADER_LAYERS_DISABLE"] = ",".join(filter(None, [
-            str((inherited or {}).get("VK_LOADER_LAYERS_DISABLE", "")),
-            "VK_LAYER_LSFG*", "VK_LAYER_MAKO*", "VK_LAYER_AFMF*"]))
-        return environment, []
+        return result([])
+    if isolation["warnings"]:
+        # Stacking two generators is a documented conflict for a selected backend.
+        raise ValueError("\n".join(isolation["warnings"]))
     components = FrameGenerationArtifacts(state.get("componentRoot"))
     executable = Path(state.get("executable", ""))
     if state.get("executable") and (not executable.is_file() or (backend == "afmf" and inspect_binary(executable)["bits"] != 64)):
@@ -154,11 +183,6 @@ def launch_settings(key, root=GAMES_CONFIG_DIR, *, inherited=None, gamescope=Fal
             raise ValueError("MAKO supports vkBasalt or MangoHud in the game, not both. Disable one in its page, or select lsfg-vk")
         if hud.get("enabled") and (host_home_directory() / ".config/mako-render/mangohud.conf").is_file():
             raise ValueError("MAKO's launcher would select its independent MangoHud configuration. Preserve it and select another generator, or disable the in-game HUD explicitly")
-    import fnmatch
-    selected_layer = LAYER_NAMES[backend]
-    masks = str((inherited or {}).get("VK_LOADER_LAYERS_DISABLE", "")).split(",")
-    if any(mask in {"~all~", "~implicit~"} or (mask and fnmatch.fnmatchcase(selected_layer, mask)) for mask in masks):
-        raise ValueError("Existing VK_LOADER_LAYERS_DISABLE blocks the selected frame generator; remove that per-game conflict explicitly")
     if str((inherited or {}).get("PROTON_USE_WINED3D", "")) == "1":
         raise ValueError("Selected frame generator requires Vulkan; PROTON_USE_WINED3D=1 selects OpenGL")
     status = components.status(backend)
@@ -171,37 +195,30 @@ def launch_settings(key, root=GAMES_CONFIG_DIR, *, inherited=None, gamescope=Fal
         if not dll.is_file() or file_hash(dll) != receipt.get("sha256") or receipt.get("componentVersion") != status["version"]:
             raise ValueError("Lossless Scaling files changed or were not validated for this backend")
         if not config.is_file(): raise ValueError("Per-game frame-generation configuration is missing")
-    # Remove explicitly requested competing layers; leave unrelated layers alone.
-    selected = LAYER_NAMES[backend]
-    layers = str((inherited or {}).get("VK_INSTANCE_LAYERS", "")).split(":")
-    competing = ("LSFG", "MAKO", "AFMF")
-    foreign = [x for x in layers if x and not any(part in x.upper() for part in competing)]
-    environment["VK_INSTANCE_LAYERS"] = ":".join(foreign)
     if backend == "lsfg":
-        environment.pop("DISABLE_LSFGVK")
+        environment.pop("DISABLE_LSFGVK", None)
         environment.update(LSFGVK_CONFIG=str(config),
                            VK_ADD_IMPLICIT_LAYER_PATH=str(directory / "share/vulkan/implicit_layer.d"))
+        prefix = ["env", "-u", "DISABLE_LSFGVK", "-u", "LSFGVK_ENV", "-u", "LSFGVK_PROFILE"]
     elif backend == "mako":
-        environment.pop("DISABLE_MAKO")
+        environment.pop("DISABLE_MAKO", None)
         environment.update(ENABLE_MAKO="1", MAKO_CONFIG=str(config),
                            MAKO_LAUNCH_CONFIG=str(config.with_suffix(".launcher.conf")))
-        return environment, ["env", "-u", "DISABLE_MAKO", "-u", "MAKO_ENV", "-u", "MAKO_PROFILE",
-                             "-u", "MAKO_PROFILE_FALLBACK", "-u", "MAKO_FOLLOW_CURRENT_PROFILE", str(directory / "bin/mako-launch")]
+        prefix = ["env", "-u", "DISABLE_MAKO", "-u", "MAKO_ENV", "-u", "MAKO_PROFILE",
+                  "-u", "MAKO_PROFILE_FALLBACK", "-u", "MAKO_FOLLOW_CURRENT_PROFILE", str(directory / "bin/mako-launch")]
     else:
         settings = checked_settings(backend, state["settings"][backend])
-        environment.pop("DISABLE_AFMF")
+        environment.pop("DISABLE_AFMF", None)
         environment.update(AFMF_ENABLE="1", AFMF_LOG="2",
                            VK_ADD_IMPLICIT_LAYER_PATH=str(directory / "share/vulkan/implicit_layer.d"))
         for name, value in settings.items():
             environment["AFMF_" + name.upper()] = str(int(value)) if type(value) is bool else str(value)
         if gamescope: environment["AFMF_GAMESCOPE"] = "1"
-    # Force competing implicit layers off even if their enable variables were inherited.
-    disabled_names = [name + "*" for b, name in LAYER_NAMES.items() if b != backend]
-    disabled_names.append("VK_LAYER_LSFG_frame_generation*")
-    previous = str((inherited or {}).get("VK_LOADER_LAYERS_DISABLE", ""))
-    environment["VK_LOADER_LAYERS_DISABLE"] = ",".join(filter(None, [previous, *disabled_names]))
-    return environment, (["env", "-u", "DISABLE_LSFGVK", "-u", "LSFGVK_ENV", "-u", "LSFGVK_PROFILE"] if backend == "lsfg"
-                         else ["env", "-u", "DISABLE_AFMF"])
+        prefix = ["env", "-u", "DISABLE_AFMF"]
+    blocker = selected_blocker(backend, {**inherited, **environment})
+    if blocker:
+        raise ValueError(blocker)
+    return result(prefix)
 
 
 class FrameGenerationService:
@@ -241,7 +258,7 @@ class FrameGenerationService:
             for path in root.glob("*.json"):
                 try:
                     layer = json.loads(path.read_text()).get("layer", {})
-                    if any(x in layer.get("name", "").upper() for x in ("LSFG", "MAKO", "AFMF")):
+                    if backend_for_layer(layer.get("name", "")):
                         result.append({"path": str(path), "name": layer.get("name"), "disable": layer.get("disable_environment", {})})
                 except (OSError, ValueError): pass
         return result

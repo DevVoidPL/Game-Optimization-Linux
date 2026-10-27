@@ -44,3 +44,19 @@ Exporting a bundle does not publish a GitHub release.
 The manifest includes the maintained runner installer and required application
 assets. Optional graphics components and Narrator models are downloaded on
 demand; private voice files and local configuration are not part of the build.
+
+## Couch Edition and Desktop Edition
+
+`io.github.DevVoidPL.GameOptimizationLinux.yml` builds the Couch Edition (complete
+application). The Desktop Edition manifest is generated from it and differs only in an
+edition marker and the removal of Couch QML and Couch-only icons:
+
+```bash
+python3 flatpak/make-desktop-edition-manifest.py
+flatpak run org.flatpak.Builder --force-clean --user --install-deps-from=flathub \
+  --repo=.flatpak-build-repo-desktop --default-branch=stable .flatpak-build-dir-desktop \
+  flatpak/io.github.DevVoidPL.GameOptimizationLinux.desktop-edition.yml
+```
+
+Both editions bundle the Voidek voice from `flatpak/bundled/` (not tracked in git;
+the manifest pins its SHA-256). Both use the same App ID and user data.

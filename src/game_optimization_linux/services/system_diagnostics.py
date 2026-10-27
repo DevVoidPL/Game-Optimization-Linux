@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from game_optimization_linux.edition import EDITION, EDITION_NAMES
+
 from collections.abc import Mapping
 from configparser import ConfigParser, Error as ConfigParserError
 import os
@@ -115,6 +117,7 @@ def build_public_system_diagnostics(
     result: dict[str, Any] = {
         "appName": APP_NAME,
         "appVersion": APP_VERSION,
+        "edition": EDITION_NAMES[EDITION],
         "appId": APP_ID,
         "flatpak": inside_flatpak,
         "architecture": _known_text(architecture or platform.machine()),
@@ -145,6 +148,9 @@ def format_public_system_diagnostics(diagnostics: Mapping[str, Any]) -> str:
     app_name = _known_text(diagnostics.get("appName")) or APP_NAME
     app_version = _known_text(diagnostics.get("appVersion"))
     lines = [" ".join(part for part in (app_name, app_version) if part)]
+    edition = _known_text(diagnostics.get("edition"))
+    if edition:
+        lines.append(f"Edition: {edition}")
     app_id = _known_text(diagnostics.get("appId"))
     if app_id:
         lines.append(f"App ID: {app_id}")

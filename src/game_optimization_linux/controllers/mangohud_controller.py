@@ -10,13 +10,14 @@ from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 
 from ..models import Game, Launcher, MangoHudProfile
+from ..models.mangohud import PRESET_APPEARANCE
 from ..services import (
     METRIC_CONFIG_KEYS,
     MangoHudConfigWriter,
     SteamLaunchError,
     uses_flatpak_steam,
 )
-from ..services.mangohud import display_config_text, hud_layout, preset_metric_sets
+from ..services.mangohud import display_config_text, hud_layout, preset_metric_sets, MANGOAPP_PROCESS_METRICS
 
 if TYPE_CHECKING:
     from .app_controller import AppController
@@ -33,6 +34,30 @@ class MangoHudController:
         if game is None:
             return ""
         return game.profile_key
+
+    def _uses_mangoapp(self, optimization) -> bool:
+        if not optimization.gamescope_enabled or optimization.gamescope_mode == "disabled":
+            return False
+        _gamemode, gamescope = self._app._runtime_tool_detector.detect()
+        return gamescope.available and "--mangoapp" in gamescope.effective_options
+
+    def _availability(self, game: Game, profile: MangoHudProfile | None = None):
+        query = getattr(self._app._mangohud_detector, "for_game", None)
+        if callable(query):
+            availability, runtime = query(game)
+        else:
+            availability, runtime = self._app._mangohud_detector.detect("flatpak" if uses_flatpak_steam(game) else "native"), {}
+        if profile is not None:
+            from ..services.game_analysis import GameAnalyzer
+            resolution = self._app._mangohud_launch_integration.executable_resolver.resolve(game, profile.executable_path)
+            path = game.install_path / resolution.selected.relative_path if resolution.reliable and resolution.selected else None
+            architecture = GameAnalyzer._architecture(path).value
+            runtime = {**runtime, "architecture": architecture}
+            optimization = self._app._optimization_profile_repository.load(profile.app_id)
+            mangoapp = self._uses_mangoapp(optimization)
+            if architecture == "32-bit" and runtime.get("layer32") is False and not mangoapp:
+                availability = replace(availability, available=False, message="The game is 32-bit, but its launcher runtime has no 32-bit MangoHud layer. Install the matching MangoHud package or extension, then refresh.")
+        return availability, runtime
 
     def getMangoHudProfile(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
@@ -97,9 +122,10 @@ class MangoHudController:
                     profile, executable_path=resolution.selected.relative_path
                 )
             steam_type = "flatpak" if uses_flatpak_steam(game) else "native"
-            availability = self._app._mangohud_detector.detect(steam_type)
+            availability, _runtime = self._availability(game, profile)
             if profile.enabled and not availability.available:
                 raise ValueError(availability.message)
+            MangoHudConfigWriter.validate_target(self._app._mangohud_repository.config_path(app_id))
             profile_path = self._app._mangohud_repository.save(profile)
             effective = self._effective_mangohud_profile(profile)
             config_path = self._app._mangohud_repository.config_path(app_id)
@@ -167,9 +193,9 @@ class MangoHudController:
             return {"success": False, "code": "unsupported_game",
                     "message": "MangoHud profiles require a supported game"}
         try:
-            profile = self._effective_mangohud_profile(
-                self._app._mangohud_profile_from_payload(app_id, values)
-            )
+            # The standalone host preview is not Gamescope mangoapp and must not
+            # inherit the game's limiter or hide its per-process metric selections.
+            profile = replace(self._app._mangohud_profile_from_payload(app_id, values), fps_limit=None)
         except Exception as error:
             return {"success": False, "code": "invalid", "message": str(error)}
         if not profile.enabled or not profile.metrics:
@@ -237,6 +263,9 @@ class MangoHudController:
     ) -> MangoHudProfile:
         base = self._app._mangohud_repository.load(app_id)
         aliases = {
+            "offsetX": "offset_x",
+            "offsetY": "offset_y",
+            "cellPaddingY": "cellpadding_y",
             "fontSize": "font_size",
             "backgroundAlpha": "background_alpha",
             "roundCorners": "round_corners",
@@ -269,6 +298,7 @@ class MangoHudController:
             "enabled",
             "preset",
             "position",
+            "offset_x", "offset_y", "cellpadding_y", "graphs",
             "font_size",
             "background_alpha",
             "round_corners",
@@ -320,20 +350,25 @@ class MangoHudController:
     ) -> dict[str, Any]:
         optimization_profile = self._app._optimization_profile_repository.load(profile.app_id)
         gamescope_owns_limit = self._app._gamescope_owns_fps_limit(optimization_profile)
-        effective_profile = (
-            replace(profile, fps_limit=None, fps_limit_method="")
-            if gamescope_owns_limit else profile
-        )
+        effective_profile = self._effective_mangohud_profile(profile)
         steam_type = "flatpak" if uses_flatpak_steam(game) else "native"
-        availability = self._app._mangohud_detector.detect(steam_type)
+        availability, runtime = self._availability(game, profile)
         strategy = self._app._mangohud_launch_integration.status(game, effective_profile)
-        data = effective_profile.to_dict()
+        mangoapp = self._uses_mangoapp(optimization_profile)
+        data = profile.to_dict()
         data.update(
             {
                 "success": True,
                 "schemaVersion": profile.schema_version,
                 "appId": profile.app_id,
                 "fontSize": profile.font_size,
+                "offsetX": profile.offset_x, "offsetY": profile.offset_y,
+                "cellPaddingY": profile.cellpadding_y, "graphs": list(profile.graphs),
+                "runtimeInfo": {**runtime, "version": availability.version},
+                "supportedKeys": list(availability.supported_keys),
+                "mangoapp": mangoapp,
+                "presetAppearance": {name: {key: list(value) if isinstance(value, tuple) else value for key, value in style.items()} for name, style in PRESET_APPEARANCE.items()},
+                "editorDefaults": self._app._mangohud_repository.default(profile.app_id).to_dict(),
                 "backgroundAlpha": profile.background_alpha,
                 "roundCorners": profile.round_corners,
                 "tableColumns": profile.table_columns,
@@ -378,6 +413,7 @@ class MangoHudController:
                     metric
                     for metric, key in METRIC_CONFIG_KEYS.items()
                     if key in availability.supported_keys
+                    and (not mangoapp or metric not in MANGOAPP_PROCESS_METRICS)
                 ],
             }
         )
@@ -400,7 +436,9 @@ class MangoHudController:
         except (OSError, ValueError):
             return profile
         if self._app._gamescope_owns_fps_limit(optimization_profile):
-            return replace(profile, fps_limit=None, fps_limit_method="")
+            profile = replace(profile, fps_limit=None, fps_limit_method="")
+        if self._uses_mangoapp(optimization_profile):
+            profile = replace(profile, metrics=tuple(m for m in profile.metrics if m not in MANGOAPP_PROCESS_METRICS))
         return profile
 
     def _sync_mangohud_fps_owner(self, game: Game) -> None:
@@ -409,12 +447,10 @@ class MangoHudController:
         if not app_id:
             return
         profile = self._app._mangohud_repository.load(app_id)
-        if profile.fps_limit is None and not profile.fps_limit_method:
+        if not profile.enabled and profile.fps_limit is None and not profile.fps_limit_method:
             return
         effective = self._effective_mangohud_profile(profile)
-        availability = self._app._mangohud_detector.detect(
-            "flatpak" if uses_flatpak_steam(game) else "native"
-        )
+        availability, _runtime = self._availability(game, profile)
         MangoHudConfigWriter(availability.supported_keys).write(
             effective, self._app._mangohud_repository.config_path(app_id)
         )

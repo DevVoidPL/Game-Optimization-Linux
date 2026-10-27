@@ -91,7 +91,26 @@ class LauncherPlan:
 
 # Heroic per-game options GameOpti may write, with their accepted types.
 # ``disableUMU`` is Heroic's own "Disable UMU" switch (Game settings > Other).
-_HEROIC_MANAGED_SETTINGS: Mapping[str, type] = {"disableUMU": bool}
+_HEROIC_MANAGED_SETTINGS: Mapping[str, type] = {"disableUMU": bool, "launcherArgs": str}
+# Lutris 0.5.22 game options GameOpti may write (game section).
+_LUTRIS_MANAGED_SETTINGS: Mapping[str, type] = {"args": str}
+# Options that hold the user's own game arguments: never overwritten when set.
+ARGUMENT_SETTINGS = frozenset({"launcherArgs", "args"})
+
+
+def launcher_argument_setting(game: Game) -> str:
+    """Launcher option that carries game arguments, '' when not verified for this game type.
+
+    Heroic 2.22.4: ``launcherArgs`` is appended to legendary's launch command and
+    split with shlex (backend/storeManagers/legendary/games.ts). Other Heroic
+    runners were not verified. Lutris 0.5.22: ``game.args`` is split with shlex
+    for the wine and linux runners.
+    """
+    if game.launcher is Launcher.HEROIC:
+        return "launcherArgs" if str(game.id).startswith("heroic-legendary-") else ""
+    if game.launcher is Launcher.LUTRIS:
+        return "args" if str(getattr(game, "runner", "")).casefold() in {"wine", "linux"} else ""
+    return ""
 _MISSING = "__gameopti_missing__"
 
 
@@ -489,6 +508,31 @@ class _LutrisConfig(_ConfigFile):
 
     def wrapper_text(self, document: Any) -> str:
         return str(self._system(document).get("prefix_command") or "").strip()
+
+    @staticmethod
+    def _game(document: Any) -> dict[str, Any]:
+        game = document.get("game")
+        if not isinstance(game, dict):
+            game = {}
+            document["game"] = game
+        return game
+
+    def setting(self, document: Any, key: str) -> Any:
+        if key not in _LUTRIS_MANAGED_SETTINGS:
+            raise LauncherSyncError(f"GameOpti does not manage the Lutris option {key}")
+        game = document.get("game")
+        return game.get(key, _MISSING) if isinstance(game, dict) else _MISSING
+
+    def set_setting(self, document: Any, key: str, value: Any) -> None:
+        if key not in _LUTRIS_MANAGED_SETTINGS:
+            raise LauncherSyncError(f"GameOpti does not manage the Lutris option {key}")
+        game = self._game(document)
+        if value == _MISSING:
+            game.pop(key, None)
+        elif isinstance(value, _LUTRIS_MANAGED_SETTINGS[key]):
+            game[key] = value
+        else:
+            raise LauncherSyncError(f"Invalid value for the Lutris option {key}")
 
     def dll_overrides(self, document: Any) -> dict[str, str] | None:
         if str(document.get("runner") or "") not in {"", "wine"}:
@@ -904,6 +948,20 @@ class LauncherIntegrationService:
                 f"({config.wrapper_text(document)}); GameOpti will not change it. Remove it in "
                 f"{launcher} or turn off the GameOpti wrapper features (GameMode/Gamescope)"
             )
+        managed_settings = (record or {}).get("settings", {})
+        for key, value in sorted(plan.settings.items()):
+            if key not in ARGUMENT_SETTINGS:
+                continue
+            try:
+                current = config.setting(document, key)
+            except LauncherSyncError:
+                continue
+            owned = key in managed_settings and managed_settings[key].get("value") == current
+            if current not in (_MISSING, "", None, value) and not owned:
+                reasons.append(
+                    f"{launcher} already passes its own game arguments ({key}: {current}); "
+                    "GameOpti will not replace them. Clear them in the launcher or disable the custom arguments"
+                )
         env = config.env(document)
         overrides = config.dll_overrides(document)
         for key, value in sorted(plan.environment.items()):
@@ -928,6 +986,11 @@ class LauncherIntegrationService:
                 continue
             if current is None or current == value:
                 continue
+            if key == "DXIL_SPIRV_CONFIG":
+                old_tokens = set(re.split(r"[,;]", current)) - {""}
+                new_tokens = set(re.split(r"[,;]", value)) - {""}
+                if old_tokens <= new_tokens:
+                    continue
             if key in managed_env and managed_env[key].get("value") == current:
                 continue
             reasons.append(
@@ -1012,7 +1075,7 @@ class LauncherIntegrationService:
         result.update(
             {
                 "state": state,
-                "canApply": writable and not plan.empty and not blockers and state != "applied",
+                "canApply": writable and (not plan.empty or record is not None) and not blockers and state != "applied",
                 "canRestore": writable and record is not None,
             }
         )
@@ -1064,6 +1127,8 @@ class LauncherIntegrationService:
             raise LauncherSyncError("The game does not use Heroic or Lutris")
         plan = self._plan_provider(game, write=True)
         if plan.empty:
+            if self._load_record(game) is not None and not plan.blockers and not plan.pending:
+                return self.restore(game)
             raise LauncherSyncError("The saved profile adds nothing to the launch")
         if plan.blockers:
             raise LauncherSyncError(plan.blockers[0])

@@ -15,27 +15,9 @@ from game_optimization_linux.models import GameOptimizationProfile
 from game_optimization_linux.models.optimization_profile import GAMESCOPE_SHARPNESS_FILTERS
 
 from .optiscaler import merge_wine_dll_overrides
+from .tweaks_capabilities import merge_tweak_environment
 
 
-_HOST_WRAPPER_ENVIRONMENT_KEYS = frozenset(
-    {
-        "LD_LIBRARY_PATH",
-        "LD_PRELOAD",
-        "LIBGL_DRIVERS_PATH",
-        "MESA_LOADER_DRIVER_OVERRIDE",
-        "STEAM_LD_LIBRARY_PATH",
-        "STEAM_RUNTIME",
-        "SYSTEM_LD_LIBRARY_PATH",
-        "SYSTEM_PATH",
-        "VK_ADD_LAYER_PATH",
-        "VK_DRIVER_FILES",
-        "VK_ICD_FILENAMES",
-        "VK_INSTANCE_LAYERS",
-        "VK_LAYER_PATH",
-        "VK_LOADER_LAYERS_DISABLE",
-        "VK_LOADER_LAYERS_ENABLE",
-    }
-)
 _HOST_WRAPPER_ENVIRONMENT_PREFIXES = ("PRESSURE_VESSEL_", "STEAM_RUNTIME_")
 # Resolved by ld.so on the host and imported by pressure-vessel into the
 # Steam Linux Runtime container (verified 22.10.2026 with gamemode 1.8.2/SLR 4).
@@ -49,39 +31,113 @@ _STEAM_RUNTIME_PATH_MARKERS = (
 )
 
 
+_CUSTOM_REFUSED_KEYS = frozenset({
+    "LD_PRELOAD", "LD_LIBRARY_PATH", "PATH", "WINEDLLOVERRIDES", "VK_INSTANCE_LAYERS", "VK_LAYER_PATH",
+    "VK_ADD_LAYER_PATH", "VK_IMPLICIT_LAYER_PATH", "VK_ADD_IMPLICIT_LAYER_PATH", "VK_ICD_FILENAMES",
+    "VK_DRIVER_FILES", "SteamAppId", "SteamGameId", "SteamOverlayGameId", "HOME", "USER", "DISPLAY",
+    "WAYLAND_DISPLAY", "XDG_RUNTIME_DIR", "DBUS_SESSION_BUS_ADDRESS",
+})
+_CUSTOM_REFUSED_PREFIXES = ("VK_LOADER_", "STEAM_COMPAT_", "PRESSURE_VESSEL_", "STEAM_RUNTIME", "GAME_OPTIMIZATION_")
+
+_ACTIVATION_SOURCES = {
+    "proton_tweaks": "Proton Tweaks", "optiscaler": "OptiScaler", "gamemode": "GameMode",
+    "gamescope_hdr": "Gamescope HDR", "mangohud_profile": "MangoHud", "baseline_measurement": "MangoHud measurement",
+    "gpu_memory": "GPU memory",
+}
+
+
+def _classify_environment(environment: Mapping[str, str], sources: Mapping[str, str], inherited: Mapping[str, str],
+                          fg_entries: Sequence[Mapping[str, Any]], fg_warnings: Sequence[str], *,
+                          restore_keys: Sequence[str] = (), removed: Sequence[str] = (), unset: Sequence[str] = (),
+                          selected_fg: str = "") -> tuple[dict[str, str], ...]:
+    """One row per planned variable. Suppression is never reported as an enabled feature.
+
+    Categories: activation (selected feature), inherited (inherited value preserved),
+    suppression (targeted conflict suppression), boundary (launcher/runtime boundary),
+    unresolved (conflict GameOpti did not change).
+    """
+    rows: list[dict[str, str]] = []
+    guards = {(str(e.get("target")), str(e.get("key"))): e for e in fg_entries}
+    def guard_detail(guard):
+        return str(guard.get("layer", "")) + (f" ({guard.get('detail')})" if guard.get("detail") else "")
+    def row(key, value, category, owner, target, code, detail="", english=""):
+        rows.append({"key": key, "value": value, "category": category, "owner": owner, "target": target,
+                     "code": code, "detail": detail, "gameOnly": "1" if key in restore_keys and target == "game" and category != "boundary" else "",
+                     "reason": english or (f"{code}: {detail}" if detail else code)})
+    for key in sorted(environment):
+        value, source = str(environment[key]), str(sources.get(key, ""))
+        guard = guards.get(("game", key))
+        if guard is not None:
+            row(key, value, "suppression", str(guard.get("backendName", "")), "game", str(guard.get("reason")), guard_detail(guard))
+        elif source == "frame_generation":
+            row(key, value, "activation", "Frame generation", "game", "fg_selected", selected_fg)
+        elif source == "post_processing":
+            if key in {"ENABLE_VKBASALT", "DISABLE_VKBASALT"} and not (key == "ENABLE_VKBASALT" and value == "1"):
+                row(key, value, "suppression", "vkBasalt", "game",
+                    "vkbasalt_duplicate" if environment.get("ENABLE_VKBASALT") == "1" else "vkbasalt_inherited")
+            elif key == "WINEDLLOVERRIDES" and "VK_INSTANCE_LAYERS" not in environment:
+                row(key, value, "activation", "ReShade", "game", "reshade_override")
+            else:
+                row(key, value, "activation", "vkBasalt", "game", "vkbasalt_layer")
+        elif source == "custom_launch":
+            from .custom_launch import redact
+            row(key, redact(key, value), "activation", "Custom launch", "game", "custom_env")
+        elif source in _ACTIVATION_SOURCES:
+            row(key, value, "activation", _ACTIVATION_SOURCES[source], "game", "feature", source)
+        else:
+            row(key, value, "inherited", "", "game", "inherited")
+    for (target, key), guard in sorted(guards.items()):
+        if target == "compositor":
+            row(key, str(guard.get("value", "")), "suppression", str(guard.get("backendName", "")), "compositor",
+                str(guard.get("reason")), guard_detail(guard))
+    for key in sorted(set(restore_keys) - set(environment)):
+        row(key, "<preserved>", "boundary", "Gamescope", "game", "boundary_restored")
+    for key in sorted(set(removed) - set(restore_keys) - set(environment)):
+        row(key, "", "boundary", "Gamescope", "compositor", "boundary_removed")
+    for key in unset:
+        row(key, "", "boundary", "Gamescope", "game", "boundary_unset")
+    for warning in fg_warnings:
+        row("", "", "unresolved", "Frame generation", "", "unresolved", "", str(warning))
+    return tuple(rows)
+
+
 def _gamescope_environment_boundary(
-    environment: Mapping[str, str],
+    environment: Mapping[str, str], *, game_only_preloads: Sequence[str] = (),
+    game_only_layers: Sequence[str] = (), game_only_paths: Sequence[str] = (),
 ) -> tuple[dict[str, str], tuple[str, ...], dict[str, str]]:
+    """Isolate identified Steam/game injections, retaining unrelated host settings.
+
+    Full original values are restored before the actual Steam command, never
+    substituted with values from the GUI process. Unknown user entries survive.
+    """
     restore: dict[str, str] = {}
     removed: list[str] = []
-    for key, raw_value in environment.items():
-        if key in _HOST_WRAPPER_ENVIRONMENT_KEYS or key.startswith(
-            _HOST_WRAPPER_ENVIRONMENT_PREFIXES
-        ):
-            restore[key] = str(raw_value)
-            removed.append(key)
-
     overrides: dict[str, str] = {}
-    original_path = str(environment.get("PATH", ""))
-    if original_path:
-        safe_entries = [
-            entry
-            for entry in original_path.split(":")
-            if entry
-            and not any(
-                marker in entry.casefold() for marker in _STEAM_RUNTIME_PATH_MARKERS
-            )
-        ]
-        safe_path = ":".join(safe_entries)
-        if safe_path != original_path:
-            if not safe_path:
-                raise ValueError(
-                    "Gamescope cannot be launched safely because PATH contains only Steam Runtime entries"
-                )
-            restore["PATH"] = original_path
-            overrides["PATH"] = safe_path
-            removed.append("PATH")
+    def runtime_path(value):
+        parts = Path(value).parts
+        return any(part.casefold() in {*_STEAM_RUNTIME_PATH_MARKERS, "ubuntu12_32", "ubuntu12_64"}
+                   or part.casefold().startswith(("steamlinuxruntime_", "pinned_libs_")) for part in parts)
 
+    for key, raw_value in environment.items():
+        value = str(raw_value)
+        outer = value
+        if key in {"STEAM_LD_LIBRARY_PATH", "STEAM_RUNTIME", "SYSTEM_LD_LIBRARY_PATH", "SYSTEM_PATH"} or key.startswith(_HOST_WRAPPER_ENVIRONMENT_PREFIXES):
+            outer = ""
+        elif key == "LD_PRELOAD":
+            entries = [x for x in re.split(r"[:\s]+", value) if x]
+            outer = ":".join(x for x in entries if Path(x).name != "gameoverlayrenderer.so"
+                             and not runtime_path(x) and not any(Path(x).name.startswith(name) for name in game_only_preloads))
+        elif key == "VK_INSTANCE_LAYERS":
+            outer = ":".join(x for x in value.split(":") if x and x not in game_only_layers)
+        elif key in {"PATH", "LD_LIBRARY_PATH", "LIBGL_DRIVERS_PATH", "VK_ADD_LAYER_PATH", "VK_LAYER_PATH", "VK_IMPLICIT_LAYER_PATH", "VK_ADD_IMPLICIT_LAYER_PATH", "VK_DRIVER_FILES", "VK_ICD_FILENAMES"}:
+            outer = ":".join(x for x in value.split(":") if not runtime_path(x) and x not in game_only_paths)
+            if key == "PATH" and value and not outer:
+                raise ValueError("Gamescope cannot be launched safely because PATH contains only Steam Runtime entries")
+        if outer != value:
+            restore[key] = value
+            removed.append(key)
+            if outer:
+                overrides[key] = outer
     return restore, tuple(sorted(removed)), overrides
 
 
@@ -377,6 +433,13 @@ class GameRuntimeLaunchPlan:
     wrapper_environment_removed: tuple[str, ...] = ()
     wrapper_environment_overrides: Mapping[str, str] = field(default_factory=dict)
     environment_restore_keys: tuple[str, ...] = ()
+    environment_unset_keys: tuple[str, ...] = ()
+    frame_generation: Mapping[str, Any] = field(default_factory=dict)
+    environment_classification: tuple[Mapping[str, str], ...] = ()
+    custom_arguments: tuple[str, ...] = ()
+    pre_launch: tuple[Any, ...] = ()
+    post_exit: tuple[Any, ...] = ()
+    custom_rows: tuple[Mapping[str, str], ...] = ()
 
     @property
     def command(self) -> list[str]:
@@ -416,6 +479,18 @@ class GameRuntimeLaunchPlan:
             "gameModeWrapper": list(self.gamemode_wrapper),
             "gamescopeWrapper": list(self.gamescope_wrapper),
             "wrapperEnvironmentRemoved": list(self.wrapper_environment_removed),
+            "environmentUnsetForGame": list(self.environment_unset_keys),
+            "environmentClassification": [dict(x) for x in self.environment_classification],
+            "customArguments": list(self.custom_arguments),
+            "preLaunch": [{"argv": list(c.argv), "timeout": c.timeout, "onFailure": c.on_failure,
+                           "where": "host_runner"} for c in self.pre_launch],
+            "postExit": [{"argv": list(c.argv), "timeout": c.timeout, "runIfNotStarted": c.run_if_not_started,
+                          "where": "host_runner"} for c in self.post_exit],
+            "frameGeneration": {
+                "backend": str(self.frame_generation.get("backend", "")),
+                "entries": [dict(x) for x in self.frame_generation.get("entries", ())],
+                "detected": [dict(x) for x in self.frame_generation.get("detected", ())],
+            },
         }
 
 
@@ -443,6 +518,8 @@ class OptimizationLaunchPlanner:
         gpu_memory_environment: Mapping[str, str] | None = None,
         frame_generation_environment: Mapping[str, str] | None = None,
         frame_generation_prefix: Sequence[str] = (),
+        frame_generation_report: Mapping[str, Any] | None = None,
+        custom_launch: Any = None,
     ) -> GameRuntimeLaunchPlan:
         command = [str(value) for value in game_argv]
         if not command or not command[0] or (command[0] == "%command%" and not allow_placeholder):
@@ -460,6 +537,7 @@ class OptimizationLaunchPlanner:
         wrapper_environment_removed: tuple[str, ...] = ()
         wrapper_environment_overrides: dict[str, str] = {}
         environment_restore_keys: tuple[str, ...] = ()
+        environment_unset_keys: tuple[str, ...] = ()
         mangoapp_removed: set[str] = set()
         inherited = existing_environment or {}
         normalized_mangohud_owner = str(
@@ -476,7 +554,7 @@ class OptimizationLaunchPlanner:
             reasons.append("MangoHud uses the existing Steam environment activation")
         elif normalized_mangohud_owner == "measurement_session":
             reasons.append("MangoHud logging is active for one baseline session")
-        for raw_key, raw_value in sorted((proton_environment or {}).items()):
+        for raw_key, raw_value in sorted(merge_tweak_environment(inherited, proton_environment or {}).items()):
             key = str(raw_key)
             value = str(raw_value)
             if (
@@ -534,6 +612,15 @@ class OptimizationLaunchPlanner:
         allowed_measurement_keys = {
             "MANGOHUD", "MANGOHUD_CONFIG", "MANGOHUD_CONFIGFILE"
         }
+        post_processing_environment = dict(post_processing_environment or {})
+        if post_processing_environment.get("ENABLE_VKBASALT") != "1":
+            # ReShade or a neutral vkBasalt profile does not activate vkBasalt.
+            # Its implicit-layer gate is only needed when the inherited
+            # environment concretely enables vkBasalt (ENABLE_VKBASALT=1).
+            post_processing_environment.pop("ENABLE_VKBASALT", None)
+            post_processing_environment.pop("DISABLE_VKBASALT", None)
+            if str(inherited.get("ENABLE_VKBASALT", "")) == "1" and "DISABLE_VKBASALT" not in inherited:
+                post_processing_environment["DISABLE_VKBASALT"] = "1"
         for key, value in (post_processing_environment or {}).items():
             if key not in {"ENABLE_VKBASALT", "DISABLE_VKBASALT", "VKBASALT_CONFIG_FILE",
                            "VKBASALT_LOG_LEVEL", "VKBASALT_LOG_FILE", "VK_ADD_LAYER_PATH",
@@ -555,19 +642,29 @@ class OptimizationLaunchPlanner:
         if gpu_memory_environment:
             reasons.append("Per-game vkd3d memory-pressure trade-off; improvement requires an A/B measurement")
         from .frame_generation import ALLOWED_ENV
+        from .frame_generation_isolation import discover_layers, isolation_plan
+        fg_report = dict(frame_generation_report or {})
+        fg_entries = [dict(entry) for entry in fg_report.get("entries", ())]
+        fg_removed_layers = {entry["layer"] for entry in fg_entries if entry.get("key") == "VK_INSTANCE_LAYERS"}
         for key, value in (frame_generation_environment or {}).items():
             if key not in ALLOWED_ENV or not isinstance(value, str) or "\0" in value:
                 raise ValueError("Invalid frame-generation launch environment")
             if key == "VK_ADD_IMPLICIT_LAYER_PATH":
                 value = ":".join(dict.fromkeys(filter(None, (value + ":" + str(inherited.get(key, ""))).split(":"))))
             elif key == "VK_INSTANCE_LAYERS":
-                # Preserve the post-processing layer already added to this plan.
-                own_layers = environment.get(key, "").split(":")
-                value = ":".join(dict.fromkeys(filter(None, [*value.split(":"), *[x for x in own_layers if not any(p in x.upper() for p in ("LSFG", "MAKO", "AFMF"))]])))
+                # Remove exactly the generator entries the isolation removed;
+                # keep the order and the post-processing layer of this plan.
+                removed_tokens = fg_removed_layers or (set(str(inherited.get(key, "")).split(":")) - set(value.split(":")))
+                base = environment.get(key, str(inherited.get(key, "")))
+                value = ":".join(dict.fromkeys(x for x in base.split(":") if x and x not in removed_tokens))
             environment[key] = value
             environment_sources[key] = "frame_generation"
-        if frame_generation_environment:
-            reasons.append("Per-game external frame-generator selection; loaded runtime and generated frames require separate evidence")
+        if frame_generation_prefix or any((frame_generation_environment or {}).get(k) == "1" for k in ("AFMF_ENABLE", "ENABLE_MAKO")) or (frame_generation_environment or {}).get("LSFGVK_CONFIG"):
+            reasons.append("External frame generation is selected; generation requires separate runtime evidence")
+        elif fg_entries:
+            reasons.append(f"Frame generation Off: {len(fg_entries)} targeted guard(s) block a concrete generator activation in the game; see technical details")
+        fg_warnings = [str(item) for item in fg_report.get("warnings", ())]
+        warnings.extend(fg_warnings)
         for raw_key, raw_value in sorted((measurement_environment or {}).items()):
             key = str(raw_key)
             value = str(raw_value)
@@ -584,11 +681,51 @@ class OptimizationLaunchPlanner:
                 )
             environment[key] = value
             environment_sources[key] = "baseline_measurement"
+        # Per-game custom launch configuration. It never overrides a value a
+        # GameOpti feature set, and list-valued runtime variables are refused.
+        custom_rows: list[dict[str, str]] = []
+        custom_env_keys: set[str] = set()
+        custom_wrapper: list[str] = []
+        custom_arguments: tuple[str, ...] = ()
+        custom_pre: tuple[Any, ...] = ()
+        custom_post: tuple[Any, ...] = ()
+        if custom_launch is not None and not custom_launch.empty:
+            from .custom_launch import MANAGED_WRAPPERS, redact
+            for key, value in custom_launch.active_environment().items():
+                if key in _CUSTOM_REFUSED_KEYS or key.startswith(_CUSTOM_REFUSED_PREFIXES):
+                    reason = f"{key} is a launcher/runtime variable; use the dedicated GameOpti feature or a wrapper script"
+                elif key in environment:
+                    reason = f"{key} is already set by {environment_sources.get(key, 'GameOpti')}; the custom value is not applied"
+                else:
+                    environment[key] = value
+                    environment_sources[key] = "custom_launch"
+                    custom_env_keys.add(key)
+                    continue
+                environment_conflicts.append(f"custom:{key}")
+                warnings.append(reason)
+                custom_rows.append({"key": key, "value": redact(key, value), "category": "unresolved",
+                                    "owner": "Custom launch", "target": "game", "code": "custom_refused", "reason": reason})
+            wrapper = list(custom_launch.active_wrapper())
+            if wrapper:
+                name = Path(wrapper[0]).name
+                if name in MANAGED_WRAPPERS:
+                    reason = f"{MANAGED_WRAPPERS[name]} is placed by GameOpti itself; enable it in its own section instead of a custom wrapper"
+                    warnings.append(reason)
+                    custom_rows.append({"key": "", "value": " ".join(wrapper), "category": "unresolved", "owner": "Custom launch",
+                                        "target": "", "code": "custom_refused", "reason": reason})
+                else:
+                    custom_wrapper = wrapper
+                    reasons.append("Custom wrapper runs on the host around the Steam launch command, inside GameMode/Gamescope")
+            custom_arguments = custom_launch.active_arguments()
+            custom_pre, custom_post = custom_launch.active_pre(), custom_launch.active_post()
+            if custom_env_keys:
+                reasons.append(f"Custom environment: {', '.join(sorted(custom_env_keys))} (game process)")
         fps_limit_owner = "mangohud" if mangohud_fps_limit else "none"
         effective_fps_limit = mangohud_fps_limit
         if any(not isinstance(item, str) or "\0" in item for item in frame_generation_prefix):
             raise ValueError("Invalid frame-generation wrapper")
-        inner = [*frame_generation_prefix, *command]
+        inner = [*custom_wrapper, *frame_generation_prefix, *command, *custom_arguments]
+        if custom_wrapper: wrappers.append("custom")
         if frame_generation_prefix: wrappers.append("frame_generation")
         if profile.gamemode_enabled:
             if gamemode.available:
@@ -828,7 +965,14 @@ class OptimizationLaunchPlanner:
                 game_environment = dict(inherited)
                 game_environment.update(environment)
                 restore, removed, wrapper_environment_overrides = (
-                    _gamescope_environment_boundary(game_environment)
+                    _gamescope_environment_boundary(game_environment,
+                        game_only_preloads=(("libgamemode.so", "libgamemodeauto.so") if profile.gamemode_enabled else ())
+                                           + (("libMangoHud.so",) if normalized_mangohud_owner == "mangoapp" else ()),
+                        game_only_layers=(*str((post_processing_environment or {}).get("VK_INSTANCE_LAYERS", "")).split(":"),
+                                          *(("VK_LAYER_MANGOHUD_overlay",) if normalized_mangohud_owner == "mangoapp" else ())),
+                        game_only_paths=tuple(x for source in (post_processing_environment or {}, frame_generation_environment or {})
+                                              for key in ("VK_ADD_LAYER_PATH", "VK_ADD_IMPLICIT_LAYER_PATH")
+                                              for x in str(source.get(key, "")).split(":") if x))
                 )
                 measurement_keys = {
                     key
@@ -841,24 +985,52 @@ class OptimizationLaunchPlanner:
                              if key != "WINEDLLOVERRIDES"}
                 post_keys.update((gpu_memory_environment or {}).keys())
                 post_keys.update((frame_generation_environment or {}).keys())
-                if frame_generation_environment:
-                    # Frame generation belongs to the game, not its compositor.
-                    from .frame_generation import DISABLED
-                    wrapper_environment_overrides.update(DISABLED)
+                # Custom variables belong to the game; the compositor keeps the
+                # inherited value, if any.
+                post_keys.update(custom_env_keys)
+                for key in custom_env_keys:
+                    if key in inherited:
+                        wrapper_environment_overrides[key] = str(inherited[key])
+                shared_layer_keys = {"VK_INSTANCE_LAYERS", "VK_ADD_LAYER_PATH", "VK_ADD_IMPLICIT_LAYER_PATH", "VK_LOADER_LAYERS_DISABLE", "VK_LOADER_LAYERS_ENABLE", "VK_LOADER_LAYERS_ALLOW"}
                 for key in post_keys:
                     restore[key] = environment[key]
+                    if key in shared_layer_keys:
+                        if key not in removed:
+                            wrapper_environment_overrides.setdefault(key, str(environment[key]))
                 for key in mangoapp_removed:
                     restore.pop(key, None)
                 wrapper_environment_removed = tuple(
                     sorted({*removed, *measurement_keys, *mangoapp_removed, *post_keys})
                 )
+                # Gamescope is a separate Vulkan process: analyze the environment it
+                # actually receives. Its guards must not change the game's environment.
+                outer = {str(k): str(v) for k, v in game_environment.items() if k not in set(wrapper_environment_removed)}
+                outer.update(wrapper_environment_overrides)
+                selected_fg = str(fg_report.get("backend", ""))
+                compositor = isolation_plan(outer, discover_layers(outer), selected="off", target="compositor",
+                                            protect="" if selected_fg in {"", "off"} else selected_fg)
+                unset_for_game = []
+                for key, value in compositor["environment"].items():
+                    wrapper_environment_overrides[key] = value
+                    if key not in game_environment:
+                        unset_for_game.append(key)
+                    elif key not in restore and str(game_environment[key]) != value:
+                        restore[key] = str(game_environment[key])
+                fg_entries.extend(compositor["entries"])
+                warnings.extend(compositor["warnings"])
+                fg_warnings.extend(compositor["warnings"])
+                if compositor["entries"]:
+                    reasons.append(f"Gamescope compositor: {len(compositor['entries'])} targeted generator guard(s); the game's own environment is restored separately")
+                environment_unset_keys = tuple(sorted(unset_for_game))
                 environment_restore_keys = tuple(sorted(restore))
-                if restore:
+                if restore or environment_unset_keys:
                     inner = [
                         "env",
+                        *(item for key in environment_unset_keys for item in ("-u", key)),
                         *(f"{key}={value}" for key, value in sorted(restore.items())),
                         *inner,
                     ]
+                if restore:
                     reasons.append(
                         "Steam Runtime loader variables are isolated from the host Gamescope process and restored for the game"
                     )
@@ -887,6 +1059,18 @@ class OptimizationLaunchPlanner:
             wrapper_environment_removed=wrapper_environment_removed,
             wrapper_environment_overrides=wrapper_environment_overrides,
             environment_restore_keys=environment_restore_keys,
+            environment_unset_keys=environment_unset_keys,
+            custom_arguments=tuple(custom_arguments),
+            pre_launch=tuple(custom_pre),
+            post_exit=tuple(custom_post),
+            custom_rows=tuple(custom_rows),
+            frame_generation={"backend": str(fg_report.get("backend", "")), "entries": tuple(fg_entries),
+                              "detected": tuple(dict(x) for x in fg_report.get("detected", ())),
+                              "warnings": tuple(fg_warnings)},
+            environment_classification=(*_classify_environment(
+                environment, environment_sources, inherited, fg_entries, fg_warnings,
+                restore_keys=environment_restore_keys, removed=wrapper_environment_removed,
+                unset=environment_unset_keys, selected_fg=str(fg_report.get("backend", ""))), *custom_rows),
         )
 
 

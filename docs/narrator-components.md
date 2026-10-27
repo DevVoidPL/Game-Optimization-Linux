@@ -26,21 +26,31 @@ Its versioned provider identifier is part of the translation cache key.
 
 ## Polish speech
 
-The runtime offers multiple Polish voices; the pinned Gosia model below is
-one option, not the entire voice catalog. The development catalog also includes
-`pl_PL-bass-high`. Available models and their pinned artifacts are defined in
+The catalog offers one Polish voice, **Voidek**, created by the GameOpti
+author. It is the default voice and is included in the official GameOpti
+packages, so it works without a download. Users can also import their own
+Piper voice (`.onnx` with the matching `.onnx.json`). Pinned artifacts are
+defined in
 [`narrator_components.py`](../src/game_optimization_linux/services/narrator_components.py).
 
 - Runtime: OHF-Voice Piper 1.7.0 (`piper1-gpl`, GPL-3.0-or-later) and ONNX
   Runtime CPU 1.28.0 (MIT).
-- Voice: `pl_PL-gosia-medium` from `rhasspy/piper-voices`, revision
-  `058271fb41b630e96989367e15b4514992a25b42`.
-- Voice repository metadata: MIT. The voice model card identifies the source
-  dataset as CC0.
-- Model size: 63,201,294 bytes; SHA-256
-  `38f66464240ed74f186e6b7dc13c6e3b22e023426299f25c2b3cc9dfa9373fbc`.
-- Configuration size: 6,920 bytes; SHA-256
-  `956cd5b2a08dca5e780ad584a6d2e971ba3bd7fcd06297dfa6cd85c9fbcd3d42`.
+- Voice: Voidek (epoch 991), files `voidek-pl-e991.onnx` and
+  `voidek-pl-e991.onnx.json`.
+- Model size: 63,516,050 bytes; SHA-256
+  `ca2ad0a22273e3850ce3def4d098f1993c2393c71584f474636afd08ab6af53b`.
+- Configuration size: 5,033 bytes; SHA-256
+  `4b14423d0575b35bc4ace4dc83d639e9f8d0fa8eab3f238bd9597bfab50af5db`.
+- Build source: immutable assets of the `v2.0.0-beta` GitHub release, pinned by
+  URL and SHA-256 in the Flatpak manifest. The application never downloads it.
+- Model license: separate from the GameOpti MIT license; see
+  [`VOIDEK-LICENSE.md`](../flatpak/bundled/VOIDEK-LICENSE.md) and the
+  [model card](../flatpak/bundled/VOIDEK-MODEL-CARD.md).
+
+Earlier builds offered the `rhasspy/piper-voices` models Gosia, Bass and
+Darkman. They are no longer offered for download. Files a user already
+downloaded keep working and stay listed under components until the user
+removes them; an update never deletes them.
 
 Piper runs in a narrow local worker process with `use_cuda=False`. PCM is
 returned to the application without per-line temporary audio files. Anyone

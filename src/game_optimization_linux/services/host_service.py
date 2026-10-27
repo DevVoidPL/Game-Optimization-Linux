@@ -372,6 +372,40 @@ class HostServiceClient:
         self._tool_cache[normalized] = dict(payload)
         return payload
 
+    def mangohud_runtime_info(self, app_id: str = "") -> dict[str, Any]:
+        """Read MangoHud's version, example and architecture in its launch environment."""
+        if app_id and not _FLATPAK_APP_ID.fullmatch(app_id):
+            raise HostServiceError("Invalid launcher ID")
+        key = "mangohud-runtime:" + app_id
+        cached = self._tool_cache.get(key)
+        if cached and cached.get("_expires", 0) > datetime.now(UTC).timestamp():
+            return cached
+        probe = ("export LC_ALL=C; printf '__VERSION__\\n'; mangohud --version 2>/dev/null || true; "
+            "printf '__LAYERS__\\n'; "
+            "for f in /usr/share/vulkan/implicit_layer.d/*[Mm]ango[Hh]ud*.json "
+            "/usr/local/share/vulkan/implicit_layer.d/*[Mm]ango[Hh]ud*.json "
+            "/usr/lib/extensions/vulkan/*/share/vulkan/implicit_layer.d/*[Mm]ango[Hh]ud*.json; "
+            "do [ ! -r \"$f\" ] || printf '%s\\n' \"$f\"; done; "
+            "printf '__EXAMPLE__\\n'; "
+            "for f in /usr/share/doc/mangohud/MangoHud.conf.example "
+            "/usr/local/share/doc/mangohud/MangoHud.conf.example "
+            "/usr/lib/extensions/vulkan/*/share/doc/MangoHud.conf.example "
+            "/usr/lib/extensions/vulkan/*/share/doc/mangohud/MangoHud.conf.example; "
+            "do if [ -r \"$f\" ]; then cat \"$f\"; break; fi; done; exit 0")
+        args = ("run", "--command=sh", app_id, "-c", probe) if app_id else ("-c", probe)
+        result = self._run_fixed("flatpak" if app_id else "sh", args, timeout=5.0)
+        text = result.stdout if result and result.returncode == 0 else ""
+        version = text.split("__VERSION__\n", 1)[-1].split("__LAYERS__", 1)[0].strip() if "__VERSION__" in text else ""
+        layers = text.split("__LAYERS__\n", 1)[-1].split("__EXAMPLE__", 1)[0].splitlines() if "__LAYERS__" in text else []
+        example = text.split("__EXAMPLE__\n", 1)[-1] if "__EXAMPLE__" in text else ""
+        payload = {"checked": bool(text), "available": bool(layers), "version": version,
+            "layer64": any("64" in line for line in layers),
+            "layer32": any("x86.json" in line or "32" in line for line in layers),
+            "example": example[:65536], "launcherAppId": app_id,
+            "_expires": datetime.now(UTC).timestamp() + 60}
+        self._tool_cache[key] = payload
+        return payload
+
     def host_command_available(self, command: str) -> bool:
         """Whether a MangoHud live-preview command exists on the host PATH.
 
@@ -536,16 +570,45 @@ class HostServiceClient:
                  str(home / ".config/vulkan/implicit_layer.d"), "/usr/share/vulkan/implicit_layer.d", "/etc/vulkan/implicit_layer.d"]
         probe = 'for d do for p in "$d"/*.json; do [ -f "$p" ] || continue; printf "\\036%s\\n" "$p"; head -c 65536 "$p"; done; done'
         result = self._run_fixed("sh", ("-c", probe, "sh", *roots), timeout=5)
+        from .frame_generation_isolation import backend_for_layer
         found = []
         for record in (result.stdout if result else "").split("\x1e"):
             if not record: continue
             path, _, text = record.partition("\n")
             try:
                 layer = json.loads(text).get("layer", {})
-                if any(p in layer.get("name", "").upper() for p in ("LSFG", "MAKO", "AFMF")):
+                # Exact verified generator names; MAKO spatial scaling is not FG.
+                if backend_for_layer(layer.get("name", "")):
                     found.append({"path": path, "name": layer.get("name"), "disable": layer.get("disable_environment", {})})
-            except ValueError: continue
+            except (ValueError, AttributeError): continue
         return found
+
+    def vulkan_layer_manifests(self, directories: Sequence[str]) -> list[tuple[str, str]]:
+        """Read-only host view of layer manifests (path, text) in the given directories."""
+        directories = [str(d) for d in directories if str(d).startswith("/") and "\n" not in str(d)]
+        if not directories:
+            return []
+        probe = ('for d do for p in "$d"/*.json; do [ -f "$p" ] || continue; '
+                 '[ "$(wc -c < "$p")" -le 65536 ] || continue; printf "\\036%s\\n" "$p"; cat "$p"; done; done')
+        result = self._run_fixed("sh", ("-c", probe, "sh", *directories), timeout=5, max_output=4 * 1024 * 1024)
+        if result is None or result.returncode != 0:
+            raise HostServiceError("Host layer manifests could not be read")
+        records = []
+        for record in result.stdout.split("\x1e"):
+            path, separator, text = record.partition("\n")
+            if separator and path.startswith("/"):
+                records.append((path, text))
+        return records
+
+    def existing_files(self, paths: Sequence[str]) -> list[str]:
+        """Which absolute host paths are regular files (no contents are read)."""
+        paths = [str(p) for p in paths if str(p).startswith("/") and "\n" not in str(p)]
+        if not paths:
+            return []
+        result = self._run_fixed("sh", ("-c", 'for f do [ -f "$f" ] && printf "%s\\n" "$f"; done; exit 0', "sh", *paths), timeout=5)
+        if result is None or result.returncode != 0:
+            raise HostServiceError("Host file presence could not be checked")
+        return [line for line in result.stdout.splitlines() if line in paths]
 
     def frame_generation_grant(self, app_id: str, paths: Sequence[str], *, bridge: bool = False):
         from .frame_generation_access import LAUNCHERS

@@ -174,7 +174,8 @@ def run(argv: Sequence[str] | None = None) -> int:
         if os.environ.get("GAME_OPTIMIZATION_DEMO", "").strip() == "1"
         else "local Steam with guarded Btrfs operations"
     )
-    logger.info("Starting %s %s in %s mode", APP_NAME, APP_VERSION, mode)
+    from .edition import EDITION, EDITION_NAMES
+    logger.info("Starting %s %s (%s) in %s mode", APP_NAME, APP_VERSION, EDITION_NAMES[EDITION], mode)
 
     bootstrap_error = ""
     try:

@@ -262,6 +262,31 @@ modules:
         sha256: 5263baab691f8e1af96092fa5137ee17df5bdfbd6cff1fcac4d6ef4bc2e1735f
         dest: wheels
 
+  # Voidek, the Polish Piper voice by DevVoidPL, ships with the application so
+  # the Narrator speaks Polish without a download. GameOpti installs it once,
+  # hash-verified, into the user's Narrator components on first start. The
+  # canonical model files are immutable assets of the v2.0.0-beta release:
+  # voidek-pl-e991.onnx 63516050 bytes, voidek-pl-e991.onnx.json 5033 bytes.
+  # The model has its own license (VOIDEK-LICENSE.md), not the GameOpti MIT license.
+  - name: voidek-voice
+    buildsystem: simple
+    build-commands:
+      - install -Dm644 voidek-pl-e991.onnx ${FLATPAK_DEST}/share/game-optimization-linux/narrator-components/tts.voidek/voices/voidek-pl-e991.onnx
+      - install -Dm644 voidek-pl-e991.onnx.json ${FLATPAK_DEST}/share/game-optimization-linux/narrator-components/tts.voidek/voices/voidek-pl-e991.onnx.json
+      - install -Dm644 VOIDEK-LICENSE.md ${FLATPAK_DEST}/share/doc/game-optimization-linux/VOIDEK-LICENSE.md
+      - install -Dm644 VOIDEK-MODEL-CARD.md ${FLATPAK_DEST}/share/doc/game-optimization-linux/VOIDEK-MODEL-CARD.md
+    sources:
+      - type: file
+        url: https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.0.0-beta/voidek-pl-e991.onnx
+        sha256: ca2ad0a22273e3850ce3def4d098f1993c2393c71584f474636afd08ab6af53b
+      - type: file
+        url: https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.0.0-beta/voidek-pl-e991.onnx.json
+        sha256: 4b14423d0575b35bc4ace4dc83d639e9f8d0fa8eab3f238bd9597bfab50af5db
+      - type: file
+        path: bundled/VOIDEK-LICENSE.md
+      - type: file
+        path: bundled/VOIDEK-MODEL-CARD.md
+
   - name: game-optimization-linux
     buildsystem: simple
     build-commands:
@@ -298,5 +323,6 @@ modules:
           - dist
           - reports
           - tests
+          - flatpak/bundled
           - '*.egg-info'
           - '**/__pycache__'

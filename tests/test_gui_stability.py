@@ -324,6 +324,8 @@ def test_mangohud_desktop_editor_renders_and_saves_appid_profile(tmp_path: Path)
     assert result["reset_color_text"] == "2E9762"
     assert result["reset_horizontal_switch"] is False
     assert result["reset_preset"] == "disabled"
+    for key in ("refresh_keeps_draft", "section_reset_only", "reset_is_draft", "pad_focus", "picker_closed_with_pad", "detailed_graph_can_turn_off"):
+        assert result[key] is True
 
 
 def test_deep_recompression_ui_selection_confirmation_progress_cancel_history(tmp_path: Path) -> None:
@@ -465,7 +467,7 @@ def test_optimization_desktop_editor_saves_real_appid_profile(tmp_path: Path) ->
     payload = _run_probe(tmp_path, "optimization")
     result = payload["result"]
     assert result["app_id"] == "224760"
-    assert result["preset"] == "quiet"
+    assert result["preset"] == "low_power"
     assert result["target_fps"] == 45
     assert result["display_count"] >= 1
     assert result["steam_command"].endswith("--appid 224760 -- %command%")

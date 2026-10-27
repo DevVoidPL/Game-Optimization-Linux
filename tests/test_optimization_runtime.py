@@ -2032,8 +2032,9 @@ def test_record_baseline_runs_steam_runner_and_produces_recommendations(
 
 
 def test_controller_saves_proton_tweaks_and_updates_combined_preview(
-    tmp_path: Path,
+    tmp_path: Path, monkeypatch,
 ) -> None:
+    monkeypatch.setattr("game_optimization_linux.controllers.optimization_controller.host_home_directory", lambda: tmp_path)
     game = replace(demo_games()[0], steam_app_id="224760")
     optimization_repository = GameOptimizationProfileRepository(tmp_path / "games")
     proton_repository = ProtonTweaksRepository(tmp_path / "games")
@@ -2065,6 +2066,7 @@ def test_controller_saves_proton_tweaks_and_updates_combined_preview(
     assert saved["environment"] == {
         "PROTON_USE_WINED3D": "1",
         "PROTON_LOG": "1",
+        "PROTON_LOG_DIR": str(tmp_path / ".local/share/game-optimization-linux/proton-logs/224760"),
     }
     assert preview["launchPlan"]["environment"]["PROTON_LOG"] == "1"
     assert "PROTON_USE_WINED3D=1" in preview["protonOverrides"]

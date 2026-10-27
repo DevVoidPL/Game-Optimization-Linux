@@ -13,6 +13,7 @@ import os
 from pathlib import Path
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -204,6 +205,95 @@ def atomic(path, value):
     tmp.replace(path)
 
 
+ACTIVE_SESSION = {"starting", "observing", "protected_scope_started"}
+TERMINAL_SESSION = {"exited", "interrupted"}
+_SCOPE = re.compile(r"/app-gameopti-[a-f0-9]+-[a-f0-9]+\.scope$")
+
+
+def start_ticks(pid):
+    """Process start time (clock ticks since boot) as recorded in sessions; [] if gone."""
+    return read(f"/proc/{pid}/stat").rpartition(")")[2].split()[19:20] if pid > 0 else []
+
+
+def _identity_alive(pid, ticks):
+    """True/False when /proc proves it, None when the record lacks the evidence."""
+    if not isinstance(pid, int) or pid <= 0 or not isinstance(ticks, list) or not ticks:
+        return None
+    current = start_ticks(pid)
+    return bool(current) and current == ticks  # different ticks: the PID was reused
+
+
+def _scope_state(group):
+    if not isinstance(group, str) or not _SCOPE.search(group):
+        return "not_applicable"
+    directory = CG / group.lstrip("/")
+    if not directory.exists():
+        return "gone"
+    populated = pairs(directory / "cgroup.events").get("populated")
+    return "populated" if populated == 1 else "empty" if populated == 0 else "unknown"
+
+
+def reconcile_session(output, key, *, now=None, replace=os.replace):
+    """Read-time recovery of a session record whose wrapper never finalized it.
+
+    Only reads /proc and cgroup files; never creates a scope or writes dmem.
+    A terminal state is persisted atomically only when the game process, the
+    wrapper and the private scope are all proven gone. Returns a view:
+    ``state`` is running, exited, interrupted, unverified, missing, malformed
+    or foreign; ``record`` is the (possibly reconciled) record.
+    """
+    path = Path(output)
+    try:
+        raw = path.read_text()
+    except FileNotFoundError:
+        return {"state": "missing", "record": {}, "persisted": False}
+    except OSError as error:
+        return {"state": "unverified", "record": {}, "persisted": False, "error": str(error)}
+    try:
+        record = json.loads(raw)
+    except ValueError:
+        return {"state": "malformed", "record": {}, "persisted": False}
+    if not isinstance(record, dict) or record.get("key") != key:
+        return {"state": "foreign", "record": {}, "persisted": False}
+    status = record.get("status")
+    if status in TERMINAL_SESSION:
+        return {"state": status, "record": record, "persisted": False}
+    if status not in ACTIVE_SESSION:
+        return {"state": "malformed", "record": {}, "persisted": False}
+    game = _identity_alive(record.get("pid"), record.get("startTicks")) if status != "starting" else False
+    wrapper = _identity_alive(record.get("wrapperPid"), record.get("wrapperStartTicks"))
+    scope = _scope_state(record.get("cgroup"))
+    evidence = {"gameAlive": game, "wrapperAlive": wrapper, "scope": scope}
+    if game is True or wrapper is True or scope == "populated":
+        return {"state": "running", "record": record, "persisted": False, "evidence": evidence}
+    if status == "starting":
+        if wrapper is not False:  # an old record without the wrapper identity
+            return {"state": "unverified", "record": record, "persisted": False, "evidence": evidence}
+        reason = "launch_interrupted_before_game"
+    elif game is None or scope == "unknown":
+        return {"state": "unverified", "record": record, "persisted": False, "evidence": evidence}
+    else:
+        reason = "wrapper_interrupted_after_launch" if record.get("wrapperSignal") else "wrapper_ended_without_final_state"
+    final = {**record, "status": "interrupted", "statusBeforeReconciliation": status,
+             "reconciledAt": now or datetime.now(timezone.utc).isoformat(),
+             "reconciliation": {"reason": reason, **evidence},
+             # Last verified samples (chain, regions, drmClients...) stay as recorded.
+             "lastProtectionVerified": bool(record.get("protectionVerified")),
+             "protectionVerified": False}
+    tmp = path.with_name(path.name + f".{os.getpid()}.reconcile.tmp")
+    try:
+        tmp.write_text(json.dumps(final, indent=2) + "\n")
+        tmp.chmod(0o600)
+        if path.read_text() != raw:  # the wrapper finalized it meanwhile
+            tmp.unlink()
+            return reconcile_session(output, key, now=now, replace=replace)
+        replace(tmp, path)
+    except OSError as error:
+        tmp.unlink(missing_ok=True)
+        return {"state": "interrupted", "record": final, "persisted": False, "evidence": evidence, "error": str(error)}
+    return {"state": "interrupted", "record": final, "persisted": True, "evidence": evidence}
+
+
 def kernel_gpu_errors(started):
     try:
         since = datetime.fromisoformat(started).strftime("%Y-%m-%d %H:%M:%S UTC")
@@ -243,10 +333,24 @@ def run_scope(args):
     child = [sys.executable, str(Path(__file__).resolve()), "enter", "--key", args.key,
              "--region", args.region, "--output", args.output, "--protect", str(args.protect), "--", *argv]
     scoped = bool(args.protect or (shutil.which("systemd-run") and Path("/run/systemd/system").exists()))
+    # systemd >= 254 expands $NAME in the command line: keep game arguments literal.
+    try:
+        literal = ["--expand-environment=no"] if "--expand-environment" in subprocess.run(
+            ["systemd-run", "--help"], capture_output=True, text=True, timeout=10, check=False).stdout else []
+    except (OSError, subprocess.TimeoutExpired):
+        literal = []
     launch = (["systemd-run", "--user", "--scope", "--collect", "--quiet", "--unit=" + unit,
-               "--slice=app.slice", "--", *child] if scoped else argv)
+               "--slice=app.slice", *literal, "--", *child] if scoped else argv)
     started = datetime.now(timezone.utc).isoformat()
-    atomic(args.output, {"key": args.key, "createdAt": started, "status": "starting", "protected": bool(args.protect)})
+    atomic(args.output, {"key": args.key, "createdAt": started, "status": "starting", "protected": bool(args.protect),
+                         "wrapperPid": os.getpid(), "wrapperStartTicks": start_ticks(os.getpid())})
+    received = []
+
+    def on_signal(number, _frame):
+        received.append(number)
+        raise KeyboardInterrupt
+
+    previous_term = signal.signal(signal.SIGTERM, on_signal)
     process = subprocess.Popen(launch)
     if not scoped:
         atomic(args.output, {**snapshot(process.pid, args.region), "key": args.key, "createdAt": started,
@@ -334,7 +438,23 @@ def run_scope(args):
                 "vulkanBudget": None, "deviceCountersIncludeOtherApps": True,
                 "rssSumMayDoubleCountSharedPages": True})
         return result
+    except KeyboardInterrupt:
+        # The game may still run in its scope: record only that the wrapper was
+        # interrupted; reconcile_session() writes the terminal state later.
+        try:
+            record = json.loads(read(args.output) or "{}")
+            if record.get("key") == args.key and record.get("status") in ACTIVE_SESSION:
+                atomic(args.output, {**record, "wrapperSignal": signal.Signals(received[0]).name if received else "SIGINT",
+                                     "wrapperInterruptedAt": datetime.now(timezone.utc).isoformat()})
+        except (OSError, ValueError):
+            pass
+        if received and received[0] == signal.SIGTERM:
+            # Keep the caller-visible SIGTERM exit status.
+            signal.signal(signal.SIGTERM, signal.SIG_DFL)
+            os.kill(os.getpid(), signal.SIGTERM)
+        raise
     finally:
+        signal.signal(signal.SIGTERM, previous_term)
         if metrics:
             metrics.close()
 
@@ -382,6 +502,13 @@ def enter(args):
     evidence = snapshot(os.getpid(), args.region)
     if args.protect and not evidence["lowChainVerified"]:
         raise ValueError("Protection is blocked by an ancestor; game was not started")
+    try:
+        previous = json.loads(read(args.output) or "{}")
+    except ValueError:
+        previous = {}
+    if isinstance(previous, dict) and previous.get("key") == args.key:
+        # The wrapper's identity lets read-time recovery tell a killed wrapper apart.
+        evidence.update({name: previous[name] for name in ("wrapperPid", "wrapperStartTicks") if name in previous})
     evidence.update(key=args.key, createdAt=datetime.now(timezone.utc).isoformat(),
                     status="protected_scope_started" if args.protect else "observing")
     atomic(args.output, evidence)
@@ -509,7 +636,7 @@ def prepare_ancestors(uid, state):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("action", choices=["probe", "snapshot", "run", "enter", "setup", "restore-system"])
+    parser.add_argument("action", choices=["probe", "snapshot", "run", "enter", "setup", "restore-system", "reconcile"])
     parser.add_argument("--pid", type=int, default=0)
     parser.add_argument("--key", default="")
     parser.add_argument("--region", default="")
@@ -525,6 +652,12 @@ def main():
         return run_scope(args) if args.action == "run" else enter(args)
     if argv:
         raise ValueError("Unexpected arguments")
+    if args.action == "reconcile":
+        if not re.fullmatch(r"[A-Za-z0-9_.%+-]{1,200}", args.key) or not Path(args.output).is_absolute() \
+                or Path(args.output).name != "gpu-memory-session.json":
+            raise ValueError("Invalid profile key/output")
+        print(json.dumps(reconcile_session(args.output, args.key)))
+        return 0
     value = probe() if args.action == "probe" else snapshot(args.pid, args.region) if args.action == "snapshot" else setup(args.action == "restore-system")
     print(json.dumps(value))
     return 0

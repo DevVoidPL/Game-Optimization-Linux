@@ -19,7 +19,7 @@ from game_optimization_linux.services.narrator_persistence import (
 )
 from game_optimization_linux.services.narrator_tts import (
     PIPER_CUSTOM_COMPONENT_ID,
-    PIPER_VOICE_ID,
+    PIPER_DEFAULT_VOICE_ID,
     CustomVoiceError,
     CustomVoiceLanguageError,
     PiperPolishTtsProvider,
@@ -91,7 +91,7 @@ def test_valid_import_copies_both_files_and_uses_the_same_worker(tmp_path: Path)
     assert (target / "moj-glos-medium.onnx").read_bytes() == b"user-model"
     assert json.loads((target / "moj-glos-medium.onnx.json").read_text()) == _CONFIG
     assert voice.voice_id in provider.available_voice_ids
-    assert provider.default_voice_id == PIPER_VOICE_ID
+    assert provider.default_voice_id == "voidek-pl-e991"
 
     audio = provider.synthesize(
         "Własny głos.", language="pl", voice_id=voice.voice_id, speech_rate=1.0
@@ -185,7 +185,7 @@ def test_remove_deletes_files_and_closes_its_worker(tmp_path: Path) -> None:
     target = tmp_path / "components" / PIPER_CUSTOM_COMPONENT_ID / "voices"
     assert not any(target.iterdir())
     with pytest.raises(CustomVoiceError):
-        provider.remove_custom_voice(PIPER_VOICE_ID)
+        provider.remove_custom_voice(PIPER_DEFAULT_VOICE_ID)
 
 
 @pytest.fixture()

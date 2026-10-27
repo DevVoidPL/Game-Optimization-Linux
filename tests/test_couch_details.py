@@ -93,7 +93,7 @@ def test_tab_and_action_ids_are_preserved(details) -> None:
     expected = {
         0: ["launch", "updates"],
         1: ["analyze", "verify", "exact-measure", "profile", "compress"],
-        2: ["optimization-profile", "gamemode", "gamescope", "mangohud-profile"],
+        2: ["optimization-profile", "measured-optimization", "gamemode", "gamescope", "mangohud-profile"],
         6: ["frame-generation"],
     }
     for tab, ids in expected.items():

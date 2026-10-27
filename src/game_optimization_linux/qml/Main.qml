@@ -348,7 +348,7 @@ ApplicationWindow {
                 id: couchLoader
                 objectName: "couchModeLoader"
                 anchors.fill: parent
-                active: window.interfaceMode === "couch"
+                active: window.interfaceMode === "couch" && Boolean(window.controller && window.controller.couchAvailable)
                 asynchronous: false
                 source: Qt.resolvedUrl("couch/CouchMain.qml")
 

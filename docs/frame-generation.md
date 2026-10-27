@@ -41,8 +41,9 @@ in their own environment. Runner setup and permission changes have restore actio
 A configured runner appears as ready, with repair as a secondary action.
 
 Profiles live in `games/<key>/frame-generation.json`; lsfg-vk/MAKO use a dedicated
-TOML configuration. **Off + Apply** blocks known managed generators for that game
-on the next launch while keeping installed components and saved backend values.
+TOML configuration. **Off + Apply** requests no generator for that game on the next
+launch; it adds a guard only for a concrete inherited activation, and keeps installed
+components and saved backend values.
 The selected generator runs inside the game command, separately from Gamescope.
 MAKO uses upstream `mako-launch` and the current configuration schema.
 
@@ -91,3 +92,26 @@ shown unless the measurement source can distinguish them.
 - [Khronos Vulkan layer interface](https://github.com/KhronosGroup/Vulkan-Loader/blob/main/docs/LoaderLayerInterface.md)
 - [GOverlay](https://github.com/benjamimgois/goverlay), a workflow reference;
   GameOpti's interface and integration are implemented separately.
+
+
+## Off and launch isolation
+
+Off does not request a GameOpti generator. Missing components and opt-in layers
+without an inherited activation request add no suppression variables. A discovered
+generator with a concrete inherited request is blocked using its manifest's disable
+switch; an ungated implicit generator may also need a scoped block because it can
+follow an independent global profile. These guards do not prove generation was active.
+
+Only the identified generator request is removed from explicit Vulkan selectors.
+Unrelated layers, existing filters, library paths and preloads remain intact. Broad
+force-enable filters that cannot be narrowed safely require an explicit resolution.
+Filter semantics were verified on 26.10.2026 against the host loader 1.4.363 (also
+used inside Steam Linux Runtime 4) and the Freedesktop 25.08 runtime loader 1.4.321,
+which treats `**` and `VK_INSTANCE_LAYERS` differently; plans are safe for both.
+MAKO spatial scaling is not treated as a frame generator by Off. A previous
+backend's per-game settings and presets remain saved when switching or choosing Off.
+
+The main launch summary lists selected features. Expand **Technical launch details**
+for the command template, managed environment and the reason for each scoped guard.
+The actual Steam command and inherited runtime environment are resolved at launch;
+a template is not evidence that a runtime variable was cleared or a generator loaded.

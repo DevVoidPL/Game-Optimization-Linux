@@ -3042,6 +3042,8 @@ def _mangohud_control_interactions(
         item = _item(root, name)
         if not item.isVisible():
             raise AssertionError(f"MangoHud control {name} is not visible")
+        _invoke_qml(root, "revealControl", item)
+        _settle(application, 4)
         center = item.mapToScene(QPointF(item.width() / 2, item.height() / 2))
         QTest.mouseClick(
             view, Qt.LeftButton, Qt.NoModifier, QPoint(int(center.x()), int(center.y()))
@@ -3064,6 +3066,8 @@ def _mangohud_control_interactions(
     result["graph_in_preview"] = bool(layout().get("frameTimingGraph")) and _item(
         root, "mangoHudPreviewGraph"
     ).isVisible()
+    root.setProperty("metricGroup", 1)
+    _settle(application, 4)
     click("mangoHudMetric_gpu_power")
     result["manual_metric_preset"] = str(root.property("preset"))
     click("mangoHudMetric_gpu_power")
@@ -3080,6 +3084,7 @@ def _mangohud_control_interactions(
     wait_preview()
     cells = layout().get("cells") or []
     result["preview_gpu_label_color"] = str(cells[0].get("color", "")) if cells else ""
+    click("mangoHudLayoutAdvanced")
     click("mangoHudHorizontal")
     wait_preview()
     result["horizontal_preview"] = (
@@ -3103,21 +3108,57 @@ def _mangohud_control_interactions(
     result["reloaded_color_text"] = str(_item(root, "mangoHudColor_gpuColor").property("text"))
     result["reloaded_graph"] = root.property("frameTimingGraph") is True
 
+    before_reset = repository.profile_path(saved.app_id).read_bytes()
+    root.setProperty("fontSize", 37)
+    _invoke_qml(root, "changed")
+    _invoke_qml(root, "loadProfile")
+    result["refresh_keeps_draft"] = root.property("fontSize") == 37 and root.property("dirty") is True
+    click("resetMangoHudSectionButton")
+    result["section_reset_only"] = root.property("fontSize") == 24 and root.property("frameTimingGraph") is True
     click("resetMangoHudProfileButton")
     _settle(application, 10)
+    result["reset_is_draft"] = repository.profile_path(saved.app_id).read_bytes() == before_reset and root.property("dirty") is True
     result["reset_color_text"] = str(_item(root, "mangoHudColor_gpuColor").property("text"))
     result["reset_horizontal_switch"] = bool(_item(root, "mangoHudHorizontal").property("checked"))
     result["reset_preset"] = str(root.property("preset"))
+    screenshot_root = repository.root.parent
+    for width, height, name in [(1440,900,"wide"),(560,900,"narrow")]:
+        view.resize(width,height)
+        root.setProperty("categoryIndex",1)
+        _settle(application, 12)
+        for control in ("saveMangoHudProfileButton", "mangoHudPreviewSurface", "mangoHudFontSizeValue"):
+            _invoke_qml(root,"revealControl",_item(root,control))
+            _settle(application,4)
+            _assert_inside(_item(root,control),root)
+        view.grabWindow().save(str(screenshot_root / ("mangohud-"+name+".png")))
+    root.setProperty("couchMode",True)
+    _settle(application,4)
+    _invoke_qml(root,"handlePadAction","NavigateDown")
+    result["pad_focus"] = bool(view.activeFocusItem())
+    _invoke_qml(root,"openColor","gpuColor")
+    _settle(application,4)
+    _invoke_qml(root,"handlePadAction","NavigateDown")
+    _invoke_qml(root,"handlePadAction","Confirm")
+    _invoke_qml(root,"handlePadAction","Back")
+    result["picker_closed_with_pad"] = not bool(root.findChild(QObject,"mangoHudColorPicker").property("visible"))
+    result["responsive_screenshots"] = str(screenshot_root)
+    root.setProperty("categoryIndex",2); root.setProperty("metricGroup",0)
+    _invoke_qml(root,"setMetric","frametime_detailed",True)
+    _settle(application,4)
+    assert root.property("frameTimingGraph")
+    click("mangoHudFrameTimingGraph")
+    result["detailed_graph_can_turn_off"] = not root.property("frameTimingGraph") and "frametime_detailed" not in list(_variant(root.property("metrics")))
     return result
 
 
-def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
+def probe_mangohud_editor(application: QGuiApplication, *, layouts: bool = False) -> dict[str, Any]:
     """Exercise the rendered Desktop editor against an isolated real controller."""
 
     from game_optimization_linux.controllers import AppController
     from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
     from game_optimization_linux.providers.demo import demo_games
     from game_optimization_linux.services import (
+        GameOptimizationProfileRepository,
         GamepadService,
         MangoHudDetector,
         MangoHudLaunchIntegration,
@@ -3145,16 +3186,21 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     detector = MangoHudDetector(
         which=lambda name: "/app/bin/mangohud-probe" if name == "mangohud" else None,
         command_runner=lambda args, **_kwargs: subprocess.CompletedProcess(
-            args, 0, "MangoHud 0.8.0\n", ""
+            args, 0, "MangoHud 0.8.4\n", ""
         ),
         layer_paths=(fake_layer,),
     )
+    second_path = temporary_root / "Second game"
+    second_path.mkdir()
+    (second_path / "Second.exe").write_bytes(b"MZ")
+    second = replace(game, id="steam-9991", name="ZZ Second", steam_app_id="9991", install_path=second_path)
     controller = AppController(
         parent=application,
         ui_sound_service=NoOpUiSoundService(),
-        game_provider=DemoGameProvider((game,)),
+        game_provider=DemoGameProvider((game, second)),
         settings_store=SettingsStore(temporary_root / "settings.json"),
         gamepad_service=GamepadService(FakeGamepadProvider(available=False)),
+        optimization_profile_repository=GameOptimizationProfileRepository(temporary_root / "optimization-profiles"),
         mangohud_repository=repository,
         mangohud_detector=detector,
         mangohud_launch_integration=MangoHudLaunchIntegration(
@@ -3166,6 +3212,11 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
         ),
         auto_refresh=False,
     )
+    if layouts:
+        try:
+            return _mangohud_layout_checks(application, controller, repository, temporary_root)
+        finally:
+            controller.shutdown()
     view, root = _view(application, "pages/details/MangoHudTab.qml", 1600, 900)
     root.setProperty("controller", controller)
     root.setProperty("gameData", controller.games[0])
@@ -3198,7 +3249,7 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     application_config = temporary_root / "MangoHud" / "wine-Spelunky.conf"
     if not application_config.is_file():
         raise AssertionError("Desktop editor did not create the application profile")
-    root.setProperty("categoryIndex", 5)
+    root.setProperty("categoryIndex", 0)
     _settle(application, 10)
     save_button = _item(root, "saveMangoHudProfileButton")
     _assert_inside(save_button, root)
@@ -3227,6 +3278,89 @@ def probe_mangohud_editor(application: QGuiApplication) -> dict[str, Any]:
     result.update(_mangohud_control_interactions(application, view, root, repository))
     view.close()
     controller.shutdown()
+    return result
+
+
+def _mangohud_layout_checks(application, controller, repository, directory):
+    from game_optimization_linux.translations import TranslationManager
+    from PySide6.QtQml import QQmlExpression, QQmlEngine
+    from PySide6.QtGui import QColor
+    def set_theme(view, root, mode):
+        expression=QQmlExpression(QQmlEngine.contextForObject(root),root,'App.Theme.mode = "'+mode+'"')
+        expression.evaluate()
+        assert not expression.hasError()
+        assert QQmlExpression(QQmlEngine.contextForObject(root),root,'App.Theme.dark').evaluate()[0] == (mode=="dark")
+        view.setColor(QColor("#0B1018" if mode=="dark" else "#F3F6FA"))
+    translations = TranslationManager(application)
+    result = {"screenshots": [], "languages": [], "couch_pad": False, "profile_isolation": False}
+    first = next(game for game in controller.games if str(game.get("steamAppId")) == "239140" or game["name"] == "Spelunky")
+    second = next(game for game in controller.games if game["name"] == "ZZ Second")
+    for language in ("pl", "en", "es"):
+        translations.set_language(language)
+        for mode in ("light", "dark"):
+            view, editor = _view(application,"pages/details/MangoHudTab.qml",1280,860,
+                initial_properties={"controller":controller,"gameData":first})
+            set_theme(view, editor, mode)
+            _settle(application,6)
+            _invoke_qml(editor,"choosePreset","gameopti")
+            _invoke_qml(editor,"refreshPreview")
+            editor.setProperty("categoryIndex",1)
+            _settle(application,8)
+            for control in ("saveMangoHudProfileButton","mangoHudPreviewSurface","mangoHudOffsetXValue"):
+                _assert_inside(_item(editor,control),editor)
+            name=f"desktop-{language}-{mode}.png"
+            view.grabWindow().save(str(directory/name)); result["screenshots"].append(name)
+            if mode == "dark":
+                view.resize(480,860); _settle(application,6)
+                _assert_inside(_item(editor,"saveMangoHudProfileButton"),editor)
+                _assert_inside(_item(editor,"mangoHudPreviewSurface"),editor)
+                name=f"narrow-{language}.png"
+                view.grabWindow().save(str(directory/name));result["screenshots"].append(name)
+            editor.setProperty("fontSize",39); _invoke_qml(editor,"changed")
+            _invoke_qml(editor,"loadProfile")
+            assert editor.property("fontSize")==39
+            editor.setProperty("gameData",second);_settle(application,5)
+            assert editor.property("fontSize")==24 and not editor.property("profileEnabled") and not editor.property("dirty")
+            editor.setProperty("gameData",first);_settle(application,5)
+            assert editor.property("fontSize")==24 and not editor.property("dirty")
+            result["profile_isolation"]=True
+            view.close();view.deleteLater();_settle(application,3)
+            view,page=_view(application,"couch/CouchGameDetails.qml",1440,1000,
+                initial_properties={"controller":controller,"game":first})
+            set_theme(view, page, mode)
+            _invoke_qml(page,"openMangoHudOverlay");_settle(application,8)
+            editor=_item(page,"couchMangoHudEditor")
+            assert editor.isVisible()
+            _invoke_qml(editor,"choosePreset","minimal")
+            _invoke_qml(editor,"refreshPreview")
+            editor.setProperty("categoryIndex",1);_settle(application,5)
+            slider=_item(editor,"mangoHudFontSizeSlider")
+            _invoke_qml(editor,"revealControl",slider);_settle(application,3)
+            slider.forceActiveFocus()
+            previous=editor.property("fontSize")
+            _invoke_qml(page,"handleAction","NavigateRight");_settle(application,3)
+            assert editor.property("fontSize")==previous+1
+            number=_item(editor,"mangoHudFontSizeValue")
+            number.forceActiveFocus()
+            _invoke_qml(page,"handleAction","Confirm");_settle(application,3)
+            keyboard=_item(page,"couchMangoHudKeyboard")
+            assert keyboard.property("opened")
+            keyboard.setProperty("text","31")
+            _invoke_qml(keyboard,"close",True);_settle(application,3)
+            assert editor.property("fontSize")==31
+            assert not repository.profile_path("239140").exists()
+            _assert_inside(_item(editor,"saveMangoHudProfileButton"),page)
+            name=f"couch-{language}-{mode}.png"
+            view.grabWindow().save(str(directory/name));result["screenshots"].append(name)
+            _invoke_qml(editor,"openColor","gpuColor");_settle(application,3)
+            _invoke_qml(page,"handleAction","Back");_settle(application,3)
+            assert page.property("mangoHudOverlayOpen")
+            _invoke_qml(page,"handleAction","Back");_settle(application,3)
+            assert not page.property("mangoHudOverlayOpen")
+            result["couch_pad"]=True
+            view.close();view.deleteLater();_settle(application,3)
+        result["languages"].append(language)
+    result["directory"]=str(directory)
     return result
 
 
@@ -4191,12 +4325,12 @@ def probe_optimization_editor(application: QGuiApplication) -> dict[str, Any]:
     )
     if not candidate_apply_visible:
         raise AssertionError("Optimization candidate preview did not reveal Apply and test")
-    _invoke_qml(root, "choosePreset", "quiet")
+    _invoke_qml(root, "choosePreset", "low_power")
     _settle(application, 8)
     _invoke_qml(root, "saveProfile")
     _settle(application, 10)
     saved = repository.load("224760")
-    if saved.preset != "quiet" or saved.target_fps != 45:
+    if saved.preset != "low_power" or saved.target_fps != 45:
         raise AssertionError(f"Desktop optimization profile was not saved: {saved!r}")
     gamescope_preview = controller.previewOptimizationProfile(game.id, {
         "gamescopeEnabled": True,
@@ -4585,7 +4719,7 @@ def probe_couch(
     mangohud_detector = MangoHudDetector(
         which=lambda name: "/app/bin/mangohud-probe" if name == "mangohud" else None,
         command_runner=lambda args, **_kwargs: subprocess.CompletedProcess(
-            args, 0, "MangoHud 0.8.0\n", ""
+            args, 0, "MangoHud 0.8.4\n", ""
         ),
         layer_paths=(fake_layer,),
     )
@@ -4788,32 +4922,26 @@ def probe_couch(
         raise AssertionError("Closing MangoHud focused an invisible item")
     mangohud_back_focus = True
 
-    # Saving from Couch changes the same AppID profile used by Desktop Mode.
-    # Rows: Use MangoHud, Preset, Position, Size, FPS limit, Save, Cancel.
-    _invoke_qml(root, "handleAction", "Confirm")          # opens the menu (tab action)
-    _invoke_qml(root, "handleAction", "Confirm")          # Use MangoHud -> on (preset basic)
-    _invoke_qml(root, "handleAction", "NavigateDown")     # Preset
-    _invoke_qml(root, "handleAction", "NavigateLeft")     # basic -> fps_only
-    for _ in range(4):
-        _invoke_qml(root, "handleAction", "NavigateDown")  # -> Save
+    # Full shared editor, with controller focus, retains the same AppID profile.
     _invoke_qml(root, "handleAction", "Confirm")
-    _settle(application, 12)
-    if bool(details.property("mangoHudOverlayOpen")):
-        details_game = _variant(details.property("game")) or {}
-        debug_profile = controller.getMangoHudProfile(str(details_game.get("id", "")))
-        raise AssertionError(
-            "Saving MangoHud did not close the Couch overlay: "
-            f"row={details.property('mangoHudRow')!r}, "
-            f"preset={details.property('mangoHudPreset')!r}, "
-            f"details_game={details.property('game')!r}, "
-            f"controller_game={controller.selectedGame!r}, "
-            f"profile={debug_profile!r}"
-        )
+    _settle(application, 8)
+    visual_editor = _item(details, "couchMangoHudEditor")
+    if not visual_editor.isVisible():
+        raise AssertionError("Couch visual MangoHud editor is hidden")
+    _invoke_qml(visual_editor,"choosePreset","fps_only")
+    _invoke_qml(root,"handleAction","NavigateDown")
+    _invoke_qml(root,"handleAction","NavigateRight")
+    _invoke_qml(visual_editor,"saveProfile")
+    _settle(application,8)
     details_game = _variant(details.property("game")) or {}
     saved_profile = controller.getMangoHudProfile(str(details_game.get("id", "")))
-    if (saved_profile.get("preset") != "fps_only"
-            or saved_profile.get("success") is not True):
+    if saved_profile.get("preset") != "fps_only" or saved_profile.get("success") is not True:
         raise AssertionError(f"Couch MangoHud profile was not saved: {saved_profile!r}")
+    view.grabWindow().save(str(temporary_root / "couch-mangohud-editor.png"))
+    _invoke_qml(root,"handleAction","Back")
+    _settle(application,6)
+    if bool(details.property("mangoHudOverlayOpen")):
+        raise AssertionError("Back did not close the visual MangoHud editor")
     details.setProperty("selectedTab", 0)
 
     # Back returns to the screen Details was opened from (Home here) and keeps
@@ -5293,7 +5421,7 @@ def probe_details_tabs(application: QGuiApplication) -> dict[str, object]:
         bar.setProperty("currentIndex", 2)
         flush(40)
         flick = _item(root, "optimizationScroll").property("contentItem")
-        profile = _item(root, "optimizationProfileCard")
+        profile = _item(root, "optimizationGoalAndFps")
         proton = _item(root, "protonTweaksSection")
         gamemode = _item(root, "gameModeCard")
         gamescope = _item(root, "gamescopeSettingsCard")
@@ -5504,7 +5632,7 @@ def main() -> int:
             "signal",
             "close",
             "tasks",
-            "mangohud",
+            "mangohud", "mangohud_layout",
             "optimization",
             "details_tabs",
             "details_presentation",
@@ -5550,8 +5678,8 @@ def main() -> int:
         result = probe_close_during_compression(application)
     elif args.mode == "tasks":
         result = probe_tasks_lifecycle(application)
-    elif args.mode == "mangohud":
-        result = probe_mangohud_editor(application)
+    elif args.mode in {"mangohud", "mangohud_layout"}:
+        result = probe_mangohud_editor(application, layouts=args.mode=="mangohud_layout")
     elif args.mode == "optimization":
         result = probe_optimization_editor(application)
     elif args.mode == "details_tabs":

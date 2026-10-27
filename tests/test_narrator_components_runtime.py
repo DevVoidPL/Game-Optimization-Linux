@@ -161,6 +161,7 @@ def test_bass_voice_installs_and_verifies_under_separate_component_ownership(
     )
     definition = replace(
         official,
+        legacy=False,  # exercises the download path; the catalog no longer offers it
         artifacts=artifacts,
         download_size_bytes=sum(artifact.size_bytes for artifact in artifacts),
     )
@@ -473,6 +474,7 @@ def test_darkman_voice_installs_and_verifies_under_separate_component_ownership(
     )
     definition = replace(
         official,
+        legacy=False,  # exercises the download path; the catalog no longer offers it
         artifacts=artifacts,
         download_size_bytes=sum(artifact.size_bytes for artifact in artifacts),
     )
