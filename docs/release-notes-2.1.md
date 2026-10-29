@@ -13,8 +13,8 @@ and shared subtitle consensus and deduplication.
 - Existing capture settings and portal permissions are retained. Removing the
   Window/Monitor control does not disable screen capture.
 
-RapidOCR runs locally in an isolated CPU worker. It does not use the community
-prototype's HTTP server, hardcoded inner crop or one-line-only filter.
+RapidOCR processes the selected subtitle region locally on the CPU and supports
+multiple lines. No external recognition service is used.
 
 ## Editions
 
