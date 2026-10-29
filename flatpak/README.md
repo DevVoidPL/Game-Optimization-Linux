@@ -2,7 +2,7 @@
 
 These instructions build the current development source. Public downloads and
 release notes are available on [GitHub Releases](https://github.com/DevVoidPL/Game-Optimization-Linux/releases).
-See the [project status](../ROADMAP.md) for the Beta 2.0 schedule.
+See the [roadmap](../ROADMAP.md) for current work and later plans.
 
 Install Flatpak and Flatpak Builder, either from your distribution or as
 `org.flatpak.Builder` from Flathub. The manifest uses the Freedesktop 25.08
