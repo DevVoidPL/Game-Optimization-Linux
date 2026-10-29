@@ -1,12 +1,11 @@
-# Testing Game Optimization Linux
+# Testing GameOpti
 
 Tests must not read or modify a real Steam library. Use temporary XDG roots and
 synthetic game trees for controller, runner, OptiScaler and compression tests.
 
-This guide describes the development checkout. The current public download is
-**1.8 Alpha**. **GameOpti Beta 2.0 is being completed and polished**, with bug
-fixing and testing underway.
-See [ROADMAP.md](ROADMAP.md) for the release/development distinction.
+This guide covers tests run from a source checkout. The current public version
+is [GameOpti 2.1 Beta](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta).
+See [ROADMAP.md](ROADMAP.md) for current work and later plans.
 
 ## Local checks
 

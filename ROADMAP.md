@@ -1,55 +1,38 @@
-# GameOpti Beta 2.0
+# GameOpti roadmap
 
-Updated: **25 October 2026**.
+Updated: 29 October 2026.
 
-GameOpti Beta 2.0 is being completed and polished, with bug fixing and testing
-underway. The current public download is
-[1.8.0 Alpha](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v1.8.0-alpha).
-Beta 2.0 has not been released; there is no fixed release date.
+## Current release
 
-## Beta 2.0 scope
+[GameOpti 2.1 Beta](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta)
+is available for download. It adds a choice of Tesseract or RapidOCR for the
+Narrator. Both the Couch and Desktop editions include the same game tools.
 
-- **Library and launch integration:** Steam, Heroic, Lutris and manual games;
-  per-game profiles, launcher configuration, previews, backup and restore.
-- **Graphics:** OptiScaler, FSR modes and variants including INT8 Lite,
-  DLSS Enabler, vkBasalt and ReShade.
-- **Frame generation:** per-game selection of lsfg-vk, standalone MAKO Renderer
-  or afmf-linux, with component management and backend-specific configuration.
-- **GPU-memory protection:** supported host setup, per-game priority,
-  capability-specific memory-pressure controls and effective-process diagnostics.
-- **Monitoring and analysis:** MangoHud profiles and logging, gameplay recording,
-  comparisons and explainable performance recommendations.
-- **Storage:** Btrfs compression and measurement, update-aware jobs, deep
-  analysis and reversible cleanup quarantine.
-- **Narrator:** local subtitle capture/OCR, optional English-to-Polish
-  translation and Polish speech, with per-game capture regions.
-- **Interface:** Desktop and controller-oriented Couch Mode, light/dark themes
-  and English, Polish and Spanish translations.
-- **Additional tweaks and custom commands:** expanded compatibility and launch
-  controls are part of the Beta scope; further implementation and polish remain.
+The Beta 2.0 feature set is already available: launcher profiles, Gamescope,
+GameMode, MangoHud, OptiScaler and FSR variants, DLSS Enabler, post-processing,
+frame generation, GPU-memory protection, Btrfs compression, performance
+measurements, Proton tweaks and custom launch commands.
 
-This scope describes the development version, not the contents of the public
-Alpha download. The [README](README.md) presents the interface and integrations.
+See the [README](README.md#features) for features and requirements, and the
+[2.1 release notes](docs/release-notes-2.1.md) for the latest changes.
 
-## Work continuing before release
+## Current work
 
-The focus is on completing the remaining configuration workflows, fixing bugs,
-polishing layout and controller navigation, and testing real-game compatibility
-across launchers, graphics stacks and Flatpak environments. Performance analysis,
-Narrator accuracy and the interaction between graphics tools remain active areas
-of refinement. Compatibility and performance depend on the game and system.
+- Fix reported bugs and improve Desktop and Couch layouts.
+- Compare OCR engines in games, including compressed video and difficult backgrounds.
+- Improve translation and subtitle timing where real examples show a problem.
+- Check graphics tools together across Steam, Heroic, Lutris and their Flatpak runtimes.
+- Make installation, configuration, errors and restore actions easier to follow.
 
-Expanded tweaks and custom commands are not marked complete. GPU-memory priority,
-upscaling and frame generation are separate mechanisms; no universal FPS or
-memory-saving result is promised.
+## Later plans
 
-AI Graphics Remaster is postponed and is not part of Beta 2.0.
+[GameOpti LXB](https://github.com/DevVoidPL/GameOpti-LXB) is a separate application
+for controllers and TV use, with LineXinBar integration planned. Work on the
+regular GameOpti application takes priority for now.
 
-## Follow development
-
-[Void_Developer_PL on YouTube](https://www.youtube.com/@Void_Developer_PL) shares
-progress and demonstrations. Public builds and release notes appear in
-[GitHub Releases](https://github.com/DevVoidPL/Game-Optimization-Linux/releases).
+AI Graphics Remaster, Smart GPU Scope and deeper game and engine recognition
+remain research ideas for a later version. They are not included in 2.1 and
+have no release date.
 
 [Report a problem](https://github.com/DevVoidPL/Game-Optimization-Linux/issues) ·
-[Testing guide](TESTING.md) · [Support the project](README.md#support-gameopti)
+[Testing guide](TESTING.md) · [YouTube](https://www.youtube.com/@Void_Developer_PL)
