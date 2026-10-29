@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="ROADMAP.md"><img src="https://img.shields.io/badge/2.1-Pre--release-22c69a?style=for-the-badge" alt="2.1: pre-release"></a>
-  <a href="https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1"><img src="https://img.shields.io/badge/Download-2.1-2563eb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download GameOpti 2.1"></a>
+  <a href="ROADMAP.md"><img src="https://img.shields.io/badge/2.1-Beta-22c69a?style=for-the-badge" alt="2.1 Beta"></a>
+  <a href="https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta"><img src="https://img.shields.io/badge/Download-2.1-2563eb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download GameOpti 2.1"></a>
   <a href="https://www.youtube.com/@Void_Developer_PL"><img src="https://img.shields.io/badge/YouTube-Project_updates-ff0033?style=for-the-badge&amp;logo=youtube&amp;logoColor=white" alt="Project updates on YouTube"></a>
 </p>
 
@@ -29,8 +29,8 @@
 </p>
 
 **GameOpti 2.1 adds an optional RapidOCR engine to the Narrator.** Tesseract stays
-the default; RapidOCR models are downloaded only when you ask. Development builds
-are still marked as pre-releases. Please report problems through [GitHub Issues](https://github.com/DevVoidPL/Game-Optimization-Linux/issues).
+the default; download RapidOCR models from the Narrator settings to try it.
+Report problems through [GitHub Issues](https://github.com/DevVoidPL/Game-Optimization-Linux/issues).
 News and demonstrations are on [YouTube](https://www.youtube.com/@Void_Developer_PL).
 
 ## Features
@@ -41,19 +41,19 @@ Keep individual settings for each title rather than changing everything globally
 
 | | What you can manage |
 | --- | --- |
-| 🎮 **Library & launchers** | Steam, Heroic, Lutris and manually added games. Native and Flatpak launcher discovery, game artwork, source filters and launcher integration with backup and restore. |
-| ⚙️ **Launch profiles** | Automatic, Maximum Performance, Balanced, Low Power, Lowest Latency, Stable Image, Best Quality and Custom. GameMode, Gamescope, display settings, scaling, window modes and FPS limits. |
-| 🧠 **GPU-memory protection** | Per-game GPU-memory priority on systems with the required dmem support, host-readiness checks and effective-process diagnostics. Memory-pressure controls follow the detected capabilities. |
-| ✨ **Upscaling & FSR** | Managed OptiScaler installation, configuration, repair and restoration. FSR modes and variants include FSR 4 INT8 Lite and compatible community INT8 variants, with separate hardware and version requirements. |
-| 🧩 **DLSS Enabler** | A separate per-game backend with configuration and diagnostics, plus explicit, reversible switching from OptiScaler/Lite. |
-| 🎞️ **Frame generation** | Choose **Off / lsfg-vk / MAKO Renderer / afmf-linux** per game. On-demand component installation, backend-specific controls, separate saved settings and compatibility checks. |
-| 🎨 **Post-processing** | **vkBasalt and ReShade** integration, presets, effect selection and ordering, parameter controls, toggle shortcuts and per-game restoration. Colour, contrast, sharpening and antialiasing in one panel. |
-| 📊 **MangoHud** | Per-game presets, metric selection, colours, placement, layout preview, FPS limiting and performance logging. |
-| 📈 **Measured optimization** | Record a baseline in the scene you actually play, test one change, compare FPS, 1% lows, frame times, power and memory, then keep or revert it. Results stay local to that game and system, and "keep what you had" is a valid outcome. |
-| 💾 **Compression & cleanup** | Btrfs zstd compression, sample-based level selection, before/after storage measurements, update-aware compression and task history. Deep analysis and reversible cleanup quarantine help review reclaimable space. |
-| 🎙️ **Narrator / Lektor** | Local subtitle recognition, optional English-to-Polish translation and Polish speech with a built-in voice. Per-game subtitle regions, portal screen capture and support for your own Piper voices. |
-| 🛠️ **Tweaks** | Per-game Proton compatibility controls, applied through the launcher that starts the game. |
-| 🛋️ **Interface** | Desktop Mode in both editions; full-screen Couch Mode with controller navigation in the Couch Edition. Light/dark themes and English, Polish and Spanish. |
+| **Library & launchers** | Steam, Heroic, Lutris and manually added games. Native and Flatpak launcher discovery, game artwork, source filters and launcher integration with backup and restore. |
+| **Launch profiles** | Automatic, Maximum Performance, Balanced, Low Power, Lowest Latency, Stable Image, Best Quality and Custom. GameMode, Gamescope, display settings, scaling, window modes and FPS limits. |
+| **GPU-memory protection** | Per-game GPU-memory priority on systems with the required dmem support, host-readiness checks and effective-process diagnostics. Memory-pressure controls follow the detected capabilities. |
+| **Upscaling & FSR** | Managed OptiScaler installation, configuration, repair and restoration. FSR modes and variants include FSR 4 INT8 Lite and compatible community INT8 variants, with separate hardware and version requirements. |
+| **DLSS Enabler** | A separate per-game backend with configuration and diagnostics, plus explicit, reversible switching from OptiScaler/Lite. |
+| **Frame generation** | Choose **Off / lsfg-vk / MAKO Renderer / afmf-linux** per game. On-demand component installation, backend-specific controls, separate saved settings and compatibility checks. |
+| **Post-processing** | **vkBasalt and ReShade** integration, presets, effect selection and ordering, parameter controls, toggle shortcuts and per-game restoration. Colour, contrast, sharpening and antialiasing in one panel. |
+| **MangoHud** | Per-game presets, metric selection, colours, placement, layout preview, FPS limiting and performance logging. |
+| **Measured optimization** | Record a baseline in the scene you actually play, test one change, compare FPS, 1% lows, frame times, power and memory, then keep or revert it. Results stay local to that game and system, and "keep what you had" is a valid outcome. |
+| **Compression & cleanup** | Btrfs zstd compression, sample-based level selection, before/after storage measurements, update-aware compression and task history. Deep analysis and reversible cleanup quarantine help review reclaimable space. |
+| **Narrator / Lektor** | Local subtitle recognition, optional English-to-Polish translation and Polish speech with a built-in voice. Per-game subtitle regions, portal screen capture and support for your own Piper voices. |
+| **Tweaks** | Per-game Proton compatibility controls, applied through the launcher that starts the game. |
+| **Interface** | Desktop Mode in both editions; full-screen Couch Mode with controller navigation in the Couch Edition. Light/dark themes and English, Polish and Spanish. |
 
 **A few requirements worth knowing:** Btrfs compression needs a Btrfs game folder.
 GPU-memory protection depends on kernel, driver and host support; it prioritizes
@@ -116,13 +116,12 @@ captures; the Couch preview uses demo data. [Screenshot notes](docs/screenshots/
 ## Download and install
 
 The current release is
-[**Game Optimization Linux 2.1**](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1) (pre-release).
+[**Game Optimization Linux 2.1**](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta) (Beta).
 Download one of its x86_64 Flatpak bundles:
 
-- [Couch Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1/Game-Optimization-Linux-2.1.0-couch-edition-x86_64.flatpak) – Desktop Mode and Couch Mode
-- [Desktop Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1/Game-Optimization-Linux-2.1.0-desktop-edition-x86_64.flatpak) – Desktop Mode only
+- [Couch Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1.0-Beta/Game-Optimization-Linux-2.1.0-couch-edition-x86_64.flatpak) – Desktop Mode and Couch Mode
+- [Desktop Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1.0-Beta/Game-Optimization-Linux-2.1.0-desktop-edition-x86_64.flatpak) – Desktop Mode only
 
-Check the download against [SHA256SUMS](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1/SHA256SUMS).
 GameOpti is distributed through GitHub Releases, not Flathub; Flathub supplies its runtime.
 
 ```bash
@@ -154,9 +153,23 @@ intended to work with LineXinBar. Longer-term **Beta 3.0** research covers AI Gr
 Remaster, Smart GPU Scope and deeper game and engine recognition. These are research
 directions: support will start with specific games and setups, and there is no release date yet.
 
+## Source layout
+
+| Path | Contents |
+| --- | --- |
+| `src/game_optimization_linux/` | Application code, QML interface, translations and artwork. |
+| `data/` | Desktop entry, AppStream metadata and installation assets. |
+| `flatpak/` | Build manifests for the Couch and Desktop editions. |
+| `libexec/` | Helper programs installed with the application. |
+| `scripts/` | Build, translation and asset maintenance scripts. |
+| `tests/` | Automated tests and interface checks. |
+| `tools/` | Development utilities. |
+| `docs/` | Feature guides and screenshots. |
+| `.github/workflows/` | GitHub automation. |
+
 ## Documentation
 
-- [Project status and Beta 2.0 scope](ROADMAP.md)
+- [Release status and plans](ROADMAP.md)
 - [Testing and contributing](TESTING.md)
 - [Architecture and launch flow](docs/architecture.md)
 - [Btrfs compression measurements](docs/compression_validation.md)
@@ -192,7 +205,7 @@ for project updates, demonstrations and release news.
 ## Credits and license
 
 Created and maintained by **DevVoidPL**. Game Optimization Linux is licensed under
-[MIT](LICENSE). AI tools have assisted with development and documentation.
+[MIT](LICENSE).
 
 GameOpti builds on the work of [GameMode](https://github.com/FeralInteractive/gamemode),
 [Gamescope](https://github.com/ValveSoftware/gamescope),
