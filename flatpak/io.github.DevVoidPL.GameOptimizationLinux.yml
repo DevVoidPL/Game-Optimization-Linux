@@ -133,8 +133,62 @@ modules:
   - name: python-runtime-dependencies
     buildsystem: simple
     build-commands:
-      - python3 -m pip install --no-index --find-links=file://${PWD}/wheels --prefix=${FLATPAK_DEST} PySide6==6.11.1 dbus-next==0.2.3 py7zr==1.1.3 ctranslate2==4.8.1 sacremoses==0.1.1 subword-nmt==0.3.8 regex==2026.7.19 click==8.4.2 joblib==1.5.3 tqdm==4.70.0 mock==5.2.0 piper-tts==1.7.0 onnxruntime==1.28.0 numpy==2.5.2 PyYAML==6.0.3 protobuf==7.35.1 flatbuffers==25.12.19 pathvalidate==3.3.1
+      - python3 -m pip install --no-index --find-links=file://${PWD}/wheels --prefix=${FLATPAK_DEST} PySide6==6.11.1 dbus-next==0.2.3 py7zr==1.1.3 ctranslate2==4.8.1 sacremoses==0.1.1 subword-nmt==0.3.8 regex==2026.7.19 click==8.4.2 joblib==1.5.3 tqdm==4.70.0 mock==5.2.0 piper-tts==1.7.0 onnxruntime==1.28.0 numpy==2.5.2 PyYAML==6.0.3 protobuf==7.35.1 flatbuffers==25.12.19 pathvalidate==3.3.1 rapidocr==3.10.0 opencv-python-headless==5.0.0.93 pyclipper==1.4.0 shapely==2.2.0 pillow==13.0.0 omegaconf==2.4.0 requests==2.34.2 colorlog==6.12.0 six==1.17.0 certifi==2026.10.23 charset-normalizer==3.5.2 idna==3.20 urllib3==2.8.0
+      # Models remain an explicit, hash-verified optional component download.
+      - rm -f ${FLATPAK_DEST}/lib/python3.13/site-packages/rapidocr/models/*.onnx
     sources:
+      - type: file
+        url: https://files.pythonhosted.org/packages/59/07/203065283bba0c5e9c10af3602dc25ab3e59ee54dc2d1d22c8faeabf5ed8/rapidocr-3.10.0-py3-none-any.whl
+        sha256: 2fc34e26cd0f48514804a94f8832283039c7334076bff60768b1fed9ad068050
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/9b/21/f6ef335f6e65724aa78b8d792b48d40a48c381715f1e62f5a5049e09d07e/opencv_python_headless-5.0.0.93-cp37-abi3-manylinux_2_28_x86_64.whl
+        sha256: ed709fdf9aa0bd1f2ed8549e71d19449b03a675bb581eb292285f6861953be37
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/db/48/dd301d62c1529efdd721b47b9e5fb52120fcdac5f4d3405cfc0d2f391414/pyclipper-1.4.0-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.whl
+        sha256: 14c8bdb5a72004b721c4e6f448d2c2262d74a7f0c9e3076aeff41e564a92389f
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/5d/df/d67d5c56efddf9b8c2e6913c917c8eca78fdd9e7c6fb73b541dd56b1ce1d/shapely-2.2.0-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl
+        sha256: f340e7f99aaee3df5acd6b247cddf723051a7c93d1e1ef09025b80d84e4c0ded
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/ef/fe/f5cdaa2d1c4086e757430f368c271a58ee29cfe7378e7ae7b9d964015c25/pillow-13.0.0-cp313-cp313-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 5f56499c1a74d2b862beb0c33b8016f99d095858455df9d21583bbbc1c15b582
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/4f/bd/0d9f8247b0819385213d09564eda5c52d3673313c2414d51f72883ec24cd/omegaconf-2.4.0-py3-none-any.whl
+        sha256: f141a664c777582405e3cc6e0545ecc79429e79f844995b1a6e71c35946a025c
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/a0/f4/c67b0b3f1b9245e8d266f0f112c500d50e5b4e83cb6f3b71b6528104182a/requests-2.34.2-py3-none-any.whl
+        sha256: 2a0d60c172f83ac6ab31e4554906c0f3b3588d37b5cb939b1c061f4907e278e0
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/d4/19/0b6647bf5e331521e55d2b63bfbdc210bd9cd605189273f03614a05f702d/colorlog-6.12.0-py3-none-any.whl
+        sha256: 30d392604e9110045a2c2aeefc27d7a017abbab63f3a8aee594eac0801df784e
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl
+        sha256: 4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/32/d1/a3652fe2c19134d0d15922177821d863cbd7e842d53a21bbe7e8e3a1b5ac/certifi-2026.10.23-py3-none-any.whl
+        sha256: e9b54de76e530bb6cf0ccd036787103acb58fd42ba930ea8bf948ddbaa2f61d1
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/4b/85/41d27f234b82e47c167a5f6c0f62501dc0c640585ff4aba79e08a390336a/charset_normalizer-3.5.2-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl
+        sha256: 7218e8f32b0956cfcd048fd42d9d5779809745ca1d86113ca56f66e7ae1549c4
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/58/a2/bb081bab032533a855d44de1d56f8e8426114ff1ba5d1f07a438a0a654f8/idna-3.20-py3-none-any.whl
+        sha256: ab7ae7122974553370f0bdb919e1a960b2cd1bc1ef0276416d896db81c14582c
+        dest: wheels
+      - type: file
+        url: https://files.pythonhosted.org/packages/92/9d/c4e665119135114480843e7ab388fa94d8480650450e6f8e26b70d323a4c/urllib3-2.8.0-py3-none-any.whl
+        sha256: 0cf3cae568d36aa9576b28dfb35f11328f1cb974ca7647d9475ebb86c75ac6e3
+        dest: wheels
       - type: file
         url: https://files.pythonhosted.org/packages/d8/de/af89d71410c83b10654d86ff9aff2a4f87c30163658f1cc145242e222526/pyside6-6.11.1-cp310-abi3-manylinux_2_34_x86_64.whl
         sha256: b1fc521ba2bb5109425ab8add06bddbdd524abcad06cfa012cc39a22a189feb2

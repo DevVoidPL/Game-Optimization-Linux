@@ -4531,6 +4531,91 @@ LAUNCH_DETAILS_SHARED.update({
 
 
 
+RAPIDOCR_SHARED = {'OCR engine': ('Silnik OCR', 'Motor OCR'),
+ 'Tesseract (default)': ('Tesseract (domyślny)', 'Tesseract (predeterminado)'),
+ 'RapidOCR (optional)': ('RapidOCR (opcjonalny)', 'RapidOCR (opcional)'),
+ 'RapidOCR models (English and Polish)': ('Modele RapidOCR (angielski i polski)',
+                                          'Modelos RapidOCR (inglés y polaco)'),
+ 'Uses the original subtitle region. Download the models below; changing the engine does not change translation or voice.': ('Korzysta '
+                                                                                                                             'z '
+                                                                                                                             'oryginalnego '
+                                                                                                                             'obszaru '
+                                                                                                                             'napisów. '
+                                                                                                                             'Pobierz '
+                                                                                                                             'modele '
+                                                                                                                             'poniżej. '
+                                                                                                                             'Zmiana '
+                                                                                                                             'silnika '
+                                                                                                                             'nie '
+                                                                                                                             'zmienia '
+                                                                                                                             'tłumaczenia '
+                                                                                                                             'ani '
+                                                                                                                             'głosu.',
+                                                                                                                             'Usa '
+                                                                                                                             'la '
+                                                                                                                             'región '
+                                                                                                                             'original '
+                                                                                                                             'de '
+                                                                                                                             'subtítulos. '
+                                                                                                                             'Descarga '
+                                                                                                                             'los '
+                                                                                                                             'modelos '
+                                                                                                                             'abajo; '
+                                                                                                                             'cambiar '
+                                                                                                                             'el '
+                                                                                                                             'motor '
+                                                                                                                             'no '
+                                                                                                                             'cambia '
+                                                                                                                             'la '
+                                                                                                                             'traducción '
+                                                                                                                             'ni '
+                                                                                                                             'la '
+                                                                                                                             'voz.'),
+ 'Uses the existing text masks and automatic bright-background handling.': ('Korzysta z '
+                                                                            'dotychczasowych masek '
+                                                                            'tekstu i '
+                                                                            'automatycznej obsługi '
+                                                                            'jasnego tła.',
+                                                                            'Usa las máscaras de '
+                                                                            'texto existentes y el '
+                                                                            'tratamiento '
+                                                                            'automático de fondos '
+                                                                            'claros.'),
+ 'RapidOCR models ready': ('Modele RapidOCR gotowe', 'Modelos RapidOCR listos'),
+ 'Download models (27 MB)': ('Pobierz modele (27 MB)',
+                                      'Descargar modelos (27 MB)'),
+ 'Select Tesseract or RapidOCR; models are installed in Narrator settings': ('Wybierz Tesseract '
+                                                                             'lub RapidOCR. Modele '
+                                                                             'zainstalujesz w '
+                                                                             'ustawieniach '
+                                                                             'Lektora.',
+                                                                             'Elige Tesseract o '
+                                                                             'RapidOCR; los '
+                                                                             'modelos se instalan '
+                                                                             'en los ajustes del '
+                                                                             'Narrador.'),
+ 'RapidOCR English and Polish subtitle OCR is ready': ('RapidOCR jest gotowy do odczytu '
+                                                       'angielskich i polskich napisów',
+                                                       'RapidOCR está listo para reconocer '
+                                                       'subtítulos en inglés y polaco'),
+ 'Install the verified RapidOCR models and runtime': ('Zainstaluj zweryfikowane modele RapidOCR i '
+                                                      'jego środowisko wykonawcze',
+                                                      'Instala los modelos verificados de RapidOCR '
+                                                      'y su entorno de ejecución'),
+ 'Install the verified RapidOCR models through the application': ('Zainstaluj zweryfikowane modele '
+                                                                  'RapidOCR przez aplikację',
+                                                                  'Instala los modelos verificados '
+                                                                  'de RapidOCR desde la '
+                                                                  'aplicación'),
+ 'Optional CPU OCR engine; install its models before selecting it': ('Opcjonalny silnik OCR '
+                                                                     'korzystający z CPU. Przed '
+                                                                     'użyciem zainstaluj jego '
+                                                                     'modele.',
+                                                                     'Motor OCR opcional para CPU; '
+                                                                     'instala sus modelos antes de '
+                                                                     'usarlo.')}
+
+
 def fill(code: str) -> list[tuple[str, str]]:
     path = TRANSLATIONS / f"game_optimization_{code}.ts"
     tree = ET.parse(path)
@@ -4540,6 +4625,11 @@ def fill(code: str) -> list[tuple[str, str]]:
         for message in context.findall("message"):
             translation = message.find("translation")
             shared_source = message.findtext("source") or ""
+            if (translation is not None and code in {"pl", "es"}
+                    and name in {"NarratorPage", "CouchGameDetails", "CouchSettings", "I18n"}
+                    and shared_source in RAPIDOCR_SHARED):
+                _finish(translation, RAPIDOCR_SHARED[shared_source][0 if code == "pl" else 1])
+                continue
             if (translation is not None and code in {"pl", "es"}
                     and name in {"MangoHudTab", "MangoHudPreview", "MangoHudNumber", "CouchGameDetails", "I18n"} and shared_source in MANGOHUD_SHARED):
                 _finish(translation, MANGOHUD_SHARED[shared_source][0 if code == "pl" else 1])

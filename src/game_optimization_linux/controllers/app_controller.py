@@ -752,6 +752,7 @@ class AppController(QObject):
             except (OSError, RuntimeError) as error:
                 logger.warning("Bundled Voidek voice could not be installed: %s", error)
         if narrator_pipeline is None:
+            from ..services.narrator_rapidocr import RapidOcrProvider
             narrator_backend = QtPortalScreenCastBackend(parent=self)
             narrator_capture = PortalScreenCaptureProvider(narrator_backend)
             narrator_audio = QtNarratorAudioOutput(parent=self)
@@ -769,6 +770,7 @@ class AppController(QObject):
                         else None
                     ),
                 ),
+                ocr_providers=(RapidOcrProvider(),),
             )
         self._narrator_pipeline = narrator_pipeline
         self._apply_narrator_ocr_mode(
@@ -847,6 +849,7 @@ class AppController(QObject):
             ),
         )
         for component_id in (
+            "ocr.rapidocr-local",
             "ocr.english-local",
             TESSERACT_POLISH_COMPONENT_ID,
             "translation.opus-en-pl",
@@ -3925,7 +3928,9 @@ class AppController(QObject):
     def _apply_narrator_ocr_mode(self, mode: str) -> None:
         """Pass the Narrator "OCR mode" setting to the OCR provider."""
         pipeline = getattr(self, "_narrator_pipeline", None)
-        setter = getattr(getattr(pipeline, "ocr", None), "set_settings_mode", None)
+        resolver = getattr(pipeline, "ocr_provider_for", None)
+        provider = resolver() if callable(resolver) else getattr(pipeline, "ocr", None)
+        setter = getattr(provider, "set_settings_mode", None)
         if callable(setter):
             setter(mode)
 

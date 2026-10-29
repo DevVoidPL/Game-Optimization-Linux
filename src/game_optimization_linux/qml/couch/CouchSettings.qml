@@ -293,6 +293,8 @@ FocusScope {
     function narratorComponentName(componentId, fallback) {
         if (componentId === "capture.portal-pipewire")
             return qsTr("Screen capture portal")
+        if (componentId === "ocr.rapidocr-local")
+            return qsTr("RapidOCR models (English and Polish)")
         if (componentId === "ocr.english-local")
             return qsTr("English subtitle OCR")
         if (componentId === "ocr.polish-local")
@@ -386,7 +388,7 @@ FocusScope {
             { "id": "narrator-global-enabled", "category": "narrator", "title": qsTr("Enable Narrator by default"), "value": boolLabel(narratorGlobalData.enabled === true), "enabled": narratorGlobalData.success === true, "description": qsTr("New per-game profiles inherit this default; existing game profiles remain unchanged.") },
             { "id": "narrator-global-language", "category": "narrator", "title": qsTr("Subtitle recognition language"), "value": String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") === "polish" ? qsTr("Polish subtitles") : qsTr("English → Polish"), "enabled": narratorGlobalData.success === true, "description": qsTr("Recognize Polish directly or translate recognized English subtitles to Polish.") },
             { "id": "narrator-global-source", "category": "narrator", "title": qsTr("Recognition source"), "value": String(narratorGlobalData.sourceMode || "auto") === "ocr" ? qsTr("OCR only") : qsTr("Automatic"), "enabled": narratorGlobalData.success === true, "description": qsTr("Use automatic source selection or always use screen OCR.") },
-            { "id": "narrator-global-capture", "category": "narrator", "title": qsTr("Capture source"), "value": String(narratorGlobalData.captureSource || "window") === "monitor" ? qsTr("Monitor") : qsTr("Game window"), "enabled": narratorGlobalData.success === true, "description": qsTr("Choose whether new profiles capture a game window or the full monitor.") },
+            { "id": "narrator-global-ocr", "category": "narrator", "title": qsTr("OCR engine"), "value": String(narratorGlobalData.ocrProviderId || "") === "rapidocr-local" ? "RapidOCR" : "Tesseract", "enabled": narratorGlobalData.success === true, "description": qsTr("Select Tesseract or RapidOCR; models are installed in Narrator settings") },
             { "id": "narrator-global-translation", "category": "narrator", "title": qsTr("Translation profile"), "value": String(narratorGlobalData.translationProfileId || qsTr("Automatic")), "enabled": narratorGlobalData.success === true && String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") !== "polish" && profiles.length > 0, "description": qsTr("Select the installed local translation profile.") },
             { "id": "narrator-global-voice", "category": "narrator", "title": qsTr("Speech voice"), "value": narratorGlobalVoiceLabel(), "enabled": narratorGlobalData.success === true && narratorGlobalVoices().length > 0, "description": qsTr("Select the default installed voice for Polish speech.") },
             { "id": "narrator-global-volume", "category": "narrator", "title": qsTr("Speech volume"), "value": qsTr("%1%").arg(Math.round(Number(narratorGlobalData.volume === undefined ? 0.85 : narratorGlobalData.volume) * 100)), "enabled": narratorGlobalData.success === true, "description": qsTr("Set the default Narrator playback volume.") },
@@ -616,8 +618,8 @@ FocusScope {
             return saveNarratorGlobal({ "subtitleLanguageMode": String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") === "polish" ? "english_to_polish" : "polish" })
         if (id === "narrator-global-source")
             return saveNarratorGlobal({ "sourceMode": String(narratorGlobalData.sourceMode || "auto") === "ocr" ? "auto" : "ocr" })
-        if (id === "narrator-global-capture")
-            return saveNarratorGlobal({ "captureSource": String(narratorGlobalData.captureSource || "window") === "monitor" ? "window" : "monitor" })
+        if (id === "narrator-global-ocr")
+            return saveNarratorGlobal({ "ocrProviderId": String(narratorGlobalData.ocrProviderId || "") === "rapidocr-local" ? "tesseract-fast-eng" : "rapidocr-local" })
         if (id === "narrator-global-translation") {
             var profiles = Array.from(narratorGlobalData.translationProfiles || [])
             var profileIds = profiles.map(function(profile) { return String(profile.id || "") })

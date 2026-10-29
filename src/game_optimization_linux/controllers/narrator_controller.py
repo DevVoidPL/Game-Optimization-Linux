@@ -764,7 +764,9 @@ class NarratorController:
         }
         required_components = {
             "capture": "capture.portal-pipewire",
-            "ocr": "ocr.polish-local" if polish_mode else "ocr.english-local",
+            "ocr": ("ocr.rapidocr-local" if settings is not None
+                    and settings.ocr_provider_id == "rapidocr-local"
+                    else "ocr.polish-local" if polish_mode else "ocr.english-local"),
             "tts": voice_components.get(selected_voice, PIPER_VOIDEK_COMPONENT_ID),
             "audio": "audio.qt-pcm",
         }
@@ -1207,9 +1209,19 @@ class NarratorController:
             self._app.narratorComponentsChanged.emit()
 
     def _refresh_component_runtime(self, component_id: str) -> None:
+        pipeline = self._app._narrator_pipeline
+        resolver = getattr(pipeline, "ocr_provider_for", None)
+        default_ocr = resolver() if callable(resolver) else pipeline.ocr
+        rapid_ocr = None
+        if callable(resolver):
+            try:
+                rapid_ocr = resolver("rapidocr-local")
+            except RuntimeError:
+                pass
         providers = {
-            "ocr.english-local": self._app._narrator_pipeline.ocr,
-            "ocr.polish-local": self._app._narrator_pipeline.ocr,
+            "ocr.rapidocr-local": rapid_ocr,
+            "ocr.english-local": default_ocr,
+            "ocr.polish-local": default_ocr,
             "translation.opus-en-pl": self._app._narrator_pipeline.translator,
             **{component_id: self._app._narrator_pipeline.tts for component_id in MANAGED_VOICE_COMPONENTS},
             "audio.qt-pcm": self._app._narrator_pipeline.audio,
@@ -1397,7 +1409,8 @@ class NarratorController:
             "subtitleLanguageMode": settings.subtitle_language_mode.value,
             "subtitleAdapterId": settings.subtitle_adapter_id,
             "ocrProviderId": (
-                settings.ocr_provider_id or self._app._narrator_pipeline.ocr.provider_id
+                settings.ocr_provider_id or getattr(self._app._narrator_pipeline,
+                    "default_ocr_provider_id", self._app._narrator_pipeline.ocr.provider_id)
             ),
             "translationProviderId": (
                 settings.translation_provider_id or translator.provider_id

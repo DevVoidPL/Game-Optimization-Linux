@@ -315,18 +315,31 @@ Item {
         refreshSession()
     }
 
+    function ocrComponentId() {
+        return ocrProviderId === "rapidocr-local" ? "ocr.rapidocr-local"
+                : subtitleLanguageMode === "polish" ? "ocr.polish-local" : "ocr.english-local"
+    }
+
+    function rapidOcrComponent() {
+        var source = componentsData || []
+        for (var i = 0; i < source.length; ++i) {
+            if (String(value(source[i], ["componentId", "component_id"], "")) === "ocr.rapidocr-local")
+                return source[i]
+        }
+        return ({})
+    }
+
     function componentRequired(component) {
         var id = String(value(component, ["componentId", "component_id"], ""))
         return id === "capture.portal-pipewire" || id === "audio.qt-pcm"
-               || id === (subtitleLanguageMode === "polish" ? "ocr.polish-local" : "ocr.english-local")
+               || id === ocrComponentId()
                || (subtitleLanguageMode !== "polish" && id === "translation.opus-en-pl")
     }
 
     function requiredComponentsReady() {
         var required = {}
         required["capture.portal-pipewire"] = false
-        required[subtitleLanguageMode === "polish"
-                 ? "ocr.polish-local" : "ocr.english-local"] = false
+        required[ocrComponentId()] = false
         required["audio.qt-pcm"] = false
         if (subtitleLanguageMode !== "polish")
             required["translation.opus-en-pl"] = false
@@ -559,6 +572,8 @@ Item {
         var componentId = String(value(component, ["componentId", "component_id"], ""))
         if (componentId === "capture.portal-pipewire")
             return qsTr("Wayland portal and PipeWire capture")
+        if (componentId === "ocr.rapidocr-local")
+            return qsTr("RapidOCR models (English and Polish)")
         if (componentId === "ocr.english-local")
             return qsTr("Local English subtitle OCR")
         if (componentId === "ocr.polish-local")
@@ -1167,30 +1182,41 @@ Item {
                         ColumnLayout {
                             Layout.fillWidth: true
                             spacing: 6
-
                             Label {
-                                Layout.fillWidth: true
-                                text: qsTr("Capture source")
+                                text: qsTr("OCR engine")
                                 color: App.Theme.text
                                 font.pixelSize: App.Theme.fontBody
                                 font.weight: Font.DemiBold
                             }
-
                             AppComboBox {
-                                property var values: ["window", "monitor"]
+                                objectName: "narratorOcrEngine"
                                 Layout.fillWidth: true
-                                model: [qsTr("Window"), qsTr("Monitor")]
-                                currentIndex: page.indexOfValue(values, page.captureSource, 0)
+                                model: [qsTr("Tesseract (default)"), qsTr("RapidOCR (optional)")]
+                                currentIndex: page.ocrProviderId === "rapidocr-local" ? 1 : 0
                                 enabled: !page.sessionActive
-                                onActivated: function(index) { page.captureSource = values[index] }
+                                onActivated: function(index) {
+                                    page.ocrProviderId = index === 1 ? "rapidocr-local" : "tesseract-fast-eng"
+                                }
                             }
-
                             Label {
                                 Layout.fillWidth: true
-                                text: qsTr("The system portal asks which monitor or window may be captured")
+                                text: page.ocrProviderId === "rapidocr-local"
+                                    ? qsTr("Uses the original subtitle region. Download the models below; changing the engine does not change translation or voice.")
+                                    : qsTr("Uses the existing text masks and automatic bright-background handling.")
                                 color: App.Theme.textSecondary
                                 font.pixelSize: App.Theme.fontCaption
                                 wrapMode: Text.WordWrap
+                            }
+                            AppButton {
+                                objectName: "narratorRapidOcrDownload"
+                                Layout.fillWidth: true
+                                visible: page.ocrProviderId === "rapidocr-local"
+                                text: String(page.rapidOcrComponent().state || "") === "available"
+                                    ? qsTr("RapidOCR models ready") : qsTr("Download models (27 MB)")
+                                enabled: !page.sessionActive
+                                    && Boolean(page.rapidOcrComponent().canInstall)
+                                    && String(page.rapidOcrComponent().state || "") !== "available"
+                                onClicked: page.runComponentAction(page.rapidOcrComponent())
                             }
                         }
                     }

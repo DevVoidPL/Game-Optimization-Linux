@@ -209,10 +209,6 @@ FocusScope {
         var mode = String(narratorData.sourceMode || "auto")
         return mode === "ocr" ? qsTr("OCR only") : qsTr("Automatic")
     }
-    function narratorCaptureLabel() {
-        return String(narratorData.captureSource || "window") === "monitor"
-                ? qsTr("Monitor") : qsTr("Game window")
-    }
     function narratorSessionActive() {
         return ["starting", "selecting_source", "listening", "ocr", "translating",
                 "speaking", "stopping"].indexOf(String(narratorSession.status || "idle")) >= 0
@@ -300,7 +296,7 @@ FocusScope {
             { "id": "narrator-enabled", "icon": App.UiIcons.couchGlyphNarrator, "iconOnLight": App.UiIcons.couchGlyphNarratorOnLight, "symbol": "N", "title": qsTr("Narrator: %1").arg(narratorData.enabled ? qsTr("On") : qsTr("Off")), "label": qsTr("Lektor"), "value": narratorData.enabled ? qsTr("Enabled") : qsTr("Disabled"), "description": qsTr("Saved only for this game"), "subtitle": qsTr("Saved only for this game"), "enabled": true },
             { "id": "narrator-language", "icon": App.UiIcons.couchGlyphSubtitles, "iconOnLight": App.UiIcons.couchGlyphSubtitlesOnLight, "symbol": "文", "title": narratorLanguageLabel(), "label": qsTr("Language mode"), "value": narratorLanguageLabel(), "description": qsTr("Cycle subtitle language mode"), "subtitle": qsTr("Cycle subtitle language mode"), "enabled": true },
             { "id": "narrator-source", "icon": App.UiIcons.couchGlyphScanSource, "iconOnLight": App.UiIcons.couchGlyphScanSourceOnLight, "symbol": "⌁", "title": qsTr("Source: %1").arg(narratorSourceLabel()), "label": qsTr("Recognition source"), "value": narratorSourceLabel(), "description": qsTr("Automatic detection or OCR capture"), "subtitle": qsTr("Automatic detection or OCR capture"), "enabled": true },
-            { "id": "narrator-capture", "icon": App.UiIcons.couchGlyphCapture, "iconOnLight": App.UiIcons.couchGlyphCaptureOnLight, "symbol": "▣", "title": qsTr("Capture: %1").arg(narratorCaptureLabel()), "label": qsTr("Capture"), "value": narratorCaptureLabel(), "description": qsTr("Choose a window or the full monitor"), "subtitle": qsTr("Choose a window or the full monitor"), "enabled": true },
+            { "id": "narrator-ocr", "icon": App.UiIcons.couchGlyphScanSource, "iconOnLight": App.UiIcons.couchGlyphScanSourceOnLight, "symbol": "OCR", "title": qsTr("OCR engine"), "label": qsTr("OCR engine"), "value": String(narratorData.ocrProviderId || "") === "rapidocr-local" ? "RapidOCR" : "Tesseract", "description": qsTr("Select Tesseract or RapidOCR; models are installed in Narrator settings"), "subtitle": qsTr("Select Tesseract or RapidOCR; models are installed in Narrator settings"), "enabled": !active },
             { "id": "narrator-voice", "icon": App.UiIcons.couchGlyphVoice, "iconOnLight": App.UiIcons.couchGlyphVoiceOnLight, "symbol": "♪", "title": narratorVoiceLabel(), "label": qsTr("Voice"), "value": narratorVoiceLabel(), "description": qsTr("Cycle installed speech voices"), "subtitle": qsTr("Cycle installed speech voices"), "enabled": narratorVoices().length > 0 },
             { "id": "narrator-volume", "icon": App.UiIcons.couchGlyphVolume, "iconOnLight": App.UiIcons.couchGlyphVolumeOnLight, "symbol": "◖", "title": qsTr("Volume: %1%").arg(Math.round(Number(narratorData.volume || 0) * 100)), "label": qsTr("Volume"), "value": qsTr("%1%").arg(Math.round(Number(narratorData.volume || 0) * 100)), "description": qsTr("Press repeatedly to adjust"), "subtitle": qsTr("Press repeatedly to adjust"), "enabled": true },
             { "id": "narrator-rate", "icon": App.UiIcons.couchGlyphSpeechRate, "iconOnLight": App.UiIcons.couchGlyphSpeechRateOnLight, "symbol": "››", "title": qsTr("Speech rate: %1×").arg(Number(narratorData.speechRate || 1).toFixed(1)), "label": qsTr("Speech rate"), "value": qsTr("%1×").arg(Number(narratorData.speechRate || 1).toFixed(1)), "description": qsTr("Press repeatedly to adjust"), "subtitle": qsTr("Press repeatedly to adjust"), "enabled": true },
@@ -880,9 +876,9 @@ FocusScope {
         if (id === "narrator-source")
             return saveNarratorValue("sourceMode",
                     String(narratorData.sourceMode || "auto") === "ocr" ? "auto" : "ocr")
-        if (id === "narrator-capture")
-            return saveNarratorValue("captureSource",
-                    String(narratorData.captureSource || "window") === "monitor" ? "window" : "monitor")
+        if (id === "narrator-ocr")
+            return saveNarratorValue("ocrProviderId",
+                String(narratorData.ocrProviderId || "") === "rapidocr-local" ? "tesseract-fast-eng" : "rapidocr-local")
         if (id === "narrator-voice") {
             var voices = narratorVoices()
             if (!voices.length)

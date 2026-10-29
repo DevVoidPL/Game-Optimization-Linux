@@ -166,9 +166,14 @@ class TesseractWorkerClient:
         timeout_seconds: float = OCR_WORKER_TIMEOUT_SECONDS,
         popen: Callable[..., subprocess.Popen[str]] = subprocess.Popen,
         worker_script: Path | None = None,
+        worker_name: str = "Tesseract",
+        restart_after_cancel: bool = True,
     ) -> None:
         self._model_path = Path(model_path).resolve()
         self._language = str(language)
+        self._worker_name = str(worker_name)
+        self._restart_after_cancel = bool(restart_after_cancel)
+        self._cancelled = False
         self._executable = str(executable)
         self._worker_script = (
             Path(worker_script)
@@ -200,6 +205,15 @@ class TesseractWorkerClient:
             self._ensure_process()
 
     def recognize_png(self, payload: bytes, *, source_resolution: int) -> str:
+        response = self.recognize_response(payload, source_resolution=source_resolution)
+        tsv = response.get("tsv")
+        if not isinstance(tsv, str) or not tsv.startswith("level\t"):
+            self.cancel()
+            raise RuntimeError("The OCR worker returned invalid TSV data")
+        return tsv
+
+    def recognize_response(self, payload: bytes, *, source_resolution: int = 96) -> dict[str, object]:
+        """Exchange one image with an isolated worker; preserve cancellation/timeouts."""
         lock_started = time.monotonic()
         with self._io_lock:
             self.last_lock_wait_ms = max(
@@ -228,7 +242,7 @@ class TesseractWorkerClient:
                 raise RuntimeError("The OCR worker returned an unexpected response")
             if not response.get("ok"):
                 message = str(response.get("error", "")).strip()
-                raise RuntimeError(message or "Persistent Tesseract OCR failed")
+                raise RuntimeError(message or f"Persistent {self._worker_name} OCR failed")
             self.last_roundtrip_ms = max(
                 0.0, (time.monotonic() - roundtrip_started) * 1000.0
             )
@@ -239,14 +253,12 @@ class TesseractWorkerClient:
             self.last_recognition_ms = self._response_float(
                 response, "recognition_ms"
             )
-            tsv = response.get("tsv")
-            if not isinstance(tsv, str) or not tsv.startswith("level\t"):
-                self._discard(process)
-                raise RuntimeError("The OCR worker returned invalid TSV data")
-            return tsv
+            return response
 
     def cancel(self) -> None:
         with self._state_lock:
+            if not self._restart_after_cancel:
+                self._cancelled = True
             process = self._process
             self._process = None
         if process is not None:
@@ -254,6 +266,8 @@ class TesseractWorkerClient:
 
     def close(self) -> None:
         with self._state_lock:
+            if not self._restart_after_cancel:
+                self._cancelled = True
             process = self._process
             self._process = None
         if process is None:
@@ -268,6 +282,8 @@ class TesseractWorkerClient:
 
     def _ensure_process(self) -> subprocess.Popen[str]:
         with self._state_lock:
+            if self._cancelled:
+                raise RuntimeError("The OCR worker was cancelled")
             process = self._process
             if process is not None and process.poll() is None:
                 return process
@@ -319,8 +335,9 @@ class TesseractWorkerClient:
         self.tesseract_library = str(response.get("tesseract_library", ""))
         self.leptonica_library = str(response.get("leptonica_library", ""))
         logger.debug(
-            "Persistent Tesseract worker ready language=%s startup=%.1fms "
+            "Persistent %s worker ready language=%s startup=%.1fms "
             "initialization=%s tesseract=%s leptonica=%s",
+            self._worker_name,
             self._language,
             self.startup_ms or 0.0,
             (
@@ -350,7 +367,7 @@ class TesseractWorkerClient:
         try:
             selector.register(stdout, selectors.EVENT_READ)
             if not selector.select(self._timeout_seconds):
-                raise RuntimeError("Persistent Tesseract OCR timed out")
+                raise RuntimeError(f"Persistent {self._worker_name} OCR timed out")
             line = stdout.readline()
         finally:
             selector.close()

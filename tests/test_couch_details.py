@@ -208,7 +208,7 @@ def test_carousel_shows_only_whole_covers() -> None:
 
 
 def test_narrator_action_grid_is_balanced_readable_and_navigable() -> None:
-    """9 Lektor actions -> 3x3; short names + values fit in Polish at 1920x1080."""
+    """Narrator actions use a 4x3 grid, including the optional OCR engine."""
 
     from PySide6.QtCore import Property, Signal, Slot
     from PySide6.QtTest import QTest
@@ -246,7 +246,7 @@ def test_narrator_action_grid_is_balanced_readable_and_navigable() -> None:
         root.setProperty("selectedAction", 0)
         QTest.qWait(250)
         ids = [action["id"] for action in _plain(root.property("actionModel"))]
-        assert ids == ["narrator-enabled", "narrator-language", "narrator-source", "narrator-capture",
+        assert ids == ["narrator-enabled", "narrator-language", "narrator-source", "narrator-ocr",
                        "narrator-voice", "narrator-volume", "narrator-rate", "narrator-region", "narrator-reselect", "narrator-start"]
         viewport = root.findChild(QObject, "couchDetailsActionsViewport")
         assert (viewport.property("columns"), viewport.property("rows")) == (4, 3)

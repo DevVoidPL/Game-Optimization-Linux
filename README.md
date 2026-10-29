@@ -2,7 +2,7 @@
   <img src="src/game_optimization_linux/assets/branding/game-optimization-linux-app-icon.svg" width="96" alt="GameOpti">
 </p>
 
-<h1 align="center">GameOpti Beta 2.0</h1>
+<h1 align="center">GameOpti 2.1</h1>
 
 <p align="center">
   Manage your Linux game library, graphics, performance and storage from one application.<br>
@@ -10,13 +10,13 @@
 </p>
 
 <p align="center">
-  <a href="ROADMAP.md"><img src="https://img.shields.io/badge/Beta_2.0-Pre--release-22c69a?style=for-the-badge" alt="Beta 2.0: pre-release"></a>
-  <a href="https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.0.0-beta"><img src="https://img.shields.io/badge/Download-2.0_Beta-2563eb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download GameOpti 2.0 Beta"></a>
+  <a href="ROADMAP.md"><img src="https://img.shields.io/badge/2.1-Pre--release-22c69a?style=for-the-badge" alt="2.1: pre-release"></a>
+  <a href="https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1"><img src="https://img.shields.io/badge/Download-2.1-2563eb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download GameOpti 2.1"></a>
   <a href="https://www.youtube.com/@Void_Developer_PL"><img src="https://img.shields.io/badge/YouTube-Project_updates-ff0033?style=for-the-badge&amp;logo=youtube&amp;logoColor=white" alt="Project updates on YouTube"></a>
 </p>
 
 <p align="center">
-  <a href="#inside-beta-20">Features</a> ·
+  <a href="#features">Features</a> ·
   <a href="#couch-edition-and-desktop-edition">Editions</a> ·
   <a href="#interface">Interface</a> ·
   <a href="#download-and-install">Download</a> ·
@@ -28,11 +28,12 @@
   <img src="docs/screenshots/beta-2-library-dark.png" width="960" alt="GameOpti Beta 2.0 dark library interface with game covers">
 </p>
 
-**GameOpti 2.0 Beta is available as a pre-release.** It is a beta: please report
-problems through [GitHub Issues](https://github.com/DevVoidPL/Game-Optimization-Linux/issues).
+**GameOpti 2.1 adds an optional RapidOCR engine to the Narrator.** Tesseract stays
+the default; RapidOCR models are downloaded only when you ask. Development builds
+are still marked as pre-releases. Please report problems through [GitHub Issues](https://github.com/DevVoidPL/Game-Optimization-Linux/issues).
 News and demonstrations are on [YouTube](https://www.youtube.com/@Void_Developer_PL).
 
-## Inside Beta 2.0
+## Features
 
 GameOpti brings the tools around your games into one place: choose a game,
 configure its profile, apply your changes and launch through its existing launcher.
@@ -64,7 +65,7 @@ checks conflicts before applying them. Anti-cheat is never bypassed.
 
 ## Couch Edition and Desktop Edition
 
-GameOpti Beta 2.0 comes as two alternative Flatpak bundles of the same application.
+GameOpti 2.1 comes as two alternative Flatpak bundles of the same application.
 Install one of them; both use the same App ID and the same settings, so you can switch
 by installing the other bundle without losing your profiles.
 
@@ -115,18 +116,18 @@ captures; the Couch preview uses demo data. [Screenshot notes](docs/screenshots/
 ## Download and install
 
 The current release is
-[**Game Optimization Linux 2.0.0 Beta**](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.0.0-beta) (pre-release).
+[**Game Optimization Linux 2.1**](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1) (pre-release).
 Download one of its x86_64 Flatpak bundles:
 
-- [Couch Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.0.0-beta/Game-Optimization-Linux-2.0.0-beta-couch-edition-x86_64.flatpak) – Desktop Mode and Couch Mode
-- [Desktop Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.0.0-beta/Game-Optimization-Linux-2.0.0-beta-desktop-edition-x86_64.flatpak) – Desktop Mode only
+- [Couch Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1/Game-Optimization-Linux-2.1.0-couch-edition-x86_64.flatpak) – Desktop Mode and Couch Mode
+- [Desktop Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1/Game-Optimization-Linux-2.1.0-desktop-edition-x86_64.flatpak) – Desktop Mode only
 
-Check the download against [SHA256SUMS](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.0.0-beta/SHA256SUMS).
+Check the download against [SHA256SUMS](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1/SHA256SUMS).
 GameOpti is distributed through GitHub Releases, not Flathub; Flathub supplies its runtime.
 
 ```bash
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --user ./Game-Optimization-Linux-2.0.0-beta-couch-edition-x86_64.flatpak
+flatpak install --user ./Game-Optimization-Linux-2.1.0-couch-edition-x86_64.flatpak
 flatpak run io.github.DevVoidPL.GameOptimizationLinux
 ```
 
@@ -160,7 +161,8 @@ directions: support will start with specific games and setups, and there is no r
 - [Architecture and launch flow](docs/architecture.md)
 - [Btrfs compression measurements](docs/compression_validation.md)
 - [Narrator components and licenses](docs/narrator-components.md)
-- [Release notes 2.0.0 Beta](docs/release-notes-2.0.0-beta.md)
+- [Release notes 2.1](docs/release-notes-2.1.md)
+- [RapidOCR setup and limits](docs/narrator-rapidocr.md)
 - [Build the Flatpak](flatpak/README.md)
 
 For source development, use Python 3.12+:

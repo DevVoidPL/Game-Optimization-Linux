@@ -31,6 +31,7 @@ _COMPONENT_ID = re.compile(r"^[a-z0-9]+(?:[._-][a-z0-9]+)*$")
 _APPROVED_DOWNLOAD_HOSTS = frozenset(
     {
         "raw.githubusercontent.com",
+        "files.pythonhosted.org",
         "data.argosopentech.com",
         "huggingface.co",
 
@@ -155,6 +156,25 @@ class NarratorComponentDefinition:
 
 
 DEFAULT_NARRATOR_COMPONENTS = (
+    NarratorComponentDefinition(
+        component_id="ocr.rapidocr-local",
+        kind=NarratorComponentKind.OCR,
+        name="RapidOCR English and Polish subtitle OCR",
+        license_id="Apache-2.0",
+        runtime_license_id="Apache-2.0",
+        artifact_license_id="Apache-2.0",
+        version="rapidocr-3.10.0-ppocrv6-small",
+        download_size_bytes=27_288_134,
+        install_ready=True,
+        attribution="RapidAI/RapidOCR; PaddleOCR models by PaddlePaddle",
+        message="Optional CPU OCR engine; install its models before selecting it",
+        artifacts=(NarratorComponentArtifact(
+            source_url="https://files.pythonhosted.org/packages/59/07/203065283bba0c5e9c10af3602dc25ab3e59ee54dc2d1d22c8faeabf5ed8/rapidocr-3.10.0-py3-none-any.whl",
+            sha256="2fc34e26cd0f48514804a94f8832283039c7334076bff60768b1fed9ad068050",
+            size_bytes=27_288_134,
+            archive_format="zip",
+        ),),
+    ),
     NarratorComponentDefinition(
         component_id="capture.portal-pipewire",
         kind=NarratorComponentKind.CAPTURE,

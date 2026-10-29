@@ -14,7 +14,7 @@ import sys
 
 
 APP_NAME = "Game Optimization Linux"
-APP_VERSION = "2.0.0-beta"
+APP_VERSION = "2.1.0"
 APP_ID = "io.github.DevVoidPL.GameOptimizationLinux"
 ORGANIZATION_NAME = APP_NAME
 ORGANIZATION_DOMAIN = "game-optimization-linux.local"

@@ -2300,6 +2300,14 @@
         <source>Current configuration</source>
         <translation>Current configuration</translation>
     </message>
+    <message>
+        <source>OCR engine</source>
+        <translation>OCR engine</translation>
+    </message>
+    <message>
+        <source>Select Tesseract or RapidOCR; models are installed in Narrator settings</source>
+        <translation>Select Tesseract or RapidOCR; models are installed in Narrator settings</translation>
+    </message>
 </context>
 <context>
     <name>CouchHints</name>
@@ -4231,6 +4239,18 @@
     <message>
         <source>(no longer offered)</source>
         <translation>(no longer offered)</translation>
+    </message>
+    <message>
+        <source>RapidOCR models (English and Polish)</source>
+        <translation>RapidOCR models (English and Polish)</translation>
+    </message>
+    <message>
+        <source>OCR engine</source>
+        <translation>OCR engine</translation>
+    </message>
+    <message>
+        <source>Select Tesseract or RapidOCR; models are installed in Narrator settings</source>
+        <translation>Select Tesseract or RapidOCR; models are installed in Narrator settings</translation>
     </message>
 </context>
 <context>
@@ -11549,6 +11569,22 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>This voice is no longer offered</source>
         <translation>This voice is no longer offered</translation>
     </message>
+    <message>
+        <source>RapidOCR English and Polish subtitle OCR is ready</source>
+        <translation>RapidOCR English and Polish subtitle OCR is ready</translation>
+    </message>
+    <message>
+        <source>Install the verified RapidOCR models and runtime</source>
+        <translation>Install the verified RapidOCR models and runtime</translation>
+    </message>
+    <message>
+        <source>Install the verified RapidOCR models through the application</source>
+        <translation>Install the verified RapidOCR models through the application</translation>
+    </message>
+    <message>
+        <source>Optional CPU OCR engine; install its models before selecting it</source>
+        <translation>Optional CPU OCR engine; install its models before selecting it</translation>
+    </message>
 </context>
 <context>
     <name>LabeledValue</name>
@@ -14554,6 +14590,38 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     <message>
         <source>Not published yet</source>
         <translation>Not published yet</translation>
+    </message>
+    <message>
+        <source>OCR engine</source>
+        <translation>OCR engine</translation>
+    </message>
+    <message>
+        <source>Tesseract (default)</source>
+        <translation>Tesseract (default)</translation>
+    </message>
+    <message>
+        <source>RapidOCR (optional)</source>
+        <translation>RapidOCR (optional)</translation>
+    </message>
+    <message>
+        <source>RapidOCR models (English and Polish)</source>
+        <translation>RapidOCR models (English and Polish)</translation>
+    </message>
+    <message>
+        <source>Uses the original subtitle region. Download the models below; changing the engine does not change translation or voice.</source>
+        <translation>Uses the original subtitle region. Download the models below; changing the engine does not change translation or voice.</translation>
+    </message>
+    <message>
+        <source>Uses the existing text masks and automatic bright-background handling.</source>
+        <translation>Uses the existing text masks and automatic bright-background handling.</translation>
+    </message>
+    <message>
+        <source>RapidOCR models ready</source>
+        <translation>RapidOCR models ready</translation>
+    </message>
+    <message>
+        <source>Download models (27 MB)</source>
+        <translation>Download models (27 MB)</translation>
     </message>
 </context>
 <context>

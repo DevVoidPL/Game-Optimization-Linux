@@ -2974,10 +2974,17 @@ class NarratorPipeline:
         *,
         executor: Executor | None = None,
         tts_executor: Executor | None = None,
+        ocr_providers: tuple[OcrProvider, ...] = (),
         clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.capture = capture
         self.ocr = ocr
+        self.default_ocr_provider_id = ocr.provider_id
+        self._ocr_providers = {ocr.provider_id: ocr}
+        for provider in ocr_providers:
+            if provider.provider_id in self._ocr_providers:
+                raise ValueError("Duplicate OCR provider: " + provider.provider_id)
+            self._ocr_providers[provider.provider_id] = provider
         self.translator = translator
         self.tts = tts
         self.audio = audio
@@ -3217,6 +3224,15 @@ class NarratorPipeline:
         if temporary and callback is not None:
             callback(state, message)
 
+    def ocr_provider_for(self, provider_id: str = "") -> OcrProvider:
+        selected = provider_id or self.default_ocr_provider_id
+        if self.ocr.provider_id == selected:
+            return self.ocr
+        try:
+            return self._ocr_providers[selected]
+        except KeyError:
+            raise RuntimeError("The selected OCR provider is not available: " + selected) from None
+
     def missing_requirements(
         self, settings: NarratorGameSettings | None = None
     ) -> tuple[str, ...]:
@@ -3229,7 +3245,13 @@ class NarratorPipeline:
         missing: list[str] = []
         if not self.capture.capabilities().available:
             missing.append("capture")
-        if not self._ocr_language_available("pl" if polish_mode else "en"):
+        try:
+            provider = self.ocr_provider_for(selected.ocr_provider_id if selected else "")
+        except RuntimeError:
+            provider = None
+        language_available = getattr(provider, "language_available", None)
+        if not (language_available("pl" if polish_mode else "en")
+                if callable(language_available) else bool(provider and provider.available)):
             missing.append("ocr")
         if not polish_mode and not self.translator.available:
             missing.append("translation")
@@ -3276,6 +3298,7 @@ class NarratorPipeline:
             activity = self.activity.is_active(settings.game_key)
             if activity is False:
                 raise RuntimeError("The selected game is not running")
+            self.ocr = self.ocr_provider_for(settings.ocr_provider_id)
             self._generation += 1
             self._request_id = 0
             self._work_id = 0
@@ -3379,7 +3402,7 @@ class NarratorPipeline:
             settings.subtitle_language_mode is NarratorSubtitleLanguageMode.POLISH
         )
         selected_providers = [
-            ("OCR", settings.ocr_provider_id, self.ocr.provider_id),
+            ("OCR", settings.ocr_provider_id, self.ocr_provider_for(settings.ocr_provider_id).provider_id),
             ("speech", settings.tts_provider_id, self.tts.provider_id),
         ]
         if not polish_mode:
@@ -3424,7 +3447,7 @@ class NarratorPipeline:
 
         return replace(
             settings,
-            ocr_provider_id=settings.ocr_provider_id or self.ocr.provider_id,
+            ocr_provider_id=settings.ocr_provider_id or self.default_ocr_provider_id,
             translation_provider_id=(
                 settings.translation_provider_id
                 if polish_mode
@@ -3712,7 +3735,7 @@ class NarratorPipeline:
         close_capture = getattr(self.capture, "close", None)
         if callable(close_capture):
             close_capture()
-        for provider in (self.ocr, self.translator, self.tts):
+        for provider in (*self._ocr_providers.values(), self.translator, self.tts):
             close = getattr(provider, "close", None)
             if callable(close):
                 close()
