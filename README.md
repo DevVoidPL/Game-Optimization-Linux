@@ -41,19 +41,19 @@ Keep individual settings for each title rather than changing everything globally
 
 | | What you can manage |
 | --- | --- |
-| **Library & launchers** | Steam, Heroic, Lutris and manually added games. Native and Flatpak launcher discovery, game artwork, source filters and launcher integration with backup and restore. |
-| **Launch profiles** | Automatic, Maximum Performance, Balanced, Low Power, Lowest Latency, Stable Image, Best Quality and Custom. GameMode, Gamescope, display settings, scaling, window modes and FPS limits. |
-| **GPU-memory protection** | Per-game GPU-memory priority on systems with the required dmem support, host-readiness checks and effective-process diagnostics. Memory-pressure controls follow the detected capabilities. |
-| **Upscaling & FSR** | Managed OptiScaler installation, configuration, repair and restoration. FSR modes and variants include FSR 4 INT8 Lite and compatible community INT8 variants, with separate hardware and version requirements. |
-| **DLSS Enabler** | A separate per-game backend with configuration and diagnostics, plus explicit, reversible switching from OptiScaler/Lite. |
-| **Frame generation** | Choose **Off / lsfg-vk / MAKO Renderer / afmf-linux** per game. On-demand component installation, backend-specific controls, separate saved settings and compatibility checks. |
-| **Post-processing** | **vkBasalt and ReShade** integration, presets, effect selection and ordering, parameter controls, toggle shortcuts and per-game restoration. Colour, contrast, sharpening and antialiasing in one panel. |
-| **MangoHud** | Per-game presets, metric selection, colours, placement, layout preview, FPS limiting and performance logging. |
-| **Measured optimization** | Record a baseline in the scene you actually play, test one change, compare FPS, 1% lows, frame times, power and memory, then keep or revert it. Results stay local to that game and system, and "keep what you had" is a valid outcome. |
-| **Compression & cleanup** | Btrfs zstd compression, sample-based level selection, before/after storage measurements, update-aware compression and task history. Deep analysis and reversible cleanup quarantine help review reclaimable space. |
-| **Narrator / Lektor** | Local subtitle recognition, optional English-to-Polish translation and Polish speech with a built-in voice. Per-game subtitle regions, portal screen capture and support for your own Piper voices. |
-| **Tweaks** | Per-game Proton compatibility controls, applied through the launcher that starts the game. |
-| **Interface** | Desktop Mode in both editions; full-screen Couch Mode with controller navigation in the Couch Edition. Light/dark themes and English, Polish and Spanish. |
+| 🎮 **Library & launchers** | Steam, Heroic, Lutris and manually added games. Native and Flatpak launcher discovery, game artwork, source filters and launcher integration with backup and restore. |
+| ⚙️ **Launch profiles** | Automatic, Maximum Performance, Balanced, Low Power, Lowest Latency, Stable Image, Best Quality and Custom. GameMode, Gamescope, display settings, scaling, window modes and FPS limits. |
+| 🧠 **GPU-memory protection** | Per-game GPU-memory priority on systems with the required dmem support, host-readiness checks and effective-process diagnostics. Memory-pressure controls follow the detected capabilities. |
+| ✨ **Upscaling & FSR** | Managed OptiScaler installation, configuration, repair and restoration. FSR modes and variants include FSR 4 INT8 Lite and compatible community INT8 variants, with separate hardware and version requirements. |
+| 🧩 **DLSS Enabler** | A separate per-game backend with configuration and diagnostics, plus explicit, reversible switching from OptiScaler/Lite. |
+| 🎞️ **Frame generation** | Choose **Off / lsfg-vk / MAKO Renderer / afmf-linux** per game. On-demand component installation, backend-specific controls, separate saved settings and compatibility checks. |
+| 🎨 **Post-processing** | **vkBasalt and ReShade** integration, presets, effect selection and ordering, parameter controls, toggle shortcuts and per-game restoration. Colour, contrast, sharpening and antialiasing in one panel. |
+| 📊 **MangoHud** | Per-game presets, metric selection, colours, placement, layout preview, FPS limiting and performance logging. |
+| 📈 **Measured optimization** | Record a baseline in the scene you actually play, test one change, compare FPS, 1% lows, frame times, power and memory, then keep or revert it. Results stay local to that game and system, and "keep what you had" is a valid outcome. |
+| 💾 **Compression & cleanup** | Btrfs zstd compression, sample-based level selection, before/after storage measurements, update-aware compression and task history. Deep analysis and reversible cleanup quarantine help review reclaimable space. |
+| 🎙️ **Narrator / Lektor** | Local subtitle recognition, optional English-to-Polish translation and Polish speech with a built-in voice. Per-game subtitle regions, portal screen capture and support for your own Piper voices. |
+| 🛠️ **Tweaks** | Per-game Proton compatibility controls, applied through the launcher that starts the game. |
+| 🛋️ **Interface** | Desktop Mode in both editions; full-screen Couch Mode with controller navigation in the Couch Edition. Light/dark themes and English, Polish and Spanish. |
 
 **A few requirements worth knowing:** Btrfs compression needs a Btrfs game folder.
 GPU-memory protection depends on kernel, driver and host support; it prioritizes
