@@ -37,23 +37,6 @@ def test_basic_sidebar_text_exists_in_english_polish_and_spanish() -> None:
         assert QCoreApplication.translate("Sidebar", "Games") == translated
 
 
-def test_narrator_text_exists_in_english_polish_and_spanish() -> None:
-    manager = TranslationManager(_APPLICATION)
-    expected = {
-        "en": ("Narrator", "Start narrator", "Waiting for portal permission or source"),
-        "pl": ("Lektor", "Uruchom lektora", "Oczekiwanie na zgodę portalu lub wybór źródła"),
-        "es": ("Narrador", "Iniciar narrador", "Esperando permiso del portal o selección de fuente"),
-    }
-
-    for code, (sidebar, start, capture_status) in expected.items():
-        assert manager.set_language(code)
-        assert QCoreApplication.translate("Sidebar", "Narrator") == sidebar
-        assert QCoreApplication.translate("NarratorPage", "Start narrator") == start
-        assert QCoreApplication.translate(
-            "NarratorPage", "Waiting for portal permission or source"
-        ) == capture_status
-
-
 def test_core_interface_texts_are_translated_in_every_language() -> None:
     manager = TranslationManager(_APPLICATION)
     expected = {
@@ -318,17 +301,6 @@ def test_all_qml_translation_sources_exist_in_every_catalog() -> None:
         # Catalogs store the decoded string (real newline/quote), as lupdate does.
         expected.update((context, _unescape(source)) for source in pattern.findall(text))
 
-    python_selector = Path(
-        "src/game_optimization_linux/controllers/narrator_region_selector.py"
-    ).read_text(encoding="utf-8")
-    expected.update(
-        ("SubtitleRegionSelector", source)
-        for source in re.findall(
-            r'translate\(\s*"SubtitleRegionSelector",\s*"((?:[^"\\]|\\.)*)"', python_selector
-        )
-    )
-
-    assert expected
     for code in ("en", "pl", "es"):
         root = ET.parse(
             TRANSLATIONS_DIR / f"game_optimization_{code}.ts"
@@ -340,31 +312,6 @@ def test_all_qml_translation_sources_exist_in_every_catalog() -> None:
         }
         missing = sorted(expected - actual)
         assert not missing, f"{code} catalog is missing QML sources: {missing}"
-
-
-def test_couch_uses_shared_narrator_route_and_icon_registry() -> None:
-    """Keep Couch navigation and visual identity connected to shared surfaces."""
-
-    couch_main = (Path("src/game_optimization_linux/qml/couch/CouchMain.qml")
-              ).read_text(encoding="utf-8")
-    couch_home = (Path("src/game_optimization_linux/qml/couch/CouchHome.qml")
-              ).read_text(encoding="utf-8")
-    tile = (Path("src/game_optimization_linux/qml/couch/components/CouchTile.qml")
-        ).read_text(encoding="utf-8")
-    assert 'name === "narrator" ? narratorPage' in couch_main
-    assert 'controller.navigate("narrator")' not in couch_home
-    assert "App.UiIcons.sidebarNarrator" not in couch_home
-    assert "property url iconSource" in tile
-
-
-def test_couch_narrator_is_not_desktop_page() -> None:
-    main = Path("src/game_optimization_linux/qml/couch/CouchMain.qml").read_text(
-        encoding="utf-8"
-    )
-    # The obsolete global Couch Narrator page was removed; the Narrator is per game.
-    assert "CouchNarratorPage" not in main
-    assert "NarratorPage.qml" not in main
-    assert not Path("src/game_optimization_linux/qml/couch/CouchNarratorPage.qml").exists()
 
 
 def test_language_aliases_and_unknown_language() -> None:

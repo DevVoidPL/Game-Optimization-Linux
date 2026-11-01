@@ -71,7 +71,7 @@ _HOST_EXECUTABLES = frozenset(
         "xrandr",
         "pkexec",
         "true",
-        # Read-only process list for "is the game running" (Narrator autostart).
+        # Read-only process list for launcher and measurement guards.
         "ps",
         # Read only /proc/<validated numeric PID>/maps for module diagnostics.
         "cat",

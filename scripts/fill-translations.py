@@ -47,7 +47,7 @@ EN_FOR_POLISH_SOURCES = {
         "Only values reported by the installed OptiScaler INI are shown.",
     "Oficjalne wydanie OptiScaler": "Official OptiScaler release",
     "Wersja dostępna: %1 | Wersja zainstalowana: %2": "Available version: %1 | Installed version: %2",
-    "Sprawdź online": "Check online",
+
     "Status instalacji": "Installation status",
     "Wersja zainstalowana": "Installed version",
     "Brak": "None",
@@ -101,7 +101,6 @@ PL_COUCH = {
     ("I18n", "Custom games", "launcher source"): "Własne",
 }
 
-
 # (context, source) -> Polish, for the remaining non-Couch desktop texts.
 PL_DESKTOP = {
     ('DlssEnablerPanel', 'The DLSS Enabler configuration could not be saved'): 'Nie udało się zapisać konfiguracji DLSS Enablera',
@@ -110,20 +109,20 @@ PL_DESKTOP = {
     ('DlssEnablerPanelContent', 'Installed · not selected'): 'Zainstalowano · niewybrany',
     ('DlssEnablerPanelContent', 'Error'): 'Błąd',
     ('DlssEnablerPanelContent', 'DLSS Enabler release %1 (module %2) replaces OptiScaler for this game and bundles OptiScaler %3. FSR 4 INT8 Lite is unavailable while this backend is selected. Switching remains fully reversible.'): 'Wydanie DLSS Enabler %1 (moduł %2) zastępuje OptiScaler dla tej gry i zawiera OptiScaler %3. FSR 4 INT8 Lite jest niedostępne, gdy wybrano ten backend. Przełączanie pozostaje w pełni odwracalne.',
-    ('DlssEnablerPanelContent', 'The current installation produced a fresh DLSS Enabler runtime log.'): 'Bieżąca instalacja utworzyła świeży log działania DLSS Enablera.',
-    ('DlssEnablerPanelContent', 'Installed and selected. Runtime operation is not confirmed until the game produces a fresh DLSS Enabler log.'): 'Zainstalowano i wybrano. Działanie nie jest potwierdzone, dopóki gra nie utworzy świeżego logu DLSS Enablera.',
+
+
     ('DlssEnablerPanelContent', 'The game process and graphics runtime were verified with this installation.'): 'Proces gry i środowisko graficzne zostały potwierdzone dla tej instalacji.',
     ('DlssEnablerPanelContent', 'Installed and selected. Runtime operation is not confirmed until a game launch produces fresh runtime evidence.'): 'Zainstalowano i wybrano. Działanie nie jest potwierdzone, dopóki uruchomienie gry nie dostarczy świeżego dowodu działania.',
     ('DlssEnablerPanelContent', 'Native game DLSS copied as _nvngx.dll: %1'): 'Natywna biblioteka DLSS gry skopiowana jako _nvngx.dll: %1',
     ('DlssEnablerPanelContent', 'DX12 upscaler'): 'Upscaler DX12',
     ('DlssEnablerPanelContent', 'Automatic'): 'Automatyczny',
-    ('DlssEnablerPanelContent', "AMD/Intel support installed: dxgi.dll, nvapi64-proxy.dll, dlss-finder.exe and the game's native DLSS copied as _nvngx.dll. Proton override: version=n,b;dxgi=n,b."): 'Zainstalowano obsługę AMD/Intel: dxgi.dll, nvapi64-proxy.dll, dlss-finder.exe oraz natywną bibliotekę DLSS gry skopiowaną jako _nvngx.dll. Override Protona: version=n,b;dxgi=n,b.',
+
     ('DlssEnablerPanelContent', 'Supported by the installed Enabler module and bundled OptiScaler.'): 'Obsługiwane przez zainstalowany moduł Enablera i dołączony OptiScaler.',
     ('DlssEnablerPanelContent', 'Frame generation'): 'Generowanie klatek',
     ('DlssEnablerPanelContent', 'Automatic or FSR 3, as supported by Enabler 3.00.000.0.'): 'Tryb automatyczny lub FSR 3, zgodnie z obsługą Enablera 3.00.000.0.',
     ('DlssEnablerPanelContent', 'Runtime logging'): 'Logowanie działania',
     ('DlssEnablerPanelContent', 'Keeps local Enabler and OptiScaler logs for verification and diagnostics.'): 'Zachowuje lokalne logi Enablera i OptiScalera do weryfikacji i diagnostyki.',
-    ('DlssEnablerPanelContent', 'Switch this game to DLSS Enabler? GameOpti will verify the installed files and will report runtime verification only after a fresh log is produced by the game.'): 'Przełączyć tę grę na DLSS Enabler? GameOpti zweryfikuje zainstalowane pliki, a potwierdzenie działania zgłosi dopiero po utworzeniu świeżego logu przez grę.',
+
     ('CouchGameDetails', 'Runtime verified'): 'Działanie potwierdzone w logu',
     ('CouchGameDetails', 'Selected · runtime not verified'): 'Wybrano · działanie niepotwierdzone',
     ('CouchGameDetails', 'Error'): 'Błąd',
@@ -133,17 +132,8 @@ PL_DESKTOP = {
     ('CouchGameDetails', 'Runtime logging: %1'): 'Logowanie działania: %1',
     ('CouchGameDetails', 'Diagnostics'): 'Diagnostyka',
     ('CouchGameDetails', 'Local logs are used for runtime verification'): 'Lokalne logi służą do potwierdzenia działania',
-    ('CouchGameDetails', 'Retry, or choose the game window again'): 'Ponów albo wybierz okno gry ponownie',
-    ('CouchGameDetails', 'Requires choosing the window again'): 'Wymaga ponownego wyboru okna',
-    ('NarratorPage', 'Requires choosing the window again'): 'Wymaga ponownego wyboru okna',
-    ('CouchGameDetails', 'The first start requires a one-time window choice with the mouse (preferably in Desktop, while the game is running)'): 'Pierwsze uruchomienie wymaga jednorazowego wyboru okna myszką (najlepiej w Desktop, gdy gra już działa)',
-    ('CouchGameDetails', 'Choose window again'): 'Wybierz okno ponownie',
-    ('NarratorPage', 'Choose window again'): 'Wybierz okno ponownie',
-    ('CouchGameDetails', 'Saved'): 'Zapisane',
-    ('CouchGameDetails', 'Not chosen'): 'Nie wybrano',
-    ('CouchGameDetails', 'Forget the saved window for this game only'): 'Zapomnij zapisane okno tylko dla tej gry',
-    ('NarratorPage', 'Forget the saved window for this game only'): 'Zapomnij zapisane okno tylko dla tej gry',
-    ('NarratorPage', 'Retry'): 'Ponów',
+
+
     ('I18n', 'Automatic recording is not available for Lutris games yet. Record a MangoHud log in the game (logging key) and use Import MangoHud log'): 'Automatyczne nagrywanie nie jest jeszcze dostępne dla gier Lutris. Nagraj log MangoHud w grze (klawisz logowania) i użyj „Importuj log MangoHud”',
     ('I18n', 'A baseline recording is already active for this game'): 'Nagrywanie pomiaru bazowego dla tej gry już trwa',
     ('I18n', 'Baseline recording exceeded the four-hour MangoHud limit'): 'Nagrywanie pomiaru bazowego przekroczyło czterogodzinny limit MangoHud',
@@ -160,28 +150,8 @@ PL_DESKTOP = {
     ('OptimizationTab', 'Close %1 first. GameOpti starts the game through %1 with a private MangoHud logging configuration for this one launch, records until the game exits and then removes that configuration again.'): 'Najpierw zamknij %1. GameOpti uruchomi grę przez %1 z prywatną konfiguracją logowania MangoHud tylko na to jedno uruchomienie, nagrywa do wyjścia z gry, a potem usuwa tę konfigurację.',
     ('OptimizationTab', 'Starts the game through %1 and records until you exit the game'): 'Uruchamia grę przez %1 i nagrywa do wyjścia z gry',
     ('OptimizationTab', 'Waiting for the game to start in %1...'): 'Czekanie na uruchomienie gry w %1...',
-    ('OptimizationTab', 'Automatic recording is available for Steam and local games only'): 'Automatyczne nagrywanie jest dostępne tylko dla gier Steam i gier lokalnych',
-    ('OptimizationTab', 'Automatic recording works only for Steam games and local games: the measurement runner is started by Steam Launch Options, while Heroic and Lutris start the game themselves. Record a MangoHud log in the game (logging key) and use Import MangoHud log'): 'Automatyczne nagrywanie działa tylko dla gier Steam i gier lokalnych: runner pomiaru uruchamiają opcje uruchamiania Steam, a Heroic i Lutris uruchamiają grę samodzielnie. Nagraj log MangoHud w grze (klawisz logowania) i użyj „Importuj log MangoHud”',
-    ('I18n', 'Automatic recording works only for Steam games and local games: the measurement runner is started by Steam Launch Options, while Heroic and Lutris start the game themselves. Record a MangoHud log in the game (logging key) and use Import MangoHud log'): 'Automatyczne nagrywanie działa tylko dla gier Steam i gier lokalnych: runner pomiaru uruchamiają opcje uruchamiania Steam, a Heroic i Lutris uruchamiają grę samodzielnie. Nagraj log MangoHud w grze (klawisz logowania) i użyj „Importuj log MangoHud”',
-    ('I18n', 'The capture session was closed (the chosen window disappeared or the choice was cancelled)'): 'Sesja przechwytywania została zamknięta (wybrane okno zniknęło albo wybór anulowano)',
-    ('I18n', 'Check the preview - it should show the game'): 'Sprawdź podgląd - powinien pokazywać grę',
-    ('CouchGameDetails', 'The first start asks you to choose the game window once; it is remembered'): 'Przy pierwszym uruchomieniu trzeba raz wybrać okno gry; wybór zostanie zapamiętany',
-    ('NarratorPage', 'The first start asks you to choose the game window once; it is remembered'): 'Przy pierwszym uruchomieniu trzeba raz wybrać okno gry; wybór zostanie zapamiętany',
-    ('CouchGameDetails', 'Starts automatically with the game; you can also start it now'): 'Uruchomi się automatycznie z grą; możesz też uruchomić go teraz',
-    ('CouchGameDetails', 'This launcher cannot be detected; start the Narrator manually'): 'Nie można wykryć gry z tego launchera; uruchom Lektora ręcznie',
-    ('CouchGameDetails', 'Voice: %1'): 'Głos: %1',
-    ('I18n', 'screen capture'): 'przechwytywanie ekranu',
-    ('I18n', 'subtitle OCR'): 'OCR napisów',
-    ('I18n', 'translation'): 'tłumaczenie',
-    ('I18n', 'voice'): 'głos',
-    ('I18n', 'audio output'): 'wyjście audio',
-    ('I18n', 'Error: %1'): 'Błąd: %1',
-    ('I18n', 'On · missing: %1'): 'Włączony · brakuje: %1',
-    ('I18n', 'On · starts with the game'): 'Włączony · uruchomi się z grą',
-    ('I18n', 'On · start the Narrator manually'): 'Włączony · uruchom Lektora ręcznie',
-    ('I18n', 'Off'): 'Wyłączony',
-    ('I18n', 'Narrator started with the game'): 'Lektor uruchomił się z grą',
-    ('I18n', 'Narrator started with the game. Choose the game window once; the choice is remembered'): 'Lektor uruchomił się z grą. Wybierz raz okno gry; wybór zostanie zapamiętany',
+
+
     ('OptiScalerSection', 'Cancel'): 'Anuluj',
     ('CouchGameDetails', 'Retry: %1'): 'Ponów: %1',
     ('CouchGameDetails', 'Official release from the internet · confirmation required'): 'Oficjalne wydanie z internetu · wymaga potwierdzenia',
@@ -242,8 +212,8 @@ PL_DESKTOP = {
     ('GameDetailsPage', 'Remove custom game?'): 'Usunąć własną grę?',
     ('GameDetailsPage', 'This removes only the Game Optimization Linux entry. Game files and artwork are not deleted.'): 'Usuwany jest tylko wpis w Game Optimization Linux. Pliki gry i grafiki nie zostaną usunięte.',
     ('GameDetailsPage', 'Remove'): 'Usuń',
-    ('GameDetailsPage', 'OptiScaler'): 'OptiScaler',
-    ('GameDetailsPage', 'Full optimization launch integration for this launcher is not available yet'): 'Pełna integracja uruchamiania z optymalizacją nie jest jeszcze dostępna dla tego launchera',
+
+
     ('GamesPage', 'Manual/Custom'): 'Ręczne/własne',
     ('ManualGameDialog', 'Manual game configuration is unavailable.'): 'Konfiguracja gier ręcznych jest niedostępna.',
     ('ManualGameDialog', 'Manual game was not found.'): 'Nie znaleziono gry ręcznej.',
@@ -287,50 +257,8 @@ PL_DESKTOP = {
     ('ManualGameDialog', 'Select game directory'): 'Wybierz katalog gry',
     ('ManualGameDialog', 'Select working directory'): 'Wybierz katalog roboczy',
     ('ManualGameDialog', 'Select Wine prefix'): 'Wybierz prefiks Wine',
-    ('NarratorPage', 'Not negotiated'): 'Nie uzgodniono',
-    ('NarratorPage', '%1 (after %2 failed)'): '%1 (po nieudanym %2)',
-    ('NarratorPage', '%1 (%2 sampling interval, %3 OCR busy)'): '%1 (%2 z interwału próbkowania, %3 z zajętego OCR)',
-    ('NarratorPage', '%1 (played %2 of %3)'): '%1 (odtworzono %2 z %3)',
-    ('NarratorPage', 'seen %1 -> accepted %2 -> spoken %3 -> finished %4'): 'widoczne %1 -> przyjęte %2 -> wypowiedziane %3 -> zakończone %4',
-    ('NarratorPage', 'empty %1, no strong line %2, lost despite strong line %3, duplicate %4, abandoned %5, superseded %6'): 'puste %1, brak pewnej linii %2, utracone mimo pewnej linii %3, duplikaty %4, porzucone %5, zastąpione %6',
-    ('NarratorPage', 'None attempted'): 'Brak prób',
-    ('NarratorPage', ' (GL available)'): ' (GL dostępny)',
-    ('NarratorPage', ' (no GL)'): ' (bez GL)',
-    ('NarratorPage', 'Advanced voice articulation'): 'Zaawansowana artykulacja głosu',
-    ('NarratorPage', "Piper inference parameters. Lower values reduce variation. Leave this off to use each voice's own values."): 'Parametry wnioskowania Piper. Niższe wartości zmniejszają zmienność. Pozostaw wyłączone, aby używać wartości własnych każdego głosu.',
-    ('NarratorPage', 'Phoneme duration variation'): 'Zmienność długości fonemów',
-    ('NarratorPage', 'Acoustic variation'): 'Zmienność akustyczna',
-    ('NarratorPage', 'Hide recent OCR decisions'): 'Ukryj ostatnie decyzje OCR',
-    ('NarratorPage', 'Recent OCR decisions (%1)'): 'Ostatnie decyzje OCR (%1)',
-    ('NarratorPage', '%1 s · confidence %2 · candidate %3/%4 · %5'): '%1 s · pewność %2 · kandydat %3/%4 · %5',
-    ('NarratorPage', 'Raw: %1'): 'Surowe: %1',
-    ('NarratorPage', 'Filtered: %1 · normalized: %2'): 'Filtrowane: %1 · znormalizowane: %2',
-    ('NarratorPage', 'Reason: %1 · match: %2 · replaced: %3 · TTS: %4 · ROI: %5x%6 · %7 / %8'): 'Powód: %1 · dopasowanie: %2 · zastąpione: %3 · TTS: %4 · ROI: %5x%6 · %7 / %8',
-    ('NarratorPage', 'yes'): 'tak',
-    ('NarratorPage', 'no'): 'nie',
-    ('NarratorPage', 'submitted'): 'wysłane',
-    ('NarratorPage', 'not submitted'): 'niewysłane',
-    ('NarratorPage', 'Tokens: %1/%2 · lines: %3 · dropped: %4 · minimum confidence: %5 · geometry: %6 · strong short evidence: %7 · visual: %8 · filter: %9'): 'Tokeny: %1/%2 · linie: %3 · odrzucone: %4 · minimalna pewność: %5 · geometria: %6 · silne krótkie dowody: %7 · obraz: %8 · filtr: %9',
-    ('NarratorPage', 'coherent'): 'spójny',
-    ('NarratorPage', 'uncertain'): 'niepewny',
-    ('NarratorPage', 'unchanged'): 'bez zmian',
-    ('NarratorPage', 'Subtitle on screen to speech: %1'): 'Od napisu na ekranie do mowy: %1',
-    ('NarratorPage', 'Consensus wait: %1'): 'Oczekiwanie na zgodność: %1',
-    ('NarratorPage', 'Phrase accepted to speech: %1'): 'Od przyjęcia frazy do mowy: %1',
-    ('NarratorPage', 'Confirming frame to speech: %1'): 'Od potwierdzającej klatki do mowy: %1',
-    ('NarratorPage', 'Frames skipped by rate limit: %1'): 'Klatki pominięte przez limit częstotliwości: %1',
-    ('NarratorPage', 'Subtitle funnel: %1'): 'Lejek napisów: %1',
-    ('NarratorPage', 'Lost at: %1'): 'Utracone na etapie: %1',
-    ('NarratorPage', 'Superseded in audio queue: %1'): 'Zastąpione w kolejce audio: %1',
-    ('NarratorPage', 'Playback completed: %1'): 'Odtwarzanie zakończone: %1',
-    ('NarratorPage', 'Playback interrupted: %1'): 'Odtwarzanie przerwane: %1',
-    ('NarratorPage', 'Last playback: %1'): 'Ostatnie odtwarzanie: %1',
-    ('NarratorPage', 'Frames received: %1'): 'Odebrane klatki: %1',
-    ('NarratorPage', 'Capture format: %1'): 'Format przechwytywania: %1',
-    ('NarratorPage', 'Capture variants tried: %1'): 'Wypróbowane warianty przechwytywania: %1',
-    ('NarratorPage', 'Capture stream errors: %1'): 'Błędy strumienia przechwytywania: %1',
-    ('NarratorPage', 'Capture restarts: %1'): 'Ponowne uruchomienia przechwytywania: %1',
-    ('NarratorPage', 'Filtered OCR: %1'): 'Filtrowany OCR: %1',
+
+
     ('OptiScalerSection', 'Backend runtime'): 'Środowisko backendu',
     ('OptiScalerSection', 'GOL-created files will be removed and verified original game files will be restored. Unknown modified binaries are preserved and block removal for review.'): 'Pliki utworzone przez GOL zostaną usunięte, a zweryfikowane oryginalne pliki gry przywrócone. Nieznane zmodyfikowane pliki binarne zostaną zachowane i zablokują usuwanie do sprawdzenia.',
     ('OptiScalerSection', 'FSR 4.1.1'): 'FSR 4.1.1',
@@ -342,9 +270,8 @@ PL_DESKTOP = {
     ('OptiScalerSection', 'Refresh error: %1. Last known installation information is shown.'): 'Błąd odświeżania: %1. Widoczne są ostatnie znane informacje o instalacji.',
     ('OptiScalerSection', 'The release channel could not be changed'): 'Nie udało się zmienić kanału wydania',
     ('OptiScalerSection', 'The backend could not be changed'): 'Nie udało się zmienić backendu',
-    ('OptiScalerSection', 'The official release check was started. Apply the recommendation when the download is ready.'): 'Rozpoczęto sprawdzanie oficjalnego wydania. Zastosuj zalecenie, gdy pobieranie będzie gotowe.',
-    ('OptiScalerSection', 'Review the file conflict beside the install action and confirm replacement before continuing.'): 'Sprawdź konflikt plików obok akcji instalacji i potwierdź zastąpienie przed kontynuacją.',
-    ('OptiScalerSection', 'The OptiScaler install and configuration task could not be started'): 'Nie udało się uruchomić zadania instalacji i konfiguracji OptiScalera',
+
+
     ('OptiScalerSection', 'The OptiScaler configuration could not be saved'): 'Nie udało się zapisać konfiguracji OptiScalera',
     ('OptiScalerSection', 'Install OptiScaler + apply recommended FSR'): 'Zainstaluj OptiScaler + zastosuj zalecany FSR',
     ('OptiScalerSection', 'Install OptiScaler + apply selected FSR'): 'Zainstaluj OptiScaler + zastosuj wybrany FSR',
@@ -371,10 +298,10 @@ PL_DESKTOP = {
     ('OptiScalerSummaryCard', 'OptiScaler'): 'OptiScaler',
     ('OptiScalerSummaryCard', 'Detecting…'): 'Wykrywanie…',
     ('OptiScalerSummaryCard', 'No'): 'Nie',
-    ('OptiScalerSummaryCard', 'FSR'): 'FSR',
+
     ('OptiScalerSummaryCard', 'Configured'): 'Skonfigurowano',
     ('OptiScalerSummaryCard', 'Open OptiScaler'): 'Otwórz OptiScaler',
-    ('OptiScalerTab', 'OptiScaler'): 'OptiScaler',
+
     ('Sidebar', 'Donate'): 'Wesprzyj',
     ('SystemPage', 'About and diagnostics'): 'Informacje i diagnostyka',
     ('SystemPage', 'A privacy-safe summary for support reports'): 'Podsumowanie bez danych prywatnych do zgłoszeń',
@@ -396,20 +323,20 @@ ES_DLSS = {
     ('DlssEnablerPanelContent', 'Installed · not selected'): 'Instalado · no seleccionado',
     ('DlssEnablerPanelContent', 'Error'): 'Error',
     ('DlssEnablerPanelContent', 'DLSS Enabler release %1 (module %2) replaces OptiScaler for this game and bundles OptiScaler %3. FSR 4 INT8 Lite is unavailable while this backend is selected. Switching remains fully reversible.'): 'DLSS Enabler %1 (módulo %2) sustituye a OptiScaler para este juego e incluye OptiScaler %3. FSR 4 INT8 Lite no está disponible mientras este backend esté seleccionado. El cambio es totalmente reversible.',
-    ('DlssEnablerPanelContent', 'The current installation produced a fresh DLSS Enabler runtime log.'): 'La instalación actual produjo un registro nuevo de ejecución de DLSS Enabler.',
-    ('DlssEnablerPanelContent', 'Installed and selected. Runtime operation is not confirmed until the game produces a fresh DLSS Enabler log.'): 'Instalado y seleccionado. La ejecución no se confirma hasta que el juego produzca un registro nuevo de DLSS Enabler.',
+
+
     ('DlssEnablerPanelContent', 'The game process and graphics runtime were verified with this installation.'): 'El proceso del juego y el entorno gráfico se verificaron con esta instalación.',
     ('DlssEnablerPanelContent', 'Installed and selected. Runtime operation is not confirmed until a game launch produces fresh runtime evidence.'): 'Instalado y seleccionado. La ejecución no se confirma hasta que un inicio del juego produzca pruebas nuevas.',
     ('DlssEnablerPanelContent', 'Native game DLSS copied as _nvngx.dll: %1'): 'DLSS nativo del juego copiado como _nvngx.dll: %1',
     ('DlssEnablerPanelContent', 'DX12 upscaler'): 'Escalador DX12',
     ('DlssEnablerPanelContent', 'Automatic'): 'Automático',
-    ('DlssEnablerPanelContent', "AMD/Intel support installed: dxgi.dll, nvapi64-proxy.dll, dlss-finder.exe and the game's native DLSS copied as _nvngx.dll. Proton override: version=n,b;dxgi=n,b."): 'Soporte AMD/Intel instalado: dxgi.dll, nvapi64-proxy.dll, dlss-finder.exe y el DLSS nativo del juego copiado como _nvngx.dll. Sustituciones de Proton: version=n,b;dxgi=n,b.',
+
     ('DlssEnablerPanelContent', 'Supported by the installed Enabler module and bundled OptiScaler.'): 'Compatible con el módulo Enabler instalado y el OptiScaler incluido.',
     ('DlssEnablerPanelContent', 'Frame generation'): 'Generación de fotogramas',
     ('DlssEnablerPanelContent', 'Automatic or FSR 3, as supported by Enabler 3.00.000.0.'): 'Automático o FSR 3, según lo admite Enabler 3.00.000.0.',
     ('DlssEnablerPanelContent', 'Runtime logging'): 'Registro de ejecución',
     ('DlssEnablerPanelContent', 'Keeps local Enabler and OptiScaler logs for verification and diagnostics.'): 'Conserva registros locales de Enabler y OptiScaler para verificación y diagnóstico.',
-    ('DlssEnablerPanelContent', 'Switch this game to DLSS Enabler? GameOpti will verify the installed files and will report runtime verification only after a fresh log is produced by the game.'): '¿Cambiar este juego a DLSS Enabler? GameOpti verificará los archivos instalados y solo indicará la ejecución verificada cuando el juego produzca un registro nuevo.',
+
     ('CouchGameDetails', 'Runtime verified'): 'Ejecución verificada',
     ('CouchGameDetails', 'Selected · runtime not verified'): 'Seleccionado · ejecución no verificada',
     ('CouchGameDetails', 'Error'): 'Error',
@@ -420,7 +347,6 @@ ES_DLSS = {
     ('CouchGameDetails', 'Diagnostics'): 'Diagnóstico',
     ('CouchGameDetails', 'Local logs are used for runtime verification'): 'Los registros locales se usan para verificar la ejecución',
 }
-
 
 DLSS_SHARED = {
     "AMD/Intel uses the DXGI loader with dlss-enabler.dll and the game's native DLSS copied as _nvngx.dll. Proton override: dxgi=n,b.": (
@@ -452,7 +378,6 @@ DLSS_SHARED = {
     "Refresh diagnostics": ("Odśwież diagnostykę", "Actualizar diagnóstico"),
     "Open game folder": ("Otwórz folder gry", "Abrir carpeta del juego"),
 }
-
 
 FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
  'The operation could not be started': ('Nie udało się rozpocząć operacji', 'No se pudo iniciar la operación'),
@@ -570,44 +495,8 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                         'Elige cómo mostrar las zonas con movimiento incierto.'),
  'Select the required Lossless Scaling DLL': ('Wybierz wymagany DLL Lossless Scaling',
                                               'Selecciona la DLL requerida de Lossless Scaling'),
- 'Frame generation for this game': ('Generowanie klatek dla tej gry', 'Generación de fotogramas para este juego'),
- "Interpolated frames improve presentation smoothness, not the game's simulation or input rate. Start with stable real FPS.": ('Interpolowane '
-                                                                                                                               'klatki '
-                                                                                                                               'mogą '
-                                                                                                                               'poprawić '
-                                                                                                                               'płynność '
-                                                                                                                               'obrazu, '
-                                                                                                                               'ale '
-                                                                                                                               'nie '
-                                                                                                                               'symulację '
-                                                                                                                               'ani '
-                                                                                                                               'reakcję '
-                                                                                                                               'gry. '
-                                                                                                                               'Zacznij '
-                                                                                                                               'od '
-                                                                                                                               'stabilnych '
-                                                                                                                               'rzeczywistych '
-                                                                                                                               'FPS.',
-                                                                                                                               'La '
-                                                                                                                               'interpolación '
-                                                                                                                               'puede '
-                                                                                                                               'mejorar '
-                                                                                                                               'la '
-                                                                                                                               'fluidez '
-                                                                                                                               'visual, '
-                                                                                                                               'no '
-                                                                                                                               'la '
-                                                                                                                               'simulación '
-                                                                                                                               'ni '
-                                                                                                                               'la '
-                                                                                                                               'respuesta. '
-                                                                                                                               'Parte '
-                                                                                                                               'de '
-                                                                                                                               'FPS '
-                                                                                                                               'reales '
-                                                                                                                               'estables.'),
- 'Saved selection: %1 · Component: %2 · Runtime: %3': ('Zapisano: %1 · Komponent: %2 · Runtime: %3',
-                                                       'Guardado: %1 · Componente: %2 · Ejecución: %3'),
+
+
  'Not required': ('Niewymagany', 'No necesario'),
  'Missing': ('Brak', 'Falta'),
  'Layer loaded in PID %1': ('Warstwa załadowana w PID %1', 'Capa cargada en PID %1'),
@@ -650,155 +539,11 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                                                                                                                 'que '
                                                                                                                                                 'los '
                                                                                                                                                 'distinga.'),
- "lsfg-vk 2 uses lsfg-vk.dll from Lossless Scaling's lsfg-vk Steam branch. Only VSync pacing is supported; adaptive generation is not available in this release.": ('lsfg-vk '
-                                                                                                                                                                    '2 '
-                                                                                                                                                                    'używa '
-                                                                                                                                                                    'lsfg-vk.dll '
-                                                                                                                                                                    'z '
-                                                                                                                                                                    'gałęzi '
-                                                                                                                                                                    'Steam '
-                                                                                                                                                                    'lsfg-vk '
-                                                                                                                                                                    'programu '
-                                                                                                                                                                    'Lossless '
-                                                                                                                                                                    'Scaling. '
-                                                                                                                                                                    'Obsługuje '
-                                                                                                                                                                    'tylko '
-                                                                                                                                                                    'VSync; '
-                                                                                                                                                                    'to '
-                                                                                                                                                                    'wydanie '
-                                                                                                                                                                    'nie '
-                                                                                                                                                                    'ma '
-                                                                                                                                                                    'generowania '
-                                                                                                                                                                    'adaptacyjnego.',
-                                                                                                                                                                    'lsfg-vk '
-                                                                                                                                                                    '2 '
-                                                                                                                                                                    'usa '
-                                                                                                                                                                    'lsfg-vk.dll '
-                                                                                                                                                                    'de '
-                                                                                                                                                                    'la '
-                                                                                                                                                                    'rama '
-                                                                                                                                                                    'lsfg-vk '
-                                                                                                                                                                    'de '
-                                                                                                                                                                    'Lossless '
-                                                                                                                                                                    'Scaling '
-                                                                                                                                                                    'en '
-                                                                                                                                                                    'Steam. '
-                                                                                                                                                                    'Solo '
-                                                                                                                                                                    'admite '
-                                                                                                                                                                    'VSync; '
-                                                                                                                                                                    'esta '
-                                                                                                                                                                    'versión '
-                                                                                                                                                                    'no '
-                                                                                                                                                                    'tiene '
-                                                                                                                                                                    'generación '
-                                                                                                                                                                    'adaptativa.'),
- 'Standalone MAKO Renderer uses Lossless.dll from the public Lossless Scaling release. Decky is not required. Its launcher disables Steam overlay and HDR exposure for the supported SDR path.': ('Samodzielny '
-                                                                                                                                                                                                  'MAKO '
-                                                                                                                                                                                                  'Renderer '
-                                                                                                                                                                                                  'używa '
-                                                                                                                                                                                                  'Lossless.dll '
-                                                                                                                                                                                                  'z '
-                                                                                                                                                                                                  'publicznego '
-                                                                                                                                                                                                  'wydania '
-                                                                                                                                                                                                  'Lossless '
-                                                                                                                                                                                                  'Scaling. '
-                                                                                                                                                                                                  'Nie '
-                                                                                                                                                                                                  'wymaga '
-                                                                                                                                                                                                  'Decky. '
-                                                                                                                                                                                                  'Jego '
-                                                                                                                                                                                                  'launcher '
-                                                                                                                                                                                                  'wyłącza '
-                                                                                                                                                                                                  'nakładkę '
-                                                                                                                                                                                                  'Steam '
-                                                                                                                                                                                                  'i '
-                                                                                                                                                                                                  'udostępnianie '
-                                                                                                                                                                                                  'HDR '
-                                                                                                                                                                                                  'w '
-                                                                                                                                                                                                  'obsługiwanej '
-                                                                                                                                                                                                  'ścieżce '
-                                                                                                                                                                                                  'SDR.',
-                                                                                                                                                                                                  'MAKO '
-                                                                                                                                                                                                  'Renderer '
-                                                                                                                                                                                                  'independiente '
-                                                                                                                                                                                                  'usa '
-                                                                                                                                                                                                  'Lossless.dll '
-                                                                                                                                                                                                  'de '
-                                                                                                                                                                                                  'la '
-                                                                                                                                                                                                  'versión '
-                                                                                                                                                                                                  'pública '
-                                                                                                                                                                                                  'de '
-                                                                                                                                                                                                  'Lossless '
-                                                                                                                                                                                                  'Scaling. '
-                                                                                                                                                                                                  'No '
-                                                                                                                                                                                                  'requiere '
-                                                                                                                                                                                                  'Decky. '
-                                                                                                                                                                                                  'Su '
-                                                                                                                                                                                                  'lanzador '
-                                                                                                                                                                                                  'desactiva '
-                                                                                                                                                                                                  'la '
-                                                                                                                                                                                                  'superposición '
-                                                                                                                                                                                                  'de '
-                                                                                                                                                                                                  'Steam '
-                                                                                                                                                                                                  'y '
-                                                                                                                                                                                                  'la '
-                                                                                                                                                                                                  'exposición '
-                                                                                                                                                                                                  'HDR '
-                                                                                                                                                                                                  'para '
-                                                                                                                                                                                                  'la '
-                                                                                                                                                                                                  'ruta '
-                                                                                                                                                                                                  'SDR '
-                                                                                                                                                                                                  'compatible.'),
- "afmf-linux is an independent project, not AMD's official Linux driver feature. Fixed 2× generation; published packages support 64-bit Vulkan games only.": ('afmf-linux '
-                                                                                                                                                              'to '
-                                                                                                                                                              'niezależny '
-                                                                                                                                                              'projekt, '
-                                                                                                                                                              'a '
-                                                                                                                                                              'nie '
-                                                                                                                                                              'oficjalna '
-                                                                                                                                                              'funkcja '
-                                                                                                                                                              'sterownika '
-                                                                                                                                                              'AMD '
-                                                                                                                                                              'dla '
-                                                                                                                                                              'Linuksa. '
-                                                                                                                                                              'Stałe '
-                                                                                                                                                              '2×; '
-                                                                                                                                                              'opublikowane '
-                                                                                                                                                              'pakiety '
-                                                                                                                                                              'obsługują '
-                                                                                                                                                              'tylko '
-                                                                                                                                                              '64-bitowe '
-                                                                                                                                                              'gry '
-                                                                                                                                                              'Vulkan.',
-                                                                                                                                                              'afmf-linux '
-                                                                                                                                                              'es '
-                                                                                                                                                              'un '
-                                                                                                                                                              'proyecto '
-                                                                                                                                                              'independiente, '
-                                                                                                                                                              'no '
-                                                                                                                                                              'una '
-                                                                                                                                                              'función '
-                                                                                                                                                              'oficial '
-                                                                                                                                                              'del '
-                                                                                                                                                              'controlador '
-                                                                                                                                                              'AMD '
-                                                                                                                                                              'para '
-                                                                                                                                                              'Linux. '
-                                                                                                                                                              'Generación '
-                                                                                                                                                              'fija '
-                                                                                                                                                              '2×; '
-                                                                                                                                                              'sus '
-                                                                                                                                                              'paquetes '
-                                                                                                                                                              'admiten '
-                                                                                                                                                              'solo '
-                                                                                                                                                              'juegos '
-                                                                                                                                                              'Vulkan '
-                                                                                                                                                              'de '
-                                                                                                                                                              '64 '
-                                                                                                                                                              'bits.'),
+
+
  'Detect graphics path': ('Wykryj ścieżkę grafiki', 'Detectar ruta gráfica'),
- 'Detected executable: %1 · %2-bit · API: %3 · %4': ('Wykryty plik: %1 · %2-bit · API: %3 · %4',
-                                                     'Ejecutable: %1 · %2 bits · API: %3 · %4'),
- 'Shared component': ('Wspólny komponent', 'Componente compartido'),
+
+
  'Available version: %1 · Download: %2 MiB. Installation does not activate any game or global layer.': ('Dostępna '
                                                                                                         'wersja: '
                                                                                                         '%1 · '
@@ -828,46 +573,8 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
  'Remove component': ('Usuń komponent', 'Eliminar componente'),
  'Cancel download': ('Anuluj pobieranie', 'Cancelar descarga'),
  'Operation: %1 · %2% ': ('Operacja: %1 · %2% ', 'Operación: %1 · %2% '),
- 'Your Lossless Scaling installation': ('Twoja instalacja Lossless Scaling', 'Tu instalación de Lossless Scaling'),
- 'Proprietary files are never bundled. Discovery and model validation are separate for each backend; GameOpti never changes your Steam branch.': ('Pliki '
-                                                                                                                                                  'własnościowe '
-                                                                                                                                                  'nie '
-                                                                                                                                                  'są '
-                                                                                                                                                  'dołączane. '
-                                                                                                                                                  'Wykrywanie '
-                                                                                                                                                  'i '
-                                                                                                                                                  'walidacja '
-                                                                                                                                                  'modeli '
-                                                                                                                                                  'są '
-                                                                                                                                                  'osobne '
-                                                                                                                                                  'dla '
-                                                                                                                                                  'każdego '
-                                                                                                                                                  'backendu; '
-                                                                                                                                                  'GameOpti '
-                                                                                                                                                  'nie '
-                                                                                                                                                  'zmienia '
-                                                                                                                                                  'gałęzi '
-                                                                                                                                                  'Steam.',
-                                                                                                                                                  'No '
-                                                                                                                                                  'se '
-                                                                                                                                                  'incluyen '
-                                                                                                                                                  'archivos '
-                                                                                                                                                  'propietarios. '
-                                                                                                                                                  'La '
-                                                                                                                                                  'detección '
-                                                                                                                                                  'y '
-                                                                                                                                                  'validación '
-                                                                                                                                                  'son '
-                                                                                                                                                  'independientes '
-                                                                                                                                                  'por '
-                                                                                                                                                  'backend; '
-                                                                                                                                                  'GameOpti '
-                                                                                                                                                  'no '
-                                                                                                                                                  'cambia '
-                                                                                                                                                  'la '
-                                                                                                                                                  'rama '
-                                                                                                                                                  'de '
-                                                                                                                                                  'Steam.'),
+
+
  'Discover': ('Wykryj', 'Detectar'),
  'Browse…': ('Przeglądaj…', 'Examinar…'),
  'Validate models': ('Sprawdź modele', 'Validar modelos'),
@@ -877,7 +584,7 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                          'componente: %2'),
  'Models not validated for this backend': ('Modele niesprawdzone dla tego backendu',
                                            'Modelos sin validar para este backend'),
- 'Per-game settings': ('Ustawienia tej gry', 'Ajustes por juego'),
+
  'Hide advanced': ('Ukryj zaawansowane', 'Ocultar avanzados'),
  'Advanced': ('Zaawansowane', 'Avanzados'),
  'Reset backend defaults': ('Przywróć domyślne backendu', 'Restablecer valores del backend'),
@@ -912,95 +619,8 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                                                                                     'propietarios '
                                                                                                                     'y '
                                                                                                                     'escaladores.'),
- 'Set a stable base FPS cap in the game or the existing Optimization page. This backend has no separate base-cap control.': ('Ustaw '
-                                                                                                                             'stabilny '
-                                                                                                                             'limit '
-                                                                                                                             'bazowych '
-                                                                                                                             'FPS '
-                                                                                                                             'w '
-                                                                                                                             'grze '
-                                                                                                                             'lub '
-                                                                                                                             'na '
-                                                                                                                             'stronie '
-                                                                                                                             'Optymalizacja. '
-                                                                                                                             'Ten '
-                                                                                                                             'backend '
-                                                                                                                             'nie '
-                                                                                                                             'ma '
-                                                                                                                             'osobnego '
-                                                                                                                             'limitu '
-                                                                                                                             'bazowego.',
-                                                                                                                             'Configura '
-                                                                                                                             'un '
-                                                                                                                             'límite '
-                                                                                                                             'base '
-                                                                                                                             'estable '
-                                                                                                                             'en '
-                                                                                                                             'el '
-                                                                                                                             'juego '
-                                                                                                                             'o '
-                                                                                                                             'en '
-                                                                                                                             'Optimización. '
-                                                                                                                             'Este '
-                                                                                                                             'backend '
-                                                                                                                             'no '
-                                                                                                                             'tiene '
-                                                                                                                             'un '
-                                                                                                                             'límite '
-                                                                                                                             'base '
-                                                                                                                             'propio.'),
- 'Apply and launch': ('Zapis i uruchamianie', 'Aplicar e iniciar'),
- 'Close the game before Apply. Changes take effect on the next launch through the configured runner. Off disables GameOpti-managed generators for this game without uninstalling components.': ('Zamknij '
-                                                                                                                                                                                                'grę '
-                                                                                                                                                                                                'przed '
-                                                                                                                                                                                                'Zastosuj. '
-                                                                                                                                                                                                'Zmiany '
-                                                                                                                                                                                                'działają '
-                                                                                                                                                                                                'po '
-                                                                                                                                                                                                'następnym '
-                                                                                                                                                                                                'starcie '
-                                                                                                                                                                                                'przez '
-                                                                                                                                                                                                'skonfigurowany '
-                                                                                                                                                                                                'runner. '
-                                                                                                                                                                                                'Wyłączone '
-                                                                                                                                                                                                'blokuje '
-                                                                                                                                                                                                'generatory '
-                                                                                                                                                                                                'zarządzane '
-                                                                                                                                                                                                'przez '
-                                                                                                                                                                                                'GameOpti '
-                                                                                                                                                                                                'dla '
-                                                                                                                                                                                                'tej '
-                                                                                                                                                                                                'gry '
-                                                                                                                                                                                                'bez '
-                                                                                                                                                                                                'usuwania '
-                                                                                                                                                                                                'komponentów.',
-                                                                                                                                                                                                'Cierra '
-                                                                                                                                                                                                'el '
-                                                                                                                                                                                                'juego '
-                                                                                                                                                                                                'antes '
-                                                                                                                                                                                                'de '
-                                                                                                                                                                                                'Aplicar. '
-                                                                                                                                                                                                'Los '
-                                                                                                                                                                                                'cambios '
-                                                                                                                                                                                                'surten '
-                                                                                                                                                                                                'efecto '
-                                                                                                                                                                                                'al '
-                                                                                                                                                                                                'reiniciar '
-                                                                                                                                                                                                'mediante '
-                                                                                                                                                                                                'el '
-                                                                                                                                                                                                'runner '
-                                                                                                                                                                                                'configurado. '
-                                                                                                                                                                                                'Desactivado '
-                                                                                                                                                                                                'bloquea '
-                                                                                                                                                                                                'los '
-                                                                                                                                                                                                'generadores '
-                                                                                                                                                                                                'de '
-                                                                                                                                                                                                'GameOpti '
-                                                                                                                                                                                                'para '
-                                                                                                                                                                                                'este '
-                                                                                                                                                                                                'juego '
-                                                                                                                                                                                                'sin '
-                                                                                                                                                                                                'desinstalarlos.'),
+
+
  'I disabled in-game / OptiScaler / DLSS Enabler frame generation. Keep the working upscaler.': ('Wyłączyłem '
                                                                                                  'generowanie '
                                                                                                  'klatek w grze / '
@@ -1017,10 +637,9 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                                                                  'Conservar el '
                                                                                                  'escalador que '
                                                                                                  'funciona.'),
- 'Runner: %1': ('Runner: %1', 'Runner: %1'),
+
  'Configured': ('Skonfigurowany', 'Configurado'),
- 'Not confirmed — configure before launching': ('Niepotwierdzony — skonfiguruj przed startem',
-                                                'Sin confirmar — configurar antes de iniciar'),
+
  'Apply changes': ('Zastosuj zmiany', 'Aplicar cambios'),
  'Apply': ('Zastosuj', 'Aplicar'),
  'Set up runner': ('Skonfiguruj runner', 'Configurar runner'),
@@ -1253,380 +872,15 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
  'Not checked': ('Niesprawdzone', 'Sin comprobar'),
  'Independent installations (kept): %1': ('Niezależne instalacje (zachowane): %1',
                                           'Instalaciones independientes (conservadas): %1'),
- 'MAKO uses its supported ordered layer boundary. MangoHud + vkBasalt together are unsupported there. lsfg-vk and afmf-linux combinations need a per-game test. No upscaler DLL is replaced.': ('MAKO '
-                                                                                                                                                                                                'stosuje '
-                                                                                                                                                                                                'obsługiwaną '
-                                                                                                                                                                                                'kolejność '
-                                                                                                                                                                                                'warstw. '
-                                                                                                                                                                                                'MangoHud '
-                                                                                                                                                                                                'i '
-                                                                                                                                                                                                'vkBasalt '
-                                                                                                                                                                                                'jednocześnie '
-                                                                                                                                                                                                'nie '
-                                                                                                                                                                                                'są '
-                                                                                                                                                                                                'tam '
-                                                                                                                                                                                                'obsługiwane. '
-                                                                                                                                                                                                'Połączenia '
-                                                                                                                                                                                                'lsfg-vk '
-                                                                                                                                                                                                'i '
-                                                                                                                                                                                                'afmf-linux '
-                                                                                                                                                                                                'wymagają '
-                                                                                                                                                                                                'próby '
-                                                                                                                                                                                                'w '
-                                                                                                                                                                                                'konkretnej '
-                                                                                                                                                                                                'grze. '
-                                                                                                                                                                                                'DLL '
-                                                                                                                                                                                                'upscalera '
-                                                                                                                                                                                                'nie '
-                                                                                                                                                                                                'jest '
-                                                                                                                                                                                                'zastępowany.',
-                                                                                                                                                                                                'MAKO '
-                                                                                                                                                                                                'usa '
-                                                                                                                                                                                                'su '
-                                                                                                                                                                                                'orden '
-                                                                                                                                                                                                'de '
-                                                                                                                                                                                                'capas '
-                                                                                                                                                                                                'compatible. '
-                                                                                                                                                                                                'No '
-                                                                                                                                                                                                'admite '
-                                                                                                                                                                                                'MangoHud '
-                                                                                                                                                                                                'y '
-                                                                                                                                                                                                'vkBasalt '
-                                                                                                                                                                                                'a '
-                                                                                                                                                                                                'la '
-                                                                                                                                                                                                'vez. '
-                                                                                                                                                                                                'Las '
-                                                                                                                                                                                                'combinaciones '
-                                                                                                                                                                                                'de '
-                                                                                                                                                                                                'lsfg-vk '
-                                                                                                                                                                                                'y '
-                                                                                                                                                                                                'afmf-linux '
-                                                                                                                                                                                                'requieren '
-                                                                                                                                                                                                'pruebas '
-                                                                                                                                                                                                'por '
-                                                                                                                                                                                                'juego. '
-                                                                                                                                                                                                'No '
-                                                                                                                                                                                                'se '
-                                                                                                                                                                                                'reemplaza '
-                                                                                                                                                                                                'ninguna '
-                                                                                                                                                                                                'DLL '
-                                                                                                                                                                                                'de '
-                                                                                                                                                                                                'escalado.'),
+
  'Game/session: %1 · Saved: %2 · Loaded PID: %3': ('Gra/sesja: %1 · Zapis: %2 · Załadowany PID: %3',
                                                    'Juego/sesión: %1 · Guardado: %2 · PID cargado: %3'),
  'Open configuration / logs': ('Otwórz konfigurację / logi', 'Abrir configuración / registros'),
  'Frame generation': ('Generowanie klatek', 'Generación de fotogramas'),
  'Configure lsfg-vk / MAKO / afmf-linux': ('Konfiguruj lsfg-vk / MAKO / afmf-linux',
                                            'Configurar lsfg-vk / MAKO / afmf-linux'),
- 'Invalid frame-generation backend': ('Nieprawidłowy backend generowania klatek',
-                                      'Backend de generación no válido'),
- 'Invalid frame-generation settings': ('Nieprawidłowe ustawienia generowania klatek',
-                                       'Ajustes de generación no válidos'),
- 'afmf-linux upstream does not support OptiScaler injectors. Preserve OptiScaler and choose lsfg-vk/MAKO, or restore it explicitly on its own page': ('afmf-linux '
-                                                                                                                                                      'nie '
-                                                                                                                                                      'obsługuje '
-                                                                                                                                                      'wstrzykiwania '
-                                                                                                                                                      'przez '
-                                                                                                                                                      'OptiScaler. '
-                                                                                                                                                      'Zachowaj '
-                                                                                                                                                      'OptiScaler '
-                                                                                                                                                      'i '
-                                                                                                                                                      'wybierz '
-                                                                                                                                                      'lsfg-vk/MAKO '
-                                                                                                                                                      'lub '
-                                                                                                                                                      'jawnie '
-                                                                                                                                                      'przywróć '
-                                                                                                                                                      'oryginalne '
-                                                                                                                                                      'pliki '
-                                                                                                                                                      'na '
-                                                                                                                                                      'jego '
-                                                                                                                                                      'stronie.',
-                                                                                                                                                      'afmf-linux '
-                                                                                                                                                      'no '
-                                                                                                                                                      'admite '
-                                                                                                                                                      'inyectores '
-                                                                                                                                                      'OptiScaler. '
-                                                                                                                                                      'Conserva '
-                                                                                                                                                      'OptiScaler '
-                                                                                                                                                      'y '
-                                                                                                                                                      'elige '
-                                                                                                                                                      'lsfg-vk/MAKO '
-                                                                                                                                                      'o '
-                                                                                                                                                      'restáuralo '
-                                                                                                                                                      'explícitamente '
-                                                                                                                                                      'en '
-                                                                                                                                                      'su '
-                                                                                                                                                      'página.'),
- 'Existing VK_LOADER_LAYERS_DISABLE blocks the selected frame generator; remove that per-game conflict explicitly': ('Obecne '
-                                                                                                                     'VK_LOADER_LAYERS_DISABLE '
-                                                                                                                     'blokuje '
-                                                                                                                     'wybrany '
-                                                                                                                     'generator. '
-                                                                                                                     'Usuń '
-                                                                                                                     'ten '
-                                                                                                                     'konflikt '
-                                                                                                                     'jawnie '
-                                                                                                                     'w '
-                                                                                                                     'ustawieniach '
-                                                                                                                     'gry.',
-                                                                                                                     'VK_LOADER_LAYERS_DISABLE '
-                                                                                                                     'bloquea '
-                                                                                                                     'el '
-                                                                                                                     'generador '
-                                                                                                                     'seleccionado. '
-                                                                                                                     'Elimina '
-                                                                                                                     'explícitamente '
-                                                                                                                     'ese '
-                                                                                                                     'conflicto '
-                                                                                                                     'del '
-                                                                                                                     'juego.'),
- 'Selected frame generator requires Vulkan; PROTON_USE_WINED3D=1 selects OpenGL': ('Generator wymaga Vulkan; '
-                                                                                   'PROTON_USE_WINED3D=1 wybiera '
-                                                                                   'OpenGL.',
-                                                                                   'El generador requiere Vulkan; '
-                                                                                   'PROTON_USE_WINED3D=1 '
-                                                                                   'selecciona OpenGL.'),
- 'MAKO + ReShade loader coexistence has not been verified; select Off on one page and Apply': ('Niezweryfikowana '
-                                                                                               'zgodność loadera '
-                                                                                               'MAKO z ReShade. '
-                                                                                               'Wybierz Wyłączone '
-                                                                                               'na jednej ze '
-                                                                                               'stron i Zastosuj.',
-                                                                                               'La coexistencia '
-                                                                                               'de MAKO y ReShade '
-                                                                                               'no está '
-                                                                                               'verificada. Elige '
-                                                                                               'Desactivado en '
-                                                                                               'una página y '
-                                                                                               'Aplica.'),
- 'MAKO supports vkBasalt or MangoHud in the game, not both. Disable one in its page, or select lsfg-vk': ('MAKO '
-                                                                                                          'obsługuje '
-                                                                                                          'vkBasalt '
-                                                                                                          'lub '
-                                                                                                          'MangoHud '
-                                                                                                          'w '
-                                                                                                          'grze, '
-                                                                                                          'ale '
-                                                                                                          'nie '
-                                                                                                          'oba '
-                                                                                                          'naraz. '
-                                                                                                          'Wyłącz '
-                                                                                                          'jedno '
-                                                                                                          'na '
-                                                                                                          'jego '
-                                                                                                          'stronie '
-                                                                                                          'lub '
-                                                                                                          'wybierz '
-                                                                                                          'lsfg-vk.',
-                                                                                                          'MAKO '
-                                                                                                          'admite '
-                                                                                                          'vkBasalt '
-                                                                                                          'o '
-                                                                                                          'MangoHud '
-                                                                                                          'en el '
-                                                                                                          'juego, '
-                                                                                                          'no '
-                                                                                                          'ambos. '
-                                                                                                          'Desactiva '
-                                                                                                          'uno en '
-                                                                                                          'su '
-                                                                                                          'página '
-                                                                                                          'o '
-                                                                                                          'elige '
-                                                                                                          'lsfg-vk.'),
- 'Lossless Scaling files changed or were not validated for this backend': ('Pliki Lossless Scaling zmieniły się '
-                                                                           'lub nie zostały sprawdzone dla tego '
-                                                                           'backendu.',
-                                                                           'Los archivos de Lossless Scaling '
-                                                                           'cambiaron o no se validaron para este '
-                                                                           'backend.'),
- 'Per-game frame-generation configuration is missing': ('Brak konfiguracji generowania klatek tej gry.',
-                                                        'Falta la configuración de generación de este juego.'),
- 'This backend does not use Lossless Scaling': ('Ten backend nie używa Lossless Scaling.',
-                                                'Este backend no usa Lossless Scaling.'),
- 'Install the selected component before validating its proprietary models': ('Zainstaluj wybrany komponent przed '
-                                                                             'sprawdzaniem jego modeli '
-                                                                             'własnościowych.',
-                                                                             'Instala el componente antes de '
-                                                                             'validar sus modelos propietarios.'),
- 'Unknown frame generator': ('Nieznany generator klatek', 'Generador de fotogramas desconocido'),
- 'Invalid Vulkan launch path': ('Nieprawidłowa ścieżka uruchamiania Vulkan',
-                                'Ruta de lanzamiento Vulkan no válida'),
- 'Discover/select and validate Lossless Scaling for this backend first': ('Najpierw wykryj/wybierz i sprawdź '
-                                                                          'Lossless Scaling dla tego backendu.',
-                                                                          'Detecta/selecciona y valida Lossless '
-                                                                          'Scaling para este backend primero.'),
- 'Unknown frame-generation backend': ('Nieznany backend generowania klatek', 'Backend de generación desconocido'),
- 'Invalid component ownership manifest': ('Nieprawidłowy manifest własności komponentu',
-                                          'Manifiesto de propiedad del componente no válido'),
- 'Component download failed size/SHA-256 verification': ('Pobrany komponent nie przeszedł weryfikacji '
-                                                         'rozmiaru/SHA-256.',
-                                                         'El componente descargado no superó la verificación de '
-                                                         'tamaño/SHA-256.'),
- 'Package does not contain a Vulkan layer': ('Pakiet nie zawiera warstwy Vulkan.',
-                                             'El paquete no contiene una capa Vulkan.'),
- 'Installation cancelled; previous component preserved': ('Anulowano instalację; zachowano poprzedni komponent.',
-                                                          'Instalación cancelada; componente anterior '
-                                                          'conservado.'),
- 'Unknown files in component directory; removal stopped': ('Nieznane pliki w katalogu komponentu; usuwanie '
-                                                           'zatrzymane.',
-                                                           'Archivos desconocidos en el componente; eliminación '
-                                                           'detenida.'),
- 'Download cancelled; installation unchanged': ('Anulowano pobieranie; instalacja bez zmian.',
-                                                'Descarga cancelada; instalación sin cambios.'),
- 'Download exceeds verified size': ('Pobieranie przekracza zweryfikowany rozmiar.',
-                                    'La descarga supera el tamaño verificado.'),
- 'Unsafe component archive member': ('Niebezpieczna ścieżka w archiwum komponentu.',
-                                     'Ruta insegura en el archivo del componente.'),
- 'Invalid component archive': ('Nieprawidłowe archiwum komponentu.', 'Archivo del componente no válido.'),
- 'Steam has no settings entry for this game; open its Properties once, close Steam, then retry': ('Steam nie ma '
-                                                                                                  'wpisu ustawień '
-                                                                                                  'tej gry. '
-                                                                                                  'Otwórz raz jej '
-                                                                                                  'Właściwości, '
-                                                                                                  'zamknij Steam '
-                                                                                                  'i ponów.',
-                                                                                                  'Steam no tiene '
-                                                                                                  'ajustes para '
-                                                                                                  'este juego. '
-                                                                                                  'Abre sus '
-                                                                                                  'Propiedades '
-                                                                                                  'una vez, '
-                                                                                                  'cierra Steam y '
-                                                                                                  'reintenta.'),
- 'Close Steam completely before automatic runner setup; Steam keeps launch options in memory': ('Zamknij '
-                                                                                                'całkowicie Steam '
-                                                                                                'przed '
-                                                                                                'automatyczną '
-                                                                                                'konfiguracją '
-                                                                                                'runnera. Steam '
-                                                                                                'przechowuje '
-                                                                                                'opcje startu w '
-                                                                                                'pamięci.',
-                                                                                                'Cierra Steam por '
-                                                                                                'completo antes '
-                                                                                                'de configurar el '
-                                                                                                'runner. Steam '
-                                                                                                'mantiene las '
-                                                                                                'opciones en '
-                                                                                                'memoria.'),
- 'Cannot select a unique Steam user configuration for this game': ('Nie można jednoznacznie wybrać konfiguracji '
-                                                                   'użytkownika Steam dla tej gry.',
-                                                                   'No se puede elegir una única configuración de '
-                                                                   'usuario de Steam para este juego.'),
- 'Steam configuration changed while preparing runner setup': ('Konfiguracja Steam zmieniła się podczas '
-                                                              'przygotowania runnera.',
-                                                              'La configuración de Steam cambió al preparar el '
-                                                              'runner.'),
- 'Steam launch options changed independently; automatic restore stopped': ('Opcje startu Steam zmieniły się '
-                                                                           'niezależnie; zatrzymano automatyczne '
-                                                                           'przywracanie.',
-                                                                           'Las opciones de Steam cambiaron '
-                                                                           'independientemente; restauración '
-                                                                           'automática detenida.'),
- 'Close games before changing shared frame-generation components': ('Zamknij gry przed zmianą wspólnych '
-                                                                    'komponentów generowania klatek.',
-                                                                    'Cierra los juegos antes de cambiar '
-                                                                    'componentes compartidos de generación.'),
- 'Unknown frame-generation operation': ('Nieznana operacja generowania klatek',
-                                        'Operación de generación desconocida'),
- 'This launcher has no supported frame-generation runner setup': ('Ten launcher nie ma obsługiwanej konfiguracji '
-                                                                  'runnera generowania klatek.',
-                                                                  'Este lanzador no tiene configuración de runner '
-                                                                  'compatible con la generación.'),
- 'afmf-linux 1.3.1 has no published 32-bit layer': ('afmf-linux 1.3.1 nie udostępnia warstwy 32-bitowej.',
-                                                    'afmf-linux 1.3.1 no publica una capa de 32 bits.'),
- 'This integration requires Vulkan, DXVK or VKD3D-Proton; OpenGL is not enabled automatically': ('Integracja '
-                                                                                                 'wymaga Vulkan, '
-                                                                                                 'DXVK lub '
-                                                                                                 'VKD3D-Proton. '
-                                                                                                 'OpenGL nie jest '
-                                                                                                 'zmieniany '
-                                                                                                 'automatycznie.',
-                                                                                                 'Esta '
-                                                                                                 'integración '
-                                                                                                 'requiere '
-                                                                                                 'Vulkan, DXVK o '
-                                                                                                 'VKD3D-Proton. '
-                                                                                                 'No se cambia '
-                                                                                                 'OpenGL '
-                                                                                                 'automáticamente.'),
- 'Graphics API is inconclusive; confirm Vulkan, DXVK or VKD3D-Proton explicitly': ('Wykryte API jest '
-                                                                                   'niejednoznaczne. Potwierdź '
-                                                                                   'jawnie Vulkan, DXVK lub '
-                                                                                   'VKD3D-Proton.',
-                                                                                   'La API no es concluyente. '
-                                                                                   'Confirma explícitamente '
-                                                                                   'Vulkan, DXVK o VKD3D-Proton.'),
- 'Vulkan compute/storage-image capabilities were not confirmed on the host': ('Nie potwierdzono obsługi Vulkan '
-                                                                              'compute/storage images na hoście.',
-                                                                              'No se confirmaron capacidades '
-                                                                              'Vulkan compute/storage images en '
-                                                                              'el host.'),
- 'Confirm internal/in-game frame generation is off before selecting an external generator; the upscaler is preserved': ('Potwierdź '
-                                                                                                                        'wyłączenie '
-                                                                                                                        'generowania '
-                                                                                                                        'klatek '
-                                                                                                                        'w '
-                                                                                                                        'grze/przez '
-                                                                                                                        'mody '
-                                                                                                                        'przed '
-                                                                                                                        'wyborem '
-                                                                                                                        'zewnętrznego '
-                                                                                                                        'generatora. '
-                                                                                                                        'Upscaler '
-                                                                                                                        'zostaje '
-                                                                                                                        'zachowany.',
-                                                                                                                        'Confirma '
-                                                                                                                        'que '
-                                                                                                                        'la '
-                                                                                                                        'generación '
-                                                                                                                        'interna/del '
-                                                                                                                        'juego '
-                                                                                                                        'está '
-                                                                                                                        'desactivada '
-                                                                                                                        'antes '
-                                                                                                                        'de '
-                                                                                                                        'elegir '
-                                                                                                                        'el '
-                                                                                                                        'generador '
-                                                                                                                        'externo. '
-                                                                                                                        'Se '
-                                                                                                                        'conserva '
-                                                                                                                        'el '
-                                                                                                                        'escalador.'),
- 'Component/dependencies are not available inside the selected launch environment; see diagnostics': ('Komponent '
-                                                                                                      'lub '
-                                                                                                      'zależności '
-                                                                                                      'niedostępne '
-                                                                                                      'w '
-                                                                                                      'środowisku '
-                                                                                                      'uruchamiającym '
-                                                                                                      'grę. '
-                                                                                                      'Sprawdź '
-                                                                                                      'diagnostykę.',
-                                                                                                      'El '
-                                                                                                      'componente '
-                                                                                                      'o sus '
-                                                                                                      'dependencias '
-                                                                                                      'no están '
-                                                                                                      'disponibles '
-                                                                                                      'en el '
-                                                                                                      'entorno de '
-                                                                                                      'ejecución. '
-                                                                                                      'Consulta '
-                                                                                                      'el '
-                                                                                                      'diagnóstico.'),
- 'Private component directory is occupied by unowned files': ('Prywatny katalog komponentu jest zajęty przez '
-                                                              'pliki bez potwierdzonego właściciela.',
-                                                              'El directorio privado está ocupado por archivos '
-                                                              'sin propiedad confirmada.'),
- 'Component belongs to another installer': ('Komponent należy do innego instalatora.',
-                                            'El componente pertenece a otro instalador.'),
- 'Unknown files in component directory; update/removal stopped': ('Nieznane pliki w katalogu komponentu; '
-                                                                  'aktualizacja/usuwanie zatrzymane.',
-                                                                  'Archivos desconocidos en el componente; '
-                                                                  'actualización/eliminación detenidas.'),
+
+
  'Runtime error — inspect diagnostics': ('Błąd runtime — sprawdź diagnostykę',
                                          'Error de ejecución — consulta el diagnóstico'),
  'The matching session log confirms initialized interpolation and submitted generated frames. This does not measure image quality or input latency.': ('Log '
@@ -1668,203 +922,11 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                                                                                                                        'latencia '
                                                                                                                                                        'de '
                                                                                                                                                        'entrada.'),
- 'Selected executable is missing or incompatible with the saved frame generator': ('Wybrany plik gry nie istnieje '
-                                                                                   'lub nie pasuje do zapisanego '
-                                                                                   'generatora klatek.',
-                                                                                   'El ejecutable no existe o no '
-                                                                                   'es compatible con el '
-                                                                                   'generador guardado.'),
- 'This MAKO integration uses its supported SDR launcher. Disable HDR explicitly or select another generator; GameOpti will not lower it silently': ('Ta '
-                                                                                                                                                    'integracja '
-                                                                                                                                                    'MAKO '
-                                                                                                                                                    'używa '
-                                                                                                                                                    'obsługiwanego '
-                                                                                                                                                    'launchera '
-                                                                                                                                                    'SDR. '
-                                                                                                                                                    'Wyłącz '
-                                                                                                                                                    'HDR '
-                                                                                                                                                    'jawnie '
-                                                                                                                                                    'lub '
-                                                                                                                                                    'wybierz '
-                                                                                                                                                    'inny '
-                                                                                                                                                    'generator; '
-                                                                                                                                                    'GameOpti '
-                                                                                                                                                    'nie '
-                                                                                                                                                    'obniży '
-                                                                                                                                                    'ustawienia '
-                                                                                                                                                    'po '
-                                                                                                                                                    'cichu.',
-                                                                                                                                                    'Esta '
-                                                                                                                                                    'integración '
-                                                                                                                                                    'MAKO '
-                                                                                                                                                    'usa '
-                                                                                                                                                    'el '
-                                                                                                                                                    'lanzador '
-                                                                                                                                                    'SDR '
-                                                                                                                                                    'compatible. '
-                                                                                                                                                    'Desactiva '
-                                                                                                                                                    'HDR '
-                                                                                                                                                    'explícitamente '
-                                                                                                                                                    'o '
-                                                                                                                                                    'elige '
-                                                                                                                                                    'otro '
-                                                                                                                                                    'generador; '
-                                                                                                                                                    'GameOpti '
-                                                                                                                                                    'no '
-                                                                                                                                                    'lo '
-                                                                                                                                                    'reducirá '
-                                                                                                                                                    'silenciosamente.'),
+
+
  'The game is currently running': ('Gra jest teraz uruchomiona.', 'El juego está en ejecución.'),
- 'Launcher Flatpak access setup failed; see the host permission error': ('Nie udało się udostępnić plików '
-                                                                         'Flatpakowi launchera. Sprawdź błąd '
-                                                                         'uprawnień hosta.',
-                                                                         'No se pudo dar acceso al Flatpak del '
-                                                                         'lanzador. Revisa el error de permisos '
-                                                                         'del host.'),
- 'Launcher override location could not be verified; no automatic restore ownership recorded': ('Nie potwierdzono '
-                                                                                               'lokalizacji '
-                                                                                               'nadpisań '
-                                                                                               'launchera. Nie '
-                                                                                               'zapisano '
-                                                                                               'własności do '
-                                                                                               'automatycznego '
-                                                                                               'przywracania.',
-                                                                                               'No se confirmó la '
-                                                                                               'ubicación de las '
-                                                                                               'reglas del '
-                                                                                               'lanzador. No se '
-                                                                                               'registró '
-                                                                                               'propiedad para '
-                                                                                               'restauración '
-                                                                                               'automática.'),
- 'Invalid component transaction journal': ('Nieprawidłowy dziennik transakcji komponentu',
-                                           'Diario de transacción del componente no válido'),
- 'Unknown files in interrupted transaction; recovery stopped': ('Nieznane pliki w przerwanej transakcji. '
-                                                                'Zatrzymano odzyskiwanie.',
-                                                                'Archivos desconocidos en la transacción '
-                                                                'interrumpida. Recuperación detenida.'),
- 'Modified files in interrupted transaction; recovery stopped': ('Zmodyfikowane pliki w przerwanej transakcji. '
-                                                                 'Zatrzymano odzyskiwanie.',
-                                                                 'Archivos modificados en la transacción '
-                                                                 'interrumpida. Recuperación detenida.'),
- 'Complex Steam launch options require review; nothing was overwritten': ('Złożone opcje startu Steam wymagają '
-                                                                          'przeglądu. Niczego nie nadpisano.',
-                                                                          'Las opciones complejas de Steam '
-                                                                          'requieren revisión. No se sobrescribió '
-                                                                          'nada.'),
- 'Existing GameOpti runner options are invalid or use another AppID; nothing was overwritten': ('Obecne opcje '
-                                                                                                'runnera GameOpti '
-                                                                                                'są nieprawidłowe '
-                                                                                                'lub dotyczą '
-                                                                                                'innego AppID. '
-                                                                                                'Niczego nie '
-                                                                                                'nadpisano.',
-                                                                                                'Las opciones del '
-                                                                                                'runner no son '
-                                                                                                'válidas o usan '
-                                                                                                'otro AppID. No '
-                                                                                                'se sobrescribió '
-                                                                                                'nada.'),
- 'Close the launcher before changing frame-generation access': ('Zamknij launcher przed zmianą dostępu do '
-                                                                'generowania klatek.',
-                                                                'Cierra el lanzador antes de cambiar el acceso '
-                                                                'para generación.'),
- "afmf-linux is an independent project, not AMD's official Linux driver feature. Fixed 2× generation; published packages need a 64-bit application using Vulkan 1.1 or newer.": ('afmf-linux '
-                                                                                                                                                                                 'to '
-                                                                                                                                                                                 'niezależny '
-                                                                                                                                                                                 'projekt, '
-                                                                                                                                                                                 'a '
-                                                                                                                                                                                 'nie '
-                                                                                                                                                                                 'oficjalna '
-                                                                                                                                                                                 'funkcja '
-                                                                                                                                                                                 'sterownika '
-                                                                                                                                                                                 'AMD '
-                                                                                                                                                                                 'dla '
-                                                                                                                                                                                 'Linuksa. '
-                                                                                                                                                                                 'Stałe '
-                                                                                                                                                                                 '2×; '
-                                                                                                                                                                                 'pakiety '
-                                                                                                                                                                                 'wymagają '
-                                                                                                                                                                                 '64-bitowej '
-                                                                                                                                                                                 'aplikacji '
-                                                                                                                                                                                 'używającej '
-                                                                                                                                                                                 'Vulkan '
-                                                                                                                                                                                 '1.1 '
-                                                                                                                                                                                 'lub '
-                                                                                                                                                                                 'nowszego.',
-                                                                                                                                                                                 'afmf-linux '
-                                                                                                                                                                                 'es '
-                                                                                                                                                                                 'un '
-                                                                                                                                                                                 'proyecto '
-                                                                                                                                                                                 'independiente, '
-                                                                                                                                                                                 'no '
-                                                                                                                                                                                 'una '
-                                                                                                                                                                                 'función '
-                                                                                                                                                                                 'oficial '
-                                                                                                                                                                                 'del '
-                                                                                                                                                                                 'controlador '
-                                                                                                                                                                                 'AMD '
-                                                                                                                                                                                 'para '
-                                                                                                                                                                                 'Linux. '
-                                                                                                                                                                                 'Generación '
-                                                                                                                                                                                 'fija '
-                                                                                                                                                                                 '2×; '
-                                                                                                                                                                                 'los '
-                                                                                                                                                                                 'paquetes '
-                                                                                                                                                                                 'requieren '
-                                                                                                                                                                                 'una '
-                                                                                                                                                                                 'aplicación '
-                                                                                                                                                                                 'de '
-                                                                                                                                                                                 '64 '
-                                                                                                                                                                                 'bits '
-                                                                                                                                                                                 'con '
-                                                                                                                                                                                 'Vulkan '
-                                                                                                                                                                                 '1.1 '
-                                                                                                                                                                                 'o '
-                                                                                                                                                                                 'posterior.'),
- "GameOpti's shared component": ('Wspólny komponent GameOpti', 'Componente compartido de GameOpti'),
- 'Independent installations were detected and will be preserved. GameOpti uses a separate verified component; its launch plan disables competing generators for this game.': ('Wykryto '
-                                                                                                                                                                              'niezależne '
-                                                                                                                                                                              'instalacje, '
-                                                                                                                                                                              'które '
-                                                                                                                                                                              'zostaną '
-                                                                                                                                                                              'zachowane. '
-                                                                                                                                                                              'GameOpti '
-                                                                                                                                                                              'używa '
-                                                                                                                                                                              'osobnego, '
-                                                                                                                                                                              'sprawdzonego '
-                                                                                                                                                                              'komponentu; '
-                                                                                                                                                                              'jego '
-                                                                                                                                                                              'plan '
-                                                                                                                                                                              'startu '
-                                                                                                                                                                              'wyłącza '
-                                                                                                                                                                              'konkurencyjne '
-                                                                                                                                                                              'generatory '
-                                                                                                                                                                              'dla '
-                                                                                                                                                                              'tej '
-                                                                                                                                                                              'gry.',
-                                                                                                                                                                              'Se '
-                                                                                                                                                                              'detectaron '
-                                                                                                                                                                              'instalaciones '
-                                                                                                                                                                              'independientes '
-                                                                                                                                                                              'y '
-                                                                                                                                                                              'se '
-                                                                                                                                                                              'conservarán. '
-                                                                                                                                                                              'GameOpti '
-                                                                                                                                                                              'usa '
-                                                                                                                                                                              'un '
-                                                                                                                                                                              'componente '
-                                                                                                                                                                              'separado '
-                                                                                                                                                                              'y '
-                                                                                                                                                                              'verificado; '
-                                                                                                                                                                              'su '
-                                                                                                                                                                              'plan '
-                                                                                                                                                                              'desactiva '
-                                                                                                                                                                              'generadores '
-                                                                                                                                                                              'competidores '
-                                                                                                                                                                              'para '
-                                                                                                                                                                              'este '
-                                                                                                                                                                              'juego.'),
+
+
  'Cap real FPS in the game. This backend has no separate base-cap control. A Gamescope output limit is not a base-FPS cap.': ('Ogranicz '
                                                                                                                               'rzeczywiste '
                                                                                                                               'FPS '
@@ -2036,104 +1098,8 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                                                                                                                                                                                                'permisos '
                                                                                                                                                                                                                                'independientes '
                                                                                                                                                                                                                                'previos.'),
- 'Required Vulkan API version was not confirmed for the selected backend': ('Nie potwierdzono wymaganej wersji '
-                                                                            'API Vulkan dla wybranego backendu.',
-                                                                            'No se confirmó la versión requerida '
-                                                                            'de Vulkan para este backend.'),
- 'Interrupted component transaction; retry installation to recover': ('Przerwana transakcja komponentu. Ponów '
-                                                                      'instalację, aby odzyskać stan.',
-                                                                      'Transacción interrumpida. Reintenta la '
-                                                                      'instalación para recuperar el estado.'),
- 'Selected frame generator is not installed': ('Wybrany generator klatek nie jest zainstalowany.',
-                                               'El generador seleccionado no está instalado.'),
- "MAKO's launcher would select its independent MangoHud configuration. Preserve it and select another generator, or disable the in-game HUD explicitly": ('Launcher '
-                                                                                                                                                          'MAKO '
-                                                                                                                                                          'wybrałby '
-                                                                                                                                                          'swoją '
-                                                                                                                                                          'niezależną '
-                                                                                                                                                          'konfigurację '
-                                                                                                                                                          'MangoHud. '
-                                                                                                                                                          'Zachowaj '
-                                                                                                                                                          'ją '
-                                                                                                                                                          'i '
-                                                                                                                                                          'wybierz '
-                                                                                                                                                          'inny '
-                                                                                                                                                          'generator '
-                                                                                                                                                          'lub '
-                                                                                                                                                          'jawnie '
-                                                                                                                                                          'wyłącz '
-                                                                                                                                                          'HUD '
-                                                                                                                                                          'w '
-                                                                                                                                                          'grze.',
-                                                                                                                                                          'El '
-                                                                                                                                                          'lanzador '
-                                                                                                                                                          'de '
-                                                                                                                                                          'MAKO '
-                                                                                                                                                          'elegiría '
-                                                                                                                                                          'su '
-                                                                                                                                                          'configuración '
-                                                                                                                                                          'independiente '
-                                                                                                                                                          'de '
-                                                                                                                                                          'MangoHud. '
-                                                                                                                                                          'Consérvala '
-                                                                                                                                                          'y '
-                                                                                                                                                          'elige '
-                                                                                                                                                          'otro '
-                                                                                                                                                          'generador '
-                                                                                                                                                          'o '
-                                                                                                                                                          'desactiva '
-                                                                                                                                                          'explícitamente '
-                                                                                                                                                          'el '
-                                                                                                                                                          'HUD '
-                                                                                                                                                          'del '
-                                                                                                                                                          'juego.'),
- "Standalone MAKO's host MangoHud integration is unavailable inside a launcher Flatpak. Disable the in-game HUD explicitly or select another generator": ('Integracja '
-                                                                                                                                                          'MangoHud '
-                                                                                                                                                          'hosta '
-                                                                                                                                                          'w '
-                                                                                                                                                          'samodzielnym '
-                                                                                                                                                          'MAKO '
-                                                                                                                                                          'nie '
-                                                                                                                                                          'działa '
-                                                                                                                                                          'we '
-                                                                                                                                                          'Flatpaku '
-                                                                                                                                                          'launchera. '
-                                                                                                                                                          'Jawnie '
-                                                                                                                                                          'wyłącz '
-                                                                                                                                                          'HUD '
-                                                                                                                                                          'w '
-                                                                                                                                                          'grze '
-                                                                                                                                                          'lub '
-                                                                                                                                                          'wybierz '
-                                                                                                                                                          'inny '
-                                                                                                                                                          'generator.',
-                                                                                                                                                          'La '
-                                                                                                                                                          'integración '
-                                                                                                                                                          'del '
-                                                                                                                                                          'MangoHud '
-                                                                                                                                                          'del '
-                                                                                                                                                          'host '
-                                                                                                                                                          'de '
-                                                                                                                                                          'MAKO '
-                                                                                                                                                          'independiente '
-                                                                                                                                                          'no '
-                                                                                                                                                          'está '
-                                                                                                                                                          'disponible '
-                                                                                                                                                          'en '
-                                                                                                                                                          'el '
-                                                                                                                                                          'Flatpak '
-                                                                                                                                                          'del '
-                                                                                                                                                          'lanzador. '
-                                                                                                                                                          'Desactiva '
-                                                                                                                                                          'explícitamente '
-                                                                                                                                                          'el '
-                                                                                                                                                          'HUD '
-                                                                                                                                                          'del '
-                                                                                                                                                          'juego '
-                                                                                                                                                          'o '
-                                                                                                                                                          'elige '
-                                                                                                                                                          'otro '
-                                                                                                                                                          'generador.'),
+
+
  'Installation': ('Instalacja', 'Instalación'),
  'Checking…': ('Sprawdzanie…', 'Comprobando…'),
  'Requirements': ('Wymagania', 'Requisitos'),
@@ -2157,12 +1123,9 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
  'Component missing': ('Brak komponentu', 'Falta el componente'),
  'OptiScaler conflict': ('Konflikt z OptiScaler', 'Conflicto con OptiScaler'),
  'Lossless Scaling required': ('Wymagane Lossless Scaling', 'Requiere Lossless Scaling'),
- 'Component installed': ('Komponent zainstalowany', 'Componente instalado'),
+
  '2 · Install the shared component': ('2 · Zainstaluj wspólny komponent', '2 · Instala el componente compartido'),
- 'Installed: %1. Downloading does not activate frame generation.': ('Zainstalowano: %1. Pobranie nie włącza '
-                                                                    'generowania klatek.',
-                                                                    'Instalado: %1. Descargar no activa la '
-                                                                    'generación.'),
+
  '3 · Resolve requirements': ('3 · Spełnij wymagania', '3 · Resuelve los requisitos'),
  'afmf-linux cannot be used with the installed OptiScaler. Restore/remove it in its existing panel, or choose another generator. Nothing is removed automatically.': ('Nie '
                                                                                                                                                                       'można '
@@ -2208,8 +1171,7 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                                                                                                                                       'elimina '
                                                                                                                                                                       'nada '
                                                                                                                                                                       'automáticamente.'),
- 'Open OptiScaler restore / remove': ('Otwórz przywracanie / usuwanie OptiScaler',
-                                      'Abrir restauración / eliminación de OptiScaler'),
+
  'Frame generation requires separately purchased Lossless Scaling. The free backend download does not include it. Generation with lsfg-vk / MAKO has not been tested here.': ('Generowanie '
                                                                                                                                                                               'wymaga '
                                                                                                                                                                               'osobno '
@@ -2589,71 +1551,10 @@ FG_SHARED = {'Off': ('Wyłączone', 'Desactivado'),
                                                                                                                             'configurado '
                                                                                                                             'para '
                                                                                                                             'probarla.'),
- "Before testing afmf-linux, turn off the game's own frame generation. OptiScaler must be restored/removed explicitly.": ('Przed '
-                                                                                                                          'testem '
-                                                                                                                          'afmf-linux '
-                                                                                                                          'wyłącz '
-                                                                                                                          'generowanie '
-                                                                                                                          'klatek '
-                                                                                                                          'w '
-                                                                                                                          'samej '
-                                                                                                                          'grze. '
-                                                                                                                          'OptiScaler '
-                                                                                                                          'trzeba '
-                                                                                                                          'jawnie '
-                                                                                                                          'przywrócić/usunąć.',
-                                                                                                                          'Antes '
-                                                                                                                          'de '
-                                                                                                                          'probar '
-                                                                                                                          'afmf-linux, '
-                                                                                                                          'desactiva '
-                                                                                                                          'la '
-                                                                                                                          'generación '
-                                                                                                                          'del '
-                                                                                                                          'propio '
-                                                                                                                          'juego. '
-                                                                                                                          'OptiScaler '
-                                                                                                                          'debe '
-                                                                                                                          'restaurarse/eliminarse '
-                                                                                                                          'explícitamente.'),
+
  'Resolve the requirements in step 3 before Apply.': ('Przed Zastosuj spełnij wymagania z kroku 3.',
                                                       'Resuelve los requisitos del paso 3 antes de Aplicar.'),
- "Off prevents managed generators on the next launch. Installed components and each backend's saved values are kept.": ('Wyłączone '
-                                                                                                                        'blokuje '
-                                                                                                                        'zarządzane '
-                                                                                                                        'generatory '
-                                                                                                                        'przy '
-                                                                                                                        'następnym '
-                                                                                                                        'starcie. '
-                                                                                                                        'Zainstalowane '
-                                                                                                                        'komponenty '
-                                                                                                                        'i '
-                                                                                                                        'zapisane '
-                                                                                                                        'wartości '
-                                                                                                                        'każdego '
-                                                                                                                        'backendu '
-                                                                                                                        'pozostają '
-                                                                                                                        'zachowane.',
-                                                                                                                        'Desactivado '
-                                                                                                                        'bloquea '
-                                                                                                                        'los '
-                                                                                                                        'generadores '
-                                                                                                                        'gestionados '
-                                                                                                                        'en '
-                                                                                                                        'el '
-                                                                                                                        'próximo '
-                                                                                                                        'inicio. '
-                                                                                                                        'Se '
-                                                                                                                        'conservan '
-                                                                                                                        'los '
-                                                                                                                        'componentes '
-                                                                                                                        'instalados '
-                                                                                                                        'y '
-                                                                                                                        'los '
-                                                                                                                        'valores '
-                                                                                                                        'de '
-                                                                                                                        'cada '
-                                                                                                                        'backend.'),
+
  'Open OptiScaler': ('Otwórz OptiScaler', 'Abrir OptiScaler'),
  "Before testing afmf-linux, turn off the game's own frame generation.": ('Przed testem afmf-linux wyłącz '
                                                                           'generowanie klatek w samej grze.',
@@ -2714,15 +1615,14 @@ GPU_SHARED = {
     "Apply for next launch": ("Zastosuj przy następnym uruchomieniu", "Aplicar al próximo inicio"),
     "Reset editor to defaults": ("Przywróć domyślne w edytorze", "Restablecer valores del editor"),
     "Applying GPU-memory operation…": ("Trwa operacja pamięci GPU…", "Aplicando operación de memoria de GPU…"),
-    "Effective protection verified in the actual game process": ("Potwierdzono skuteczną ochronę w rzeczywistym procesie gry", "Protección efectiva verificada en el proceso real del juego"),
-    "Configured · actual game protection not verified": ("Skonfigurowano · ochrona rzeczywistej gry niepotwierdzona", "Configurado · protección real del juego sin verificar"),
-    "GameOpti profile Off · independent system protection may still apply": ("Profil GameOpti wyłączony · niezależna ochrona systemowa może nadal działać", "Perfil de GameOpti desactivado · puede seguir activa la protección independiente del sistema"),
+
+
     "Measure Off and On with the same scene and settings using the existing Baseline / Comparison recording below. GPU telemetry is saved beside MangoHud logs: VRAM/GTT, DRM residency where exposed, RAM pressure and process RSS. Per-process Vulkan budget can be unavailable. Compare FPS, p95/p99 and stutters; lower VRAM alone is not proof of improvement.": ("Nagraj Wył. i Wł. w tej samej scenie i ustawieniach, używając istniejącego pomiaru bazowego/porównawczego poniżej. Telemetria GPU jest zapisywana obok logów MangoHud: VRAM/GTT, dostępna rezydencja DRM, presja RAM i RSS procesów. Budżet Vulkan procesu może być niedostępny. Porównuj FPS, p95/p99 i przycięcia; niższa VRAM sama nie dowodzi poprawy.", "Graba Desactivado y Activado con la misma escena y ajustes usando la medición base/comparativa existente. La telemetría se guarda junto a los registros MangoHud: VRAM/GTT, residencia DRM disponible, presión de RAM y RSS. El presupuesto Vulkan por proceso puede no estar disponible. Compara FPS, p95/p99 y tirones; menos VRAM por sí sola no demuestra una mejora."),
     "I compared the same scene, duration and graphics settings": ("Porównałem tę samą scenę, czas i ustawienia grafiki", "Comparé la misma escena, duración y ajustes gráficos"),
     "Compare GPU-memory recordings": ("Porównaj nagrania pamięci GPU", "Comparar grabaciones de memoria de GPU"),
     "Measured improvement in this pair: FPS ≥ +5%, p99 ≤ −5%, p95 did not regress by more than 5%. Repeat the test; one pair is not a guarantee.": ("Zmierzona poprawa w tej parze: FPS ≥ +5%, p99 ≤ −5%, regresja p95 nie przekroczyła 5%. Powtórz test; jedna para nie daje gwarancji.", "Mejora medida en esta pareja: FPS ≥ +5%, p99 ≤ −5%, p95 no empeoró más del 5%. Repite la prueba; una pareja no es garantía."),
     "Comparable recordings found; the improvement criteria were not met.": ("Znaleziono porównywalne nagrania; kryteria poprawy nie zostały spełnione.", "Se encontraron grabaciones comparables; no se cumplieron los criterios de mejora."),
-    "Measured improvement unverified · two valid recordings with different memory profiles are required.": ("Poprawa pomiarowa niepotwierdzona · wymagane dwa poprawne nagrania z różnymi profilami pamięci.", "Mejora medida sin verificar · se necesitan dos grabaciones válidas con perfiles de memoria distintos."),
+
     "Before": ("Przed", "Antes"), "After": ("Po", "Después"),
     "Peak device VRAM / GTT: %1 / %2 MiB · process RSS sum: %3 MiB": ("Szczyt VRAM / GTT urządzenia: %1 / %2 MiB · suma RSS procesów: %3 MiB", "Pico VRAM / GTT del dispositivo: %1 / %2 MiB · suma RSS de procesos: %3 MiB"),
     "Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as —; GPU budget and inaccessible driver errors are not invented.": ("Sumy urządzenia obejmują inne aplikacje. Suma RSS może wielokrotnie liczyć strony współdzielone. Brakujące metryki oznaczono —; budżet GPU i niedostępne błędy sterownika nie są zgadywane.", "Los totales del dispositivo incluyen otras aplicaciones. La suma RSS puede contar páginas compartidas varias veces. Las métricas ausentes aparecen como —; no se inventan presupuestos GPU ni errores inaccesibles del controlador."),
@@ -2794,7 +1694,7 @@ POST_SHARED = {
     "Runtime loaded · effects not verified": ("Załadowano w grze · efekty niezweryfikowane", "Cargado en ejecución · efectos sin verificar"),
     "Installed · runtime not verified": ("Zainstalowano · uruchomienie niezweryfikowane", "Instalado · ejecución sin verificar"),
     "Off": ("Wyłączone", "Desactivado"),
-    "Steam Linux Runtime not verified; launch and check the log": ("Steam Linux Runtime niezweryfikowany; uruchom grę i sprawdź log", "Steam Linux Runtime sin verificar; inicia el juego y revisa el registro"),
+
     "Executable: %1 · %2-bit · API: %3": ("Plik wykonywalny: %1 · %2-bit · API: %3", "Ejecutable: %1 · %2 bits · API: %3"),
     "Backend": ("Backend", "Backend"),
     "Graphics path": ("Ścieżka graficzna", "Ruta gráfica"),
@@ -2811,7 +1711,7 @@ POST_SHARED = {
     "Move effect up": ("Przenieś efekt wyżej", "Subir efecto"),
     "Move effect down": ("Przenieś efekt niżej", "Bajar efecto"),
     "Anti-cheat files detected. Single-player/offline only; do not enter online modes with these modifications.": ("Wykryto pliki anti-cheat. Używaj tylko w trybie jednoosobowym/offline; nie wchodź do trybów online z tymi modyfikacjami.", "Se detectaron archivos antitrampas. Solo para un jugador/sin conexión; no entres en modos en línea con estas modificaciones."),
-    "Existing files are preserved. Check loader conflicts: %1": ("Istniejące pliki pozostają zachowane. Sprawdź kolizje loaderów: %1", "Se conservan los archivos existentes. Revisa los conflictos de cargadores: %1"),
+
     "Install/apply verified components for this game? Existing loader DLLs will not be overwritten. Turning Off preserves custom presets in the game folder.": ("Zainstalować/zastosować zweryfikowane składniki dla tej gry? Istniejące DLL loaderów nie zostaną nadpisane. Wyłączenie zachowa własne presety w folderze gry.", "¿Instalar/aplicar componentes verificados para este juego? No se sobrescribirán DLL de cargadores existentes. Desactivar conserva los presets propios en la carpeta del juego."),
     "Confirm": ("Potwierdź", "Confirmar"),
     "Install / apply": ("Zainstaluj / zastosuj", "Instalar / aplicar"),
@@ -2819,14 +1719,12 @@ POST_SHARED = {
     "Import ReShade preset": ("Importuj preset ReShade", "Importar preset de ReShade"),
     "Select LUT": ("Wybierz LUT", "Elegir LUT"),
     "Apply launcher profile": ("Zastosuj profil launchera", "Aplicar perfil del lanzador"),
-    "Launch through the GameOpti Steam runner or apply the Heroic/Lutris launcher profile. A host layer alone does not prove loading in a container. Restart the game after changes.": ("Uruchamiaj przez runner Steam GameOpti lub zastosuj profil Heroic/Lutris. Sama warstwa na hoście nie dowodzi ładowania w kontenerze. Po zmianach uruchom grę ponownie.", "Inicia mediante el runner Steam de GameOpti o aplica el perfil Heroic/Lutris. Una capa en el anfitrión no prueba su carga en un contenedor. Reinicia el juego tras los cambios."),
-}
 
+}
 
 def _finish(translation: ET.Element, text: str) -> None:
     translation.text = text
     translation.attrib.pop("type", None)
-
 
 MANGOHUD_SHARED = {'Existing MangoHud configuration is not managed by GameOpti': ('Istniejąca konfiguracja MangoHud nie jest zarządzana przez GameOpti', 'GameOpti no gestiona la configuración existente de MangoHud'), 'Edit value': ('Edytuj wartość', 'Editar valor'), 'Illustrative preview': ('Podgląd poglądowy', 'Vista ilustrativa'),
  'Sample values · approximate layout · not measurements': ('Przykładowe wartości · przybliżony układ · bez '
@@ -3336,7 +2234,6 @@ MANGOHUD_SHARED = {'Existing MangoHud configuration is not managed by GameOpti':
                                                                                                                     'vuelve '
                                                                                                                     'a '
                                                                                                                     'comprobarlo.')}
-
 
 TWEAKS_SHARED = {'Display and input': ('Obraz i sterowanie', 'Pantalla y controles'),
  'Latency': ('Opóźnienia', 'Latencia'),
@@ -4507,114 +3404,21 @@ TWEAKS_SHARED.update({
 })
 
 LAUNCH_DETAILS_SHARED = {
- "External frame generation": ("Zewnętrzne generowanie klatek", "Generación externa de fotogramas"),
+
  "Steam Deck mode (requested)": ("Tryb Steam Deck (żądany)", "Modo Steam Deck (solicitado)"),
  "Proton FSR4 upgrade (requested)": ("Aktualizacja FSR4 przez Proton (żądana)", "Actualización FSR4 de Proton (solicitada)"),
  "Default launch": ("Domyślne uruchamianie", "Inicio predeterminado"),
  "Selected features: %1": ("Wybrane funkcje: %1", "Funciones seleccionadas: %1"),
  "Technical launch details": ("Techniczne szczegóły uruchamiania", "Detalles técnicos de inicio"),
  "This is a template, not Steam's final command. Steam supplies the game command and runtime environment at launch. <preserved> marks values restored for the game.": ("To szablon, nie ostateczna komenda Steam. Steam dostarcza polecenie gry i środowisko podczas startu. <preserved> oznacza wartości przywracane dla gry.", "Es una plantilla, no el comando final de Steam. Steam proporciona el comando y el entorno al iniciar. <preserved> indica valores restaurados para el juego."),
- "Steam Runtime loader entries are isolated from host Gamescope and restored for Steam/Proton. Unrelated user libraries, driver settings and layers are preserved.": ("Wpisy loadera Steam Runtime są izolowane od hostowego Gamescope i przywracane dla Steam/Proton. Pozostałe biblioteki użytkownika, ustawienia sterownika i warstwy zostają zachowane.", "Los ajustes del cargador de Steam Runtime se aíslan de Gamescope del host y se restauran para Steam/Proton. Se conservan las otras bibliotecas, los ajustes del controlador y las capas del usuario."),
- "Off still needs suppression flags: they prevent known implicit frame-generation layers from activating in Gamescope or the game. These flags do not enable frame generation. Vulkan filters use plain glob patterns; shell quoting only groups each argument.": ("Wyłączenie nadal wymaga flag blokujących: zapobiegają aktywacji znanych niejawnych warstw generowania klatek w Gamescope lub grze. Te flagi nie włączają FG. Filtry Vulkan używają zwykłych wzorców glob; cudzysłowy powłoki tylko grupują argumenty.", "Desactivado sigue necesitando indicadores de bloqueo: impiden que las capas implícitas conocidas de generación se activen en Gamescope o el juego. No activan la generación. Los filtros Vulkan usan patrones glob normales; las comillas solo agrupan cada argumento."),
- "Managed game environment (preview):": ("Zarządzane środowisko gry (podgląd):", "Entorno gestionado del juego (vista previa):"),
+
+
 }
 
 LAUNCH_DETAILS_SHARED.update({
- "%1 blocks %2: its discovered layer had an inherited activation request or could load automatically.": ("%1 blokuje %2: wykryta warstwa miała odziedziczone żądanie aktywacji lub mogła ładować się automatycznie.", "%1 bloquea %2: su capa detectada tenía una solicitud de activación heredada o podía cargarse automáticamente."),
- "VK_INSTANCE_LAYERS removes only a discovered generator's explicit request; other layers are retained.": ("VK_INSTANCE_LAYERS usuwa tylko jawne żądanie wykrytego generatora; pozostałe warstwy zostają zachowane.", "VK_INSTANCE_LAYERS elimina solo la solicitud explícita de un generador detectado; conserva las otras capas."),
- "%1 removes only the specific conflicting generator request; unrelated filters are retained.": ("%1 usuwa wyłącznie konkretne żądanie kolidującego generatora; pozostałe filtry zostają zachowane.", "%1 elimina solo la solicitud específica del generador en conflicto; conserva los demás filtros."),
- "VK_LOADER_LAYERS_DISABLE targets a discovered generator without a usable disable gate; existing filters are retained.": ("VK_LOADER_LAYERS_DISABLE wskazuje wykryty generator bez dostępnego przełącznika wyłączenia; istniejące filtry zostają zachowane.", "VK_LOADER_LAYERS_DISABLE bloquea un generador detectado sin un interruptor de desactivación utilizable; conserva los filtros existentes."),
- "%1 belongs to post-processing, not frame generation: vkBasalt is suppressed while the other post-processing backend is selected.": ("%1 należy do post-processingu, nie do generowania klatek: vkBasalt jest blokowany, gdy wybrano drugi backend efektów.", "%1 pertenece al posprocesado, no a la generación: se bloquea vkBasalt mientras está seleccionado el otro sistema de efectos."),
- "Missing or unrequested opt-in generators add no suppression. Saved Off never requests GameOpti generation. Targeted entries below only resolve concrete layer conflicts; they are not proof that generation is active.": ("Brakujące generatory i generatory opt-in bez żądania aktywacji nie dodają blokad. Zapisane Wyłączone nigdy nie żąda generowania przez GameOpti. Poniższe wpisy rozwiązują wyłącznie konkretne konflikty warstw; nie dowodzą aktywnej generacji.", "Los generadores ausentes o de activación opcional sin solicitud no añaden bloqueos. Desactivado nunca solicita generación de GameOpti. Las entradas siguientes solo resuelven conflictos concretos; no demuestran generación activa."),
- "GameMode's client library is added beside existing preloads so Steam Runtime can import it. The game retains its original preload entries; the compositor does not receive this game injection.": ("Biblioteka klienta GameMode jest dodawana obok istniejących wpisów preload, aby Steam Runtime mógł ją zaimportować. Gra zachowuje pierwotne wpisy; kompozytor nie otrzymuje tej iniekcji gry.", "La biblioteca cliente de GameMode se añade junto a las precargas existentes para que Steam Runtime la importe. El juego conserva sus entradas originales; el compositor no recibe esta inyección."),
+
+
 })
-
-
-
-RAPIDOCR_SHARED = {'OCR engine': ('Silnik OCR', 'Motor OCR'),
- 'Tesseract (default)': ('Tesseract (domyślny)', 'Tesseract (predeterminado)'),
- 'RapidOCR (optional)': ('RapidOCR (opcjonalny)', 'RapidOCR (opcional)'),
- 'RapidOCR models (English and Polish)': ('Modele RapidOCR (angielski i polski)',
-                                          'Modelos RapidOCR (inglés y polaco)'),
- 'Uses the original subtitle region. Download the models below; changing the engine does not change translation or voice.': ('Korzysta '
-                                                                                                                             'z '
-                                                                                                                             'oryginalnego '
-                                                                                                                             'obszaru '
-                                                                                                                             'napisów. '
-                                                                                                                             'Pobierz '
-                                                                                                                             'modele '
-                                                                                                                             'poniżej. '
-                                                                                                                             'Zmiana '
-                                                                                                                             'silnika '
-                                                                                                                             'nie '
-                                                                                                                             'zmienia '
-                                                                                                                             'tłumaczenia '
-                                                                                                                             'ani '
-                                                                                                                             'głosu.',
-                                                                                                                             'Usa '
-                                                                                                                             'la '
-                                                                                                                             'región '
-                                                                                                                             'original '
-                                                                                                                             'de '
-                                                                                                                             'subtítulos. '
-                                                                                                                             'Descarga '
-                                                                                                                             'los '
-                                                                                                                             'modelos '
-                                                                                                                             'abajo; '
-                                                                                                                             'cambiar '
-                                                                                                                             'el '
-                                                                                                                             'motor '
-                                                                                                                             'no '
-                                                                                                                             'cambia '
-                                                                                                                             'la '
-                                                                                                                             'traducción '
-                                                                                                                             'ni '
-                                                                                                                             'la '
-                                                                                                                             'voz.'),
- 'Uses the existing text masks and automatic bright-background handling.': ('Korzysta z '
-                                                                            'dotychczasowych masek '
-                                                                            'tekstu i '
-                                                                            'automatycznej obsługi '
-                                                                            'jasnego tła.',
-                                                                            'Usa las máscaras de '
-                                                                            'texto existentes y el '
-                                                                            'tratamiento '
-                                                                            'automático de fondos '
-                                                                            'claros.'),
- 'RapidOCR models ready': ('Modele RapidOCR gotowe', 'Modelos RapidOCR listos'),
- 'Download models (27 MB)': ('Pobierz modele (27 MB)',
-                                      'Descargar modelos (27 MB)'),
- 'Select Tesseract or RapidOCR; models are installed in Narrator settings': ('Wybierz Tesseract '
-                                                                             'lub RapidOCR. Modele '
-                                                                             'zainstalujesz w '
-                                                                             'ustawieniach '
-                                                                             'Lektora.',
-                                                                             'Elige Tesseract o '
-                                                                             'RapidOCR; los '
-                                                                             'modelos se instalan '
-                                                                             'en los ajustes del '
-                                                                             'Narrador.'),
- 'RapidOCR English and Polish subtitle OCR is ready': ('RapidOCR jest gotowy do odczytu '
-                                                       'angielskich i polskich napisów',
-                                                       'RapidOCR está listo para reconocer '
-                                                       'subtítulos en inglés y polaco'),
- 'Install the verified RapidOCR models and runtime': ('Zainstaluj zweryfikowane modele RapidOCR i '
-                                                      'jego środowisko wykonawcze',
-                                                      'Instala los modelos verificados de RapidOCR '
-                                                      'y su entorno de ejecución'),
- 'Install the verified RapidOCR models through the application': ('Zainstaluj zweryfikowane modele '
-                                                                  'RapidOCR przez aplikację',
-                                                                  'Instala los modelos verificados '
-                                                                  'de RapidOCR desde la '
-                                                                  'aplicación'),
- 'Optional CPU OCR engine; install its models before selecting it': ('Opcjonalny silnik OCR '
-                                                                     'korzystający z CPU. Przed '
-                                                                     'użyciem zainstaluj jego '
-                                                                     'modele.',
-                                                                     'Motor OCR opcional para CPU; '
-                                                                     'instala sus modelos antes de '
-                                                                     'usarlo.')}
-
 
 def fill(code: str) -> list[tuple[str, str]]:
     path = TRANSLATIONS / f"game_optimization_{code}.ts"
@@ -4625,11 +3429,6 @@ def fill(code: str) -> list[tuple[str, str]]:
         for message in context.findall("message"):
             translation = message.find("translation")
             shared_source = message.findtext("source") or ""
-            if (translation is not None and code in {"pl", "es"}
-                    and name in {"NarratorPage", "CouchGameDetails", "CouchSettings", "I18n"}
-                    and shared_source in RAPIDOCR_SHARED):
-                _finish(translation, RAPIDOCR_SHARED[shared_source][0 if code == "pl" else 1])
-                continue
             if (translation is not None and code in {"pl", "es"}
                     and name in {"MangoHudTab", "MangoHudPreview", "MangoHudNumber", "CouchGameDetails", "I18n"} and shared_source in MANGOHUD_SHARED):
                 _finish(translation, MANGOHUD_SHARED[shared_source][0 if code == "pl" else 1])
@@ -4676,7 +3475,6 @@ def fill(code: str) -> list[tuple[str, str]]:
     text = ET.tostring(tree.getroot(), encoding="unicode")
     path.write_text('<?xml version="1.0" encoding="utf-8"?>\n<!DOCTYPE TS>\n' + text + "\n", encoding="utf-8")
     return left
-
 
 if __name__ == "__main__":
     for code in sys.argv[1:] or ("en", "pl"):

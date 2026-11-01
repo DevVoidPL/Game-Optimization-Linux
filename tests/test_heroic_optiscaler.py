@@ -183,18 +183,6 @@ def test_old_cache_entries_keep_their_existing_keys(tmp_path: Path) -> None:
     )
 
 
-def test_narrator_key_for_heroic_is_unchanged() -> None:
-    """Narrator settings are keyed separately; profile_key must not move them."""
-    from game_optimization_linux.controllers.narrator_controller import NarratorController
-
-    game = Game(
-        id=GAME_ID, name="x", launcher=Launcher.HEROIC, install_path=Path("/x"),
-        logical_size_gb=0, physical_size_gb=0, filesystem=FilesystemType.EXT4,
-        compression_available=False,
-    )
-    assert NarratorController._game_key(game).startswith("local-")
-
-
 # -- capabilities --------------------------------------------------------------
 
 

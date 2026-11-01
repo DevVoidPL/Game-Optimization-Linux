@@ -17,7 +17,6 @@ import pytest
 from PySide6.QtCore import QCoreApplication
 
 from game_optimization_linux.controllers import AppController
-from game_optimization_linux.controllers.narrator_controller import NarratorController
 from game_optimization_linux.models import AppSettings
 from game_optimization_linux.providers import DemoGameProvider, FakeGamepadProvider
 from game_optimization_linux.services import (
@@ -187,62 +186,6 @@ def test_live_audio_settings_update_service_and_persist(tmp_path: Path) -> None:
     assert restored.couch_music_volume == 35
     assert restored.couch_menu_sounds_enabled is True
     assert restored.couch_menu_sounds_volume == 65
-
-
-def test_narrator_ducking_is_reversible_and_idempotent() -> None:
-    service, _effects, music = _callback_service()
-    service.set_couch_active(True)
-    service.set_window_active(True)
-
-    class Pipeline:
-        def __init__(self) -> None:
-            self.snapshot = SimpleNamespace(
-                status=SimpleNamespace(value="speaking"),
-                audio_status="speaking",
-            )
-
-        def poll_game_activity(self) -> None:
-            return None
-
-        def drain_events(self) -> tuple[object, ...]:
-            return ()
-
-    pipeline = Pipeline()
-    app = SimpleNamespace(
-        _narrator_pipeline=pipeline,
-        _ui_sound_service=service,
-        narratorChanged=SimpleNamespace(emit=lambda _game_id: None),
-        _emit_toast=lambda _message, _level: None,
-    )
-    narrator = NarratorController.__new__(NarratorController)
-    narrator._app = app
-    narrator._clock = lambda: 0.0
-    narrator._poll_component_jobs = lambda: None  # type: ignore[method-assign]
-    narrator._poll_autostart = lambda: None  # type: ignore[method-assign]
-    # This test covers music ducking only; the capture retry and frame
-    # watchdog stages of poll() are exercised in test_narrator_autostart.
-    narrator._poll_capture_closed = lambda _now: None  # type: ignore[method-assign]
-    narrator._poll_frame_watchdog = lambda _now: None  # type: ignore[method-assign]
-
-    NarratorController.poll(narrator)
-    duck_event_count = len(music)
-    assert service.musicDucked is True
-    assert music[-1] == ("volume", pytest.approx(0.056))
-
-    NarratorController.poll(narrator)
-    assert len(music) == duck_event_count
-
-    pipeline.snapshot = SimpleNamespace(
-        status=SimpleNamespace(value="idle"),
-        audio_status="idle",
-    )
-    NarratorController.poll(narrator)
-    unduck_event_count = len(music)
-    assert service.musicDucked is False
-    assert music[-1] == ("volume", pytest.approx(0.2))
-
-    NarratorController.poll(narrator)
-    assert len(music) == unduck_event_count
 
 
 def test_shutdown_is_idempotent() -> None:
@@ -498,7 +441,7 @@ def test_noop_audio_service_exposes_complete_semantic_api() -> None:
     required = (
         "playNavigate", "playConfirm", "playBack", "playOpen", "playClose",
         "playAdjust", "playError", "playLaunch", "startMenuMusic",
-        "stopMenuMusic", "setMusicDucked", "configure_menu", "shutdown",
+        "stopMenuMusic", "configure_menu", "shutdown",
     )
     assert all(callable(getattr(service, name, None)) for name in required)
     service.configure_menu(
@@ -512,8 +455,6 @@ def test_noop_audio_service_exposes_complete_semantic_api() -> None:
     assert service.musicPlaying is True
     for name in required[:8]:
         assert getattr(service, name)() is True
-    service.setMusicDucked(True)
-    assert service.musicDucked is True
     service.stopMenuMusic()
     assert service.musicPlaying is False
     service.shutdown()
@@ -587,23 +528,6 @@ def test_real_audio_shutdown_releases_initialized_objects_in_order() -> None:
     assert service._music_output is None
     service.shutdown()
     assert tuple(events) == expected_order
-
-
-def test_ducking_after_shutdown_cannot_initialize_audio(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    preload_calls: list[UiSoundService] = []
-    monkeypatch.setattr(
-        UiSoundService,
-        "_preload_effects",
-        lambda service: preload_calls.append(service),
-    )
-    service = UiSoundService()
-    service.shutdown()
-    service.set_music_ducked(True)
-    service.setMusicDucked(False)
-    assert service._initialized is False
-    assert preload_calls == []
 
 
 def test_couch_qml_probe_subprocess_exits_without_multimedia_teardown_crash(

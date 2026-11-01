@@ -70,20 +70,6 @@
     "theme": "light"
   },
   {
-    "filename": "sidebar-narrator.svg",
-    "semantic_name": "Narrator",
-    "category": "sidebar",
-    "default_color": "#4FE3B8",
-    "theme": "dark"
-  },
-  {
-    "filename": "sidebar-narrator-on-light.svg",
-    "semantic_name": "Narrator",
-    "category": "sidebar",
-    "default_color": "#128A66",
-    "theme": "light"
-  },
-  {
     "filename": "sidebar-donate.svg",
     "semantic_name": "Donate",
     "category": "sidebar",

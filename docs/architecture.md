@@ -52,18 +52,6 @@ its managed launch configuration. Other paths retain their recording/import
 limitations. Manual games have an explicit launch configuration and do not
 inherit every Steam-specific integration.
 
-## Narrator flow
-
-The local Narrator uses portal-authorized screen capture, PipeWire/GStreamer,
-a selected subtitle region, Tesseract OCR, text filtering and consensus,
-subtitle-episode deduplication, optional English-to-Polish translation, and
-Piper speech output. The Polish subtitle mode bypasses translation.
-
-OCR quality and episode decisions are separate verification targets: avoiding
-a second reading does not establish that the first reading was accurate.
-Component details are in [narrator-components.md](narrator-components.md),
-and testing guidance is in [../TESTING.md](../TESTING.md).
-
 ## Flatpak and host integration
 
 The Flatpak packages the Python/Qt application and the Btrfs command used by

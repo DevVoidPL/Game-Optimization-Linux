@@ -1,12 +1,12 @@
 # GameOpti roadmap
 
-Updated: 29 October 2026.
+Updated: 1 November 2026.
 
 ## Current release
 
 [GameOpti 2.1 Beta](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta)
-is available for download. It adds a choice of Tesseract or RapidOCR for the
-Narrator. Both the Couch and Desktop editions include the same game tools.
+is available for download. Both editions share the same game tools.
+Current development source removes built-in narration, which now belongs to a standalone application.
 
 The Beta 2.0 feature set is already available: launcher profiles, Gamescope,
 GameMode, MangoHud, OptiScaler and FSR variants, DLSS Enabler, post-processing,
@@ -19,8 +19,6 @@ See the [README](README.md#features) for features and requirements, and the
 ## Current work
 
 - Fix reported bugs and improve Desktop and Couch layouts.
-- Compare OCR engines in games, including compressed video and difficult backgrounds.
-- Improve translation and subtitle timing where real examples show a problem.
 - Check graphics tools together across Steam, Heroic, Lutris and their Flatpak runtimes.
 - Make installation, configuration, errors and restore actions easier to follow.
 

@@ -199,7 +199,6 @@ def test_max_jobs_limits_parallel_automatic_work(tmp_path: Path) -> None:
         controller.shutdown()
 
 
-
 def test_skipped_appids_and_library_filter_exclude_games(tmp_path: Path) -> None:
     first = _game(tmp_path, app_id="501")
     second = _game(tmp_path, app_id="502")
@@ -290,7 +289,6 @@ def test_safety_delay_change_applies_to_the_running_tracker(tmp_path: Path) -> N
         assert tracker.stability_delay_seconds == 45.0
     finally:
         controller.shutdown()
-
 
 
 # -- Automatic compression across an application restart ---------------------
@@ -550,3 +548,33 @@ def test_unused_fields_survive_other_saves(tmp_path: Path) -> None:
     assert restored.automatic_updates is False
     assert restored.backup_directory == Path("my-backups")
     assert restored.quarantine_directory == Path("my-quarantine")
+
+
+def test_retired_settings_do_not_reset_or_discard_other_preferences(tmp_path: Path) -> None:
+    import json
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"language": "Polski", "narrator_ocr_mode": {"retired": True},
+                               "future_metadata": {"keep": [1, 2]}, "couch_music_volume": 37}))
+    store = SettingsStore(path)
+    settings = store.load()
+    assert settings.language == "Polski" and settings.couch_music_volume == 37
+    store.save(replace(settings, language="English"))
+    saved = json.loads(path.read_text())
+    assert saved["future_metadata"] == {"keep": [1, 2]}
+    assert saved["narrator_ocr_mode"] == {"retired": True}
+    assert saved["couch_music_volume"] == 37
+
+
+def test_retired_route_stays_unavailable_after_controller_activity(tmp_path: Path) -> None:
+    controller, mapper = _pad_controller(tmp_path)
+    try:
+        assert controller.navigate("settings")
+        assert not controller.navigate("narrator")
+        assert controller.currentPage == "settings"
+        controller._on_gamepad_activity("Confirm")
+        assert controller.currentPage == "settings"
+        meta = controller.metaObject()
+        assert meta.indexOfMethod("startNarrator(QString)") == -1
+        assert meta.indexOfProperty("narratorComponents") == -1
+    finally:
+        controller.shutdown()

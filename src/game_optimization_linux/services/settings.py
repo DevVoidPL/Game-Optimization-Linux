@@ -65,9 +65,18 @@ class SettingsStore:
 
     def save(self, settings: AppSettings) -> None:
         try:
-            payload = json.dumps(
-                settings.to_dict(), ensure_ascii=False, indent=2, sort_keys=True
-            )
+            # Keep unknown fields from older/newer installations when changing
+            # a maintained preference. They are not exposed or acted upon.
+            existing = {}
+            if self._path.exists():
+                try:
+                    data = json.loads(self._path.read_text(encoding="utf-8"))
+                    if isinstance(data, dict):
+                        existing = data
+                except (OSError, UnicodeError, json.JSONDecodeError):
+                    pass
+            existing.update(settings.to_dict())
+            payload = json.dumps(existing, ensure_ascii=False, indent=2, sort_keys=True)
         except (TypeError, ValueError) as error:
             self.last_error = str(error)
             raise SettingsStoreError(f"could not serialize settings: {error}") from error

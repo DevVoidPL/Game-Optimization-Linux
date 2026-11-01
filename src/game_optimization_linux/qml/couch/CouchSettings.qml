@@ -34,7 +34,6 @@ FocusScope {
     property int selectedIndex: 0
     property int activeCategoryIndex: 0
     property var settingsData: controller && controller.settings ? controller.settings : ({})
-    property var narratorGlobalData: ({})
     property string editingSettingId: ""
     property int ignoredLibraryIndex: 0
     property int pendingMenuVolume: -1
@@ -44,8 +43,6 @@ FocusScope {
     readonly property int effectiveMusicVolume: pendingMusicVolume >= 0
             ? pendingMusicVolume : Number(setting("couchMusicVolume", 20))
     readonly property bool keyboardOpen: onScreenKeyboard.opened
-    readonly property var narratorComponents: controller && controller.narratorComponents
-            ? controller.narratorComponents : []
 
     readonly property var categories: [
         { "id": "general", "title": qsTr("General"), "subtitle": qsTr("Language, appearance and startup"), "icon": App.UiIcons.couchGlyphSettings, "iconOnLight": App.UiIcons.couchGlyphSettingsOnLight },
@@ -53,7 +50,6 @@ FocusScope {
         { "id": "automation", "title": qsTr("Automation"), "subtitle": qsTr("Updates and compression"), "icon": App.UiIcons.couchGlyphUpdates, "iconOnLight": App.UiIcons.couchGlyphUpdatesOnLight },
         { "id": "controller", "title": qsTr("Controller"), "subtitle": qsTr("Input and Couch behaviour"), "icon": App.UiIcons.couchGlyphController, "iconOnLight": App.UiIcons.couchGlyphControllerOnLight },
         { "id": "audio", "title": qsTr("Audio"), "subtitle": qsTr("Menu sounds and music"), "icon": App.UiIcons.couchGlyphVolume, "iconOnLight": App.UiIcons.couchGlyphVolumeOnLight },
-        { "id": "narrator", "title": qsTr("Narrator"), "subtitle": qsTr("Local speech components"), "icon": App.UiIcons.couchGlyphNarrator, "iconOnLight": App.UiIcons.couchGlyphNarratorOnLight },
         { "id": "advanced", "title": qsTr("Advanced"), "subtitle": qsTr("Resources, diagnostics and mode"), "icon": App.UiIcons.couchGlyphTune, "iconOnLight": App.UiIcons.couchGlyphTuneOnLight }
     ]
     readonly property var rows: [
@@ -87,7 +83,7 @@ FocusScope {
         { "id": "menu-sounds", "category": "audio", "title": qsTr("Enable menu sounds"), "value": boolLabel(setting("couchMenuSoundsEnabled", true)), "enabled": true, "description": qsTr("Play subtle semantic feedback in Couch Mode.") },
         { "id": "menu-volume", "category": "audio", "title": qsTr("Menu sound volume"), "value": qsTr("%1%").arg(effectiveMenuVolume), "enabled": setting("couchMenuSoundsEnabled", true) === true, "description": qsTr("Adjust short navigation and action effects.") },
         { "id": "music", "category": "audio", "title": qsTr("Enable Couch Mode music"), "value": boolLabel(setting("couchMusicEnabled", true)), "enabled": true, "description": qsTr("Play the packaged ambient loop only in Couch Mode.") },
-        { "id": "music-volume", "category": "audio", "title": qsTr("Music volume"), "value": qsTr("%1%").arg(effectiveMusicVolume), "enabled": setting("couchMusicEnabled", true) === true, "description": qsTr("Keep the ambient loop below game and Narrator audio.") },
+        { "id": "music-volume", "category": "audio", "title": qsTr("Music volume"), "value": qsTr("%1%").arg(effectiveMusicVolume), "enabled": setting("couchMusicEnabled", true) === true, "description": qsTr("Keep the ambient loop below game audio.") },
 
         { "id": "steam-tools", "category": "libraries", "title": qsTr("Show Steam tools and runtimes"), "value": boolLabel(setting("showSteamToolsAndRuntimes", false)), "enabled": true, "description": qsTr("Include Proton, runtimes, SDKs and dedicated servers.") },
         { "id": "steam-paths", "category": "libraries", "title": qsTr("Additional Steam locations"), "value": listLabel("steamInstallationDirectories"), "enabled": true, "description": qsTr("Separate multiple paths with semicolons in the controller keyboard.") },
@@ -103,7 +99,7 @@ FocusScope {
         // remain in settings.json untouched.
         { "id": "desktop", "category": "advanced", "title": qsTr("Switch to Desktop Mode"), "value": qsTr("Always available"), "enabled": true, "description": qsTr("Return to the standard desktop interface.") },
         { "id": "reset", "category": "advanced", "title": qsTr("Reset Couch Mode settings"), "value": qsTr("Safe defaults"), "enabled": true, "description": qsTr("Restore controller and Couch audio defaults without changing game data.") }
-    ].concat(narratorRows())
+    ]
     readonly property var activeRows: rowsForCategory(activeCategoryIndex)
     readonly property int selectedActiveIndex: activeIndexForGlobal(selectedIndex)
     readonly property var selectedRow: rows[selectedIndex] || ({})
@@ -198,26 +194,21 @@ FocusScope {
     function rowKind(row) {
         var id = String(row && row.id || "")
         if (["automatic-updates", "auto-notify", "swap", "cursor", "fullscreen", "system-usage", "menu-sounds",
-             "music", "steam-tools", "experimental", "narrator-global-enabled"].indexOf(id) >= 0)
+             "music", "steam-tools", "experimental"].indexOf(id) >= 0)
             return "bool"
         if (["auto-libraries", "auto-skipped", "steam-paths", "game-paths",
              "backup-path", "quarantine-path"].indexOf(id) >= 0)
             return "path"
         if (["auto-delay", "auto-jobs", "auto-free", "deadzone", "repeat-delay", "repeat-rate",
-             "menu-volume", "music-volume", "cpu-limit", "gpu-limit", "narrator-global-volume",
-             "narrator-global-rate", "narrator-global-sampling", "narrator-global-change",
-             "narrator-global-stabilization", "narrator-global-confidence", "narrator-global-cooldown",
-             "narrator-global-noise-w", "narrator-global-noise"].indexOf(id) >= 0)
+             "menu-volume", "music-volume", "cpu-limit", "gpu-limit"].indexOf(id) >= 0)
             return "number"
-        if (id === "narrator-overview")
-            return "info"
-        if (id === "desktop" || id === "reset" || id === "forgotten-library" || row.componentAction)
+        if (id === "desktop" || id === "reset" || id === "forgotten-library")
             return "action"
         return "choice"
     }
 
     function destructive(row) {
-        return row && (row.id === "reset" || row.componentAction === "remove")
+        return row && row.id === "reset"
     }
 
     function adjustable(row) {
@@ -240,9 +231,6 @@ FocusScope {
             return qsTr("No forgotten libraries")
         if (id === "automatic-updates" || id === "backup-path" || id === "quarantine-path")
             return qsTr("Not implemented")
-        if (id.indexOf("narrator-global-") === 0)
-            return narratorGlobalData.success === true ? qsTr("Not available with the current choice")
-                                                       : qsTr("Narrator settings could not be loaded")
         return qsTr("Unavailable")
     }
 
@@ -290,170 +278,6 @@ FocusScope {
         return result
     }
 
-    function narratorComponentName(componentId, fallback) {
-        if (componentId === "capture.portal-pipewire")
-            return qsTr("Screen capture portal")
-        if (componentId === "ocr.rapidocr-local")
-            return qsTr("RapidOCR models (English and Polish)")
-        if (componentId === "ocr.english-local")
-            return qsTr("English subtitle OCR")
-        if (componentId === "ocr.polish-local")
-            return qsTr("Polish subtitle OCR")
-        if (componentId === "translation.opus-en-pl")
-            return qsTr("English to Polish translation")
-        if (componentId === "tts.voidek")
-            return qsTr("Polish voice - Voidek")
-        if (componentId === "tts.polish-voice")
-            return qsTr("Polish voice - Gosia")
-        if (componentId === "tts.polish-bass")
-            return qsTr("Polish voice - Bass")
-        if (componentId === "tts.polish-darkman")
-            return qsTr("Polish voice - Darkman")
-        if (componentId === "audio.qt-pcm")
-            return qsTr("Narrator audio output")
-        return String(fallback || componentId)
-    }
-
-    function narratorComponentDescription(code) {
-        if (code === "capture_runtime")
-            return qsTr("Capture support supplied by the application runtime.")
-        if (code === "ocr_model_required")
-            return qsTr("Local English subtitle recognition model.")
-        if (code === "polish_ocr_model_required")
-            return qsTr("Local Polish subtitle recognition model.")
-        if (code === "translation_model_required")
-            return qsTr("Local CPU translation model for English subtitles.")
-        if (code === "polish_voice_required")
-            return qsTr("Local Polish speech voice used by per-game Narrator settings.")
-        if (code === "audio_runtime")
-            return qsTr("Audio playback supplied by the application runtime.")
-        return qsTr("Local Narrator component.")
-    }
-
-    function narratorComponentState(component) {
-        var state = String(component && component.state || "")
-        if (state === "available")
-            return qsTr("Ready")
-        if (state === "not_installed")
-            return qsTr("Not installed")
-        if (state === "installing")
-            return qsTr("Installing…")
-        if (state === "update_available")
-            return qsTr("Update available")
-        if (state === "error")
-            return qsTr("Needs attention")
-        if (state === "unsupported")
-            return qsTr("Unavailable on this system")
-        return qsTr("Unknown")
-    }
-
-    function narratorGlobalVoices() {
-        var source = narratorGlobalData && narratorGlobalData.voices
-                ? Array.from(narratorGlobalData.voices) : []
-        return source.filter(function(voice) {
-            return voice && (voice.available === true || voice.installed === true)
-        })
-    }
-
-    function narratorGlobalVoiceLabel() {
-        var voices = narratorGlobalVoices()
-        var selected = String(narratorGlobalData.voiceId || "")
-        for (var index = 0; index < voices.length; ++index) {
-            if (String(voices[index].id || "") === selected)
-                return String(voices[index].name || voices[index].id)
-        }
-        return voices.length ? String(voices[0].name || voices[0].id)
-                             : qsTr("No installed voice")
-    }
-
-    function narratorGlobalRegionLabel() {
-        var region = narratorGlobalData.subtitleRegion || ({})
-        var y = Number(region.y === undefined ? 0.62 : region.y)
-        var height = Number(region.height === undefined ? 0.30 : region.height)
-        if (y <= 0.08 && height >= 0.82)
-            return qsTr("Full frame")
-        if (y <= 0.45)
-            return qsTr("Lower half")
-        return qsTr("Bottom subtitles")
-    }
-
-    function narratorRows() {
-        var components = Array.from(page.narratorComponents || [])
-        var articulation = narratorGlobalData.noiseScale !== null
-                && narratorGlobalData.noiseScale !== undefined
-                || narratorGlobalData.noiseWScale !== null
-                && narratorGlobalData.noiseWScale !== undefined
-        var profiles = Array.from(narratorGlobalData.translationProfiles || [])
-        var result = [
-            { "id": "narrator-global-enabled", "category": "narrator", "title": qsTr("Enable Narrator by default"), "value": boolLabel(narratorGlobalData.enabled === true), "enabled": narratorGlobalData.success === true, "description": qsTr("New per-game profiles inherit this default; existing game profiles remain unchanged.") },
-            { "id": "narrator-global-language", "category": "narrator", "title": qsTr("Subtitle recognition language"), "value": String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") === "polish" ? qsTr("Polish subtitles") : qsTr("English → Polish"), "enabled": narratorGlobalData.success === true, "description": qsTr("Recognize Polish directly or translate recognized English subtitles to Polish.") },
-            { "id": "narrator-global-source", "category": "narrator", "title": qsTr("Recognition source"), "value": String(narratorGlobalData.sourceMode || "auto") === "ocr" ? qsTr("OCR only") : qsTr("Automatic"), "enabled": narratorGlobalData.success === true, "description": qsTr("Use automatic source selection or always use screen OCR.") },
-            { "id": "narrator-global-ocr", "category": "narrator", "title": qsTr("OCR engine"), "value": String(narratorGlobalData.ocrProviderId || "") === "rapidocr-local" ? "RapidOCR" : "Tesseract", "enabled": narratorGlobalData.success === true, "description": qsTr("Select Tesseract or RapidOCR; models are installed in Narrator settings") },
-            { "id": "narrator-global-translation", "category": "narrator", "title": qsTr("Translation profile"), "value": String(narratorGlobalData.translationProfileId || qsTr("Automatic")), "enabled": narratorGlobalData.success === true && String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") !== "polish" && profiles.length > 0, "description": qsTr("Select the installed local translation profile.") },
-            { "id": "narrator-global-voice", "category": "narrator", "title": qsTr("Speech voice"), "value": narratorGlobalVoiceLabel(), "enabled": narratorGlobalData.success === true && narratorGlobalVoices().length > 0, "description": qsTr("Select the default installed voice for Polish speech.") },
-            { "id": "narrator-global-volume", "category": "narrator", "title": qsTr("Speech volume"), "value": qsTr("%1%").arg(Math.round(Number(narratorGlobalData.volume === undefined ? 0.85 : narratorGlobalData.volume) * 100)), "enabled": narratorGlobalData.success === true, "description": qsTr("Set the default Narrator playback volume.") },
-            { "id": "narrator-global-rate", "category": "narrator", "title": qsTr("Speech rate"), "value": qsTr("%1×").arg(Number(narratorGlobalData.speechRate || 1).toFixed(2)), "enabled": narratorGlobalData.success === true, "description": qsTr("Adjust default speech speed from 0.5× to 2.0×.") },
-            { "id": "narrator-global-sampling", "category": "narrator", "title": qsTr("Capture sampling rate"), "value": qsTr("%1 Hz").arg(Number(narratorGlobalData.captureSamplingHz || 6).toFixed(1)), "enabled": narratorGlobalData.success === true, "description": qsTr("Choose how often the subtitle region is sampled.") },
-            { "id": "narrator-global-change", "category": "narrator", "title": qsTr("Visual change threshold"), "value": qsTr("%1%").arg(Math.round(Number(narratorGlobalData.visualChangeThreshold || 0.08) * 100)), "enabled": narratorGlobalData.success === true, "description": qsTr("Ignore frames whose subtitle region changed less than this amount.") },
-            { "id": "narrator-global-stabilization", "category": "narrator", "title": qsTr("Subtitle stabilization"), "value": qsTr("%1 ms").arg(Number(narratorGlobalData.stabilizationMs || 240)), "enabled": narratorGlobalData.success === true, "description": qsTr("Wait for subtitles to settle before recognition.") },
-            { "id": "narrator-global-confidence", "category": "narrator", "title": qsTr("Minimum OCR confidence"), "value": qsTr("%1%").arg(Math.round(Number(narratorGlobalData.ocrMinConfidence || 0.62) * 100)), "enabled": narratorGlobalData.success === true, "description": qsTr("Reject recognition results below this confidence.") },
-            { "id": "narrator-global-cooldown", "category": "narrator", "title": qsTr("Duplicate subtitle cooldown"), "value": qsTr("%1 s").arg((Number(narratorGlobalData.duplicateCooldownMs || 4500) / 1000).toFixed(1)), "enabled": narratorGlobalData.success === true, "description": qsTr("Delay before the same subtitle may be spoken again.") },
-            { "id": "narrator-global-speaker-names", "category": "narrator", "title": qsTr("Read character names"), "value": boolLabel(narratorGlobalData.readSpeakerNames === true), "enabled": narratorGlobalData.success === true, "description": qsTr("Speak the character name label before a subtitle line.") },
-            { "id": "narrator-global-articulation", "category": "narrator", "title": qsTr("Voice articulation overrides"), "value": articulation ? qsTr("Custom") : qsTr("Voice defaults"), "enabled": narratorGlobalData.success === true, "description": qsTr("Use each voice's tuned defaults or expose custom Piper articulation values.") },
-            { "id": "narrator-global-noise-w", "category": "narrator", "title": qsTr("Phoneme width variation"), "value": Number(narratorGlobalData.noiseWScale === null || narratorGlobalData.noiseWScale === undefined ? 0.8 : narratorGlobalData.noiseWScale).toFixed(3), "enabled": narratorGlobalData.success === true && articulation, "description": qsTr("Advanced Piper timing variation for newly created profiles.") },
-            { "id": "narrator-global-noise", "category": "narrator", "title": qsTr("Voice variation"), "value": Number(narratorGlobalData.noiseScale === null || narratorGlobalData.noiseScale === undefined ? 0.667 : narratorGlobalData.noiseScale).toFixed(3), "enabled": narratorGlobalData.success === true && articulation, "description": qsTr("Advanced Piper voice variation for newly created profiles.") },
-            { "id": "narrator-global-region", "category": "narrator", "title": qsTr("Default subtitle region"), "value": narratorGlobalRegionLabel(), "enabled": narratorGlobalData.success === true, "description": qsTr("Cycle a controller-friendly default capture region; games can override it individually.") },
-            {
-                "id": "narrator-overview",
-                "category": "narrator",
-                "title": qsTr("Narrator components"),
-                "value": qsTr("%1 components").arg(components.length),
-                "enabled": true,
-                "description": qsTr("Install and maintain the local capture, OCR, translation and speech building blocks used by each game.")
-            }
-        ]
-        for (var index = 0; index < components.length; ++index) {
-            var component = components[index] || ({})
-            var componentId = String(component.componentId || "")
-            if (!componentId.length)
-                continue
-            var state = String(component.state || "")
-            var action = ""
-            var actionLabel = narratorComponentState(component)
-            if (state === "update_available" && component.canUpdate === true) {
-                action = "update"
-                actionLabel = qsTr("Update")
-            } else if ((state === "not_installed" || state === "error")
-                       && component.canInstall === true) {
-                action = "install"
-                actionLabel = qsTr("Install")
-            }
-            var title = narratorComponentName(componentId, component.name)
-            result.push({
-                "id": "narrator-component-" + componentId,
-                "category": "narrator",
-                "title": title,
-                "value": actionLabel,
-                "enabled": true,
-                "componentId": componentId,
-                "componentAction": action,
-                "description": narratorComponentDescription(String(component.descriptionCode || ""))
-            })
-            if (component.canRemove === true) {
-                result.push({
-                    "id": "narrator-remove-" + componentId,
-                    "category": "narrator",
-                    "title": qsTr("Remove %1").arg(title),
-                    "value": qsTr("Remove"),
-                    "enabled": true,
-                    "componentId": componentId,
-                    "componentAction": "remove",
-                    "description": qsTr("Remove only the component files managed by GameOpti.")
-                })
-            }
-        }
-        return result
-    }
 
     function cycle(values, current, delta) {
         var index = values.indexOf(String(current))
@@ -594,102 +418,6 @@ FocusScope {
         return saved
     }
 
-    function loadNarratorGlobal() {
-        if (controller && controller.getNarratorGlobalSettings)
-            narratorGlobalData = controller.getNarratorGlobalSettings() || ({})
-        else
-            narratorGlobalData = ({})
-    }
-
-    function saveNarratorGlobal(values) {
-        if (!controller || !controller.saveNarratorGlobalSettings)
-            return false
-        var saved = Boolean(controller.saveNarratorGlobalSettings(values || ({})))
-        if (saved)
-            loadNarratorGlobal()
-        playSemanticSound(saved ? "adjust" : "error")
-        return saved
-    }
-
-    function changeNarratorGlobal(id, delta) {
-        if (id === "narrator-global-enabled")
-            return saveNarratorGlobal({ "enabled": narratorGlobalData.enabled !== true })
-        if (id === "narrator-global-language")
-            return saveNarratorGlobal({ "subtitleLanguageMode": String(narratorGlobalData.subtitleLanguageMode || "english_to_polish") === "polish" ? "english_to_polish" : "polish" })
-        if (id === "narrator-global-source")
-            return saveNarratorGlobal({ "sourceMode": String(narratorGlobalData.sourceMode || "auto") === "ocr" ? "auto" : "ocr" })
-        if (id === "narrator-global-ocr")
-            return saveNarratorGlobal({ "ocrProviderId": String(narratorGlobalData.ocrProviderId || "") === "rapidocr-local" ? "tesseract-fast-eng" : "rapidocr-local" })
-        if (id === "narrator-global-translation") {
-            var profiles = Array.from(narratorGlobalData.translationProfiles || [])
-            var profileIds = profiles.map(function(profile) { return String(profile.id || "") })
-            if (!profileIds.length) return false
-            return saveNarratorGlobal({ "translationProfileId": cycle(profileIds, String(narratorGlobalData.translationProfileId || profileIds[0]), delta) })
-        }
-        if (id === "narrator-global-voice") {
-            var voices = narratorGlobalVoices()
-            var voiceIds = voices.map(function(voice) { return String(voice.id || "") })
-            if (!voiceIds.length) return false
-            return saveNarratorGlobal({ "voiceId": cycle(voiceIds, String(narratorGlobalData.voiceId || voiceIds[0]), delta) })
-        }
-        if (id === "narrator-global-volume")
-            return saveNarratorGlobal({ "volume": clamp(Number(narratorGlobalData.volume === undefined ? 0.85 : narratorGlobalData.volume) + delta * 0.05, 0, 1) })
-        if (id === "narrator-global-rate")
-            return saveNarratorGlobal({ "speechRate": clamp(Number(narratorGlobalData.speechRate || 1) + delta * 0.05, 0.5, 2) })
-        if (id === "narrator-global-sampling")
-            return saveNarratorGlobal({ "captureSamplingHz": clamp(Number(narratorGlobalData.captureSamplingHz || 6) + delta * 0.5, 1, 10) })
-        if (id === "narrator-global-change")
-            return saveNarratorGlobal({ "visualChangeThreshold": clamp(Number(narratorGlobalData.visualChangeThreshold || 0.08) + delta * 0.01, 0.001, 1) })
-        if (id === "narrator-global-stabilization")
-            return saveNarratorGlobal({ "stabilizationMs": clamp(Number(narratorGlobalData.stabilizationMs || 240) + delta * 50, 50, 3000) })
-        if (id === "narrator-global-confidence")
-            return saveNarratorGlobal({ "ocrMinConfidence": clamp(Number(narratorGlobalData.ocrMinConfidence || 0.62) + delta * 0.05, 0, 1) })
-        if (id === "narrator-global-cooldown")
-            return saveNarratorGlobal({ "duplicateCooldownMs": clamp(Number(narratorGlobalData.duplicateCooldownMs || 4500) + delta * 250, 250, 60000) })
-        if (id === "narrator-global-speaker-names")
-            return saveNarratorGlobal({ "readSpeakerNames": narratorGlobalData.readSpeakerNames !== true })
-        if (id === "narrator-global-articulation") {
-            var overridden = narratorGlobalData.noiseScale !== null
-                    && narratorGlobalData.noiseScale !== undefined
-                    || narratorGlobalData.noiseWScale !== null
-                    && narratorGlobalData.noiseWScale !== undefined
-            return saveNarratorGlobal(overridden
-                    ? { "noiseScale": null, "noiseWScale": null }
-                    : { "noiseScale": 0.667, "noiseWScale": 0.8 })
-        }
-        if (id === "narrator-global-noise-w")
-            return saveNarratorGlobal({ "noiseWScale": clamp(Number(narratorGlobalData.noiseWScale || 0.8) + delta * 0.025, 0, 2) })
-        if (id === "narrator-global-noise")
-            return saveNarratorGlobal({ "noiseScale": clamp(Number(narratorGlobalData.noiseScale || 0.667) + delta * 0.025, 0, 2) })
-        if (id === "narrator-global-region") {
-            var regions = [
-                { "x": 0.05, "y": 0.62, "width": 0.90, "height": 0.30 },
-                { "x": 0.05, "y": 0.45, "width": 0.90, "height": 0.50 },
-                { "x": 0.05, "y": 0.05, "width": 0.90, "height": 0.90 }
-            ]
-            var currentRegion = narratorGlobalRegionLabel()
-            var currentIndex = currentRegion === qsTr("Full frame") ? 2
-                    : currentRegion === qsTr("Lower half") ? 1 : 0
-            return saveNarratorGlobal({ "subtitleRegion": regions[(currentIndex + delta + regions.length) % regions.length] })
-        }
-        return false
-    }
-
-    function runNarratorComponentAction(row) {
-        if (!controller || !row || !row.componentAction)
-            return false
-        var action = String(row.componentAction)
-        var componentId = String(row.componentId || "")
-        var started = false
-        if (action === "install" && controller.installNarratorComponent)
-            started = Boolean(controller.installNarratorComponent(componentId))
-        else if (action === "update" && controller.updateNarratorComponent)
-            started = Boolean(controller.updateNarratorComponent(componentId))
-        else if (action === "remove" && controller.removeNarratorComponent)
-            started = Boolean(controller.removeNarratorComponent(componentId))
-        playSemanticSound(started ? "confirm" : "error")
-        return started
-    }
 
     function previewVolume(key, value) {
         if (!controller || !controller.previewCouchAudioSetting)
@@ -751,15 +479,8 @@ FocusScope {
         }
         var row = rows[selectedIndex]
         var id = row.id
-        if (id.indexOf("narrator-global-") === 0)
-            return changeNarratorGlobal(id, delta)
         // Actions run only on Confirm, never on left/right.
-        if (row.componentAction)
-            return false
-        if (id === "narrator-overview") {
-            playSemanticSound("confirm")
-            return true
-        }
+
         if (id === "language") {
             commitPendingVolumes()
             var language = cycle(["en", "pl", "es"], languageCode(setting("language", "en")), delta)
@@ -890,12 +611,7 @@ FocusScope {
 
     function performRow(row) {
         var id = row.id
-        if (row.componentAction)
-            return runNarratorComponentAction(row)
-        if (id === "narrator-overview") {
-            playSemanticSound("confirm")
-            return true
-        }
+
         if (id === "desktop") {
             commitPendingVolumes()
             controller.setInterfaceMode("desktop")
@@ -1088,7 +804,6 @@ FocusScope {
 
     focus: visible
     Component.onCompleted: {
-        loadNarratorGlobal()
         restoreFocus()
         restoreActiveFocus()
     }
@@ -1098,7 +813,6 @@ FocusScope {
         if (visible) {
             selectedTile = 3
             focusZone = 1
-            loadNarratorGlobal()
             Qt.callLater(restoreFocus)
             restoreActiveFocus()
         } else {
@@ -1285,10 +999,7 @@ FocusScope {
             }
             Label {
                 Layout.fillWidth: true
-                text: page.categories[page.activeCategoryIndex]
-                      && page.categories[page.activeCategoryIndex].id === "narrator"
-                      ? qsTr("Global defaults for new per-game profiles. A game's own Narrator profile can override them.")
-                      : qsTr("Left and right change the selected value. A opens editors and actions.")
+                text: qsTr("Left and right change the selected value. A opens editors and actions.")
                 color: App.Theme.textSecondary
                 font.pixelSize: App.Theme.couchLabelSize * page.fitScale
                 elide: Text.ElideRight

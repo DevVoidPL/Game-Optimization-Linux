@@ -99,7 +99,6 @@ ApplicationWindow {
         App.PopupCoordinator.closeActive()
         closeCompressionDialog.close()
         gamesLoader.active = false
-        narratorLoader.active = false
         updatesLoader.active = false
         tasksLoader.active = false
         systemLoader.active = false
@@ -124,8 +123,6 @@ ApplicationWindow {
     }
 
     function pageSource(pageName) {
-        if (pageName === "narrator")
-            return Qt.resolvedUrl("pages/NarratorPage.qml")
         if (pageName === "updates")
             return Qt.resolvedUrl("pages/UpdatesPage.qml")
         if (pageName === "tasks")
@@ -142,27 +139,24 @@ ApplicationWindow {
     }
 
     function pageIndex(pageName) {
-        if (pageName === "narrator")
-            return 1
         if (pageName === "updates")
-            return 2
+            return 1
         if (pageName === "tasks")
-            return 3
+            return 2
         if (pageName === "system")
-            return 4
+            return 3
         if (pageName === "donate")
-            return 5
+            return 4
         if (pageName === "settings")
-            return 6
+            return 5
         if (pageName === "gameDetails" || pageName === "game" || pageName === "details")
-            return 7
+            return 6
         return 0
     }
 
     function activeDesktopLoader() {
         var loaders = [
             gamesLoader,
-            narratorLoader,
             updatesLoader,
             tasksLoader,
             systemLoader,
@@ -232,13 +226,6 @@ ApplicationWindow {
                     onLoaded: if (item && item.hasOwnProperty("controller")) item.controller = window.controller
                 }
 
-                Loader {
-                    id: narratorLoader
-                    objectName: "narratorPageLoader"
-                    asynchronous: false
-                    source: Qt.resolvedUrl("pages/NarratorPage.qml")
-                    onLoaded: if (item && item.hasOwnProperty("controller")) item.controller = window.controller
-                }
 
                 Loader {
                     id: updatesLoader

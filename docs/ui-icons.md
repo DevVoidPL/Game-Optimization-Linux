@@ -35,9 +35,6 @@ MangoHud, OptiScaler wordmark) is never generated; see `assets/ui-icons/brands/`
 
 - Games / library / controller: gamepad with D-pad and two face buttons cut
   out. Library offline: the same gamepad opened by a wide 45° gap.
-- Narrator (Lektor): speech bubble with two caption rows, tail toward the
-  screen. Polish subtitles: caption bar plus sparkle. Subtitle area: screen
-  with the caption region highlighted. Recognition source: scanning beam.
 - Tasks: clipboard; Updates: badge with an upward arrow; Check updates: the
   badge with a magnifier handle; System: processor die; Settings: gear;
   Advanced / Tune: three sliders; Donate: heart.

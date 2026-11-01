@@ -74,12 +74,6 @@ Useful focused runs while changing a subsystem:
   tests/test_launcher_native.py \
   tests/test_launcher_providers.py
 
-.venv/bin/python -m pytest -q \
-  tests/test_narrator_behavior_contract.py \
-  tests/test_narrator_ocr_corpus.py \
-  tests/test_narrator_runtime_regressions.py \
-  tests/test_narrator_subtitle_episode.py \
-  tests/test_narrator_tts_text_filter.py
 
 # UI icons ("Facet" set, see docs/ui-icons.md); regenerate with
 # python3 scripts/build-facet-icons.py, verify drift with --check
@@ -89,33 +83,6 @@ QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q \
   tests/test_couch_glyphs.py \
   tests/test_couch_design_system.py
 ```
-
-### Narrator verification in games
-
-The normal Narrator page keeps playback controls, errors and an expandable last
-read text. OCR timings, raw recognition and decision history are only created
-when the developer UI is enabled for that process:
-
-```bash
-GAMEOPTI_DEVELOPER_UI=1 PYTHONPATH=src .venv/bin/python -m game_optimization_linux.main --desktop
-flatpak run --env=GAMEOPTI_DEVELOPER_UI=1 io.github.DevVoidPL.GameOptimizationLinux
-```
-
-The Flatpak command requires a build containing this UI change. Starting without
-the variable restores the normal view. This switch only reveals diagnostics;
-it does not change capture, OCR, translation or speech settings.
-
-Text replay tests exercise the decisions made from supplied OCR results; they
-do not establish capture, cropping, preprocessing, or Tesseract accuracy in a
-real game. The committed OCR corpus contains recorded TSV results, not a full
-image/timeline replay dataset.
-
-For a real-game regression, retain the build identity, settings, complete
-observation sequence, and corresponding subtitle images. Compare the first
-text sent to speech with a manual transcription; record omissions, extra audio
-starts for one utterance, meaningful text changes, and time to the first audio.
-Evaluate both first-read quality and repetition, rather than only the number
-of accepted phrases or passing tests. Sanitize all material before sharing it.
 
 ## QML smoke probes
 

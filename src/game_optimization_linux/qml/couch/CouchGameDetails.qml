@@ -87,8 +87,6 @@ FocusScope {
             optiScalerData.error || optiScalerData.onlineError
             || optiScalerData.refreshError || optiScalerData.operationError || ""))
     property var protonTweaksData: ({})
-    property var narratorData: ({})
-    property var narratorSession: ({})
     readonly property var optimizationPresets: ["automatic", "maximum_performance", "balanced", "low_power", "lowest_latency", "stable_image", "best_quality", "custom"]
     readonly property var optimizationCategories: ["competitive", "fast_action", "cinematic", "platformer_2d", "strategy_simulation", "retro", "unknown", "custom"]
     readonly property var optimizationFpsValues: [30, 45, 60, 90, 120, 144, 165, 200, 240]
@@ -102,7 +100,6 @@ FocusScope {
         { "id": "storage", "icon": App.UiIcons.couchGlyphStorage, "iconOnLight": App.UiIcons.couchGlyphStorageOnLight, "title": qsTr("Storage") },
         { "id": "optimization", "icon": App.UiIcons.couchGlyphOptimization, "iconOnLight": App.UiIcons.couchGlyphOptimizationOnLight, "title": qsTr("Optimization") },
         { "id": "optiscaler", "icon": App.UiIcons.couchGlyphOptiscaler, "iconOnLight": App.UiIcons.couchGlyphOptiscalerOnLight, "title": qsTr("OptiScaler") },
-        { "id": "narrator", "icon": App.UiIcons.couchGlyphNarrator, "iconOnLight": App.UiIcons.couchGlyphNarratorOnLight, "title": qsTr("Lektor") },
         { "id": "post-processing", "icon": App.UiIcons.couchGlyphTune, "title": qsTr("Post-processing") },
         { "id": "frame-generation", "icon": App.UiIcons.couchGlyphTune, "title": qsTr("Frame generation") }
     ]
@@ -182,128 +179,6 @@ FocusScope {
         var unit = 0
         while (bytes >= 1024 && unit < units.length - 1) { bytes /= 1024; unit++ }
         return (unit ? bytes.toFixed(bytes >= 100 ? 0 : 1) : Math.round(bytes)) + " " + units[unit]
-    }
-    function narratorVoices() {
-        var source = narratorData && narratorData.voices
-                ? Array.from(narratorData.voices) : []
-        return source.filter(function(voice) {
-            return voice && (voice.available === true || voice.installed === true)
-        })
-    }
-    function narratorVoiceLabel() {
-        var voices = narratorVoices()
-        if (String(narratorData.voiceName || "").length)
-            return String(narratorData.voiceName)     // the voice really used
-        var selected = String(narratorData.voiceId || "")
-        for (var index = 0; index < voices.length; ++index) {
-            if (String(voices[index].id || "") === selected)
-                return String(voices[index].name || voices[index].id)
-        }
-        return voices.length ? String(voices[0].name || voices[0].id) : qsTr("No installed voice")
-    }
-    function narratorLanguageLabel() {
-        return String(narratorData.subtitleLanguageMode || "english_to_polish") === "polish"
-                ? qsTr("Polish subtitles") : qsTr("English → Polish")
-    }
-    function narratorSourceLabel() {
-        var mode = String(narratorData.sourceMode || "auto")
-        return mode === "ocr" ? qsTr("OCR only") : qsTr("Automatic")
-    }
-    function narratorSessionActive() {
-        return ["starting", "selecting_source", "listening", "ocr", "translating",
-                "speaking", "stopping"].indexOf(String(narratorSession.status || "idle")) >= 0
-    }
-    function narratorStatusLabel() {
-        var status = String(narratorSession.status || "idle")
-        if (status === "starting") return qsTr("Starting")
-        if (status === "selecting_source") return qsTr("Select a capture source")
-        if (status === "listening") return qsTr("Listening")
-        if (status === "ocr") return qsTr("Reading subtitles")
-        if (status === "translating") return qsTr("Translating")
-        if (status === "speaking") return qsTr("Speaking")
-        if (status === "stopping") return qsTr("Stopping")
-        if (status === "error") return qsTr("Error")
-        return qsTr("Stopped")
-    }
-    function narratorCaptureStateLabel(state) {
-        if (state === "permission_required" || state === "selecting_source")
-            return qsTr("Waiting for portal permission or source")
-        if (state === "starting")
-            return qsTr("Starting capture")
-        if (state === "active")
-            return qsTr("Active")
-        if (state === "cancelled")
-            return qsTr("Selection cancelled")
-        if (state === "permission_denied")
-            return qsTr("Permission denied")
-        if (state === "error" || state === "source_lost")
-            return qsTr("Capture error")
-        if (state === "unavailable")
-            return qsTr("Unavailable")
-        return qsTr("Stopped")
-    }
-    function narratorOcrStateLabel(state) {
-        if (state === "loading")
-            return qsTr("Loading")
-        if (state === "processing")
-            return qsTr("Processing")
-        if (state === "ready")
-            return qsTr("Ready")
-        if (state === "error")
-            return qsTr("OCR error")
-        return qsTr("Component missing")
-    }
-    function narratorInferenceStateLabel(state, processingLabel, errorLabel) {
-        if (state === "loading")
-            return qsTr("Loading")
-        if (state === "processing")
-            return processingLabel
-        if (state === "ready")
-            return qsTr("Ready")
-        if (state === "bypassed")
-            return qsTr("Disabled")
-        if (state === "error")
-            return errorLabel
-        return qsTr("Component missing")
-    }
-    function narratorStartMessage() {
-        if (narratorSessionActive())
-            return qsTr("Stop the current narration session")
-        var reason = String(narratorSession.reasonCode || "")
-        if (reason === "components_missing") return qsTr("Required local components are missing")
-        if (reason === "game_not_running") return qsTr("Launch the game before starting Narrator")
-        if (reason === "another_session_active") return qsTr("Narrator is active for another game")
-        if (narratorData.enabled !== true) return qsTr("Enable Narrator for this game first")
-        if (narratorSession.cardState === "error")
-            return qsTr("Retry, or choose the game window again")
-        if (narratorSession.captureGrantStale === true)
-            return qsTr("Requires choosing the window again")
-        if (narratorSession.captureGrantSaved === false)
-            return qsTr("The first start requires a one-time window choice with the mouse (preferably in Desktop, while the game is running)")
-        if (narratorSession.cardState === "waiting_for_game")
-            return qsTr("Starts automatically with the game; you can also start it now")
-        if (narratorSession.cardState === "manual")
-            return qsTr("This launcher cannot be detected; start the Narrator manually")
-        return qsTr("Start narration for the running game")
-    }
-    function narratorActions() {
-        if (!narratorData || narratorData.success !== true) return [{
-            "id": "narrator-reload", "icon": App.UiIcons.couchGlyphRefresh, "iconOnLight": App.UiIcons.couchGlyphRefreshOnLight, "symbol": "↻", "title": qsTr("Load Narrator settings"),
-            "subtitle": qsTr("Read the saved per-game configuration"), "enabled": true
-        }]
-        var active = narratorSessionActive()
-        return [
-            { "id": "narrator-enabled", "icon": App.UiIcons.couchGlyphNarrator, "iconOnLight": App.UiIcons.couchGlyphNarratorOnLight, "symbol": "N", "title": qsTr("Narrator: %1").arg(narratorData.enabled ? qsTr("On") : qsTr("Off")), "label": qsTr("Lektor"), "value": narratorData.enabled ? qsTr("Enabled") : qsTr("Disabled"), "description": qsTr("Saved only for this game"), "subtitle": qsTr("Saved only for this game"), "enabled": true },
-            { "id": "narrator-language", "icon": App.UiIcons.couchGlyphSubtitles, "iconOnLight": App.UiIcons.couchGlyphSubtitlesOnLight, "symbol": "文", "title": narratorLanguageLabel(), "label": qsTr("Language mode"), "value": narratorLanguageLabel(), "description": qsTr("Cycle subtitle language mode"), "subtitle": qsTr("Cycle subtitle language mode"), "enabled": true },
-            { "id": "narrator-source", "icon": App.UiIcons.couchGlyphScanSource, "iconOnLight": App.UiIcons.couchGlyphScanSourceOnLight, "symbol": "⌁", "title": qsTr("Source: %1").arg(narratorSourceLabel()), "label": qsTr("Recognition source"), "value": narratorSourceLabel(), "description": qsTr("Automatic detection or OCR capture"), "subtitle": qsTr("Automatic detection or OCR capture"), "enabled": true },
-            { "id": "narrator-ocr", "icon": App.UiIcons.couchGlyphScanSource, "iconOnLight": App.UiIcons.couchGlyphScanSourceOnLight, "symbol": "OCR", "title": qsTr("OCR engine"), "label": qsTr("OCR engine"), "value": String(narratorData.ocrProviderId || "") === "rapidocr-local" ? "RapidOCR" : "Tesseract", "description": qsTr("Select Tesseract or RapidOCR; models are installed in Narrator settings"), "subtitle": qsTr("Select Tesseract or RapidOCR; models are installed in Narrator settings"), "enabled": !active },
-            { "id": "narrator-voice", "icon": App.UiIcons.couchGlyphVoice, "iconOnLight": App.UiIcons.couchGlyphVoiceOnLight, "symbol": "♪", "title": narratorVoiceLabel(), "label": qsTr("Voice"), "value": narratorVoiceLabel(), "description": qsTr("Cycle installed speech voices"), "subtitle": qsTr("Cycle installed speech voices"), "enabled": narratorVoices().length > 0 },
-            { "id": "narrator-volume", "icon": App.UiIcons.couchGlyphVolume, "iconOnLight": App.UiIcons.couchGlyphVolumeOnLight, "symbol": "◖", "title": qsTr("Volume: %1%").arg(Math.round(Number(narratorData.volume || 0) * 100)), "label": qsTr("Volume"), "value": qsTr("%1%").arg(Math.round(Number(narratorData.volume || 0) * 100)), "description": qsTr("Press repeatedly to adjust"), "subtitle": qsTr("Press repeatedly to adjust"), "enabled": true },
-            { "id": "narrator-rate", "icon": App.UiIcons.couchGlyphSpeechRate, "iconOnLight": App.UiIcons.couchGlyphSpeechRateOnLight, "symbol": "››", "title": qsTr("Speech rate: %1×").arg(Number(narratorData.speechRate || 1).toFixed(1)), "label": qsTr("Speech rate"), "value": qsTr("%1×").arg(Number(narratorData.speechRate || 1).toFixed(1)), "description": qsTr("Press repeatedly to adjust"), "subtitle": qsTr("Press repeatedly to adjust"), "enabled": true },
-            { "id": "narrator-region", "icon": App.UiIcons.couchGlyphRegion, "iconOnLight": App.UiIcons.couchGlyphRegionOnLight, "symbol": "⌗", "title": qsTr("Select subtitle region"), "label": qsTr("Subtitle region"), "value": qsTr("Select"), "description": qsTr("Open the native capture selector"), "subtitle": qsTr("Open the native capture selector"), "enabled": Boolean(controller && controller.selectNarratorSubtitleRegion) },
-            { "id": "narrator-reselect", "icon": App.UiIcons.couchGlyphCapture, "iconOnLight": App.UiIcons.couchGlyphCaptureOnLight, "symbol": "▣", "title": qsTr("Choose window again"), "label": qsTr("Game window"), "value": narratorSession.captureGrantSaved === true ? qsTr("Saved") : qsTr("Not chosen"), "description": qsTr("Forget the saved window for this game only"), "subtitle": qsTr("Forget the saved window for this game only"), "enabled": true },
-            { "id": active ? "narrator-stop" : "narrator-start", "icon": active ? App.UiIcons.couchGlyphStop : App.UiIcons.couchGlyphStart, "iconOnLight": active ? App.UiIcons.couchGlyphStopOnLight : App.UiIcons.couchGlyphStartOnLight, "symbol": active ? "■" : "▶", "title": active ? qsTr("Stop Narrator") : narratorSession.cardState === "error" ? qsTr("Retry") : qsTr("Start Narrator"), "label": active ? qsTr("Stop Narrator") : narratorSession.cardState === "error" ? qsTr("Retry") : qsTr("Start Narrator"), "value": active ? qsTr("Active") : App.I18n.narratorState(narratorSession).text, "description": narratorStartMessage(), "subtitle": narratorStartMessage(), "enabled": active || (narratorData.enabled === true && narratorSession.canStart === true) }
-        ]
     }
     function optiScalerExecutable() {
         var selected = optiScalerData.selectedExecutable || ({})
@@ -518,11 +393,9 @@ FocusScope {
         if (selectedTab === 3)
             return optiScalerActions()
         if (selectedTab === 4)
-            return narratorActions()
-        if (selectedTab === 5)
             return [{"id": "post-processing", "icon": App.UiIcons.couchGlyphTune, "title": qsTr("Post-processing"),
                      "subtitle": qsTr("Configure ReShade / vkBasalt"), "enabled": true}]
-        if (selectedTab === 6)
+        if (selectedTab === 5)
             return [{"id": "frame-generation", "icon": App.UiIcons.couchGlyphTune, "title": qsTr("Frame generation"),
                      "subtitle": qsTr("Configure lsfg-vk / MAKO / afmf-linux"), "enabled": true}]
         return [{ "id": "unavailable", "icon": App.UiIcons.couchGlyphInfo, "iconOnLight": App.UiIcons.couchGlyphInfoOnLight, "symbol": "i", "title": qsTr("Unavailable in this version"), "enabled": false }]
@@ -531,7 +404,7 @@ FocusScope {
     // States come only from the loaded per-game data; "Preview" marks features
     // that are saved but not yet applied when the game launches.
     function featureInfo(id) {
-        if (id !== "narrator" && !launcherIntegrationSupported)
+        if (!launcherIntegrationSupported)
             return { "tone": "unavailable", "state": qsTr("Unavailable"), "detail": qsTr("Not supported for this launcher"), "preview": false }
         if (id === "gamemode" || id === "gamescope") {
             var tool = optimizationData ? optimizationData[id] : null
@@ -566,17 +439,6 @@ FocusScope {
                 return { "tone": "success", "state": qsTr("Installed"), "detail": qsTr("Upscaling: %1").arg(optiScalerModeLabel()), "preview": false }
             return { "tone": "neutral", "state": qsTr("Not installed"), "detail": qsTr("Install from the OptiScaler tab"), "preview": false }
         }
-        // Narrator
-        if (!narratorData || narratorData.success !== true)
-            return { "tone": "neutral", "state": qsTr("Unknown"), "detail": qsTr("Settings not loaded"), "preview": false }
-        var narratorSessionState = narratorSession && narratorSession.cardState ? narratorSession
-                : { "cardState": narratorData.enabled === true ? "manual" : "disabled" }
-        var narratorCard = App.I18n.narratorState(narratorSessionState)
-        var voiceName = String(narratorSession.voiceName || narratorData.voiceName || "")
-        return { "tone": narratorCard.tone,
-                 "state": narratorSessionActive() ? narratorStatusLabel() : narratorCard.text,
-                 "detail": voiceName.length ? qsTr("Voice: %1").arg(voiceName) : narratorLanguageLabel(),
-                 "preview": false }
     }
     function gamescopeSummaryFromData() {
         var data = optimizationData || ({})
@@ -605,8 +467,6 @@ FocusScope {
           "title": "MangoHud", "info": featureInfo("mangohud"), "enabled": launcherIntegrationSupported, "primary": false },
         { "id": "optiscaler", "icon": App.UiIcons.couchGlyphOptiscaler, "iconOnLight": App.UiIcons.couchGlyphOptiscalerOnLight,
           "title": "OptiScaler", "info": featureInfo("optiscaler"), "enabled": launcherIntegrationSupported, "primary": false },
-        { "id": "narrator", "icon": App.UiIcons.couchGlyphNarrator, "iconOnLight": App.UiIcons.couchGlyphNarratorOnLight,
-          "title": qsTr("Lektor"), "info": featureInfo("narrator"), "enabled": true, "primary": false }
     ]
     function headerCardItem(index) {
         return index < 3 ? headerRowTop.itemAt(index) : headerRowBottom.itemAt(index - 3)
@@ -840,81 +700,6 @@ FocusScope {
         if (!controller || !controller.getProtonTweaks || !game.id) return
         var result = controller.getProtonTweaks(String(game.id)) || ({})
         protonTweaksData = result.success ? result : ({})
-    }
-    function loadNarrator() {
-        if (!controller || !game.id) {
-            narratorData = ({})
-            narratorSession = ({})
-            return
-        }
-        if (controller.getNarratorGameSettings)
-            narratorData = controller.getNarratorGameSettings(String(game.id)) || ({})
-        if (controller.getNarratorSessionState)
-            narratorSession = controller.getNarratorSessionState(String(game.id)) || ({})
-    }
-    function saveNarratorValue(key, value) {
-        if (!controller || !controller.saveNarratorGameSettings || !game.id)
-            return false
-        var payload = ({})
-        payload[key] = value
-        var saved = Boolean(controller.saveNarratorGameSettings(String(game.id), payload))
-        if (saved)
-            loadNarrator()
-        return saved
-    }
-    function activateNarratorAction(id) {
-        if (id === "narrator-reload") {
-            loadNarrator()
-            return narratorData.success === true
-        }
-        if (id === "narrator-enabled")
-            return saveNarratorValue("enabled", narratorData.enabled !== true)
-        if (id === "narrator-language")
-            return saveNarratorValue("subtitleLanguageMode",
-                    String(narratorData.subtitleLanguageMode || "english_to_polish") === "polish"
-                    ? "english_to_polish" : "polish")
-        if (id === "narrator-source")
-            return saveNarratorValue("sourceMode",
-                    String(narratorData.sourceMode || "auto") === "ocr" ? "auto" : "ocr")
-        if (id === "narrator-ocr")
-            return saveNarratorValue("ocrProviderId",
-                String(narratorData.ocrProviderId || "") === "rapidocr-local" ? "tesseract-fast-eng" : "rapidocr-local")
-        if (id === "narrator-voice") {
-            var voices = narratorVoices()
-            if (!voices.length)
-                return false
-            var selected = String(narratorData.voiceId || "")
-            var voiceIndex = -1
-            for (var index = 0; index < voices.length; ++index) {
-                if (String(voices[index].id || "") === selected) {
-                    voiceIndex = index
-                    break
-                }
-            }
-            return saveNarratorValue("voiceId",
-                    String(voices[(voiceIndex + 1) % voices.length].id || ""))
-        }
-        if (id === "narrator-volume") {
-            var volume = Math.round((Number(narratorData.volume || 0) + 0.05) * 100) / 100
-            return saveNarratorValue("volume", volume > 1 ? 0 : volume)
-        }
-        if (id === "narrator-rate") {
-            var rate = Math.round((Number(narratorData.speechRate || 1) + 0.1) * 10) / 10
-            return saveNarratorValue("speechRate", rate > 2 ? 0.5 : rate)
-        }
-        if (id === "narrator-region")
-            return Boolean(controller.selectNarratorSubtitleRegion
-                    && controller.selectNarratorSubtitleRegion(
-                        String(game.id), narratorData.subtitleRegion || ({})))
-        if (id === "narrator-reselect")
-            return Boolean(controller.chooseNarratorWindowAgain
-                    && controller.chooseNarratorWindowAgain(String(game.id)))
-        if (id === "narrator-start")
-            return Boolean(controller.startNarrator
-                    && controller.startNarrator(String(game.id)))
-        if (id === "narrator-stop")
-            return Boolean(controller.stopNarrator && controller.stopNarrator())
-        return false
     }
     function refreshCouchOptiScaler() {
         return Boolean(controller && controller.refreshOptiScalerRelease
@@ -1763,10 +1548,7 @@ FocusScope {
         }
         if (id === "compress")
             return prepareCompression() ? "open" : "error"
-        if (id.indexOf("narrator-") === 0) {
-            var narratorResult = activateNarratorAction(id)
-            return narratorResult ? (id === "narrator-region" ? "open" : "confirm") : "error"
-        }
+
         if (id === "gamemode") {
             openGameModeOverlay()
             return "open"
@@ -2080,8 +1862,8 @@ FocusScope {
     Timer { id: launchGuard; interval: 1800; onTriggered: page.launchPending = false }
     onSelectedTabChanged: Qt.callLater(ensureAction)
     focus: visible
-    Component.onCompleted: { applyDefaultProfile(); loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); loadNarrator(); restoreActiveFocus() }
-    onVisibleChanged: if (visible) { loadMangoHudProfile(); loadNarrator(); restoreActiveFocus() }
+    Component.onCompleted: { applyDefaultProfile(); loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); restoreActiveFocus() }
+    onVisibleChanged: if (visible) { loadMangoHudProfile(); restoreActiveFocus() }
     onGameChanged: {
         if (mangoHudKeyboard && mangoHudKeyboard.opened) mangoHudKeyboard.close(false)
         if (customLaunchKeyboard && customLaunchKeyboard.opened) customLaunchKeyboard.close(false)
@@ -2096,7 +1878,7 @@ FocusScope {
             profileChosenByUser = false
             applyDefaultProfile()
         }
-        focusArea = 0; headerIndex = 0; loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); loadNarrator(); Qt.callLater(ensureHeaderCard)
+        focusArea = 0; headerIndex = 0; loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); Qt.callLater(ensureHeaderCard)
     }
     property string profileGameId: ""
 
@@ -2111,14 +1893,6 @@ FocusScope {
         function onOptiScalerStatusChanged(changedGameId, result) {
             if (String(changedGameId) === String(page.game.id || ""))
                 page.applyOptiScalerStatus(result)
-        }
-        function onNarratorChanged(changedGameId) {
-            if (String(changedGameId) === String(page.game.id || ""))
-                page.loadNarrator()
-        }
-        function onNarratorRegionSelectionChanged(changedGameId, region) {
-            if (String(changedGameId) === String(page.game.id || ""))
-                page.loadNarrator()
         }
         function onProtonTweaksChanged(appId) {
             if (String(appId) === String(page.game.steamAppId || ""))
@@ -2507,9 +2281,8 @@ FocusScope {
                                          : page.selectedTab === 1 ? storageContent
                                          : page.selectedTab === 2 ? optimizationContent
                                          : page.selectedTab === 3 ? optiScalerContent
-                                         : page.selectedTab === 4 ? narratorContent
-                                         : page.selectedTab === 5 ? postProcessingContent
-                                         : page.selectedTab === 6 ? frameGenerationContent
+                                         : page.selectedTab === 4 ? postProcessingContent
+                                         : page.selectedTab === 5 ? frameGenerationContent
                                          : unavailableContent
                     }
                 }
@@ -2674,130 +2447,6 @@ FocusScope {
                 Label { text: qsTr("Executable"); color: App.Theme.textSecondary; font.pixelSize: 16 * page.couchScale }
                 Label { text: page.optiScalerModeLabel(); color: App.Theme.text; font.pixelSize: 20 * page.couchScale; font.weight: Font.Bold }
                 Label { text: page.optiScalerExecutable().length > 0 ? page.optiScalerExecutable() : qsTr("Not detected"); color: App.Theme.text; font.pixelSize: 18 * page.couchScale; elide: Text.ElideMiddle }
-            }
-            Item { Layout.fillHeight: true }
-        }
-    }
-    Component {
-        id: narratorContent
-        ColumnLayout {
-            spacing: 14 * page.couchScale
-            RowLayout {
-                Layout.fillWidth: true
-                Label {
-                    Layout.fillWidth: true
-                    text: qsTr("Per-game Narrator")
-                    color: App.Theme.text
-                    font.pixelSize: 27 * page.couchScale
-                    font.weight: Font.Bold
-                }
-                Rectangle {
-                    implicitWidth: narratorStateLabel.implicitWidth + 28 * page.couchScale
-                    implicitHeight: 38 * page.couchScale
-                    radius: height / 2
-                    color: page.narratorSessionActive() ? App.Theme.successSoft : App.Theme.surfaceRaised
-                    border.width: 1
-                    border.color: page.narratorSessionActive() ? App.Theme.success : App.Theme.border
-                    Label {
-                        id: narratorStateLabel
-                        anchors.centerIn: parent
-                        text: page.narratorStatusLabel()
-                        color: page.narratorSessionActive() ? App.Theme.success : App.Theme.textSecondary
-                        font.pixelSize: 15 * page.couchScale
-                        font.weight: Font.Bold
-                    }
-                }
-            }
-            Label {
-                Layout.fillWidth: true
-                text: qsTr("These settings are saved only for %1. Use the action cards above to configure and start narration with the controller.").arg(String(page.game.name || qsTr("this game")))
-                color: App.Theme.textSecondary
-                font.pixelSize: 17 * page.couchScale
-                wrapMode: Text.WordWrap
-            }
-            GridLayout {
-                Layout.fillWidth: true
-                columns: 4
-                columnSpacing: 10 * page.couchScale
-                Repeater {
-                    model: [
-                        { "label": qsTr("Capture"), "value": page.narratorCaptureStateLabel(String(page.narratorSession.captureState || "stopped")) },
-                        { "label": qsTr("OCR"), "value": page.narratorOcrStateLabel(String(page.narratorSession.ocrStatus || "component_missing")) },
-                        { "label": qsTr("Translation"), "value": page.narratorInferenceStateLabel(String(page.narratorSession.translationStatus || "component_missing"), qsTr("Translating"), qsTr("Translation error")) },
-                        { "label": qsTr("Speech"), "value": page.narratorInferenceStateLabel(String(page.narratorSession.ttsStatus || "component_missing"), qsTr("Generating speech"), qsTr("Speech error")) }
-                    ]
-                    delegate: Rectangle {
-                        id: narratorMetric
-                        required property var modelData
-                        Layout.fillWidth: true
-                        Layout.preferredHeight: 74 * page.couchScale
-                        radius: 14 * page.couchScale
-                        color: App.Theme.surfaceRaised
-                        border.width: 1
-                        border.color: App.Theme.border
-                        ColumnLayout {
-                            anchors.fill: parent
-                            anchors.margins: 11 * page.couchScale
-                            spacing: 2 * page.couchScale
-                            Label { Layout.fillWidth: true; text: narratorMetric.modelData.label; color: App.Theme.textMuted; font.pixelSize: 13 * page.couchScale; elide: Text.ElideRight }
-                            Label { Layout.fillWidth: true; text: narratorMetric.modelData.value; color: App.Theme.text; font.pixelSize: 17 * page.couchScale; font.weight: Font.Bold; elide: Text.ElideRight }
-                        }
-                    }
-                }
-            }
-            Rectangle {
-                Layout.fillWidth: true
-                Layout.preferredHeight: narratorSummary.implicitHeight + 24 * page.couchScale
-                radius: 14 * page.couchScale
-                color: App.Theme.surfaceRaised
-                border.width: 1
-                border.color: (page.narratorSession.missingRequirements || []).length
-                              ? App.Theme.warning : App.Theme.border
-                ColumnLayout {
-                    id: narratorSummary
-                    anchors.left: parent.left
-                    anchors.right: parent.right
-                    anchors.verticalCenter: parent.verticalCenter
-                    anchors.margins: 12 * page.couchScale
-                    spacing: 5 * page.couchScale
-                    Label {
-                        Layout.fillWidth: true
-                        text: (page.narratorSession.missingRequirements || []).length
-                              ? qsTr("%1 required component(s) are missing").arg((page.narratorSession.missingRequirements || []).length)
-                              : qsTr("Local Narrator components are ready")
-                        color: (page.narratorSession.missingRequirements || []).length
-                               ? App.Theme.warning : App.Theme.success
-                        font.pixelSize: 16 * page.couchScale
-                        font.weight: Font.Bold
-                    }
-                    Label {
-                        Layout.fillWidth: true
-                        text: qsTr("Language: %1 · Voice: %2 · Volume: %3% · Speech: %4×")
-                              .arg(page.narratorLanguageLabel())
-                              .arg(page.narratorVoiceLabel())
-                              .arg(Math.round(Number(page.narratorData.volume || 0) * 100))
-                              .arg(Number(page.narratorData.speechRate || 1).toFixed(1))
-                        color: App.Theme.textSecondary
-                        font.pixelSize: 15 * page.couchScale
-                        elide: Text.ElideRight
-                    }
-                }
-            }
-            Label {
-                Layout.fillWidth: true
-                visible: String(page.narratorSession.lastDetectedText || "").length > 0
-                text: qsTr("Last subtitle: %1").arg(String(page.narratorSession.lastDetectedText || ""))
-                color: App.Theme.textSecondary
-                font.pixelSize: 16 * page.couchScale
-                elide: Text.ElideRight
-            }
-            Label {
-                Layout.fillWidth: true
-                visible: String(page.narratorSession.lastTranslation || "").length > 0
-                text: qsTr("Last translation: %1").arg(String(page.narratorSession.lastTranslation || ""))
-                color: App.Theme.textSecondary
-                font.pixelSize: 16 * page.couchScale
-                elide: Text.ElideRight
             }
             Item { Layout.fillHeight: true }
         }

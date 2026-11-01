@@ -44,7 +44,7 @@ def test_couch_icon_set_is_packaged_and_mapped() -> None:
     expected = {
         "library", "tasks", "updates", "settings", "launch",
         "check-updates", "overview", "storage", "optimization",
-        "optiscaler", "narrator",
+        "optiscaler",
     }
     assert {path.stem for path in couch_dir.glob("*.svg")} == expected
     for path in couch_dir.glob("*.svg"):
@@ -59,8 +59,8 @@ def test_couch_icon_set_is_packaged_and_mapped() -> None:
 
     action_names = {
         "analyze", "verify-compression", "apply-optimization",
-        "polish-subtitles", "capture-window", "voice", "volume",
-        "speech-speed", "subtitle-area", "install", "remove",
+           "volume",
+          "install", "remove",
         "gamemode", "gamescope", "mangohud",
     }
     action_dir = couch_dir / "actions"

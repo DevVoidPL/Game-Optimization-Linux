@@ -20,35 +20,7 @@ QtObject {
         }
     }
 
-    // Honest Narrator state for a game, from session.cardState (backend):
     // disabled | waiting_for_game | manual | missing | running | error.
-    function narratorMissingLabel(kind) {
-        switch (text(kind)) {
-        case "capture": return qsTr("screen capture")
-        case "ocr": return qsTr("subtitle OCR")
-        case "translation": return qsTr("translation")
-        case "tts": return qsTr("voice")
-        case "audio": return qsTr("audio output")
-        default: return text(kind)
-        }
-    }
-    function narratorState(session) {
-        var data = session || ({})
-        var state = text(data.cardState)
-        if (state === "running")
-            return { "tone": "success", "text": qsTr("Running") }
-        if (state === "error")
-            return { "tone": "danger", "text": qsTr("Error: %1").arg(message(text(data.message)) || qsTr("Unknown")) }
-        if (state === "missing") {
-            var labels = (data.missingRequirements || []).map(function(kind) { return narratorMissingLabel(kind) })
-            return { "tone": "warning", "text": qsTr("On · missing: %1").arg(labels.join(", ")) }
-        }
-        if (state === "waiting_for_game")
-            return { "tone": "success", "text": qsTr("On · starts with the game") }
-        if (state === "manual")
-            return { "tone": "info", "text": qsTr("On · start the Narrator manually") }
-        return { "tone": "neutral", "text": qsTr("Off") }
-    }
 
     function profile(value) {
         switch (text(value)) {
@@ -516,84 +488,6 @@ QtObject {
             return qsTr("Baseline recording exceeded the four-hour MangoHud limit")
         case "A baseline recording is already active for this game":
             return qsTr("A baseline recording is already active for this game")
-        case "Narrator settings saved":
-            return qsTr("Narrator settings saved")
-        case "Narrator settings could not be saved":
-            return qsTr("Narrator settings could not be saved")
-        case "This narrator component operation is already running":
-            return qsTr("This narrator component operation is already running")
-        case "Stop the narrator before changing its components":
-            return qsTr("Stop the narrator before changing its components")
-        case "Narrator component installed":
-            return qsTr("Narrator component installed")
-        case "Install the verified component through the application":
-            return qsTr("Install the verified component through the application")
-        case "The desktop portal session bus is unavailable":
-            return qsTr("The desktop portal session bus is unavailable")
-        case "The ScreenCast portal is unavailable":
-            return qsTr("The ScreenCast portal is unavailable")
-        case "The ScreenCast portal exposes no monitor or window sources":
-            return qsTr("The ScreenCast portal exposes no monitor or window sources")
-        case "Wayland portal capture is available":
-            return qsTr("Wayland portal capture is available")
-        case "GStreamer PipeWire capture is available":
-            return qsTr("GStreamer PipeWire capture is available")
-        case "The portal transport is provided by the application runtime":
-            return qsTr("The portal transport is provided by the application runtime")
-        case "The Tesseract OCR runtime is unavailable":
-            return qsTr("The Tesseract OCR runtime is unavailable")
-        case "Install the verified English OCR model":
-            return qsTr("Install the verified English OCR model")
-        case "Tesseract English subtitle OCR is ready":
-            return qsTr("Tesseract English subtitle OCR is ready")
-        case "Verified 3.9 MiB English tessdata_fast model":
-            return qsTr("Verified 3.9 MiB English tessdata_fast model")
-        case "Verified 64.2 MiB Argos OPUS model for local CPU translation":
-            return qsTr("Verified 64.2 MiB Argos OPUS model for local CPU translation")
-        case "Verified 60.3 MiB Polish Piper voice for local CPU speech":
-            return qsTr("Verified 60.3 MiB Polish Piper voice for local CPU speech")
-        case "PCM is sent directly to the sandbox audio service":
-            return qsTr("PCM is sent directly to the sandbox audio service")
-        case "Local English to Polish translation is ready":
-            return qsTr("Local English to Polish translation is ready")
-        case "The local CTranslate2 translation runtime is unavailable":
-            return qsTr("The local CTranslate2 translation runtime is unavailable")
-        case "Install the verified English to Polish translation model":
-            return qsTr("Install the verified English to Polish translation model")
-        case "Piper Polish speech synthesis is ready":
-            return qsTr("Piper Polish speech synthesis is ready")
-        case "The Piper CPU runtime is unavailable":
-            return qsTr("The Piper CPU runtime is unavailable")
-        case "Install the verified Polish Piper voice":
-            return qsTr("Install the verified Polish Piper voice")
-        case "Install the Voidek Polish voice or import your own Piper voice":
-            return qsTr("Install the Voidek Polish voice or import your own Piper voice")
-        case "The Voidek voice is included with GameOpti":
-            return qsTr("The Voidek voice is included with GameOpti")
-        case "This voice is no longer offered":
-            return qsTr("This voice is no longer offered")
-        case "This voice is no longer offered for download":
-            return qsTr("This voice is no longer offered for download")
-        case "The selected game is not running":
-            return qsTr("The selected game is not running")
-        case "Narrator is disabled for this game":
-            return qsTr("Narrator is disabled for this game")
-        case "No game subtitle adapter is available":
-            return qsTr("No game subtitle adapter is available")
-        case "The game exited":
-            return qsTr("The game exited")
-        case "No audio output device is available":
-            return qsTr("No audio output device is available")
-        case "The audio output does not support the narrator PCM format":
-            return qsTr("The audio output does not support the narrator PCM format")
-        case "Narrator PCM playback buffer could not be opened":
-            return qsTr("Narrator PCM playback buffer could not be opened")
-        case "Narrator audio playback failed":
-            return qsTr("Narrator audio playback failed")
-        case "Screen capture permission was cancelled":
-            return qsTr("Screen capture permission was cancelled")
-        case "Screen capture stopped":
-            return qsTr("Screen capture stopped")
         case "Could not reach GitHub. Check the internet connection and try again":
             return qsTr("Could not reach GitHub. Check the internet connection and try again")
         case "GitHub did not list any Nightly build right now; the installation was not changed. Try again in a few minutes":
@@ -620,14 +514,6 @@ QtObject {
             return qsTr("game directory is unavailable")
         case "A game file or directory is not accessible":
             return qsTr("A game file or directory is not accessible")
-        case "The portal capture session closed":
-            return qsTr("The capture session was closed (the chosen window disappeared or the choice was cancelled)")
-        case "Check the preview - it should show the game":
-            return qsTr("Check the preview - it should show the game")
-        case "Narrator started with the game":
-            return qsTr("Narrator started with the game")
-        case "Narrator started with the game. Choose the game window once; the choice is remembered":
-            return qsTr("Narrator started with the game. Choose the game window once; the choice is remembered")
         case "Checking OptiScaler took too long":
             return qsTr("Checking OptiScaler took too long")
         case "The installation can only be relocated when every recorded file matches in the new game directory":
@@ -729,30 +615,6 @@ QtObject {
         match = original.match(/^Failed to refresh OptiScaler status: (.+)$/)
         if (match)
             return qsTr("Failed to refresh OptiScaler status: %1").arg(message(match[1]))
-        match = original.match(/^Narrator components are unavailable: (.+)$/)
-        if (match)
-            return qsTr("Narrator components are unavailable: %1").arg(match[1])
-        match = original.match(/^The selected (OCR|translation|speech) provider is not available: (.+)$/)
-        if (match)
-            return qsTr("The selected %1 provider is not available: %2").arg(match[1]).arg(match[2])
-        match = original.match(/^The selected translation profile is not available: (.+)$/)
-        if (match)
-            return qsTr("The selected translation profile is not available: %1").arg(match[1])
-        match = original.match(/^The selected Polish voice is not available: (.+)$/)
-        if (match)
-            return qsTr("The selected Polish voice is not available: %1").arg(match[1])
-        match = original.match(/^OCR failed: (.+)$/)
-        if (match)
-            return qsTr("OCR failed: %1").arg(match[1])
-        match = original.match(/^Translation failed: (.+)$/)
-        if (match)
-            return qsTr("Translation failed: %1").arg(match[1])
-        match = original.match(/^Speech synthesis failed: (.+)$/)
-        if (match)
-            return qsTr("Speech synthesis failed: %1").arg(match[1])
-        match = original.match(/^Audio playback failed: (.+)$/)
-        if (match)
-            return qsTr("Audio playback failed: %1").arg(match[1])
         match = original.match(/^Game category: (.+)$/)
         if (match)
             return qsTr("Game category: %1").arg(optimizationCategory(match[1]))

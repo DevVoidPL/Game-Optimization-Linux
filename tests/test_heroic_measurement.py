@@ -17,7 +17,7 @@ import time
 import pytest
 
 from game_optimization_linux.services import BaselineSessionRepository
-from game_optimization_linux.services.narrator_activity import NarratorGameActivityDetector
+from game_optimization_linux.services.game_activity import GameActivityDetector
 from test_game_analysis import _mangohud_log
 from test_heroic_optiscaler import APP_NAME, _controller, _flatpak_heroic
 from test_heroic_tool_plans import _Host, _MangoDetector, _Tools
@@ -62,7 +62,7 @@ def measured(tmp_path: Path, monkeypatch):
         controller._launcher_native = _Launcher(fail=launcher_fails)
         processes = _Processes()
         optimization = controller._optimization_controller
-        optimization._launcher_activity = NarratorGameActivityDetector(
+        optimization._launcher_activity = GameActivityDetector(
             lambda key: game if key == game.id else None,
             host_processes=processes, sandboxed=True, min_interval=0.0,
         )
@@ -175,7 +175,6 @@ def test_short_process_gap_does_not_end_the_recording(measured) -> None:
     processes.lines = [_game_line(game)]
     optimization._poll_baseline_sessions()
     assert controller._baseline_sessions.load(game.profile_key).status == "recording"
-
 
 
 def test_cancel_removes_the_session_variables(measured) -> None:

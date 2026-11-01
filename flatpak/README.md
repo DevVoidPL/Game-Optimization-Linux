@@ -42,8 +42,8 @@ must use the host executable. Local installation preserves application data.
 Exporting a bundle does not publish a GitHub release.
 
 The manifest includes the maintained runner installer and required application
-assets. Optional graphics components and Narrator models are downloaded on
-demand; private voice files and local configuration are not part of the build.
+assets. Optional graphics components are downloaded on demand; local
+configuration is not part of the build.
 
 ## Couch Edition and Desktop Edition
 
@@ -58,5 +58,9 @@ flatpak run org.flatpak.Builder --force-clean --user --install-deps-from=flathub
   flatpak/io.github.DevVoidPL.GameOptimizationLinux.desktop-edition.yml
 ```
 
-Both editions bundle the Voidek voice from `flatpak/bundled/` (not tracked in git;
-the manifest pins its SHA-256). Both use the same App ID and user data.
+Both editions use the same App ID and user data.
+
+Export the two repositories separately, using filenames ending in
+`-couch-edition-x86_64.flatpak` and `-desktop-edition-x86_64.flatpak`.
+Install only the edition you intend to use. For an existing system-wide
+installation, use `flatpak install --system --reinstall` instead of `--user`.

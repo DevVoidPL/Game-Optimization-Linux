@@ -79,7 +79,6 @@ class UiSoundService(QObject):
         self._window_active = False
         self._launch_suspended = False
         self._launch_saw_window_inactive = False
-        self._ducked = False
         self._music_gain = 0.0
         self._music_target_gain = 0.0
         self._shutdown = False
@@ -92,9 +91,6 @@ class UiSoundService(QObject):
     def musicPlaying(self) -> bool:
         return self._music_started and self._music_target_gain > 0.0
 
-    @Property(bool, notify=musicStateChanged)
-    def musicDucked(self) -> bool:
-        return self._ducked
 
     @Slot(result=bool)
     def initialize(self) -> bool:
@@ -309,9 +305,6 @@ class UiSoundService(QObject):
     def stopMenuMusic(self) -> None:
         self.set_couch_active(False)
 
-    @Slot(bool)
-    def setMusicDucked(self, ducked: bool) -> None:
-        self.set_music_ducked(ducked)
 
     def set_couch_active(self, active: bool) -> None:
         if self._shutdown:
@@ -364,15 +357,6 @@ class UiSoundService(QObject):
         self._launch_saw_window_inactive = False
         self._update_music_playback()
 
-    def set_music_ducked(self, ducked: bool) -> None:
-        if self._shutdown:
-            return
-        normalized = bool(ducked)
-        if normalized == self._ducked:
-            return
-        self._ducked = normalized
-        self.musicStateChanged.emit()
-        self._update_music_playback()
 
     def _music_wanted(self) -> bool:
         return (
@@ -388,7 +372,7 @@ class UiSoundService(QObject):
         if wanted and not self._music_started:
             if not self._start_music_backend():
                 return
-        self._music_target_gain = (0.28 if self._ducked else 1.0) if wanted else 0.0
+        self._music_target_gain = 1.0 if wanted else 0.0
         if self._music_callback is not None:
             if wanted:
                 self._set_music_volume(self._music_target_gain)
@@ -598,7 +582,6 @@ class UiSoundService(QObject):
         self._window_active = False
         self._launch_suspended = False
         self._launch_saw_window_inactive = False
-        self._ducked = False
         self._initialized = False
         self.musicStateChanged.emit()
 
@@ -625,7 +608,6 @@ class NoOpUiSoundService(QObject):
         self._music_enabled = True
         self._couch_active = False
         self._window_active = False
-        self._ducked = False
         self._launch_suspended = False
         self._shutdown = False
 
@@ -639,9 +621,6 @@ class NoOpUiSoundService(QObject):
             and not self._launch_suspended
         )
 
-    @Property(bool, notify=musicStateChanged)
-    def musicDucked(self) -> bool:
-        return self._ducked
 
     @Slot(result=bool)
     def initialize(self) -> bool:
@@ -711,9 +690,6 @@ class NoOpUiSoundService(QObject):
     def stopMenuMusic(self) -> None:
         self.set_couch_active(False)
 
-    @Slot(bool)
-    def setMusicDucked(self, ducked: bool) -> None:
-        self.set_music_ducked(ducked)
 
     def set_couch_active(self, active: bool) -> None:
         if not self._shutdown:
@@ -740,10 +716,6 @@ class NoOpUiSoundService(QObject):
             self._launch_suspended = False
             self.musicStateChanged.emit()
 
-    def set_music_ducked(self, ducked: bool) -> None:
-        if not self._shutdown and self._ducked != bool(ducked):
-            self._ducked = bool(ducked)
-            self.musicStateChanged.emit()
 
     def stop_effects(self) -> None:
         return None
@@ -756,7 +728,6 @@ class NoOpUiSoundService(QObject):
         self._couch_active = False
         self._window_active = False
         self._launch_suspended = False
-        self._ducked = False
         self.musicStateChanged.emit()
 
     def stop(self) -> None:

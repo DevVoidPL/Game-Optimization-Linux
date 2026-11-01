@@ -1101,7 +1101,7 @@ Item {
                         SettingRow {
                             Layout.fillWidth: true
                             title: qsTr("Couch Mode music volume")
-                            description: qsTr("Low background level; Narrator speech ducks it automatically")
+                            description: qsTr("Low background music volume")
                             RowLayout {
                                 AppSlider {
                                     id: couchMusicVolumeSlider

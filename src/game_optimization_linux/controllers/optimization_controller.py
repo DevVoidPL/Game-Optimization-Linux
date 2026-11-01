@@ -64,7 +64,7 @@ from ..services.mangohud import CONFIG_FILE_NAME, MangoHudConfigWriter
 from ..services.performance_analysis import compare_measurements
 from ..services.tweaks_capabilities import runner_capabilities, log_directory, conflicts, merge_tweak_environment
 from ..services.launcher_integration import locate_config
-from ..services.narrator_activity import NarratorGameActivityDetector
+from ..services.game_activity import GameActivityDetector
 from ..services.performance_session import RUNNER_HEARTBEAT_STALE_SECONDS
 from ..services.automatic_optimization import verify_runtime_activation
 from ..services.post_processing import optional_launch_environment
@@ -1459,7 +1459,7 @@ class OptimizationController:
             if host is not None and getattr(host, "in_flatpak", False)
             else None
         )
-        detector = NarratorGameActivityDetector(
+        detector = GameActivityDetector(
             lambda game_id: self._app._resolve_game(game_id, show_error=False),
             host_processes=host_processes,
         )

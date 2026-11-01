@@ -155,9 +155,6 @@ FocusScope {
         if (pageName === "gameDetails") setSection("details", "tab-overview")
         else if (pageName === "updates") setSection("updates", "")
         else if (pageName === "tasks") setSection("tasks", "")
-        // The Narrator is per game in Couch (game details); the Desktop
-        // Narrator page has no Couch counterpart.
-        else if (pageName === "narrator" && ["home", "library"].indexOf(section) < 0) setSection("home", "")
         else if (pageName === "settings") setSection("settings", "")
         else if (pageName === "games" && ["home", "library"].indexOf(section) < 0) setSection("home", "")
     }

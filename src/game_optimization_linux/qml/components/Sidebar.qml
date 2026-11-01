@@ -27,7 +27,6 @@ Rectangle {
 
     readonly property var destinations: [
         { "page": "games", "label": qsTr("Games"), "icon": App.UiIcons.sidebarGames },
-        { "page": "narrator", "label": qsTr("Narrator"), "icon": App.UiIcons.sidebarNarrator },
         { "page": "updates", "label": qsTr("Updates"), "icon": App.UiIcons.sidebarUpdates,
           "count": Math.max(0, sidebar.updatesPendingCount) },
         { "page": "tasks", "label": qsTr("Tasks"), "icon": App.UiIcons.sidebarTasks },

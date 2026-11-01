@@ -231,7 +231,6 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
     assert "updateColumn" not in sidebar
     for name, property_name in (
         ("games", "sidebarGames"),
-        ("narrator", "sidebarNarrator"),
         ("updates", "sidebarUpdates"),
         ("tasks", "sidebarTasks"),
         ("system", "sidebarSystem"),
@@ -240,9 +239,6 @@ def test_settings_and_sidebar_hide_nonfunctional_controls() -> None:
         assert f"App.UiIcons.{property_name}" in sidebar
         assert f'assets/ui-icons/sidebar-{name}.svg' in ui_icons
         assert (qml_root.parent / "assets" / "ui-icons" / f"sidebar-{name}.svg").is_file()
-    assert '"page": "narrator"' in sidebar
-    assert "assets/ui-icons/sidebar-narrator.svg" in ui_icons
-    assert (qml_root.parent / "assets" / "ui-icons" / "sidebar-narrator.svg").is_file()
 
 
 def test_kde_breeze_read_only_preview_has_no_textarea_warning(tmp_path: Path) -> None:
@@ -749,63 +745,6 @@ def test_incremental_games_model_keeps_existing_delegates_and_images(
     assert result["modelResetSignals"] == 0
 
 
-@pytest.mark.parametrize("scale", ["1.0", "1.5"])
-def test_narrator_region_selector_drag_move_resize_cancel_and_hidpi(
-    tmp_path: Path,
-    scale: str,
-) -> None:
-    payload = _run_probe(tmp_path, "narrator_region", scale=scale)
-    result = payload["result"]
-
-    assert result["opened"] is True
-    assert result["outsideIgnored"] is True
-    assert result["draftVisible"] is True
-    assert result["draftVisibleDuringDrag"] is True
-    assert result["releaseFinalized"] is True
-    assert result["created"] == pytest.approx((0.15, 0.20, 0.60, 0.15), abs=0.004)
-    assert result["moved"] == pytest.approx((0.25, 0.30, 0.60, 0.15), abs=0.004)
-    assert result["resized"] == pytest.approx((0.25, 0.30, 0.70, 0.25), abs=0.004)
-    assert result["resetInvalid"] is True
-    assert result["recreated"] == pytest.approx((0.20, 0.60, 0.60, 0.22), abs=0.003)
-    assert result["saveSignals"] == 1
-    assert result["savedRegion"] == pytest.approx(
-        {"x": 0.20, "y": 0.60, "width": 0.60, "height": 0.22},
-        abs=0.003,
-    )
-    assert result["sourceDimensions"] == [1600, 900]
-    assert result["selectedSourceDimensions"] == pytest.approx(
-        [960, 198], abs=2
-    )
-    assert result["mainHidden"] is True
-    assert result["mainRestored"] is True
-    assert result["coordinatorSubmissions"] == 1
-    assert result["cancelDidNotSubmit"] is True
-    assert result["cancelRestoredMain"] is True
-    assert result["pageRequestedNative"] is True
-    assert result["pageRegion"] == pytest.approx((0.2, 0.6, 0.6, 0.22))
-    assert result["ocrHistoryRendered"] is True
-    assert result["popupAbsent"] is True
-    assert result["applicationType"] == "QApplication"
-
-
-def test_narrator_page_exposes_bounded_ocr_decision_diagnostics() -> None:
-    source = (ROOT / "src/game_optimization_linux/qml/pages/NarratorPage.qml").read_text(
-        encoding="utf-8"
-    )
-
-    assert 'qsTr("Recent OCR decisions (%1)")' in source
-    assert '["ocrDecisionHistory"]' in source
-    assert "candidateObservationCount" in source
-    assert "candidateMatchKind" in source
-    assert "ttsSubmitted" in source
-    assert "minimumTokenConfidence" in source
-    assert "cleanShortPhraseEvidence" in source
-    assert "visualChangeDecision" in source
-    assert "filterSummary" in source
-    assert 'qsTr("Raw: %1")' in source
-    assert 'qsTr("Filtered: %1 · normalized: %2")' in source
-
-
 def signal_number(name: str) -> int:
     import signal
 
@@ -877,15 +816,3 @@ def test_details_artwork_and_localized_feature_sections(tmp_path: Path) -> None:
     assert "nie są jeszcze dostępne" in result["plannedTexts"][1]
     assert result["plannedTexts"][2] in {"Wyłączone", "Przetwarzanie…"}
     assert result["plannedInstallButtons"] == []
-
-
-def test_narrator_hides_developer_diagnostics_but_keeps_play_controls(tmp_path: Path) -> None:
-    result = _run_probe(tmp_path, "narrator_layout")["result"]
-    for mode in ("False", "True"):
-        assert result[mode]["startStopVisible"]
-        assert result[mode]["lastTextCollapsed"]
-        assert result[mode]["lastTextCanExpand"]
-    assert not result["False"]["diagnosticsCreated"]
-    assert not result["False"]["rawDiagnosticsExist"]
-    assert result["True"]["diagnosticsCreated"]
-    assert result["True"]["rawDiagnosticsExist"]

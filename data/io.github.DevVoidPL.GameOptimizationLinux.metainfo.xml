@@ -10,7 +10,7 @@
   </developer>
   <url type="homepage">https://github.com/DevVoidPL/GameOptimizationLinux</url>
   <description>
-    <p>Game Optimization Linux presents local Steam installations, storage information, and guarded optimization workflows.</p>
+    <p>GameOpti manages Steam, Heroic, Lutris and custom games with per-game graphics and launch profiles, performance monitoring and Btrfs storage tools.</p>
   </description>
   <launchable type="desktop-id">io.github.DevVoidPL.GameOptimizationLinux.desktop</launchable>
   <icon type="stock">io.github.DevVoidPL.GameOptimizationLinux</icon>

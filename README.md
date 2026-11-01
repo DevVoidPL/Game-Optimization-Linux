@@ -25,11 +25,11 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/beta-2-library-dark.png" width="960" alt="GameOpti Beta 2.0 dark library interface with game covers">
+  <img src="docs/screenshots/beta-2-library-dark.png" width="960" alt="GameOpti dark library interface with sample games">
 </p>
 
-**GameOpti 2.1 adds an optional RapidOCR engine to the Narrator.** Tesseract stays
-the default; download RapidOCR models from the Narrator settings to try it.
+The screenshots show current development source. The 2.1 release downloads
+below predate these changes. See the build instructions to use current source.
 Report problems through [GitHub Issues](https://github.com/DevVoidPL/Game-Optimization-Linux/issues).
 News and demonstrations are on [YouTube](https://www.youtube.com/@Void_Developer_PL).
 
@@ -51,7 +51,6 @@ Keep individual settings for each title rather than changing everything globally
 | 📊 **MangoHud** | Per-game presets, metric selection, colours, placement, layout preview, FPS limiting and performance logging. |
 | 📈 **Measured optimization** | Record a baseline in the scene you actually play, test one change, compare FPS, 1% lows, frame times, power and memory, then keep or revert it. Results stay local to that game and system, and "keep what you had" is a valid outcome. |
 | 💾 **Compression & cleanup** | Btrfs zstd compression, sample-based level selection, before/after storage measurements, update-aware compression and task history. Deep analysis and reversible cleanup quarantine help review reclaimable space. |
-| 🎙️ **Narrator / Lektor** | Local subtitle recognition, optional English-to-Polish translation and Polish speech with a built-in voice. Per-game subtitle regions, portal screen capture and support for your own Piper voices. |
 | 🛠️ **Tweaks** | Per-game Proton compatibility controls, applied through the launcher that starts the game. |
 | 🛋️ **Interface** | Desktop Mode in both editions; full-screen Couch Mode with controller navigation in the Couch Edition. Light/dark themes and English, Polish and Spanish. |
 
@@ -75,7 +74,7 @@ by installing the other bundle without losing your profiles.
 | Couch Mode for controller and TV | ✓ | — |
 | Automatic switch to Couch Mode when a controller is used | ✓ | — |
 | Controller settings | ✓ | — |
-| Library, launchers, graphics, storage, MangoHud, Narrator, measurements | ✓ | ✓ |
+| Library, launchers, graphics, storage, MangoHud, measurements | ✓ | ✓ |
 
 Choose the **Couch Edition** for a living-room or handheld setup, and the
 **Desktop Edition** if you only use a mouse and keyboard.
@@ -173,9 +172,7 @@ directions: support will start with specific games and setups, and there is no r
 - [Testing and contributing](TESTING.md)
 - [Architecture and launch flow](docs/architecture.md)
 - [Btrfs compression measurements](docs/compression_validation.md)
-- [Narrator components and licenses](docs/narrator-components.md)
 - [Release notes 2.1](docs/release-notes-2.1.md)
-- [RapidOCR setup and limits](docs/narrator-rapidocr.md)
 - [Build the Flatpak](flatpak/README.md)
 
 For source development, use Python 3.12+:
@@ -216,12 +213,9 @@ GameOpti builds on the work of [GameMode](https://github.com/FeralInteractive/ga
 [lsfg-vk](https://lsfg-vk.dev/), [MAKO](https://github.com/eugeniosegala/MAKO),
 [afmf-linux](https://github.com/serialexperimentslainnnn/afmf-linux),
 [dmemcg-booster](https://gitlab.steamos.cloud/holo/dmemcg-booster) and their contributors.
-Thanks also to the Wine/Proton, DXVK, vkd3d-proton, Mesa, Btrfs/compsize,
-PipeWire, Tesseract, CTranslate2, OPUS-MT/Argos and Piper communities,
+Thanks also to the Wine/Proton, DXVK, vkd3d-proton, Mesa and Btrfs/compsize communities,
 and the authors of the FSR variants and shaders used by the integrations.
 
-Third-party tools, models, game artwork and trademarks remain the property of
+Third-party tools, game artwork and trademarks remain the property of
 their respective authors and retain their own licenses. Proprietary Lossless
-Scaling files are not bundled with GameOpti. The bundled **Voidek** voice model is
-© DevVoidPL and has [its own license](flatpak/bundled/VOIDEK-LICENSE.md); it is not
-covered by the MIT license.
+Scaling files are not bundled with GameOpti.

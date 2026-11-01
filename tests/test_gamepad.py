@@ -505,7 +505,7 @@ def test_couch_navigation_disconnect_blocks_pad_and_5000_inputs_keep_focus() -> 
     assert navigation.inputModality == "keyboard"
 
 
-def test_couch_audio_semantics_rate_limit_music_duck_and_launch() -> None:
+def test_couch_audio_semantics_rate_limit_music_and_launch() -> None:
     now = [10.0]
     effects: list[str] = []
     music: list[tuple[str, float]] = []
@@ -531,14 +531,12 @@ def test_couch_audio_semantics_rate_limit_music_duck_and_launch() -> None:
     assert service.playConfirm() is True
     assert effects == ["navigate", "navigate", "confirm"]
 
-    service.set_music_ducked(True)
-    assert music[-1] == ("volume", 0.05600000000000001)
     service.begin_game_launch()
     assert effects[-1] == "launch"
     assert music[-1] == ("pause", 0.0)
     service.set_window_active(False)
     service.set_window_active(True)
-    assert music[-2:] == [("start", 0.2), ("volume", 0.05600000000000001)]
+    assert music[-2:] == [("start", 0.2), ("volume", 0.2)]
 
     service.set_couch_active(False)
     assert service.playConfirm() is False

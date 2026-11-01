@@ -1,4 +1,4 @@
-"""Read-only check whether a game is running (Narrator autostart and autostop).
+"""Read-only game process detection for launcher and measurement guards.
 
 A game counts as running when one process matches it:
 
@@ -16,8 +16,7 @@ Results are cached per game for ``min_interval`` seconds, and the host
 process list is shared by all games for the same time, so callers polling
 every frame do not spawn a process each time.
 
-``game_process_running`` is the stricter check used before autostart and the
-portal prompt: the process' own executable (argv[0]) must be inside the game
+``game_process_running`` is the stricter check: the process' own executable (argv[0]) must be inside the game
 directory and must not be a known launcher stub. Wrappers such as Steam's
 reaper, Proton or launchers only mention the path in their arguments.
 """
@@ -40,7 +39,7 @@ def _in_flatpak() -> bool:
     return Path("/.flatpak-info").exists()
 
 
-class NarratorGameActivityDetector:
+class GameActivityDetector:
     def __init__(
         self,
         game_loader: Callable[[str], Game | None],
@@ -75,7 +74,7 @@ class NarratorGameActivityDetector:
         return not self._sandboxed or self._host_processes is not None
 
     def supports(self, game: Game | None) -> bool:
-        """Whether this game can be recognised when it runs (for autostart)."""
+        """Whether this game can be recognised when it runs."""
 
         if game is None or not self.can_observe_processes:
             return False
@@ -274,4 +273,4 @@ class NarratorGameActivityDetector:
         return False
 
 
-__all__ = ["DEFAULT_MIN_INTERVAL_SECONDS", "NarratorGameActivityDetector"]
+__all__ = ["DEFAULT_MIN_INTERVAL_SECONDS", "GameActivityDetector"]

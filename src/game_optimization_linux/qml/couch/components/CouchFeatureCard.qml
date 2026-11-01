@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import "../.." as App
 
 // Card used in the Couch game-details header: the primary Launch card and the
-// GameMode / Gamescope / MangoHud / OptiScaler / Narrator feature cards.
+// GameMode / Gamescope / MangoHud / OptiScaler feature cards.
 // A card never toggles anything by itself; Confirm opens the existing
 // configuration (overlay or tab), so the state shown is always the saved one.
 Button {

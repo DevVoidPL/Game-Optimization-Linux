@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-import sys
 
 
 APP_NAME = "Game Optimization Linux"
@@ -64,10 +63,6 @@ CONFIG_DIR = CONFIG_HOME / _APP_DIRECTORY_NAME
 STATE_DIR = STATE_HOME / _APP_DIRECTORY_NAME
 CACHE_DIR = CACHE_HOME / _APP_DIRECTORY_NAME
 DATA_DIR = DATA_HOME / _APP_DIRECTORY_NAME
-# Narrator components shipped inside the application (Flatpak: /app/share/...).
-# <prefix>/lib/pythonX.Y/site-packages/game_optimization_linux -> <prefix>
-_INSTALL_PREFIX = Path(__file__).resolve().parents[4] if len(Path(__file__).resolve().parents) > 4 else Path(sys.prefix)
-BUNDLED_NARRATOR_COMPONENTS_DIR = _INSTALL_PREFIX / "share" / _APP_DIRECTORY_NAME / "narrator-components"
 SETTINGS_FILE = CONFIG_DIR / "settings.json"
 GAMEPAD_MAPPINGS_FILE = CONFIG_DIR / "gamecontrollerdb.txt"
 LIBRARY_CACHE_FILE = CACHE_DIR / "library-v1.json"
@@ -83,13 +78,6 @@ LOG_FILE = LOG_DIR / "game-optimization-linux.log"
 GAMES_CONFIG_DIR = CONFIG_DIR / "games"
 MANGOHUD_LOG_DIR = STATE_DIR / "mangohud-logs"
 OPTISCALER_DATA_DIR = DATA_DIR / "games"
-NARRATOR_COMPONENTS_DIR = DATA_DIR / "narrator" / "components"
-NARRATOR_TRANSLATION_CACHE_FILE = (
-    CACHE_DIR / "narrator" / "translation-cache-v1.sqlite3"
-)
-NARRATOR_CAPTURE_GRANTS_FILE = (
-    CONFIG_DIR / "narrator" / "capture-grants-v1.json"
-)
 
 
 __all__ = [
@@ -99,7 +87,6 @@ __all__ = [
     "APP_ICON_VARIANTS",
     "APP_NAME",
     "APP_VERSION",
-    "BUNDLED_NARRATOR_COMPONENTS_DIR",
     "ANALYSIS_CACHE_FILE",
     "CONFIG_DIR",
     "CONFIG_HOME",
@@ -116,9 +103,6 @@ __all__ = [
     "LOG_FILE",
     "MANGOHUD_LOG_DIR",
     "OPTISCALER_DATA_DIR",
-    "NARRATOR_CAPTURE_GRANTS_FILE",
-    "NARRATOR_COMPONENTS_DIR",
-    "NARRATOR_TRANSLATION_CACHE_FILE",
     "LIBRARY_CACHE_FILE",
     "LOCAL_EXECUTABLE_CHOICES_FILE",
     "MANUAL_GAMES_FILE",

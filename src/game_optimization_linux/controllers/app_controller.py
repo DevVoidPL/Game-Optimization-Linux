@@ -117,18 +117,6 @@ from ..services import (
     MangoHudLivePreview,
     GamescopeTestRun,
     ManualGameStore,
-    NarratorComponentManager,
-    NarratorGameActivityDetector,
-    NarratorPipeline,
-    NarratorSettingsRepository,
-    ArgosCTranslate2TranslationProvider,
-    MANAGED_VOICE_COMPONENTS,
-    TESSERACT_POLISH_COMPONENT_ID,
-    PiperPolishTtsProvider,
-    PortalScreenCaptureProvider,
-    QtPortalScreenCastBackend,
-    QtNarratorAudioOutput,
-    TesseractOcrProvider,
     SettingsStore,
     PrivilegedMeasurementClient,
     ProtonTweaksRepository,
@@ -137,7 +125,6 @@ from ..services import (
     SteamLauncher,
     UiSoundService,
     UnavailableBackupService,
-    UnavailableOcrProvider,
     UpdateDisplayStateStore,
     uses_flatpak_steam,
 )
@@ -166,8 +153,6 @@ from ..services.btrfs_recompression import (
 )
 from ..services.deep_cleanup import CleanupJournal, DeepCleanupExecutor
 from ..services.deep_optimization import DeepAnalysisRepository, DeepOptimizationAnalyzer
-from .narrator_controller import NarratorController
-from .narrator_region_selector import NarratorRegionSelectorCoordinator
 from .optimization_controller import OptimizationController
 from .custom_launch_controller import CustomLaunchController
 from .optiscaler_controller import OptiScalerController
@@ -192,7 +177,6 @@ _VALID_PAGES = {
     "games",
     "updates",
     "tasks",
-    "narrator",
     "donate",
     "system",
     "settings",
@@ -331,11 +315,6 @@ class AppController(QObject):
     optiScalerStatusChanged = Signal(str, "QVariantMap")
     protonTweaksChanged = Signal(str)
     optimizationAnalysisChanged = Signal(str)
-    narratorChanged = Signal(str)
-    narratorComponentsChanged = Signal()
-    narratorRegionPreviewChanged = Signal(str, "QVariantMap")
-    narratorRegionPreviewStopRequested = Signal(str, int)
-    narratorRegionSelectionChanged = Signal(str, "QVariantMap")
 
     toastRequested = Signal(str, str)
     toastDismissRequested = Signal(str)
@@ -386,9 +365,6 @@ class AppController(QObject):
         optiscaler_service: OptiScalerService | None = None,
         optiscaler_release_client: OptiScalerReleaseClient | None = None,
         proton_tweaks_repository: ProtonTweaksRepository | None = None,
-        narrator_settings_repository: NarratorSettingsRepository | None = None,
-        narrator_component_manager: NarratorComponentManager | None = None,
-        narrator_pipeline: NarratorPipeline | None = None,
         initial_games: Sequence[Game] | None = None,
         demo_mode: bool | None = None,
         auto_refresh: bool = True,
@@ -400,23 +376,6 @@ class AppController(QObject):
         self._compression_controller = CompressionController(self)
         self._updates_controller = UpdatesController(self)
         self._mangohud_controller = MangoHudController(self)
-        self._narrator_controller = NarratorController(self)
-        self._narrator_region_selector = NarratorRegionSelectorCoordinator(self)
-        self._pending_narrator_region_selector: tuple[
-            str, dict[str, Any]
-        ] | None = None
-        self.narratorRegionPreviewStopRequested.connect(
-            self._finishNarratorRegionPreviewCapture
-        )
-        self.narratorRegionPreviewChanged.connect(
-            self._handleNarratorRegionPreviewForSelector
-        )
-        self._narrator_region_selector.selectionSubmitted.connect(
-            self._saveNarratorRegionSelection
-        )
-        self._narrator_region_selector.cancelled.connect(
-            self._narratorRegionSelectorCancelled
-        )
         self._optiscaler_controller = OptiScalerController(self)
         self._optimization_controller = OptimizationController(self)
         self._custom_launch_controller = CustomLaunchController(self)
@@ -735,128 +694,6 @@ class AppController(QObject):
         )
         from .measured_optimization_controller import MeasuredOptimizationController
         self._measured_optimization = MeasuredOptimizationController(self)
-        self._narrator_settings_repository = (
-            narrator_settings_repository or NarratorSettingsRepository()
-        )
-        self._narrator_component_manager = (
-            narrator_component_manager or NarratorComponentManager()
-        )
-        if narrator_component_manager is None:
-            # The release bundles Voidek: install it once, hash-verified, so it
-            # works immediately without a download.
-            from ..config import BUNDLED_NARRATOR_COMPONENTS_DIR
-            try:
-                if self._narrator_component_manager.install_bundled(
-                        "tts.voidek", BUNDLED_NARRATOR_COMPONENTS_DIR):
-                    logger.info("Installed the bundled Voidek voice")
-            except (OSError, RuntimeError) as error:
-                logger.warning("Bundled Voidek voice could not be installed: %s", error)
-        if narrator_pipeline is None:
-            from ..services.narrator_rapidocr import RapidOcrProvider
-            narrator_backend = QtPortalScreenCastBackend(parent=self)
-            narrator_capture = PortalScreenCaptureProvider(narrator_backend)
-            narrator_audio = QtNarratorAudioOutput(parent=self)
-            narrator_pipeline = NarratorPipeline(
-                narrator_capture,
-                TesseractOcrProvider(),
-                ArgosCTranslate2TranslationProvider(),
-                PiperPolishTtsProvider(),
-                narrator_audio,
-                NarratorGameActivityDetector(
-                    lambda game_key: self._narrator_controller.game_for_key(game_key),
-                    host_processes=(
-                        host_service.host_process_commands
-                        if host_service is not None and host_service.in_flatpak
-                        else None
-                    ),
-                ),
-                ocr_providers=(RapidOcrProvider(),),
-            )
-        self._narrator_pipeline = narrator_pipeline
-        self._apply_narrator_ocr_mode(
-            str(getattr(self._settings_model, "narrator_ocr_mode", "automatic"))
-        )
-        capture_status = narrator_pipeline.capture.capabilities()
-        self._narrator_component_manager.set_runtime_state(
-            "capture.portal-pipewire",
-            capture_status.available,
-            capture_status.message,
-        )
-        ocr_language_available = getattr(
-            narrator_pipeline.ocr, "language_available", None
-        )
-        english_ocr_available = bool(
-            ocr_language_available("en")
-            if callable(ocr_language_available)
-            else narrator_pipeline.ocr.available
-        )
-        polish_ocr_available = bool(
-            ocr_language_available("pl")
-            if callable(ocr_language_available)
-            else False
-        )
-        self._narrator_component_manager.set_runtime_state(
-            "ocr.english-local",
-            english_ocr_available,
-            str(
-                getattr(
-                    narrator_pipeline.ocr,
-                    "status_message",
-                    (
-                        "Local English OCR is ready"
-                        if english_ocr_available
-                        else "No local English OCR provider is installed"
-                    ),
-                )
-            ),
-        )
-        self._narrator_component_manager.set_runtime_state(
-            TESSERACT_POLISH_COMPONENT_ID,
-            polish_ocr_available,
-            (
-                "Local Polish OCR is ready"
-                if polish_ocr_available
-                else "No local Polish OCR model is installed"
-            ),
-        )
-        self._narrator_component_manager.set_runtime_state(
-            "translation.opus-en-pl",
-            narrator_pipeline.translator.available,
-            (
-                "Local English to Polish translation is ready"
-                if narrator_pipeline.translator.available
-                else "No local English to Polish translation provider is installed"
-            ),
-        )
-        voice_available = getattr(narrator_pipeline.tts, "voice_available", None)
-        for component_id, voice_id in MANAGED_VOICE_COMPONENTS.items():
-            ready = bool(voice_available(voice_id)) if callable(voice_available) else False
-            self._narrator_component_manager.set_runtime_state(
-                component_id,
-                ready,
-                f"Piper Polish voice {voice_id} is ready" if ready
-                else f"Install the verified Polish voice {voice_id}"
-                if self._narrator_component_manager.can_install(component_id)
-                else self._narrator_component_manager.offer_message(component_id),
-            )
-        self._narrator_component_manager.set_runtime_state(
-            "audio.qt-pcm",
-            narrator_pipeline.audio.available,
-            (
-                "Qt PCM audio output is available"
-                if narrator_pipeline.audio.available
-                else "No sandbox audio output is available"
-            ),
-        )
-        for component_id in (
-            "ocr.rapidocr-local",
-            "ocr.english-local",
-            TESSERACT_POLISH_COMPONENT_ID,
-            "translation.opus-en-pl",
-            *MANAGED_VOICE_COMPONENTS,
-            "audio.qt-pcm",
-        ):
-            self._narrator_controller._refresh_component_runtime(component_id)
         self._ui_sound_service = (
             UiSoundService(parent=self)
             if ui_sound_service is None
@@ -889,7 +726,6 @@ class AppController(QObject):
         )
         self._gamepad_service.actionTriggered.connect(self._on_gamepad_action)
         self._gamepad_service.inputActivity.connect(self._on_gamepad_activity)
-        self._gamepad_service.shortcutTriggered.connect(self._on_gamepad_shortcut)
         self._configure_gamepad_service()
 
         self._games: list[dict[str, Any]] = []
@@ -926,10 +762,7 @@ class AppController(QObject):
         self._manual_runtime_reports: dict[str, dict[str, Any]] = {}
         self._shutdown_requested = False
         self._consume_gamepad_action = ""
-        # Gamepad input reaches the UI only while GameOpti's own window is
-        # active; the Select+Y narrator shortcut is handled separately so it
-        # keeps working while a game holds focus. Default active until QML
-        # reports otherwise, so headless/desktop startup is unchanged.
+        # Do not steer the Couch UI while the game has focus.
         self._window_active = True
         self._last_launch_request: dict[str, float] = {}
         from ..edition import couch_available
@@ -1227,9 +1060,6 @@ class AppController(QObject):
     def settings(self) -> dict[str, Any]:
         return self._settings
 
-    @Property("QVariantList", notify=narratorComponentsChanged)
-    def narratorComponents(self) -> list[dict[str, Any]]:
-        return self._narrator_controller.components()
 
     @Property(str, constant=True)
     def appName(self) -> str:
@@ -1718,13 +1548,7 @@ class AppController(QObject):
 
     @Slot(str, result=bool)
     def launchGame(self, game_id: str) -> bool:
-        launched = self._launch_game(game_id)
-        if launched and not self._demo_mode:
-            game = self._resolve_game(game_id, show_error=False)
-            if game is not None:
-                # Lets the Narrator start with the game and stop after it.
-                self._narrator_controller.game_launched(game)
-        return launched
+        return self._launch_game(game_id)
 
     def _launch_game(self, game_id: str) -> bool:
         game = self._resolve_game(game_id)
@@ -2237,9 +2061,6 @@ class AppController(QObject):
         self._window_active = bool(active)
         self._ui_sound_service.set_window_active(bool(active))
 
-    @Slot(bool)
-    def setCouchMusicDucked(self, ducked: bool) -> None:
-        self._ui_sound_service.set_music_ducked(bool(ducked))
 
     @Slot(str, result="QVariantMap")
     def optimizationDefaults(self, profile: str) -> dict[str, Any]:
@@ -2603,195 +2424,6 @@ class AppController(QObject):
             game_id, change_id
         )
 
-    @Slot(result="QVariantMap")
-    def getNarratorGlobalSettings(self) -> dict[str, Any]:
-        return self._narrator_controller.get_global_settings()
-
-    @Slot("QVariantMap", result=bool)
-    def saveNarratorGlobalSettings(self, values: Mapping[str, Any]) -> bool:
-        return self._narrator_controller.save_global_settings(values)
-
-    @Slot(str, result="QVariantMap")
-    def getNarratorGameSettings(self, game_id: str) -> dict[str, Any]:
-        return self._narrator_controller.get_settings(game_id)
-
-    @Slot(str, "QVariantMap", result=bool)
-    def saveNarratorGameSettings(
-        self, game_id: str, values: Mapping[str, Any]
-    ) -> bool:
-        return self._narrator_controller.save_settings(game_id, values)
-
-    @Slot(str, result=bool)
-    def clearNarratorGameOverrides(self, game_id: str) -> bool:
-        return self._narrator_controller.clear_overrides(game_id)
-
-    @Slot(str, result="QVariantMap")
-    def getNarratorSessionState(self, game_id: str) -> dict[str, Any]:
-        return self._narrator_controller.session_state(game_id)
-
-    @Slot(str, result=bool)
-    def startNarrator(self, game_id: str) -> bool:
-        return self._narrator_controller.start(game_id)
-
-    @Slot(result=bool)
-    def stopNarrator(self) -> bool:
-        return self._narrator_controller.stop()
-
-    @Slot(str, result=bool)
-    def chooseNarratorWindowAgain(self, game_id: str) -> bool:
-        return self._narrator_controller.choose_window_again(game_id)
-
-    @Slot(str, result=bool)
-    def requestNarratorRegionPreview(self, game_id: str) -> bool:
-        return self._narrator_controller.request_region_preview(game_id)
-
-    @Slot(str, "QVariantMap", result=bool)
-    def selectNarratorSubtitleRegion(
-        self,
-        game_id: str,
-        initial_region: Mapping[str, Any],
-    ) -> bool:
-        """Capture one frame and open the native top-level ROI selector."""
-
-        normalized_game_id = str(game_id)
-        if not normalized_game_id:
-            return False
-        self._pending_narrator_region_selector = (
-            normalized_game_id,
-            dict(initial_region),
-        )
-        if self._narrator_controller.request_region_preview(normalized_game_id):
-            return True
-        self._pending_narrator_region_selector = None
-        return False
-
-    @Slot(str, result=bool)
-    def cancelNarratorRegionPreview(self, game_id: str) -> bool:
-        pending = self._pending_narrator_region_selector
-        if pending is not None and pending[0] == str(game_id):
-            self._pending_narrator_region_selector = None
-        return self._narrator_controller.cancel_region_preview(game_id)
-
-    @Slot("QVariantMap", result="QVariantMap")
-    def mapNarratorRegionPreview(
-        self, values: Mapping[str, Any]
-    ) -> dict[str, Any]:
-        return self._narrator_controller.map_region_preview(values)
-
-    @Slot(str, int)
-    def _finishNarratorRegionPreviewCapture(
-        self, game_id: str, generation: int
-    ) -> None:
-        self._narrator_controller.finish_region_preview_capture(
-            game_id, generation
-        )
-
-    @Slot(str, "QVariantMap")
-    def _handleNarratorRegionPreviewForSelector(
-        self,
-        game_id: str,
-        preview: object,
-    ) -> None:
-        pending = self._pending_narrator_region_selector
-        if pending is None or pending[0] != str(game_id):
-            return
-        if not isinstance(preview, Mapping):
-            return
-        state = str(preview.get("state", ""))
-        if state == "ready" and bool(preview.get("success", False)):
-            self._pending_narrator_region_selector = None
-            try:
-                self._narrator_region_selector.show_selector(
-                    str(game_id),
-                    preview,
-                    pending[1],
-                )
-            except Exception as error:
-                logger.exception("Could not open native Narrator region selector")
-                self._emit_toast(
-                    str(error) or "The subtitle region selector could not be opened",
-                    "error",
-                )
-            return
-        if not bool(preview.get("success", True)):
-            self._pending_narrator_region_selector = None
-
-    @Slot(str, object)
-    def _saveNarratorRegionSelection(
-        self,
-        game_id: str,
-        region: object,
-    ) -> None:
-        if not isinstance(region, Mapping):
-            self._narrator_region_selector.show_error(
-                "The subtitle area is invalid"
-            )
-            return
-        if not self._narrator_controller.save_settings(
-            str(game_id),
-            {"subtitleRegion": dict(region)},
-        ):
-            self._narrator_region_selector.show_error(
-                "The subtitle area could not be saved"
-            )
-            return
-        # The native selector owns only the UI window; finish the capture
-        # preview explicitly after persistence so its lifecycle cannot remain
-        # active when the selector closes.
-        self._narrator_controller.cancel_region_preview(str(game_id))
-        values = self._narrator_controller.get_settings(str(game_id))["subtitleRegion"]
-        self._narrator_region_selector.complete_selection()
-        self.narratorRegionSelectionChanged.emit(str(game_id), values)
-
-    @Slot(str)
-    def _narratorRegionSelectorCancelled(self, game_id: str) -> None:
-        self._pending_narrator_region_selector = None
-        self._narrator_controller.cancel_region_preview(str(game_id))
-
-    def attach_main_window(self, window: QObject | None) -> None:
-        """Attach the QML top-level window for hide/restore lifecycle handling."""
-
-        self._narrator_region_selector.attach_main_window(window)
-
-    @Slot(str, result=bool)
-    def installNarratorComponent(self, component_id: str) -> bool:
-        return self._narrator_controller.install_component(component_id)
-
-    @Slot(str, result=bool)
-    def updateNarratorComponent(self, component_id: str) -> bool:
-        return self._narrator_controller.update_component(component_id)
-
-    @Slot(str, result=bool)
-    def removeNarratorComponent(self, component_id: str) -> bool:
-        return self._narrator_controller.remove_component(component_id)
-
-    @Slot(str, bool, result="QVariantMap")
-    def importNarratorCustomVoice(
-        self, model_file: str, allow_other_language: bool = False
-    ) -> dict[str, Any]:
-        text = str(model_file or "").strip()
-        url = QUrl(text)
-        if url.scheme():
-            if not url.isLocalFile():
-                return {
-                    "success": False,
-                    "errorCode": "not_local",
-                    "error": "Only local voice files are supported",
-                }
-            text = url.toLocalFile()
-        if not text:
-            return {
-                "success": False,
-                "errorCode": "not_onnx",
-                "error": "Choose a Piper voice model file (.onnx)",
-            }
-        return self._narrator_controller.import_custom_voice(
-            Path(text).expanduser(), bool(allow_other_language)
-        )
-
-    @Slot(str, result=bool)
-    def removeNarratorCustomVoice(self, voice_id: str) -> bool:
-        return self._narrator_controller.remove_custom_voice(voice_id)
 
     @Slot(str)
     @Slot(str, str)
@@ -2853,20 +2485,6 @@ class AppController(QObject):
                 live_preview.shutdown()
             except Exception:
                 logger.exception("Could not stop the MangoHud live preview")
-        narrator_controller = getattr(self, "_narrator_controller", None)
-        narrator_region_selector = getattr(
-            self, "_narrator_region_selector", None
-        )
-        if narrator_region_selector is not None:
-            narrator_region_selector.shutdown()
-        if narrator_controller is not None:
-            narrator_controller.shutdown()
-        narrator_pipeline = getattr(self, "_narrator_pipeline", None)
-        if narrator_pipeline is not None:
-            try:
-                narrator_pipeline.shutdown()
-            except Exception:
-                logger.exception("Could not stop narrator workers cleanly")
         if hasattr(self, "_library_scanner"):
             try:
                 self._library_scanner.shutdown(timeout_ms=2000)
@@ -3050,26 +2668,12 @@ class AppController(QObject):
             self._couch_available
             and self._settings_model.controller_mode is ControllerMode.AUTOMATIC
             and self._interface_mode == "desktop"
-            and self._narrator_region_selector.active_window is None
         ):
             self._set_interface_mode("couch")
             self._consume_gamepad_action = str(action)
 
-    @Slot(str)
-    def _on_gamepad_shortcut(self, shortcut: str) -> None:
-        if shortcut == "narrator_toggle":
-            result = self._narrator_controller.toggle_for_running_game()
-            logger.info("Gamepad shortcut %s handled: result=%s", shortcut, bool(result))
 
     def _on_gamepad_action(self, action: str) -> None:
-        # While the native subtitle-region selector is open it owns the pad,
-        # whatever the interface mode or main-window focus (the main window is
-        # hidden behind the selector, so _window_active is False then).
-        if self._narrator_region_selector.active_window is not None:
-            normalized = normalize_gamepad_action(action)
-            if normalized is not None:
-                self._narrator_region_selector.handle_gamepad_action(normalized.value)
-            return
         if self._consume_gamepad_action and action == self._consume_gamepad_action:
             self._consume_gamepad_action = ""
             return
@@ -3080,8 +2684,7 @@ class AppController(QObject):
             return
         # Only steer GameOpti while its own window is active. When a game holds
         # focus the window is inactive; gamepad navigation must go to the game,
-        # not to GameOpti. The Select+Y narrator shortcut is handled in
-        # _on_gamepad_shortcut and stays available regardless of focus.
+        # not to GameOpti.
         if not self._window_active:
             return
         normalized = normalize_gamepad_action(action)
@@ -3653,7 +3256,6 @@ class AppController(QObject):
         self._optiscaler_controller._poll_status_jobs()
         self._optimization_controller._poll_baseline_sessions()
         self._optimization_controller._poll_analysis_jobs()
-        self._narrator_controller.poll()
 
     def _manual_launch_plan(self, game: Game, configuration: Any, *,
                             measurement_environment: Mapping[str, str] | None = None,
@@ -3885,7 +3487,6 @@ class AppController(QObject):
             "games": "games",
             "updates": "updates",
             "tasks": "tasks",
-            "narrator": "narrator",
             "donate": "donate",
             "system": "system",
             "settings": "settings",
@@ -3925,14 +3526,6 @@ class AppController(QObject):
     ) -> str:
         return self._optimization_controller._provider_launch_preview(game, options)
 
-    def _apply_narrator_ocr_mode(self, mode: str) -> None:
-        """Pass the Narrator "OCR mode" setting to the OCR provider."""
-        pipeline = getattr(self, "_narrator_pipeline", None)
-        resolver = getattr(pipeline, "ocr_provider_for", None)
-        provider = resolver() if callable(resolver) else getattr(pipeline, "ocr", None)
-        setter = getattr(provider, "set_settings_mode", None)
-        if callable(setter):
-            setter(mode)
 
     @staticmethod
     def _apply_runtime_log_level(level_name: str) -> None:

@@ -83,7 +83,6 @@ FocusScope {
     signal openGame(string gameId)
     signal openLibrary()
     signal openSettings()
-    signal openNarrator()
 
     function buildRuntimeProbeMetrics() {
         var minimumActionHeight = 0

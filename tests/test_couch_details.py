@@ -89,19 +89,20 @@ def test_launch_preview_uses_internal_profile_value_for_every_preset(details, tm
 
 def test_tab_and_action_ids_are_preserved(details) -> None:
     tabs = [tab["id"] for tab in _plain(details.property("tabs"))]
-    assert tabs == ["overview", "storage", "optimization", "optiscaler", "narrator", "post-processing", "frame-generation"]
+    assert tabs == ["overview", "storage", "optimization", "optiscaler", "post-processing", "frame-generation"]
     expected = {
         0: ["launch", "updates"],
         1: ["analyze", "verify", "exact-measure", "profile", "compress"],
         2: ["optimization-profile", "measured-optimization", "gamemode", "gamescope", "mangohud-profile"],
-        6: ["frame-generation"],
+        4: ["post-processing"],
+        5: ["frame-generation"],
     }
     for tab, ids in expected.items():
         details.setProperty("selectedTab", tab)
         _settle()
         assert [a["id"] for a in _plain(details.property("actionModel"))] == ids
     cards = [card["id"] for card in _plain(details.property("headerCards"))]
-    assert cards == ["launch", "gamemode", "gamescope", "mangohud", "optiscaler", "narrator"]
+    assert cards == ["launch", "gamemode", "gamescope", "mangohud", "optiscaler"]
 
 
 def test_feature_cards_show_real_state(details) -> None:
@@ -114,7 +115,6 @@ def test_feature_cards_show_real_state(details) -> None:
     details.setProperty("mangoHudProfile", {"available": False, "availabilityMessage": "MangoHud is unavailable."})
     details.setProperty("optiScalerData", {"success": True, "installed": True, "installationState": "installed",
                                            "requestedFsr4Mode": "normal"})
-    details.setProperty("narratorData", {"success": True, "enabled": True})
     _settle()
     info = {card["id"]: card["info"] for card in _plain(details.property("headerCards"))}
     assert (info["gamemode"]["state"], info["gamemode"]["preview"]) == ("On", True)
@@ -122,12 +122,6 @@ def test_feature_cards_show_real_state(details) -> None:
     assert info["gamescope"]["preview"] is False
     assert info["mangohud"]["tone"] == "unavailable"
     assert (info["optiscaler"]["state"], info["optiscaler"]["tone"]) == ("Installed", "success")
-    # Without a session state the card never claims the Narrator will start.
-    assert info["narrator"]["state"] == "On · start the Narrator manually"
-    details.setProperty("narratorSession", {"cardState": "missing", "missingRequirements": ["tts"]})
-    _settle()
-    info = {card["id"]: card["info"] for card in _plain(details.property("headerCards"))}
-    assert info["narrator"]["state"] == "On · missing: voice"
     launch = _plain(details.property("headerCards"))[0]["info"]
     assert launch["detail"] == "Profile: Automatic"
 
@@ -150,14 +144,10 @@ def test_focus_order_header_tabs_actions_content(details) -> None:
     assert act("NavigateUp") == 0
 
 
-def test_optiscaler_and_narrator_cards_open_their_tabs(details) -> None:
+def test_optiscaler_card_opens_its_tab(details) -> None:
     details.setProperty("headerIndex", 4)
     _call(details, "activateHeader")
     assert int(details.property("selectedTab")) == 3 and int(details.property("focusArea")) == 2
-    details.setProperty("focusArea", 0)
-    details.setProperty("headerIndex", 5)
-    _call(details, "activateHeader")
-    assert int(details.property("selectedTab")) == 4
 
 
 def test_details_use_only_couch_glyphs_and_no_hardcoded_controller_state() -> None:
@@ -205,64 +195,6 @@ def test_carousel_shows_only_whole_covers() -> None:
             home.deleteLater()
             _settle()
             del engine
-
-
-def test_narrator_action_grid_is_balanced_readable_and_navigable() -> None:
-    """Narrator actions use a 4x3 grid, including the optional OCR engine."""
-
-    from PySide6.QtCore import Property, Signal, Slot
-    from PySide6.QtTest import QTest
-
-    from test_couch_settings_screen import _act, _probe, _view  # shared small probe helpers
-    from game_optimization_linux.translations import TranslationManager
-
-    class Controller(QObject):
-        changed = Signal()
-
-        @Property("QVariantMap", notify=changed)
-        def selectedGame(self):
-            return {"id": "steam-1", "name": "Game", "launcher": "Steam", "launchAllowed": True,
-                    "libraryAvailable": True, "status": "Ready"}
-
-        @Slot(str, result="QVariant")
-        def getNarratorGameSettings(self, _game_id):
-            return {"success": True, "enabled": False, "volume": 0.85, "speechRate": 1.0,
-                    "voices": [{"id": "gosia", "name": "Gosia", "available": True}], "voiceId": "gosia"}
-
-        @Slot(str, result="QVariant")
-        def getNarratorSessionState(self, _game_id):
-            return {"status": "idle", "canStart": False, "reasonCode": "components_missing"}
-
-    manager = TranslationManager(QCoreApplication.instance())
-    manager.set_language("pl")
-    controller = Controller()
-    condition = ('item.objectName === "couchDetailsActionTile" || item.objectName === "couchTileTitle"'
-                 ' || item.objectName === "couchDetailsActionsViewport"')
-    view, root = _view("CouchGameDetails", COUCH, condition, 1920, 1080, {"controller": controller})
-    try:
-        root.setProperty("selectedTab", 4)
-        QMetaObject.invokeMethod(root, "loadNarrator", Qt.DirectConnection)
-        root.setProperty("focusArea", 2)
-        root.setProperty("selectedAction", 0)
-        QTest.qWait(250)
-        ids = [action["id"] for action in _plain(root.property("actionModel"))]
-        assert ids == ["narrator-enabled", "narrator-language", "narrator-source", "narrator-ocr",
-                       "narrator-voice", "narrator-volume", "narrator-rate", "narrator-region", "narrator-reselect", "narrator-start"]
-        viewport = root.findChild(QObject, "couchDetailsActionsViewport")
-        assert (viewport.property("columns"), viewport.property("rows")) == (4, 3)
-        titles = [item for item in _probe(root) if item["name"] == "couchTileTitle"]
-        assert titles and not [item["text"] for item in titles if item["truncated"]]
-        _act(root, "NavigateDown")                                   # same column, next row
-        assert root.property("selectedAction") == 4
-        _act(root, "NavigateDown")                                   # third row, an enabled tile
-        actions = _plain(root.property("actionModel"))
-        selected = root.property("selectedAction")
-        assert 8 <= selected <= 9 and actions[selected]["enabled"] is True
-        _act(root, "NavigateDown")                                   # past the last row -> content
-        assert root.property("focusArea") == 3
-    finally:
-        view.close()
-        manager.set_language("en")
 
 
 class _MeasureController(QObject):
