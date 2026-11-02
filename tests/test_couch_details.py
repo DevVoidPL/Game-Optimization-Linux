@@ -92,8 +92,8 @@ def test_tab_and_action_ids_are_preserved(details) -> None:
     assert tabs == ["overview", "storage", "optimization", "optiscaler", "post-processing", "frame-generation"]
     expected = {
         0: ["launch", "updates"],
-        1: ["analyze", "verify", "exact-measure", "profile", "compress"],
-        2: ["optimization-profile", "measured-optimization", "gamemode", "gamescope", "mangohud-profile"],
+        1: ["analyze", "verify", "exact-measure", "profile", "compress", "deep-analysis", "recompression"],
+        2: ["optimization-profile", "measured-optimization", "gamemode", "gamescope", "mangohud-profile", "gpu-memory"],
         4: ["post-processing"],
         5: ["frame-generation"],
     }

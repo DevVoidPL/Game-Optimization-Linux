@@ -1,0 +1,21 @@
+# Keep source archives useful for contributors without local workspace material.
+.gameopti-ai-*.md export-ignore
+.go-tmp export-ignore
+.local-only export-ignore
+.venv export-ignore
+.pytest_cache export-ignore
+.flatpak-* export-ignore
+.agents export-ignore
+.claude export-ignore
+.codex export-ignore
+AGENTS.md export-ignore
+CLAUDE.md export-ignore
+GEMINI.md export-ignore
+prompts export-ignore
+sessions export-ignore
+build export-ignore
+dist export-ignore
+reports export-ignore
+.env export-ignore
+.env.local export-ignore
+.env.production export-ignore

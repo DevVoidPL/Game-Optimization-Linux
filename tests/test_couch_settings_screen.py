@@ -64,13 +64,13 @@ def test_settings_screen_contract() -> None:
             QCoreApplication.processEvents()
 
     rows = {row["id"]: row for row in page.property("rows").toVariant()}
-    assert {"language", "appearance", "couch-motion", "swap", "deadzone", "backup-path", "reset",
+    assert {"language", "appearance", "couch-motion", "swap", "deadzone", "reset",
             "desktop", "menu-volume"} <= set(rows)
     # Nothing reads or enforces these settings, so Couch Mode no longer offers them.
     assert not {"experimental", "cpu-limit", "gpu-limit"} & set(rows)
-    # No backend uses them yet: visible but disabled, the stored value untouched.
+    # Unused controls are absent; legacy persisted values are not removed.
     for row_id in ("automatic-updates", "backup-path", "quarantine-path"):
-        assert rows[row_id]["enabled"] is False, row_id
+        assert row_id not in rows
     nav = page.findChild(QObject, "couchSettingsNavigation")
     assert nav.property("count") == 4 and nav.property("activeIndex") == 3
 

@@ -4153,7 +4153,7 @@ def probe_couch_settings(
     }
     required_rows = {
         "auto-compression", "auto-profile", "menu-volume",
-        "steam-paths", "game-paths", "backup-path"
+        "steam-paths", "game-paths"
     }
     if not required_rows.issubset(row_indexes):
         raise AssertionError(f"Missing Couch Settings rows: {required_rows - row_indexes.keys()}")

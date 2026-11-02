@@ -5,8 +5,8 @@
 <h1 align="center">GameOpti 2.1</h1>
 
 <p align="center">
-  Manage your Linux game library, graphics, performance and storage from one application.<br>
-  Couch Edition for your controller and TV, Desktop Edition for mouse and keyboard.
+  Per-game launch profiles, graphics tools and storage management for Linux.<br>
+  Use a controller in Couch Mode or a mouse and keyboard in Desktop Mode.
 </p>
 
 <p align="center">
@@ -35,9 +35,10 @@ News and demonstrations are on [YouTube](https://www.youtube.com/@Void_Developer
 
 ## Features
 
-GameOpti brings the tools around your games into one place: choose a game,
-configure its profile, apply your changes and launch through its existing launcher.
-Keep individual settings for each title rather than changing everything globally.
+Choose a game from Steam, Heroic, Lutris or your manually added library, configure
+its profile, then launch it through the launcher you already use. Settings are
+saved per game. Availability depends on the game, graphics API and launch environment;
+changing a setting does not guarantee better performance.
 
 | | What you can manage |
 | --- | --- |
@@ -81,10 +82,15 @@ Choose the **Couch Edition** for a living-room or handheld setup, and the
 
 ## Interface
 
-Focused per-game pages keep compression, optimization, upscaling, effects,
-MangoHud and performance analysis within easy reach. Component installation,
-saved settings and runtime status are presented separately. Backups and restore
-actions stay alongside the integrations they belong to.
+Each game has pages for storage, launch settings, upscaling, post-processing and
+frame generation. The interface distinguishes installed components, saved settings
+and runtime evidence: an installed layer is not proof that a game loaded it.
+Integrations include backup and restore actions where supported.
+
+Couch Mode uses the D-pad to select or adjust options, A to confirm and B to go
+back. The executable selector lists detected game binaries and offers an on-screen
+keyboard when you need to enter a path. Downloads and installation changes require
+confirmation. Controller mappings can differ; follow the hints shown in the app.
 
 <table>
   <tr>
@@ -114,7 +120,7 @@ captures; the Couch preview uses demo data. [Screenshot notes](docs/screenshots/
 
 ## Download and install
 
-The current release is
+The linked release is
 [**Game Optimization Linux 2.1**](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta) (Beta).
 Download one of its x86_64 Flatpak bundles:
 
@@ -140,8 +146,8 @@ GameOpti provides the runner setup instructions for Steam. Heroic and Lutris use
 **Apply to launcher** and their existing launch configuration. Tools must be
 available in the environment that runs the game, including launcher Flatpaks.
 
-To update or switch edition, download the bundle and install it with
-`flatpak install --user --reinstall ./Game-Optimization-Linux-*.flatpak`.
+To update or switch edition, download the bundle you want and install that exact
+file with `flatpak install --user --reinstall ./<downloaded-bundle>.flatpak`.
 Application settings are retained. To remove the application, use
 `flatpak uninstall --user io.github.DevVoidPL.GameOptimizationLinux`.
 

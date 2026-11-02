@@ -45,6 +45,13 @@ The manifest includes the maintained runner installer and required application
 assets. Optional graphics components are downloaded on demand; local
 configuration is not part of the build.
 
+Standalone dependency notices are kept under
+`/app/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/`, including
+7-Zip, MIT Kerberos and the versioned PySide6 license texts. Python wheel license
+files and distribution metadata are retained in `site-packages` as provided by
+upstream. This packaging check is not a comprehensive license review of every
+Qt module and third-party component bundled in the wheels.
+
 ## Couch Edition and Desktop Edition
 
 `io.github.DevVoidPL.GameOptimizationLinux.yml` builds the Couch Edition (complete
