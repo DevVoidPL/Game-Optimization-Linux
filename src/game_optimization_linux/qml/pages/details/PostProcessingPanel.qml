@@ -167,6 +167,7 @@ ScrollView {
                     Layout.fillWidth: true
                     Label { Layout.fillWidth: true; text: qsTr("Post-processing"); color: App.Theme.text; font.pixelSize: App.Theme.fontTitle; wrapMode: Text.WordWrap }
                     StatusBadge { objectName: "postProcessingState"
+                        visible: Boolean(panel.statusData.busy || panel.statusData.statusState === "error" || panel.statusData.installed)
                         text: panel.statusData.busy ? qsTr("Working…") : panel.statusData.statusState === "error" ? qsTr("Shader / configuration error")
                               : panel.statusData.runtimeLoaded ? qsTr("Runtime loaded · effects not verified")
                               : panel.statusData.installed ? qsTr("Installed · runtime not verified") : qsTr("Off")

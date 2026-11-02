@@ -172,7 +172,7 @@ Item {
         scheduledRevision += 1
         var revision = scheduledRevision
         Qt.callLater(function() {
-            if (!artworkRoot.shuttingDown
+            if (artworkRoot && !artworkRoot.shuttingDown
                     && revision === scheduledRevision)
                 artworkRoot.reloadArtwork()
         })

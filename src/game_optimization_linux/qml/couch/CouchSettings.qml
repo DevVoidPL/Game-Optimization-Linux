@@ -56,8 +56,6 @@ FocusScope {
         { "id": "language", "category": "general", "title": qsTr("Language"), "value": languageLabel(setting("language", "English")), "enabled": true, "description": qsTr("Choose the interface language.") },
         { "id": "appearance", "category": "general", "title": qsTr("Appearance"), "value": themeLabel(setting("themeMode", "system")), "enabled": true, "description": qsTr("Follow the system colours or force a light or dark interface.") },
         { "id": "couch-motion", "category": "general", "title": qsTr("Couch Mode animations"), "value": motionLabel(setting("couchMotionMode", "full")), "enabled": true, "description": qsTr("Full, reduced or no movement in Couch Mode. Saved and applied immediately.") },
-        // Not implemented: no release check exists; shown disabled so the gap is visible.
-        { "id": "automatic-updates", "category": "automation", "title": qsTr("Automatic update checks"), "value": qsTr("Not implemented"), "enabled": false, "description": qsTr("Not implemented yet: GameOpti does not check for new releases itself. Updates arrive through Flatpak or the package manager.") },
         { "id": "log-level", "category": "advanced", "title": qsTr("Logging level"), "value": String(setting("logLevel", "INFO")), "enabled": true, "description": qsTr("Choose how much diagnostic information is recorded.") },
         { "id": "default-profile", "category": "automation", "title": qsTr("Default compression profile"), "value": enumLabel(setting("defaultCompressionProfile", "Auto")), "enabled": true, "description": qsTr("Preselected mode for storage operations.") },
 
@@ -89,14 +87,7 @@ FocusScope {
         { "id": "steam-paths", "category": "libraries", "title": qsTr("Additional Steam locations"), "value": listLabel("steamInstallationDirectories"), "enabled": true, "description": qsTr("Separate multiple paths with semicolons in the controller keyboard.") },
         { "id": "game-paths", "category": "libraries", "title": qsTr("Local game library directories"), "value": listLabel("libraryDirectories"), "enabled": true, "description": qsTr("Add existing local library roots; use semicolons between paths.") },
         { "id": "forgotten-library", "category": "libraries", "title": qsTr("Restore forgotten Steam library"), "value": ignoredLibraryLabel(), "enabled": stringList("ignoredSteamLibraries").length > 0, "description": qsTr("Use left/right to choose a path, then Confirm to restore it.") },
-        // Not implemented: no backend reads these paths (OptiScaler and deep cleanup use
-        // their own verified locations). Disabled rows keep the gap visible; saved values stay.
-        { "id": "backup-path", "category": "libraries", "title": qsTr("Backup directory"), "value": qsTr("Not implemented"), "enabled": false, "description": qsTr("Not implemented yet: OptiScaler keeps its backups per game in the application data folder and restores them from there. This path is not used.") },
-        { "id": "quarantine-path", "category": "libraries", "title": qsTr("Quarantine directory"), "value": qsTr("Not implemented"), "enabled": false, "description": qsTr("Not implemented yet: deep cleanup moves files to a quarantine folder on the same drive as the game, so they can be restored without copying. This path is not used.") },
 
-        // CPU/GPU limits and "Experimental features" were removed: nothing enforced
-        // or read them. cpu_limit_percent, gpu_limit_percent and experimental_features
-        // remain in settings.json untouched.
         { "id": "desktop", "category": "advanced", "title": qsTr("Switch to Desktop Mode"), "value": qsTr("Always available"), "enabled": true, "description": qsTr("Return to the standard desktop interface.") },
         { "id": "reset", "category": "advanced", "title": qsTr("Reset Couch Mode settings"), "value": qsTr("Safe defaults"), "enabled": true, "description": qsTr("Restore controller and Couch audio defaults without changing game data.") }
     ]
@@ -162,7 +153,6 @@ FocusScope {
         return code === "dark" ? qsTr("Dark") : code === "light" ? qsTr("Light") : qsTr("System")
     }
 
-    // Display label for a stored enum value; the stored value is unchanged.
     function enumLabel(value) {
         switch (String(value)) {
         case "Off": return qsTr("Off")
@@ -190,14 +180,12 @@ FocusScope {
         return code === "reduced" ? qsTr("Reduced") : code === "off" ? qsTr("Off") : qsTr("Full")
     }
 
-    // Control type of a row, from its stable id.
     function rowKind(row) {
         var id = String(row && row.id || "")
-        if (["automatic-updates", "auto-notify", "swap", "cursor", "fullscreen", "system-usage", "menu-sounds",
+        if (["auto-notify", "swap", "cursor", "fullscreen", "system-usage", "menu-sounds",
              "music", "steam-tools", "experimental"].indexOf(id) >= 0)
             return "bool"
-        if (["auto-libraries", "auto-skipped", "steam-paths", "game-paths",
-             "backup-path", "quarantine-path"].indexOf(id) >= 0)
+        if (["auto-libraries", "auto-skipped", "steam-paths", "game-paths"].indexOf(id) >= 0)
             return "path"
         if (["auto-delay", "auto-jobs", "auto-free", "deadzone", "repeat-delay", "repeat-rate",
              "menu-volume", "music-volume", "cpu-limit", "gpu-limit"].indexOf(id) >= 0)
@@ -216,7 +204,6 @@ FocusScope {
         return kind === "bool" || kind === "number" || kind === "choice" || row.id === "forgotten-library"
     }
 
-    // Honest reason shown on a disabled row.
     function disabledReason(row) {
         if (!row || row.enabled)
             return ""
@@ -229,8 +216,6 @@ FocusScope {
             return qsTr("Turn on Couch Mode music first")
         if (id === "forgotten-library")
             return qsTr("No forgotten libraries")
-        if (id === "automatic-updates" || id === "backup-path" || id === "quarantine-path")
-            return qsTr("Not implemented")
         return qsTr("Unavailable")
     }
 
@@ -485,7 +470,6 @@ FocusScope {
             commitPendingVolumes()
             var language = cycle(["en", "pl", "es"], languageCode(setting("language", "en")), delta)
             var languageSaved = controller.saveSetting("language", language)
-            // translationManager is an application context property.
             // qmllint disable unqualified
             if (languageSaved
                     && typeof translationManager !== "undefined"
@@ -497,8 +481,6 @@ FocusScope {
             saveAdjusted("themeMode", cycle(["system", "dark", "light"], themeCode(setting("themeMode", "system")), delta))
         else if (id === "couch-motion")
             saveAdjusted("couchMotionMode", cycle(["full", "reduced", "off"], motionCode(setting("couchMotionMode", "full")), delta))
-        else if (id === "automatic-updates")
-            saveAdjusted("automaticUpdates", setting("automaticUpdates", true) !== true)
         else if (id === "log-level")
             saveAdjusted("logLevel", cycle(["DEBUG", "INFO", "WARNING", "ERROR"], setting("logLevel", "INFO"), delta))
         else if (id === "default-profile")
@@ -565,8 +547,6 @@ FocusScope {
             saveAdjusted("gpuUsageLimit", clamp(Number(setting("gpuUsageLimit", 75)) + delta * 5, 1, 100))
         else if (id === "experimental")
             saveAdjusted("experimentalFeatures", setting("experimentalFeatures", false) !== true)
-        else if (id === "backup-path" || id === "quarantine-path")
-            openKeyboard(id, rows[selectedIndex].value, rows[selectedIndex].title)
     }
 
     function activate() {
@@ -790,7 +770,6 @@ FocusScope {
                     playSemanticSound("navigate")
                 }
             } else if (action === "NavigateUp") {
-                // Back to the last used setting.
                 focusZone = 1
             } else if (action === "Confirm") {
                 playSemanticSound(activateTile() ? "confirm" : "error")
@@ -832,7 +811,6 @@ FocusScope {
         sources: []
     }
 
-    // ---- Header --------------------------------------------------------------
     ColumnLayout {
         id: header
         objectName: "couchSettingsHeader"
@@ -859,7 +837,6 @@ FocusScope {
         }
     }
 
-    // ---- Categories (focus zone 0) ---------------------------------------------
     ListView {
         id: categoryList
         objectName: "couchSettingsCategories"
@@ -912,7 +889,6 @@ FocusScope {
                                  App.Theme.dark ? 0.72 : 0.86)
                 border.width: categoryDelegate.active && !categoryDelegate.focused ? 2 * page.fitScale : 1
                 border.color: categoryDelegate.active ? App.Theme.accent : App.Theme.border
-                // Focus is shown by the ring only: no scale in lists.
                 Behavior on color { ColorAnimation { duration: App.Theme.couchFadeDuration(150) } }
                 CouchFocusFrame {
                     active: categoryDelegate.focused
@@ -969,7 +945,6 @@ FocusScope {
         }
     }
 
-    // ---- Settings of the active category (focus zone 1) -------------------------
     ColumnLayout {
         id: contentColumn
         anchors.left: categoryList.right
@@ -1055,7 +1030,6 @@ FocusScope {
                     border.width: 1
                     border.color: settingDelegate.selected && !settingDelegate.focused
                                   ? App.Theme.borderStrong : App.Theme.border
-                    // Focus is shown by the ring only: no scale in lists.
                     Behavior on color { ColorAnimation { duration: App.Theme.couchFadeDuration(150) } }
                     CouchFocusFrame {
                         active: settingDelegate.focused
@@ -1064,7 +1038,6 @@ FocusScope {
                     }
                 }
 
-                // The category icon lives in the category column only.
                 RowLayout {
                     anchors.fill: rowCard
                     anchors.leftMargin: App.Theme.couchSpaceL * page.fitScale
@@ -1109,7 +1082,6 @@ FocusScope {
                         }
                     }
 
-                    // Control matching the real data type.
                     Row {
                         objectName: "couchSettingControl"
                         property string kind: settingDelegate.kind
@@ -1199,7 +1171,6 @@ FocusScope {
         height: 52 * page.fitScale
     }
 
-    // ---- Global section navigation (focus zone 2) ----------------------------------
     CouchBottomNav {
         id: bottomNav
         objectName: "couchSettingsNavigation"
@@ -1222,7 +1193,6 @@ FocusScope {
         }
     }
 
-    // ---- Confirmation for destructive actions (safe default: Cancel) ---------------
     CouchOverlayFrame {
         objectName: "couchSettingsConfirmation"
         anchors.fill: parent
@@ -1309,10 +1279,7 @@ FocusScope {
                     var appIds = page.parseAppIdList(value)
                     saved = appIds !== null
                             && page.controller.saveSetting("automaticCompressionSkippedAppIds", appIds)
-                } else if (settingId === "backup-path")
-                    saved = page.controller.saveSetting("backupDirectory", trimmed)
-                else if (settingId === "quarantine-path")
-                    saved = page.controller.saveSetting("quarantineDirectory", trimmed)
+                }
             }
             if (!saved) {
                 page.playSemanticSound("error")

@@ -141,6 +141,7 @@ SurfaceCard {
                         id: gameStatus
                         objectName: "gridCardStatus"
                         Layout.alignment: Qt.AlignTop
+                        visible: String(card.value(["status"], "ready")).toLowerCase() !== "ready"
                         text: card.value(["status", "lastTaskStatus", "last_task_status"], qsTr("Ready"))
                         status: text
                         showDot: true

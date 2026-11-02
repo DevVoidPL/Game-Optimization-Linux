@@ -80,7 +80,7 @@ class LibraryController:
         else:
             self._app._set_scan_state(
                 status="scan-queued",
-                message="Steam library refresh queued",
+                message="Game library refresh queued",
                 is_scanning=True,
             )
             self._app._scan_debounce_timer.start()
@@ -770,9 +770,23 @@ class LibraryController:
             message = "No installed games were detected in configured launcher locations"
         else:
             status = "ready"
-            message = f"Game library ready · {len(self._app._domain_games)} games"
-            if not self._app._steam_found:
-                message += " · Steam not found"
+            message = "Game library scan complete."
+        reports = getattr(self._app._game_provider, "last_reports", {})
+        provider_errors = getattr(self._app._game_provider, "provider_errors", {})
+        incomplete = set(provider_errors)
+        for launcher, report in reports.items():
+            if (
+                getattr(report, "errors", ())
+                or getattr(report, "inaccessible_paths", ())
+                or getattr(report, "malformed_records", 0)
+                or getattr(report, "invalid_manifests", 0)
+            ):
+                incomplete.add(launcher)
+        if not self._app._demo_mode and (incomplete or failed_sizes):
+            status = "partial"
+            message = "Game library scan incomplete"
+            if incomplete:
+                message += ": " + ", ".join(sorted(incomplete))
             if failed_sizes:
                 message += f" · {failed_sizes} size scans unavailable"
         self._app._set_scan_state(

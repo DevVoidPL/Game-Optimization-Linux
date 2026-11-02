@@ -158,6 +158,14 @@ QtObject {
         var original = text(value)
         var match
         switch (original) {
+        case "Game library scan complete.":
+            return qsTr("Game library scan complete.")
+        case "Game library refresh queued":
+            return qsTr("Game library refresh queued")
+        case "Scanning configured game libraries…":
+            return qsTr("Scanning game libraries…")
+        case "No installed games were detected in configured launcher locations":
+            return qsTr("No installed games found")
         case "Using safe demonstration data":
             return qsTr("Using safe demonstration data")
         case "Waiting to scan local Steam libraries":
@@ -174,6 +182,14 @@ QtObject {
             break
         }
 
+        match = original.match(/^Game library scan incomplete(?:: ([^·]+))?(?: · ([0-9]+) size scans unavailable)?$/)
+        if (match)
+            return qsTr("Game library scan incomplete")
+                    + (match[1] ? ": " + match[1].trim() : "")
+                    + (match[2] ? " · " + qsTr("%1 size scans unavailable").arg(match[2]) : "")
+        match = original.match(/^Game library scan failed: (.+)$/)
+        if (match)
+            return qsTr("Game library scan failed: %1").arg(message(match[1]))
         match = original.match(/^Showing ([0-9]+) cached games while Steam is scanned$/)
         if (match)
             return qsTr("Showing %1 cached games while Steam is scanned").arg(match[1])

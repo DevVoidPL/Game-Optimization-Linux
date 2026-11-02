@@ -156,6 +156,7 @@ Item {
                             LabeledValue {
                                 Layout.fillWidth: true
                                 label: qsTr("Game status")
+                                visible: String(tab.value(["status"], "ready")).toLowerCase() !== "ready"
                                 value: App.I18n.status(tab.value(["status"], "ready"))
                             }
                         }

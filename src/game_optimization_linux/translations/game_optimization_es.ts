@@ -7215,6 +7215,22 @@ Continúe solo después de revisar este riesgo.</translation>
         <source>Add a game</source>
         <translation>Añadir un juego</translation>
     </message>
+    <message>
+        <source>Scanning game libraries…</source>
+        <translation>Buscando en las bibliotecas de juegos…</translation>
+    </message>
+    <message>
+        <source>Game library scan complete.</source>
+        <translation>Búsqueda en las bibliotecas de juegos completada.</translation>
+    </message>
+    <message>
+        <source>Game libraries</source>
+        <translation>Bibliotecas de juegos</translation>
+    </message>
+    <message>
+        <source>No installed games found</source>
+        <translation>No se encontraron juegos instalados</translation>
+    </message>
 </context>
 <context>
     <name>GpuMemoryCard</name>
@@ -9941,6 +9957,34 @@ Continúe solo después de revisar este riesgo.</translation>
         <location line="+66" />
         <source>The launcher runtime changed (%1 -&gt; %2); %3 was not installed. Check again to get the matching extension</source>
         <translation>El entorno del lanzador cambió (%1 -&gt; %2); %3 no se instaló. Vuelve a comprobar para obtener la extensión correspondiente</translation>
+    </message>
+    <message>
+        <source>Scanning game libraries…</source>
+        <translation>Buscando en las bibliotecas de juegos…</translation>
+    </message>
+    <message>
+        <source>Game library scan complete.</source>
+        <translation>Búsqueda en las bibliotecas de juegos completada.</translation>
+    </message>
+    <message>
+        <source>No installed games found</source>
+        <translation>No se encontraron juegos instalados</translation>
+    </message>
+    <message>
+        <source>Game library refresh queued</source>
+        <translation>Actualización de bibliotecas de juegos en cola</translation>
+    </message>
+    <message>
+        <source>Game library scan incomplete</source>
+        <translation>Búsqueda en las bibliotecas de juegos incompleta</translation>
+    </message>
+    <message>
+        <source>%1 size scans unavailable</source>
+        <translation>%1 mediciones de tamaño no disponibles</translation>
+    </message>
+    <message>
+        <source>Game library scan failed: %1</source>
+        <translation>Error al buscar en las bibliotecas de juegos: %1</translation>
     </message>
 </context>
 <context>

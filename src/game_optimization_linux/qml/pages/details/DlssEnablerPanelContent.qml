@@ -22,6 +22,7 @@ ColumnLayout {
         font.weight: Font.Bold
     }
     StatusBadge {
+        visible: content.backendState !== "inactive"
         text: content.backendState === "runtime_verified" ? qsTr("Runtime verified")
               : content.backendState === "selected" ? qsTr("Selected · runtime not verified")
               : content.backendState === "installed" ? qsTr("Installed · not selected")

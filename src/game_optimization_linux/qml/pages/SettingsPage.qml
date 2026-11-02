@@ -122,21 +122,6 @@ Item {
 
                     SettingRow {
                         Layout.fillWidth: true
-                        objectName: "settingsAutomaticUpdatesRow"
-                        title: qsTr("Automatic updates")
-                        // No release check exists in this build; the saved value is kept untouched.
-                        description: qsTr("Not implemented yet: GameOpti does not check for new releases itself. Updates arrive through Flatpak or the package manager.")
-
-                        StatusBadge {
-                            text: qsTr("Not implemented")
-                            status: "paused"
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
-                    SettingRow {
-                        Layout.fillWidth: true
                         title: qsTr("Logging level")
                         description: qsTr("Controls how much diagnostic information is recorded")
 
@@ -261,12 +246,12 @@ Item {
                                      ? qsTr("Demo data is active because GAME_OPTIMIZATION_DEMO=1")
                                      : qsTr("Standard and Flatpak locations are scanned read-only")
 
-                        StatusBadge {
+                        Label {
                             text: page.controller && page.controller.isScanning
                                   ? qsTr("Scanning")
                                   : page.controller && page.controller.steamFound
                                     ? qsTr("Steam detected") : qsTr("Not detected")
-                            status: page.controller && page.controller.steamFound ? "Ready" : "Not checked"
+                            color: App.Theme.textSecondary
                         }
                     }
 
@@ -436,36 +421,6 @@ Item {
 
                     Divider { Layout.fillWidth: true }
 
-                    SettingRow {
-                        Layout.fillWidth: true
-                        objectName: "settingsBackupDirectoryRow"
-                        title: qsTr("Backup directory")
-                        // Not wired: OptiScaler backups and their restore use fixed per-game paths.
-                        description: qsTr("Not implemented yet: OptiScaler keeps its backups per game in the application data folder and restores them from there. This path is not used.")
-
-                        StatusBadge {
-                            text: qsTr("Not implemented")
-                            status: "paused"
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
-                    SettingRow {
-                        Layout.fillWidth: true
-                        objectName: "settingsQuarantineDirectoryRow"
-                        title: qsTr("Quarantine directory")
-                        // Not wired: deep cleanup quarantines on the game's own drive.
-                        description: qsTr("Not implemented yet: deep cleanup moves files to a quarantine folder on the same drive as the game, so they can be restored without copying. This path is not used.")
-
-                        StatusBadge {
-                            text: qsTr("Not implemented")
-                            status: "paused"
-                        }
-                    }
-
-                    Divider { Layout.fillWidth: true }
-
                     Label {
                         text: qsTr("Game library directories")
                         color: App.Theme.text
@@ -619,12 +574,6 @@ Item {
                             color: App.Theme.text
                             font.pixelSize: 17
                             font.weight: Font.Bold
-                        }
-                        StatusBadge {
-                            text: page.automaticCompressionEnabled
-                                  ? qsTr("Opted in") : qsTr("Off")
-                            status: page.automaticCompressionEnabled
-                                    ? "warning" : "paused"
                         }
                     }
 

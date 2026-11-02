@@ -7215,6 +7215,22 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Add a game</source>
         <translation>Add a game</translation>
     </message>
+    <message>
+        <source>Scanning game libraries…</source>
+        <translation>Scanning game libraries…</translation>
+    </message>
+    <message>
+        <source>Game library scan complete.</source>
+        <translation>Game library scan complete.</translation>
+    </message>
+    <message>
+        <source>Game libraries</source>
+        <translation>Game libraries</translation>
+    </message>
+    <message>
+        <source>No installed games found</source>
+        <translation>No installed games found</translation>
+    </message>
 </context>
 <context>
     <name>GpuMemoryCard</name>
@@ -9941,6 +9957,34 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <location line="+66" />
         <source>The launcher runtime changed (%1 -&gt; %2); %3 was not installed. Check again to get the matching extension</source>
         <translation>The launcher runtime changed (%1 -&gt; %2); %3 was not installed. Check again to get the matching extension</translation>
+    </message>
+    <message>
+        <source>Scanning game libraries…</source>
+        <translation>Scanning game libraries…</translation>
+    </message>
+    <message>
+        <source>Game library scan complete.</source>
+        <translation>Game library scan complete.</translation>
+    </message>
+    <message>
+        <source>No installed games found</source>
+        <translation>No installed games found</translation>
+    </message>
+    <message>
+        <source>Game library refresh queued</source>
+        <translation>Game library refresh queued</translation>
+    </message>
+    <message>
+        <source>Game library scan incomplete</source>
+        <translation>Game library scan incomplete</translation>
+    </message>
+    <message>
+        <source>%1 size scans unavailable</source>
+        <translation>%1 size scans unavailable</translation>
+    </message>
+    <message>
+        <source>Game library scan failed: %1</source>
+        <translation>Game library scan failed: %1</translation>
     </message>
 </context>
 <context>

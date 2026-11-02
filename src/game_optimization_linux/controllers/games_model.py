@@ -100,8 +100,10 @@ class GamesListModel(QAbstractListModel):
         if not index.isValid() or not 0 <= index.row() < len(self._visible_ids):
             return None
         game_id = self._visible_ids[index.row()]
-        if role in (self.ModelDataRole, int(Qt.ItemDataRole.DisplayRole)):
+        if role == self.ModelDataRole:
             return dict(self._all_rows[game_id])
+        if role == int(Qt.ItemDataRole.DisplayRole):
+            return str(self._all_rows[game_id].get("name") or "")
         if role == self.GameIdRole:
             return game_id
         return None
@@ -251,47 +253,49 @@ class GamesListModel(QAbstractListModel):
         inserted = removed = updated = moved = 0
         target_set = set(target_ids)
 
-        for row in range(len(self._visible_ids) - 1, -1, -1):
+        row = len(self._visible_ids) - 1
+        while row >= 0:
             if self._visible_ids[row] in target_set:
+                row -= 1
                 continue
-            game_id = self._visible_ids[row]
-            self.beginRemoveRows(QModelIndex(), row, row)
-            self._visible_ids.pop(row)
+            last = row
+            while row > 0 and self._visible_ids[row - 1] not in target_set:
+                row -= 1
+            removed_ids = self._visible_ids[row:last + 1]
+            self.beginRemoveRows(QModelIndex(), row, last)
+            del self._visible_ids[row:last + 1]
             self.endRemoveRows()
-            removed += 1
-            self.mutation.emit("remove", game_id, row)
+            removed += len(removed_ids)
+            for offset, game_id in reversed(list(enumerate(removed_ids))):
+                self.mutation.emit("remove", game_id, row + offset)
+            row -= 1
 
+        existing_ids = set(self._visible_ids)
         for target_row, game_id in enumerate(target_ids):
-            if target_row >= len(self._visible_ids):
-                self.beginInsertRows(QModelIndex(), target_row, target_row)
-                self._visible_ids.insert(target_row, game_id)
+            if target_row < len(self._visible_ids) and self._visible_ids[target_row] == game_id:
+                continue
+            if game_id not in existing_ids:
+                last = target_row
+                while last + 1 < len(target_ids) and target_ids[last + 1] not in existing_ids:
+                    last += 1
+                added_ids = target_ids[target_row:last + 1]
+                self.beginInsertRows(QModelIndex(), target_row, last)
+                self._visible_ids[target_row:target_row] = added_ids
                 self.endInsertRows()
-                inserted += 1
-                self.mutation.emit("insert", game_id, target_row)
+                existing_ids.update(added_ids)
+                inserted += len(added_ids)
+                for offset, added_id in enumerate(added_ids):
+                    self.mutation.emit("insert", added_id, target_row + offset)
                 continue
             if self._visible_ids[target_row] != game_id:
-                try:
-                    source_row = self._visible_ids.index(game_id, target_row + 1)
-                except ValueError:
-                    self.beginInsertRows(QModelIndex(), target_row, target_row)
-                    self._visible_ids.insert(target_row, game_id)
-                    self.endInsertRows()
-                    inserted += 1
-                    self.mutation.emit("insert", game_id, target_row)
-                else:
-                    self.beginMoveRows(
-                        QModelIndex(),
-                        source_row,
-                        source_row,
-                        QModelIndex(),
-                        target_row,
-                    )
-                    self._visible_ids.insert(
-                        target_row, self._visible_ids.pop(source_row)
-                    )
-                    self.endMoveRows()
-                    moved += 1
-                    self.mutation.emit("move", game_id, target_row)
+                source_row = self._visible_ids.index(game_id, target_row + 1)
+                self.beginMoveRows(
+                    QModelIndex(), source_row, source_row, QModelIndex(), target_row
+                )
+                self._visible_ids.insert(target_row, self._visible_ids.pop(source_row))
+                self.endMoveRows()
+                moved += 1
+                self.mutation.emit("move", game_id, target_row)
 
         for row, game_id in enumerate(self._visible_ids):
             if game_id not in (changed_ids or set()):

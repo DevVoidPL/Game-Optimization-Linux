@@ -882,7 +882,6 @@ FocusScope {
         }
         restoreActiveFocus()
     }
-    // ---- MangoHud menu ---------------------------------------------------------
     // Draft values mirror the saved profile; ids are the model's canonical
     // values ("fps_only", "top-left", 24, ...). Nothing is saved until Save.
     property bool mangoHudDraftEnabled: false
@@ -1083,7 +1082,6 @@ FocusScope {
         if (action === "Back" && !mangoHudVisualEditor.handlePadAction("Back")) closeMangoHudOverlay()
         else if (action !== "Back") mangoHudVisualEditor.handlePadAction(action)
     }
-    // ---- Dedicated GameMode and Gamescope menus ------------------------------
     // Values are canonical ids (e.g. "fullscreen", "fsr", "1920x1080"); labels
     // are translated only for display. Nothing is saved until Save.
     property bool gameModeOverlayOpen: false
@@ -1126,7 +1124,6 @@ FocusScope {
         return true
     }
 
-    // GameMode --------------------------------------------------------------
     function gameModeStatus() {
         if (launchActivation.state === "unsupported" || !launcherIntegrationSupported)
             return { "tone": "unavailable", "text": qsTr("Unavailable for this launch method") }
@@ -1200,7 +1197,6 @@ FocusScope {
         restoreActiveFocus()
     }
 
-    // Gamescope -------------------------------------------------------------
     function gsSupports(flag) { return (gamescopeTool.supportedOptions || []).indexOf(flag) >= 0 }
     function resolutionLabel(value) {
         if (value === "auto") return qsTr("Automatic (same as output)")
@@ -1785,7 +1781,6 @@ FocusScope {
                     || detailsContentFlick.contentY !== previousPageY)
                 playSemanticSound("navigate")
         } else if (focusArea === 0) {
-            // Header cards: 2 rows x 3 columns.
             if (action === "NavigateLeft" || action === "NavigateRight") {
                 if (moveHeader(action === "NavigateLeft" ? -1 : 1, 0))
                     playSemanticSound("navigate")
@@ -1962,7 +1957,6 @@ FocusScope {
                     font.weight: Font.Bold
                     elide: Text.ElideRight
                 }
-                // Identity: launcher, real readiness, runtime only when recorded.
                 Row {
                     objectName: "couchDetailsIdentity"
                     spacing: App.Theme.couchSpaceL * page.couchScale
@@ -1972,7 +1966,6 @@ FocusScope {
                         CouchIcon {
                             anchors.verticalCenter: parent.verticalCenter
                             size: App.Theme.couchIconSmall; couchScale: page.couchScale
-                            // Launcher logo (untouched on both themes) or the neutral glyph.
                             readonly property url logo: App.UiIcons.launcherLogo(page.game.launcher)
                             objectName: "couchDetailsLauncherIcon"
                             source: String(logo).length ? logo : App.UiIcons.couchGlyphSource
@@ -1989,6 +1982,7 @@ FocusScope {
                     Row {
                         id: detailsReadiness
                         objectName: "couchDetailsReadiness"
+                        visible: tone !== "success"
                         readonly property string tone: page.boolValue(["launchAllowed"], false) ? "success"
                                                        : (page.game.libraryAvailable === false
                                                           || ["Drive disconnected", "Missing files"].indexOf(String(page.game.status || "")) >= 0)
@@ -2228,8 +2222,6 @@ FocusScope {
                             couchScale: page.couchScale
                             iconSource: modelData.icon || ""
                             iconLightSource: modelData.iconOnLight || ""
-                            // Short name + current value; the longer description
-                            // is shown once, in the help bar below.
                             text: String(modelData.label || modelData.title)
                             subtitle: modelData.value !== undefined ? String(modelData.value)
                                                                     : String(modelData.subtitle || "")
@@ -2766,7 +2758,6 @@ FocusScope {
         }
     }
 
-    // ---- GameMode menu -------------------------------------------------------
     CouchOverlayFrame {
         anchors.fill: parent
         z: 216
@@ -2847,7 +2838,6 @@ FocusScope {
         }
     }
 
-    // ---- Gamescope menu ------------------------------------------------------
     CouchOverlayFrame {
         anchors.fill: parent
         z: 217

@@ -23,8 +23,6 @@ Item {
     // runner, launcher config), not from its source. Each entry carries a
     // concrete reason when unavailable; the tab stays visible but disabled.
     property var capabilities: ({})
-    // Keep compression prominent; launcher setup belongs to the game's overview.
-    // Only the selected page is instantiated.
     readonly property var tabCapabilityKeys: ["", "", "optimization", "optiscaler", "mangohud", "optimization"]
     readonly property var tabTitles: [qsTr("Overview"), qsTr("Compression"), qsTr("Optimization"), qsTr("Upscaling & effects"), qsTr("MangoHud"), qsTr("Performance analysis")]
     function refreshCapabilities() {
@@ -89,7 +87,6 @@ Item {
     }
 
     onGameIdChanged: { tabBar.currentIndex = 0; page.capabilityPolls = 0; page.scrollPositions = ({}); page.refreshCapabilities() }
-    // Scroll position per tab while the same game stays open.
     property var scrollPositions: ({})
     property real pendingScrollRestore: -1
     function restoreScroll() {
@@ -193,6 +190,7 @@ Item {
                     }
 
                     StatusBadge {
+                        visible: String(page.value(["status"], "ready")).toLowerCase() !== "ready"
                         text: App.I18n.status(page.value(["status"], "ready"))
                         status: page.value(["status"], "ready")
                     }

@@ -149,7 +149,7 @@ SurfaceCard {
         }
 
         StatusBadge {
-            visible: row.width >= 720
+            visible: String(row.value(["status"], "ready")).toLowerCase() !== "ready"
             text: row.value(["status", "lastTaskStatus", "last_task_status"], qsTr("Ready"))
             status: text
         }

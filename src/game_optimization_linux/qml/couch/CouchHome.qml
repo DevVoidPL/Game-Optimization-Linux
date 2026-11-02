@@ -509,6 +509,7 @@ FocusScope {
             visible: page.selectedGameIndex >= 0
             spacing: App.Theme.couchSpaceS * page.fitScale
             CouchIcon {
+                visible: readinessRow.tone !== "success"
                 anchors.verticalCenter: parent.verticalCenter
                 size: App.Theme.couchIconSmall
                 couchScale: page.fitScale
@@ -522,12 +523,13 @@ FocusScope {
             Label {
                 anchors.verticalCenter: parent.verticalCenter
                 text: readinessRow.text
+                visible: readinessRow.tone !== "success"
                 color: App.Theme.couchToneText(readinessRow.tone)
                 font.pixelSize: 20 * page.fitScale
                 font.weight: Font.Bold
             }
             Label {
-                visible: runtimeLabel.text.length > 0 || reasonLabel.text.length > 0
+                visible: readinessRow.tone !== "success" && (runtimeLabel.text.length > 0 || reasonLabel.text.length > 0)
                 anchors.verticalCenter: parent.verticalCenter
                 text: "•"
                 color: App.Theme.textMuted

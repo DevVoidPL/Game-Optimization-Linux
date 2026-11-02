@@ -56,7 +56,7 @@ Item {
                      + " visible=" + (visible ? "true" : "false")
                      + " mode=" + (gridMode ? "grid" : "list")
                      + " games=" + visibleGameCount
-                     + " filtered=" + filteredGames.length
+                     + " filtered=" + renderedGameCount
                      + (details ? " " + String(details) : ""))
     }
 
@@ -164,6 +164,8 @@ Item {
                                                  ["filesystem", "fileSystem",
                                                   "file_system"], true)
     readonly property var filteredGames: {
+        if (incrementalGamesModel)
+            return []
         var query = searchField.text.trim().toLowerCase()
         var launcher = launcherFilterValue()
         var filesystem = filesystemFilter.currentText
@@ -237,14 +239,14 @@ Item {
 
     function discoveryStatusText() {
         if (page.isScanning)
-            return qsTr("Scanning local Steam libraries…")
-        if (page.scanStatus === "error")
+            return qsTr("Scanning game libraries…")
+        if (page.scanStatus === "error" || page.scanStatus === "partial")
             return App.I18n.scanMessage(page.scanMessage)
         if (page.scanStatus === "ready")
-            return qsTr("Steam library scan complete")
+            return qsTr("Game library scan complete.")
         return page.scanMessage.length > 0
                ? App.I18n.scanMessage(page.scanMessage)
-               : qsTr("Local Steam discovery is ready")
+                : qsTr("Game libraries")
     }
 
     function hasPartialLibraryMeasurement() {
@@ -318,14 +320,10 @@ Item {
             }
         }
 
-        SurfaceCard {
+        RowLayout {
             visible: page.isScanning || !page.demoMode || page.scanStatus === "error"
             Layout.fillWidth: true
-            Layout.preferredHeight: visible ? 54 : 0
-            padding: 12
-
-            contentItem: RowLayout {
-                spacing: 10
+            spacing: 8
 
                 BusyIndicator {
                     visible: page.isScanning
@@ -335,28 +333,13 @@ Item {
                 }
 
                 Label {
-                    text: page.isScanning ? "↻" : page.scanStatus === "error" ? "!" : "●"
-                    visible: !page.isScanning
-                    color: page.scanStatus === "error" ? App.Theme.danger
-                                                         : page.scanStatus === "ready" ? App.Theme.success
-                                                                                       : App.Theme.textMuted
-                    font.pixelSize: 15
-                    font.weight: Font.Bold
-                }
-
-                Label {
                     objectName: "gamesDiscoveryStatus"
                     Layout.fillWidth: true
                     text: page.discoveryStatusText()
-                    color: page.scanStatus === "error" ? App.Theme.danger : App.Theme.textSecondary
+                    color: page.scanStatus === "error" ? App.Theme.danger
+                           : page.scanStatus === "partial" ? App.Theme.warning : App.Theme.textSecondary
                     font.pixelSize: App.Theme.fontCaption
-                    elide: Text.ElideRight
-                }
-
-                StatusBadge {
-                    visible: !page.demoMode && page.steamFound
-                    text: qsTr("Steam detected")
-                    status: "Ready"
+                    wrapMode: Text.WordWrap
                 }
 
                 StatusBadge {
@@ -364,7 +347,6 @@ Item {
                     text: qsTr("Demo")
                     status: "Not checked"
                 }
-            }
         }
 
         SurfaceCard {
@@ -719,8 +701,9 @@ Item {
             Item { Layout.fillWidth: true }
 
             Label {
+                objectName: "matchingGamesCount"
                 visible: searchField.text.length > 0 || launcherFilter.currentIndex > 0 || filesystemFilter.currentIndex > 0
-                text: qsTr("Matching filters: %1").arg(page.filteredGames.length)
+                text: qsTr("Matching filters: %1").arg(page.renderedGameCount)
                 color: App.Theme.accent
                 font.pixelSize: App.Theme.fontCaption
             }
@@ -746,12 +729,20 @@ Item {
         id: gridComponent
 
         Item {
-            implicitHeight: grid.implicitHeight
+            implicitHeight: Math.ceil(page.renderedGameCount / grid.columnCount) * grid.cellHeight
 
-        Grid {
+        GridView {
             id: grid
             objectName: "gamesGridView"
             width: parent.width
+            height: Math.min(parent.implicitHeight, pageScroll.height + 2 * cellHeight)
+            y: Math.max(0, Math.min(parent.implicitHeight - height, pageScroll.contentY - gamesLayoutLoader.y - cellHeight))
+            contentY: y
+            interactive: false
+            reuseItems: true
+            clip: true
+            cacheBuffer: cellHeight
+            model: page.incrementalGamesModel || page.filteredGames
             property real minimumCardWidth: 232
             property real maximumCardWidth: 280
             property real horizontalGap: 16
@@ -760,18 +751,12 @@ Item {
                                           1,
                                           Math.floor(width
                                                      / (minimumCardWidth + horizontalGap)))
-            property real cellWidth: width / columnCount
+            cellWidth: width / columnCount
             property real cardWidth: Math.max(
                                          1,
                                          Math.min(maximumCardWidth,
                                                   cellWidth - horizontalGap))
-            property real cellHeight: Math.ceil(cardWidth * 1.5 + 196)
-            columns: columnCount
-            columnSpacing: 0
-            rowSpacing: verticalGap
-
-            Repeater {
-                model: page.incrementalGamesModel || page.filteredGames
+            cellHeight: Math.ceil(cardWidth * 1.5 + 196) + verticalGap
 
             delegate: Item {
                 id: gridCell
@@ -790,7 +775,6 @@ Item {
                     onOpenRequested: function(gameId) { page.openGame(gameId) }
                 }
             }
-            }
         }
         }
     }
@@ -799,24 +783,29 @@ Item {
         id: listComponent
 
         Item {
-            implicitHeight: listColumn.implicitHeight
+            implicitHeight: Math.max(0, page.renderedGameCount * 114 - 10)
 
-        Column {
+        ListView {
             id: listColumn
             objectName: "gamesListView"
             width: parent.width
+            height: Math.min(parent.implicitHeight, pageScroll.height + 228)
+            y: Math.max(0, Math.min(parent.implicitHeight - height, pageScroll.contentY - gamesLayoutLoader.y - 114))
+            contentY: y
+            interactive: false
+            reuseItems: true
+            clip: true
+            cacheBuffer: 228
             spacing: 10
-
-            Repeater {
-                model: page.incrementalGamesModel || page.filteredGames
+            model: page.incrementalGamesModel || page.filteredGames
 
             delegate: GameListRow {
                 id: listRowDelegate
                 required property var modelData
                 width: listColumn.width
+                height: implicitHeight
                 gameData: listRowDelegate.modelData
                 onOpenRequested: function(gameId) { page.openGame(gameId) }
-            }
             }
         }
         }
@@ -830,13 +819,13 @@ Item {
             property bool filtersHideGames: page.gamesData
                                             && page.gamesData.length > 0
             title: filtersHideGames ? qsTr("No games match the filters")
-                   : page.isScanning ? qsTr("Scanning Steam libraries…")
+                   : page.isScanning ? qsTr("Scanning game libraries…")
                    : page.scanStatus === "error" ? qsTr("Library scan failed")
                    : !page.demoMode && !page.steamFound && page.scanStatus === "steam-not-found"
                      ? qsTr("Steam was not found")
-                   : !page.demoMode && page.steamFound ? qsTr("No installed Steam games found")
+                   : !page.demoMode && page.scanStatus === "empty" ? qsTr("No installed games found")
                    : page.demoMode ? qsTr("Your demo library is empty")
-                                   : qsTr("Preparing the Steam scan")
+                                   : qsTr("Game libraries")
             message: filtersHideGames
                      ? qsTr("Try a different search, launcher, or filesystem filter.")
                      : page.scanStatus === "error" ? App.I18n.scanMessage(page.scanMessage)

@@ -4,20 +4,12 @@ import QtQuick.Effects
 import "../../components"
 import "../.." as App
 
-// Portrait cover card for Couch carousels.
-//
-// One ring only: the selected card gets a single accent ring; the soft glow
-// appears only while the carousel itself has focus. Unselected cards have a
-// hairline edge and are slightly dimmed. The title sits on a gradient at the
-// bottom; the launcher badge shows only when the launcher is known; the play
-// marker shows on the selected card only when the game can really launch.
 Button {
     id: card
 
     property string gameId: ""
     property string title: ""
     property string launcher: ""
-    // Text shown in the launcher badge; defaults to the raw launcher name.
     property string launcherLabel: App.I18n.launcherName(launcher)
     // Optional real availability problem (e.g. "Drive disconnected"). Empty
     // on Home; the Library sets it only for games that cannot be launched.
@@ -39,7 +31,6 @@ Button {
     scale: selected ? 1.05 : 1.0
     z: selected ? 2 : 1
     Accessible.name: title
-    // Full launcher name even when the badge is elided.
     Accessible.description: launcherLabel
     ToolTip.visible: hovered && launcherLabel.length > 0
     ToolTip.text: launcherLabel
@@ -93,7 +84,6 @@ Button {
                 Behavior on opacity { NumberAnimation { duration: App.Theme.couchFadeDuration(140) } }
             }
         }
-        // Launcher badge (only when known).
         Rectangle {
             objectName: "couchGameCardLauncher"
             visible: card.launcher.length > 0
@@ -138,7 +128,6 @@ Button {
                 }
             }
         }
-        // Availability problem, above the title (plate is always dark).
         Rectangle {
             objectName: "couchGameCardState"
             visible: card.stateText.length > 0
