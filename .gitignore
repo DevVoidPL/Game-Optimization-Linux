@@ -1,0 +1,35 @@
+# Local environments, caches and generated packages
+!.gitignore
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.flatpak-builder/
+.flatpak-build*/
+.flatpak-repo*/
+build/
+build-flatpak/
+dist/
+reports/
+
+# Private workspace context and diagnostic evidence
+.gameopti-ai-*.md
+.go-tmp/
+.local-only/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+.agents/
+.claude/
+.codex/
+prompts/
+sessions/
+.env
+.env.*
+!.env.example

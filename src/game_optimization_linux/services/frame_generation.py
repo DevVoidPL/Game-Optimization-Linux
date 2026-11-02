@@ -406,7 +406,11 @@ class FrameGenerationService:
         from ..providers.steam import steam_update_activity
         update = steam_update_activity(game)
         for b, component in components.items():
-            if component["installed"]: component["environmentCheck"] = self.environment_check(game, b)
+            if component["installed"]:
+                try:
+                    component["environmentCheck"] = self.environment_check(game, b) if executable else {"available": False, "details": "\n".join(errors)}
+                except (OSError, ValueError, RuntimeError) as error:
+                    component["environmentCheck"] = {"available": False, "details": str(error)}
             component["blockers"] = self.compatibility(game, b, executable, binary) if executable else errors
             component["optiScalerConflict"] = b == "afmf" and opti.installation_state in {"installed", "modified", "missing"}
             dll = Path(state.get("dlls", {}).get(b, ""))

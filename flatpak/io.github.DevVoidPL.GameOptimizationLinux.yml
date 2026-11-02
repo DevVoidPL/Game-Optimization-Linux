@@ -38,6 +38,9 @@ modules:
     build-commands:
       - cd CPP/7zip/Bundles/Alone2 && make -f ../../cmpl_gcc.mak -j${FLATPAK_BUILDER_N_JOBS}
       - install -Dm755 CPP/7zip/Bundles/Alone2/b/g/7zz ${FLATPAK_DEST}/libexec/game-optimization-7zz
+      - install -Dm644 DOC/License.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/7zip/License.txt
+      - install -Dm644 DOC/copying.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/7zip/copying.txt
+      - install -Dm644 DOC/unRarLicense.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/7zip/unRarLicense.txt
     sources:
       - type: archive
         url: https://www.7-zip.org/a/7z2602-src.tar.xz
@@ -75,11 +78,17 @@ modules:
       - cd krb5-1.22.2/src && ./configure --prefix=${FLATPAK_DEST} --disable-static --disable-rpath --without-system-verto
       - make -C krb5-1.22.2/src -j${FLATPAK_BUILDER_N_JOBS}
       - make -C krb5-1.22.2/src install
+      - install -Dm644 krb5-1.22.2/NOTICE ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/mit-krb5/NOTICE
+      - install -Dm644 krb5-1.22.2/src/lib/gssapi/LICENSE ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/mit-krb5/GSSAPI-LICENSE
     cleanup:
       - /bin
       - /include
       - /lib/pkgconfig
-      - /share
+      - /share/man
+      - /share/doc
+      - /share/locale
+      - /share/aclocal
+      - /share/examples
     sources:
       - type: file
         url: https://web.mit.edu/kerberos/dist/krb5/1.22/krb5-1.22.2.tar.gz
@@ -92,7 +101,50 @@ modules:
     buildsystem: simple
     build-commands:
       - python3 -m pip install --no-index --find-links=file://${PWD}/wheels --prefix=${FLATPAK_DEST} PySide6==6.11.1 py7zr==1.1.3 PyYAML==6.0.3
+      # The wheels contain metadata but no standalone license texts.
+      - install -Dm644 pyside-licenses/LGPL-3.0-only.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/pyside6/LGPL-3.0-only.txt
+      - install -Dm644 pyside-licenses/GPL-3.0-only.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/pyside6/GPL-3.0-only.txt
+      - install -Dm644 pyside-licenses/GPL-2.0-only.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/pyside6/GPL-2.0-only.txt
+      - install -Dm644 pyside-licenses/BSD-3-Clause.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/pyside6/BSD-3-Clause.txt
+      - install -Dm644 pyside-licenses/GFDL-1.3-no-invariants-only.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/pyside6/GFDL-1.3-no-invariants-only.txt
+      - install -Dm644 pyside-licenses/Qt-GPL-exception-1.0.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/pyside6/Qt-GPL-exception-1.0.txt
+      - install -Dm644 pyside-licenses/LicenseRef-Qt-Commercial.txt ${FLATPAK_DEST}/share/licenses/io.github.DevVoidPL.GameOptimizationLinux/pyside6/LicenseRef-Qt-Commercial.txt
     sources:
+      - type: file
+        url: https://code.qt.io/cgit/pyside/pyside-setup.git/plain/LICENSES/LGPL-3.0-only.txt?h=v6.11.1
+        sha256: da7eabb7bafdf7d3ae5e9f223aa5bdc1eece45ac569dc21b3b037520b4464768
+        dest: pyside-licenses
+        dest-filename: LGPL-3.0-only.txt
+      - type: file
+        url: https://code.qt.io/cgit/pyside/pyside-setup.git/plain/LICENSES/GPL-3.0-only.txt?h=v6.11.1
+        sha256: 8ceb4b9ee5adedde47b31e975c1d90c73ad27b6b165a1dcd80c7c545eb65b903
+        dest: pyside-licenses
+        dest-filename: GPL-3.0-only.txt
+      - type: file
+        url: https://code.qt.io/cgit/pyside/pyside-setup.git/plain/LICENSES/GPL-2.0-only.txt?h=v6.11.1
+        sha256: 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+        dest: pyside-licenses
+        dest-filename: GPL-2.0-only.txt
+      - type: file
+        url: https://code.qt.io/cgit/pyside/pyside-setup.git/plain/LICENSES/BSD-3-Clause.txt?h=v6.11.1
+        sha256: 62803a6fcceef9091a129d7293d2469ea332b35d30f5e1bc4c628a9f35f3d29c
+        dest: pyside-licenses
+        dest-filename: BSD-3-Clause.txt
+      - type: file
+        url: https://code.qt.io/cgit/pyside/pyside-setup.git/plain/LICENSES/GFDL-1.3-no-invariants-only.txt?h=v6.11.1
+        sha256: 110535522396708cea37c72a802c5e7e81391139f5f7985631c93ef242b206a4
+        dest: pyside-licenses
+        dest-filename: GFDL-1.3-no-invariants-only.txt
+      - type: file
+        url: https://code.qt.io/cgit/pyside/pyside-setup.git/plain/LICENSES/Qt-GPL-exception-1.0.txt?h=v6.11.1
+        sha256: 40678d338ce53cd93f8b22b281a2ecbcaa3ee65ce60b25ffb0c462b0530846b2
+        dest: pyside-licenses
+        dest-filename: Qt-GPL-exception-1.0.txt
+      - type: file
+        url: https://code.qt.io/cgit/pyside/pyside-setup.git/plain/LICENSES/LicenseRef-Qt-Commercial.txt?h=v6.11.1
+        sha256: 9b1f50aae6267f9d5e0ceb6775ee86450262c25ec7c0573e151fe5d3f18a4700
+        dest: pyside-licenses
+        dest-filename: LicenseRef-Qt-Commercial.txt
       - type: file
         url: https://files.pythonhosted.org/packages/d8/de/af89d71410c83b10654d86ff9aff2a4f87c30163658f1cc145242e222526/pyside6-6.11.1-cp310-abi3-manylinux_2_34_x86_64.whl
         sha256: b1fc521ba2bb5109425ab8add06bddbdd524abcad06cfa012cc39a22a189feb2

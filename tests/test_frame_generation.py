@@ -164,6 +164,18 @@ def test_off_and_profile_isolation_preserve_upscaler(environment, monkeypatch):
     assert launch_settings("124", service.root) == ({}, [])
 
 
+def test_status_survives_missing_executable_with_installed_component(environment, monkeypatch):
+    service, game = environment
+    def missing(game):
+        raise ValueError("Choose the main game executable")
+    monkeypatch.setattr(service.post, "executable", missing)
+    monkeypatch.setattr(service.artifacts, "status", lambda backend: {"installed": True})
+    result = service.status(game)
+    assert result["success"]
+    assert result["components"]["lsfg"]["blockers"] == ["Choose the main game executable"]
+    assert not result["components"]["lsfg"]["environmentCheck"]["available"]
+
+
 def test_backend_configuration_matches_versioned_toml_contract():
     import tomllib
     lsfg = tomllib.loads(render_config("lsfg", "123", "Game.exe", "/user/lsfg-vk.dll", DEFAULTS["lsfg"], Path("/log")))
