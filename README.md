@@ -112,15 +112,6 @@ actions stay alongside the integrations they belong to.
 *Development interface previews. Desktop images are cropped from project-owner
 captures; the Couch preview uses demo data. [Screenshot notes](docs/screenshots/README.md).*
 
-## Download and install
-
-The current release is
-[**Game Optimization Linux 2.2**](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta) (Beta).
-Download one of its x86_64 Flatpak bundles:
-
-- [Couch Edition — Game-Optimization-Linux-2.2.0-couch-edition-x86_64.flatpak](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta) – Desktop Mode and Couch Mode
-- [Desktop Edition — Game-Optimization-Linux-2.2.0-desktop-edition-x86_64.flatpak](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta) – Desktop Mode only
-
 These are the filenames for builds from the current source. Published bundles
 still use the preceding version number in their filenames; use the release
 page above to select the available download and its actual filename when installing.
