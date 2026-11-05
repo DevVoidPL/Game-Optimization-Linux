@@ -161,6 +161,7 @@ directions: support will start with specific games and setups, and there is no r
 | Path | Contents |
 | --- | --- |
 | `src/game_optimization_linux/` | Application code, QML interface, translations and artwork. |
+| `src/game_optimization_linux/gtk_frontend/` | GTK4/libadwaita frontend (in development, `--gtk` flag) |
 | `data/` | Desktop entry, AppStream metadata and installation assets. |
 | `flatpak/` | Build manifests for the Couch and Desktop editions. |
 | `libexec/` | Helper programs installed with the application. |
