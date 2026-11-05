@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="ROADMAP.md"><img src="https://img.shields.io/badge/2.2-Beta-22c69a?style=for-the-badge" alt="2.2 Beta"></a>
-  <a href="https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta"><img src="https://img.shields.io/badge/Download-2.2-2563eb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download GameOpti 2.2"></a>
+  <a href="https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta"><img src="https://img.shields.io/badge/Download-2.2-2563eb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download GameOpti 2.2"></a>
   <a href="https://www.youtube.com/@Void_Developer_PL"><img src="https://img.shields.io/badge/YouTube-Project_updates-ff0033?style=for-the-badge&amp;logo=youtube&amp;logoColor=white" alt="Project updates on YouTube"></a>
 </p>
 
@@ -120,7 +120,7 @@ GameOpti is distributed through GitHub Releases, not Flathub; Flathub supplies i
 
 ```bash
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --user ./Game-Optimization-Linux-2.2.0-couch-edition-x86_64.flatpak
+flatpak install --user ./Game-Optimization-Linux-2.1.0-couch-edition-x86_64.flatpak
 flatpak run io.github.DevVoidPL.GameOptimizationLinux
 ```
 
