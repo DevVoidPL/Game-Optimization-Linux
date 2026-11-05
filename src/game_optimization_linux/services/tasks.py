@@ -31,12 +31,7 @@ class InvalidTaskTransitionError(TaskServiceError):
 
 
 class DemoTaskService(TaskService):
-    """An in-memory FIFO queue that performs no real work.
-
-    Calling :meth:`tick` advances at most one task. A Qt controller can invoke
-    it from a short timer callback, keeping the GUI responsive without worker
-    threads in demonstration mode.
-    """
+    """Demo-only FIFO; each timer tick advances at most one task."""
 
     def __init__(self, compression_provider: CompressionProvider | None = None) -> None:
         self._compression_provider = compression_provider or DemoCompressionProvider()

@@ -3,9 +3,8 @@
 Game Optimization Linux uses QML for presentation and Python for application
 state, platform integration and file operations.
 
-This describes the development checkout, which may include unfinished work
-beyond the public 1.8 Alpha. See [development status](../ROADMAP.md); the
-GameOpti Beta 2.0 is being completed and polished.
+This describes the source checkout. See [development status](../ROADMAP.md)
+for the distinction between published releases and ongoing work.
 
 ## Application layers
 

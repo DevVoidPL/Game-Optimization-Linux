@@ -115,17 +115,21 @@ captures; the Couch preview uses demo data. [Screenshot notes](docs/screenshots/
 ## Download and install
 
 The current release is
-[**Game Optimization Linux 2.1**](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta) (Beta).
+[**Game Optimization Linux 2.2**](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta) (Beta).
 Download one of its x86_64 Flatpak bundles:
 
-- [Couch Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1.0-Beta/Game-Optimization-Linux-2.1.0-couch-edition-x86_64.flatpak) – Desktop Mode and Couch Mode
-- [Desktop Edition](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/download/v2.1.0-Beta/Game-Optimization-Linux-2.1.0-desktop-edition-x86_64.flatpak) – Desktop Mode only
+- [Couch Edition — Game-Optimization-Linux-2.2.0-couch-edition-x86_64.flatpak](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta) – Desktop Mode and Couch Mode
+- [Desktop Edition — Game-Optimization-Linux-2.2.0-desktop-edition-x86_64.flatpak](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta) – Desktop Mode only
+
+These are the filenames for builds from the current source. Published bundles
+still use the preceding version number in their filenames; use the release
+page above to select the available download and its actual filename when installing.
 
 GameOpti is distributed through GitHub Releases, not Flathub; Flathub supplies its runtime.
 
 ```bash
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
-flatpak install --user ./Game-Optimization-Linux-2.1.0-couch-edition-x86_64.flatpak
+flatpak install --user ./Game-Optimization-Linux-2.2.0-couch-edition-x86_64.flatpak
 flatpak run io.github.DevVoidPL.GameOptimizationLinux
 ```
 
@@ -160,18 +164,14 @@ directions: support will start with specific games and setups, and there is no r
 | `data/` | Desktop entry, AppStream metadata and installation assets. |
 | `flatpak/` | Build manifests for the Couch and Desktop editions. |
 | `libexec/` | Helper programs installed with the application. |
-| `scripts/` | Build, translation and asset maintenance scripts. |
-| `tests/` | Automated tests and interface checks. |
-| `tools/` | Development utilities. |
+| `scripts/` | Asset build scripts and the runner installer. |
 | `docs/` | Feature guides and screenshots. |
 | `.github/workflows/` | GitHub automation. |
 
 ## Documentation
 
 - [Release status and plans](ROADMAP.md)
-- [Testing and contributing](TESTING.md)
 - [Architecture and launch flow](docs/architecture.md)
-- [Btrfs compression measurements](docs/compression_validation.md)
 - [Release notes 2.1](docs/release-notes-2.1.md)
 - [Build the Flatpak](flatpak/README.md)
 

@@ -749,13 +749,7 @@ class OptiScalerReleaseClient:
             raise
 
     def _fetch_with_retry(self, channel: str) -> OptiScalerRelease:
-        """Repeat only a release list without any build for the channel.
-
-        On 22.10.2026 the Nightly list briefly came back without a single
-        prerelease (15:29 UTC, no workflow running); the same request worked
-        minutes later. Such a reply is retried; network, rate-limit and
-        validation errors are not.
-        """
+        """Retry transient empty channel listings, not network or validation errors."""
 
         attempts = max(1, self.no_release_attempts)
         for attempt in range(1, attempts + 1):
@@ -875,10 +869,7 @@ class OptiScalerReleaseClient:
         release: OptiScalerRelease,
         progress: Callable[[int, int], None] | None = None,
     ) -> CachedOptiScalerArchive:
-        """Return a verified cached archive, downloading it at most once.
-
-        ``progress(downloaded_bytes, total_bytes)`` is called while downloading.
-        """
+        """Return a verified archive; report progress(downloaded_bytes, total_bytes)."""
 
         _validate_release(release)
         if release.asset.size > self.max_archive_bytes:

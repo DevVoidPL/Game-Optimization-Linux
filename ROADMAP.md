@@ -1,10 +1,10 @@
 # GameOpti roadmap
 
-Updated: 1 November 2026.
+Updated: 5 November 2026.
 
 ## Current release
 
-[GameOpti 2.1 Beta](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.1.0-Beta)
+[GameOpti 2.2 Beta](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta)
 is available for download. Both editions share the same game tools.
 Current development source removes built-in narration, which now belongs to a standalone application.
 
@@ -14,7 +14,7 @@ frame generation, GPU-memory protection, Btrfs compression, performance
 measurements, Proton tweaks and custom launch commands.
 
 See the [README](README.md#features) for features and requirements, and the
-[2.1 release notes](docs/release-notes-2.1.md) for the latest changes.
+[2.1 release notes](docs/release-notes-2.1.md) for the preceding release.
 
 ## Current work
 
@@ -33,4 +33,4 @@ remain research ideas for a later version. They are not included in 2.1 and
 have no release date.
 
 [Report a problem](https://github.com/DevVoidPL/Game-Optimization-Linux/issues) ·
-[Testing guide](TESTING.md) · [YouTube](https://www.youtube.com/@Void_Developer_PL)
+[YouTube](https://www.youtube.com/@Void_Developer_PL)

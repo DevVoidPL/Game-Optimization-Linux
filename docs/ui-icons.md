@@ -15,8 +15,7 @@ MangoHud, OptiScaler wordmark) is never generated; see `assets/ui-icons/brands/`
 ## Visual contract
 
 - Grid 24 × 24, safe margin 1.5 units on every side (the generator refuses
-  geometry that crosses it; `test_ui_icon_presentation.py` rasterises and
-  checks the same margin).
+  geometry that crosses it).
 - Fill only. `stroke="none"` on the root, no `fill-opacity`, no groups.
 - Exactly one body colour and one accent colour per icon:
   - Desktop dark: body `#CFDDE6`, accent `#4FE3B8`; light (`-on-light`):
@@ -68,9 +67,6 @@ MangoHud, OptiScaler wordmark) is never generated; see `assets/ui-icons/brands/`
 ```bash
 python3 scripts/build-facet-icons.py            # regenerate assets
 python3 scripts/build-facet-icons.py --check    # fail if packaged files drift
-QT_QPA_PLATFORM=offscreen .venv/bin/python -m pytest -q tests/test_ui_icons.py \
-  tests/test_ui_icon_presentation.py tests/test_couch_glyphs.py \
-  tests/test_couch_design_system.py
 ```
 
 `UiIcons.qml` picks Desktop light variants and exposes `couchGlyph*OnLight`

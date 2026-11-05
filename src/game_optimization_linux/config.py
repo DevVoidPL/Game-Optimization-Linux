@@ -1,10 +1,4 @@
-"""Application-wide metadata and filesystem locations.
-
-Keeping the public name and version here makes rebranding independent from the
-QML and controller layers.  Runtime paths follow the XDG base-directory
-convention, with conservative fallbacks for environments that do not define
-the XDG variables.
-"""
+"""Application metadata and XDG paths with fallbacks for unset variables."""
 
 from __future__ import annotations
 
@@ -13,7 +7,7 @@ from pathlib import Path
 
 
 APP_NAME = "Game Optimization Linux"
-APP_VERSION = "2.1.0"
+APP_VERSION = "2.2.0"
 APP_ID = "io.github.DevVoidPL.GameOptimizationLinux"
 ORGANIZATION_NAME = APP_NAME
 ORGANIZATION_DOMAIN = "game-optimization-linux.local"
