@@ -778,6 +778,7 @@ class AppController(QObject):
             else "desktop"
         )
         self._ui_sound_service.set_couch_active(self._interface_mode == "couch")
+        self._sync_scope_interface_mode()
         self._update_executor: ThreadPoolExecutor | None = (
             ThreadPoolExecutor(
                 max_workers=1,
@@ -1799,6 +1800,26 @@ class AppController(QObject):
     def restoreGpuMemorySystem(self, game_id: str) -> bool:
         return self._gpu_memory_controller.submit(game_id, "restore-system")
 
+    @Slot(str, bool, result=bool)
+    def setGpuMemoryGlobal(self, game_id: str, enabled: bool) -> bool:
+        return self._gpu_memory_controller.submit(game_id, "global", {"enabled": enabled})
+
+    @Slot(str, "QVariantMap", result=bool)
+    def gpuMemoryRecovery(self, game_id: str, values: Mapping[str, Any]) -> bool:
+        return self._gpu_memory_controller.submit(game_id, "recovery", values)
+
+    @Slot(result=bool)
+    def startAqueousDownload(self) -> bool:
+        from ..services.aqueous_download import DownloadJob
+        if not hasattr(self, "_aqueous_download_job"):
+            self._aqueous_download_job = DownloadJob()
+        return self._aqueous_download_job.start(DATA_DIR / "downloads/aqueous")
+
+    @Slot(result="QVariantMap")
+    def aqueousDownloadStatus(self) -> dict[str, Any]:
+        job = getattr(self, "_aqueous_download_job", None)
+        return job.status() if job else {"state": "idle", "received": 0, "total": 0}
+
     @Slot(str, bool, result="QVariantMap")
     def compareGpuMemory(self, game_id: str, same_scene: bool) -> dict[str, Any]:
         game = self._resolve_game(game_id, show_error=False)
@@ -2135,6 +2156,14 @@ class AppController(QObject):
     @Slot(str, result="QVariantMap")
     def getOptimizationProfile(self, game_id: str) -> dict[str, Any]:
         return self._optimization_controller.getOptimizationProfile(game_id)
+
+    @Slot(str, result="QVariantMap")
+    def getScopeProfile(self, game_id: str) -> dict[str, Any]:
+        return self._optimization_controller.getScopeProfile(game_id)
+
+    @Slot(str, "QVariantMap", result="QVariantMap")
+    def saveScopeProfile(self, game_id: str, values: dict[str, Any]) -> dict[str, Any]:
+        return self._optimization_controller.saveScopeProfile(game_id, values)
 
     @Slot(str, "QVariantMap", result="QVariantMap")
     def previewOptimizationProfile(
@@ -2693,11 +2722,22 @@ class AppController(QObject):
         if self._couch_navigation.dispatch(normalized.value):
             self.gamepadAction.emit(normalized.value)
 
+    def _sync_scope_interface_mode(self) -> None:
+        # Only installations that opted into Desktop scopes need a runner guard.
+        from ..services import aqueous
+        root = self._optimization_profile_repository.root
+        if (root / "aqueous").is_dir():
+            try:
+                aqueous.set_interface_mode(self._interface_mode, root=root)
+            except OSError as error:
+                logger.warning("Could not update Desktop scope guard: %s", error)
+
     def _set_interface_mode(self, mode: str) -> None:
         normalized = "couch" if mode == "couch" and self._couch_available else "desktop"
         if normalized == self._interface_mode:
             return
         self._interface_mode = normalized
+        self._sync_scope_interface_mode()
         if normalized == "couch":
             self._ui_sound_service.stop_effects()
         self._ui_sound_service.set_couch_active(normalized == "couch")

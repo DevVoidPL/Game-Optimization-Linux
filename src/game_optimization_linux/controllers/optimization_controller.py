@@ -295,6 +295,41 @@ class OptimizationController:
         path.mkdir(parents=True, exist_ok=True)
         return QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
 
+    def getScopeProfile(self, game_id: str) -> dict[str, Any]:
+        from ..services import aqueous
+        game = self._app._resolve_game(game_id, show_error=False)
+        key = self._profile_key(game)
+        if self._app._interface_mode == "couch" or not key:
+            return {"success": False, "error": "Scope selection is Desktop-only"}
+        try:
+            value = aqueous.load_profile(key, root=self._app._optimization_profile_repository.root)
+            available = aqueous.is_available()
+            full_integration = (available and aqueous.runner_supported() and
+                                bool(os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY")) and
+                                game.launcher.value == "Steam" and game.launcher_variant != "flatpak")
+            return {**value, "success": True, "available": available, "installUrl": aqueous.INSTALL_URL,
+                    "fullIntegrationAvailable": full_integration,
+                    "status": "Available" if available else "Not installed",
+                    "runnerSupported": aqueous.runner_supported(),
+                    "vrrSupported": False, "hdrSupported": False,
+                    "lastMeasurement": aqueous.last_history(key, root=self._app._optimization_profile_repository.root)}
+        except (OSError, ValueError) as error:
+            return {"success": False, "error": str(error)}
+
+    def saveScopeProfile(self, game_id: str, values: Mapping[str, Any]) -> dict[str, Any]:
+        from ..services import aqueous
+        current = self.getScopeProfile(game_id)
+        if not current.get("success"):
+            return current
+        game = self._app._resolve_game(game_id, show_error=False)
+        try:
+            aqueous.set_interface_mode(self._app._interface_mode, root=self._app._optimization_profile_repository.root)
+            aqueous.save_profile(self._profile_key(game), values, root=self._app._optimization_profile_repository.root)
+            self._app._emit_toast("Scope profile saved", "success")
+            return self.getScopeProfile(game_id)
+        except (OSError, ValueError) as error:
+            return {"success": False, "error": str(error)}
+
     def getOptimizationProfile(self, game_id: str) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
         app_id = self._profile_key(game)
@@ -625,7 +660,8 @@ class OptimizationController:
         from ..services.gpu_memory import load_profile as gpu_memory_profile, launch_prefix as gpu_memory_prefix
         gpu_profile = gpu_memory_profile(key, app._optiscaler_service.profile_repository.root)
         gpu_prefix = []
-        if feature("gpu_memory", gpu_profile.get("priority", False), game.launcher_variant != "flatpak",
+        if feature("gpu_memory", gpu_profile.get("priority", False) or gpu_profile.get("smartScope", False)
+                   or gpu_profile.get("pressure", "default") != "default", game.launcher_variant != "flatpak",
                    "The launcher Flatpak cannot access the host systemd GPU-memory scope"):
             metrics = None
             session = app._baseline_sessions.load(key)

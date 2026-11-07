@@ -32,6 +32,48 @@ Item {
     }
     TextEdit { id: clipboardHelper; visible: false }
     property var controller
+    property var scopeProfile: ({})
+    property var aqueousDownload: ({})
+    Timer {
+        interval: 400; repeat: true; running: tab.aqueousDownload.state === "downloading"
+        onTriggered: if (tab.controller && tab.controller.aqueousDownloadStatus)
+            tab.aqueousDownload = tab.controller.aqueousDownloadStatus()
+    }
+    property string selectedScope: "none"
+    property bool aqueousFullscreen: true
+    property string aqueousLayout: "game"
+    property string aqueousAppId: ""
+    property string aqueousOutput: ""
+    property int aqueousWorkspace: 0
+    property string aqueousAnchor: "center"
+    property string aqueousSize: "native"
+    property string aqueousBufferPolicy: "native"
+    function refreshScope() {
+        if (!controller || !controller.getScopeProfile || !gameId) return
+        scopeProfile = controller.getScopeProfile(gameId) || ({})
+        selectedScope = scopeProfile.scope === "legacy" ? (gamescopeEnabled ? "gamescope" : "none") : String(scopeProfile.scope || "none")
+        aqueousFullscreen = scopeProfile.fullscreen !== false
+        aqueousLayout = String(scopeProfile.layout || "game")
+        aqueousAppId = String(scopeProfile.appId || "")
+        aqueousOutput = String(scopeProfile.output || "")
+        aqueousWorkspace = Number(scopeProfile.workspace || 0)
+        aqueousAnchor = String(scopeProfile.anchor || "center")
+        aqueousSize = String(scopeProfile.size || "native")
+        aqueousBufferPolicy = String(scopeProfile.buffer_scale_policy || "native")
+    }
+    function saveScope(remove) {
+        if (!controller || !controller.saveScopeProfile) return
+        var values = {scope: remove ? "none" : selectedScope, fullscreen: aqueousFullscreen, layout: aqueousLayout,
+            appId: aqueousAppId, output: aqueousOutput, anchor: aqueousAnchor, size: aqueousSize,
+            buffer_scale_policy: aqueousBufferPolicy, vrr: false, hdr: false}
+        if (aqueousWorkspace > 0) values.workspace = aqueousWorkspace
+        var result = controller.saveScopeProfile(gameId, values)
+        if (!result || !result.success) {
+            toastRequested(String(result && result.error || qsTr("Could not save scope")), "error")
+            return
+        }
+        refreshScope()
+    }
     property var gameData: ({})
     readonly property string gameId: String(gameData && gameData.id || "")
     readonly property bool localGame: Boolean(gameData && gameData.localGame)
@@ -521,6 +563,7 @@ Item {
     function loadProfile() {
         if (controller && controller.getOptimizationProfile && gameId)
             applyResult(controller.getOptimizationProfile(gameId))
+        refreshScope()
         refreshLauncher()
         refreshComponents()
     }
@@ -896,6 +939,104 @@ Item {
                 contentItem: ColumnLayout {
                     SettingRow { Layout.fillWidth: true; title: qsTr("GameMode"); description: App.I18n.message(String(tab.gamemodeStatus.message || ""))
                         AppSwitch { enabled: Boolean(tab.gamemodeStatus.available); checked: tab.gamemodeEnabled; onToggled: { tab.gamemodeEnabled = checked; tab.preset = "custom"; tab.changed("gamemode") } }
+                    }
+                }
+            }
+
+            SurfaceCard {
+                objectName: "scopeSettingsCard"
+                visible: tab.shows("performance") && Boolean(tab.scopeProfile.success)
+                Layout.fillWidth: true
+                padding: 18
+                contentItem: ColumnLayout {
+                    Label { text: qsTr("Desktop scope"); color: App.Theme.text; font.pixelSize: 18; font.weight: Font.Bold }
+                    AppButton {
+                        objectName: "downloadAqueousButton"
+                        visible: !Boolean(tab.scopeProfile.fullIntegrationAvailable)
+                        text: qsTr("Download Aqueous")
+                        enabled: tab.aqueousDownload.state !== "downloading"
+                        onClicked: {
+                            if (tab.controller && tab.controller.startAqueousDownload) {
+                                tab.controller.startAqueousDownload()
+                                tab.aqueousDownload = tab.controller.aqueousDownloadStatus()
+                            }
+                        }
+                    }
+                    ProgressBar { Layout.fillWidth: true; visible: tab.aqueousDownload.state === "downloading"
+                        indeterminate: !Number(tab.aqueousDownload.total || 0)
+                        value: Number(tab.aqueousDownload.received || 0) / Math.max(1, Number(tab.aqueousDownload.total || 0)) }
+                    Label { Layout.fillWidth: true; wrapMode: Text.WrapAnywhere; color: App.Theme.textSecondary
+                        visible: Boolean(tab.aqueousDownload.state) && tab.aqueousDownload.state !== "idle"
+                        text: String(tab.aqueousDownload.state || "") + " · " + String(tab.aqueousDownload.phase || "") + " · " + String(tab.aqueousDownload.received || 0)
+                            + (tab.aqueousDownload.errorCategory ? "[" + String(tab.aqueousDownload.errorCategory) + "] " : "")
+                            + String(tab.aqueousDownload.error || "") + "\n"
+                            + String(tab.aqueousDownload.path || tab.aqueousDownload.error || "") + "\n"
+                            + String(tab.aqueousDownload.message || "") }
+                    SettingRow {
+                        visible: Boolean(tab.scopeProfile.fullIntegrationAvailable)
+                        Layout.fillWidth: true
+                        title: qsTr("Scope")
+                        description: qsTr("Optional compositor for runner launches. Gamescope settings below remain independent.")
+                        AppComboBox {
+                            objectName: "scopeSelector"
+                            Layout.preferredWidth: 220
+                            model: [qsTr("None"), "Gamescope", "Aqueous"]
+                            currentIndex: ["none", "gamescope", "aqueous"].indexOf(tab.selectedScope)
+                            onActivated: function(index) { tab.selectedScope = ["none", "gamescope", "aqueous"][index] }
+                        }
+                    }
+                    ColumnLayout {
+                        objectName: "aqueousSettings"
+                        visible: Boolean(tab.scopeProfile.fullIntegrationAvailable) && tab.selectedScope === "aqueous"
+                        Layout.fillWidth: true
+                        Label { text: tab.scopeProfile.available ? qsTr("Available") : qsTr("Not installed"); color: tab.scopeProfile.available ? App.Theme.text : App.Theme.warning }
+                        Label { Layout.fillWidth: true; text: qsTr("Experimental native / Flatpak host-bridge integration. Matching uses Wayland app_id or XWayland WM_CLASS. Rule placement is not GPU-memory protection."); color: App.Theme.textSecondary; wrapMode: Text.WordWrap }
+                        Label { visible: !tab.scopeProfile.runnerSupported; Layout.fillWidth: true; text: qsTr("Compiled runner is unsupported. Saved Gamescope settings or direct launch will be used."); color: App.Theme.warning; wrapMode: Text.WordWrap }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Fullscreen")
+                            AppSwitch { checked: tab.aqueousFullscreen; onToggled: tab.aqueousFullscreen = checked }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Layout")
+                            AppComboBox { Layout.preferredWidth: 220; model: [qsTr("Game"), qsTr("Floating")]; currentIndex: tab.aqueousLayout === "floating" ? 1 : 0; onActivated: function(index) { tab.aqueousLayout = index === 1 ? "floating" : "game" } }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: "VRR"; description: qsTr("Per-app support not verified; unavailable")
+                            AppSwitch { enabled: false; checked: false }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Window app_id / WM_CLASS"); description: qsTr("Use the actual identifier reported by aqueousctl windows --json; matching is case-sensitive.")
+                            AppTextField { objectName: "aqueousMatcher"; Layout.preferredWidth: 220; text: tab.aqueousAppId; onTextEdited: tab.aqueousAppId = text }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Output connector"); description: qsTr("Optional, for example DP-1. Missing outputs use normal placement.")
+                            AppTextField { Layout.preferredWidth: 220; text: tab.aqueousOutput; onTextEdited: tab.aqueousOutput = text }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Workspace (0 = default)")
+                            SpinBox { from: 0; to: 1024; value: tab.aqueousWorkspace; onValueModified: tab.aqueousWorkspace = value }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Anchor")
+                            AppComboBox { Layout.preferredWidth: 220; model: ["center", "top", "bottom", "left", "right"]; currentIndex: model.indexOf(tab.aqueousAnchor); onActivated: function(index) { tab.aqueousAnchor = model[index] } }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Game-mode size (native or WxH)")
+                            AppTextField { Layout.preferredWidth: 220; text: tab.aqueousSize; onTextEdited: tab.aqueousSize = text }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("Client buffer scaling"); description: qsTr("Integer-ceil may use larger buffers and more GPU memory.")
+                            AppComboBox { Layout.preferredWidth: 220; model: ["native", "integer-ceil"]; currentIndex: tab.aqueousBufferPolicy === "integer-ceil" ? 1 : 0; onActivated: function(index) { tab.aqueousBufferPolicy = model[index] } }
+                        }
+                        SettingRow { Layout.fillWidth: true; title: qsTr("HDR passthrough"); description: qsTr("Per-app support not verified; unavailable")
+                            AppSwitch { enabled: false; checked: false }
+                        }
+                        Label { Layout.fillWidth: true; text: qsTr("Rules file: %1").arg(String(tab.scopeProfile.rulesPath || "")); color: App.Theme.textSecondary; wrapMode: Text.WrapAnywhere }
+                    }
+                    RowLayout {
+                        objectName: "scopeApplyActions"
+                        visible: Boolean(tab.scopeProfile.fullIntegrationAvailable)
+                        AppButton { text: qsTr("Apply"); onClicked: tab.saveScope(false) }
+                        AppButton { text: qsTr("Remove"); onClicked: tab.saveScope(true) }
+                    }
+                    Label {
+                        Layout.fillWidth: true
+                        visible: Boolean(tab.scopeProfile.fullIntegrationAvailable) && Boolean(tab.scopeProfile.lastMeasurement)
+                        text: qsTr("Last scope measurement (before start / after exit):\n%1").arg(JSON.stringify(tab.scopeProfile.lastMeasurement || ({}), null, 2))
+                        color: App.Theme.textSecondary
+                        wrapMode: Text.WrapAnywhere
+                        font.pixelSize: App.Theme.fontCaption
                     }
                 }
             }

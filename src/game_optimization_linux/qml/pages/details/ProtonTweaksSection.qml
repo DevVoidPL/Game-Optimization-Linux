@@ -250,7 +250,7 @@ SurfaceCard {
                 }
             }
             ColumnLayout { Layout.fillWidth:true; visible:section.categoryIndex===2; spacing:6
-                Label { Layout.fillWidth:true; text:qsTr("Proton log folder: %1").arg(section.information.logDirectory || "—"); color:App.Theme.textMuted; font.pixelSize:section.captionSize; wrapMode:Text.WrapAnywhere }
+                Label { Layout.fillWidth:true; text:qsTr("Proton log folder: %1").arg(section.information.logDirectory || "-"); color:App.Theme.textMuted; font.pixelSize:section.captionSize; wrapMode:Text.WrapAnywhere }
                 AppButton { property string tweakAction:"button"; text:qsTr("Open log folder"); kind:"secondary"; textPixelSize:section.bodySize; onClicked:if(section.controller && section.controller.openProtonLogs) section.controller.openProtonLogs(section.gameId) }
             }
             Flow { Layout.fillWidth:true; spacing:8

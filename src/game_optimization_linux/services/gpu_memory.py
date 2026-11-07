@@ -45,10 +45,29 @@ def host_bridge_path():
 
 def ensure_host_bridge():
     target = host_bridge_path()
+    from . import smart_gpu_scope
+    policy = target.with_name("smart_gpu_scope.py")
+    if policy.is_symlink():
+        raise ValueError("Smart GPU Scope host policy must not be a symlink")
+    policy_source = Path(smart_gpu_scope.__file__).read_text()
+    if not policy.exists() or policy.read_text() != policy_source:
+        _atomic_write(policy, policy_source)
     source = Path(gpu_memory_host.__file__).read_text()
     if target.is_symlink():
         raise ValueError("GPU-memory host bridge must not be a symlink")
     if not target.exists() or target.read_text() != source:
+        if target.exists():
+            old = target.read_bytes()
+            backup = target.with_name(target.name + '.' + hashlib.sha256(old).hexdigest() + '.backup')
+            if backup.is_symlink():
+                raise ValueError('GPU-memory wrapper backup must not be a symlink')
+            if backup.exists():
+                if backup.read_bytes() != old:
+                    raise ValueError('GPU-memory wrapper backup conflicts; review required')
+            else:
+                fd = os.open(backup, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+                with os.fdopen(fd, 'wb') as stream:
+                    stream.write(old); stream.flush(); os.fsync(stream.fileno())
         _atomic_write(target, source)
     return target
 
@@ -56,12 +75,9 @@ def ensure_host_bridge():
 def host_call(*argv, privileged=False, timeout=30):
     bridge = ensure_host_bridge()
     if privileged:
-        # Existing root-owned helper is preferred. Initial bootstrap is an explicit
-        # standard pkexec authorization of the shipped, reviewable setup program.
-        helper = gpu_memory_host.HELPER
-        if not helper.exists() or helper.read_bytes() != bridge.read_bytes():
-            helper = bridge
-        command = ["pkexec", "/usr/bin/python3", str(helper), *argv]
+        # Always invoke this build's reviewed bridge. Sandbox /usr/libexec is NOT
+        # the host path; stale root helpers must never select the command protocol.
+        command = ["pkexec", "/usr/bin/python3", str(bridge), *argv]
     else:
         command = ["/usr/bin/python3", str(bridge), *argv]
     if os.environ.get("FLATPAK_ID"):
@@ -99,6 +115,8 @@ def pressure_environment(key, root, environment, argv):
     profile = load_profile(key, root)
     if profile["pressure"] == "default":
         return {}
+    if not host_call("global-status").get("enabled", False):
+        return {}
     tool = vkd3d_tool(argv)
     if (not tool.get("noUploadHvv") or profile.get("toolHash") != tool.get("hash")
             or profile.get("toolHash32", "") != tool.get("hash32", "")):
@@ -108,12 +126,13 @@ def pressure_environment(key, root, environment, argv):
     flags = [value for value in re.split(r"[,;]", environment.get("VKD3D_CONFIG", "")) if value]
     if "no_upload_hvv" not in flags:
         flags.append("no_upload_hvv")
-    return {"VKD3D_CONFIG": ",".join(flags)}
+    return {"VKD3D_CONFIG": ",".join(flags),
+            "GAMEOPTI_GPU_MEMORY_VKD3D_ORIGINAL": json.dumps(environment.get("VKD3D_CONFIG"))}
 
 
 def launch_prefix(key, root=GAMES_CONFIG_DIR, *, metrics=None):
     profile = load_profile(key, root)
-    if not profile.get("priority") and not metrics:
+    if not profile.get("priority") and not profile.get("smartScope") and profile.get("pressure") == "default" and not metrics:
         return []
     if not profile.get("priority") and not profile_path(key, root).exists():
         return []  # Existing recordings are unchanged until this feature is configured.
@@ -122,6 +141,7 @@ def launch_prefix(key, root=GAMES_CONFIG_DIR, *, metrics=None):
     return ["/usr/bin/python3", str(bridge), "run", "--key", str(key),
             "--region", str(profile.get("region", "")), "--output", str(output),
             "--protect", "1" if profile.get("priority") else "0",
+            *(["--smart-scope"] if profile.get("smartScope") else []),
             *(["--target-executable", profile["targetExecutable"]] if profile.get("targetExecutable") else []),
             *(["--metrics", str(metrics)] if metrics else []), "--"]
 
@@ -206,6 +226,7 @@ class GpuMemoryService:
         key = game_key(game)
         profile = load_profile(key, self.root)
         system = host_call("probe")
+        global_state = system.get("globalGpuMemory", {"enabled": True, "cleanupState": "not_requested"})
         tool = vkd3d_tool(self._command(game))
         api = "unknown"
         executable = ""
@@ -223,6 +244,9 @@ class GpuMemoryService:
         rebar = any(g.get("type") == "PHYSICAL_DEVICE_TYPE_DISCRETE_GPU" and g.get("vramTotal")
                     and (g.get("visibleVram") or 0) >= g["vramTotal"] * .9 for g in gpus)
         session, session_state = {}, "none"
+        smart = {"state": "not_configured"}
+        if profile.get("smartScope"):
+            smart = {"state": "ready" if system.get("readyRegions") else "unsupported"}
         path = profile_path(key, self.root).with_name("gpu-memory-session.json")
         if path.exists():
             # Read-time recovery on the host: a record the wrapper never finalized
@@ -245,6 +269,12 @@ class GpuMemoryService:
                 # Historical, interrupted or unverifiable: never current protection.
                 session = {**session, "protectionVerified": False}
             session["sessionState"] = session_state
+            if profile.get("smartScope"):
+                try:
+                    smart = host_call("smart-status", "--output", str(path), "--key", key,
+                                      "--region", profile.get("region", ""))
+                except (OSError, ValueError, subprocess.SubprocessError):
+                    smart = {"state": "active_unverified", "protectionVerified": False}
         # The wrapper PID alone proves only its scope. Match the actual selected
         # executable and its cgroup using the existing host process evidence.
         games = []
@@ -269,10 +299,10 @@ class GpuMemoryService:
         failed = bool(configured and session.get("status") == "exited" and session.get("exitCode", 0) != 0
                       and session.get("createdAt", "") >= profile.get("configuredAt", ""))
         state = "error" if failed else "effective" if profile["priority"] and effective else "pressure_applied" if configured and pressure_effective else "configured" if configured else "off"
-        return {"success": True, "profile": profile, "system": system, "tool": tool,
+        return {"success": True, "profile": profile, "system": system, "tool": tool, "globalGpuMemory": global_state,
                 "detectedApi": api, "executable": executable, "ready": ready,
                 "pressureSupported": bool(rebar and tool.get("noUploadHvv")), "dedicatedRebar": rebar,
-                "state": state, "session": session, "gameProcesses": games,
+                "state": state, "session": session, "gameProcesses": games, "smartScope": smart,
                 "runtimeProtectionVerified": effective, "failedLaunch": failed,
                 "sessionState": session_state,
                 "interruptedSession": session_state == "interrupted",
@@ -301,14 +331,21 @@ class GpuMemoryService:
             raise ValueError("Unsupported GPU-memory profile")
         if priority and (not before["ready"] or region not in before["system"]["readyRegions"]):
             raise ValueError("Prepare the host and select an exposed GPU memory region first")
+        mode = values.get('smartMode', 'monitor')
+        if mode not in {'monitor', 'balanced', 'performance'}:
+            raise ValueError('Invalid Smart resource mode')
+        if mode != 'monitor' and not before['system'].get('resourceControlAvailable'):
+            raise ValueError('Adaptive CPU resource control is unavailable on this host')
         effective_api = before["detectedApi"] if api == "auto" else api
         if pressure != "default" and (not before["pressureSupported"] or effective_api != "d3d12"):
             raise ValueError("UPLOAD system-memory profile requires verified Proton/vkd3d, D3D12 and discrete ReBAR GPU")
-        if not self.supported_launcher(game) and (priority or pressure != "default"):
+        if not self.supported_launcher(game) and (priority or pressure != "default" or values.get("smartScope") is True):
             raise ValueError("The launcher Flatpak cannot access the host systemd scope. Use a native launcher or independent Plasma/Gamescope protection; no fake activation was saved")
         if game.launcher.value != "Steam" and pressure != "default":
             raise ValueError("The actual Proton/vkd3d launch version is not established for this launcher; its default allocator is preserved")
         profile = {"priority": priority, "pressure": pressure, "api": api, "effectiveApi": effective_api,
+                   "smartScope": values.get("smartScope") is True,
+                   "smartMode": mode,
                    "region": region, "dedicatedRebar": before["dedicatedRebar"],
                    "toolHash": before["tool"].get("hash", ""), "toolVersion": before["tool"].get("version", ""),
                    "toolHash32": before["tool"].get("hash32", ""),
@@ -333,9 +370,27 @@ class GpuMemoryService:
         return self.status(game)
 
     def restore_system(self, game):
-        if self.status(game)["gameProcesses"]:
-            raise ValueError("Close the protected game before restoring system setup")
         host_call("restore-system", privileged=True, timeout=60)
+        return self.status(game)
+
+    def set_global(self, game, values):
+        host_call("global-on" if values.get("enabled") is True else "global-off", privileged=True, timeout=60)
+        return self.status(game)
+
+    def recovery(self, game, values):
+        action = values.get("action")
+        if action == "review":
+            review = host_call("legacy-review", privileged=True)
+            return {**self.status(game), "legacyReview": review}
+        if action == "reconcile":
+            if values.get("approved") is not True:
+                raise ValueError("Review and confirm exclusive ownership before reconciliation")
+            host_call("legacy-reconcile", "--review-token", str(values.get("token", "")),
+                      "--approve-exclusive-ownership", privileged=True, timeout=90)
+        elif action == "update-helper":
+            host_call("update-helper", privileged=True)
+        else:
+            raise ValueError("Unknown recovery action")
         return self.status(game)
 
 

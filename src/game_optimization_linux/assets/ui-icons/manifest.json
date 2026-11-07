@@ -3,84 +3,84 @@
     "filename": "sidebar-games.svg",
     "semantic_name": "Games",
     "category": "sidebar",
-    "default_color": "#4FE3B8",
+    "default_color": "#CFDDE6",
     "theme": "dark"
   },
   {
     "filename": "sidebar-games-on-light.svg",
     "semantic_name": "Games",
     "category": "sidebar",
-    "default_color": "#128A66",
+    "default_color": "#24313F",
     "theme": "light"
   },
   {
     "filename": "sidebar-updates.svg",
     "semantic_name": "Updates",
     "category": "sidebar",
-    "default_color": "#4FE3B8",
+    "default_color": "#CFDDE6",
     "theme": "dark"
   },
   {
     "filename": "sidebar-updates-on-light.svg",
     "semantic_name": "Updates",
     "category": "sidebar",
-    "default_color": "#128A66",
+    "default_color": "#24313F",
     "theme": "light"
   },
   {
     "filename": "sidebar-tasks.svg",
     "semantic_name": "Tasks",
     "category": "sidebar",
-    "default_color": "#4FE3B8",
+    "default_color": "#CFDDE6",
     "theme": "dark"
   },
   {
     "filename": "sidebar-tasks-on-light.svg",
     "semantic_name": "Tasks",
     "category": "sidebar",
-    "default_color": "#128A66",
+    "default_color": "#24313F",
     "theme": "light"
   },
   {
     "filename": "sidebar-system.svg",
     "semantic_name": "System",
     "category": "sidebar",
-    "default_color": "#4FE3B8",
+    "default_color": "#CFDDE6",
     "theme": "dark"
   },
   {
     "filename": "sidebar-system-on-light.svg",
     "semantic_name": "System",
     "category": "sidebar",
-    "default_color": "#128A66",
+    "default_color": "#24313F",
     "theme": "light"
   },
   {
     "filename": "sidebar-settings.svg",
     "semantic_name": "Settings",
     "category": "sidebar",
-    "default_color": "#4FE3B8",
+    "default_color": "#CFDDE6",
     "theme": "dark"
   },
   {
     "filename": "sidebar-settings-on-light.svg",
     "semantic_name": "Settings",
     "category": "sidebar",
-    "default_color": "#128A66",
+    "default_color": "#24313F",
     "theme": "light"
   },
   {
     "filename": "sidebar-donate.svg",
     "semantic_name": "Donate",
     "category": "sidebar",
-    "default_color": "#4FE3B8",
+    "default_color": "#CFDDE6",
     "theme": "dark"
   },
   {
     "filename": "sidebar-donate-on-light.svg",
     "semantic_name": "Donate",
     "category": "sidebar",
-    "default_color": "#128A66",
+    "default_color": "#24313F",
     "theme": "light"
   },
   {

@@ -1,4 +1,5 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TS>
 <TS version="2.1" language="en_US">
 <context>
     <name>ConfirmDialog</name>
@@ -6063,8 +6064,8 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+3" />
-        <source>Runtime error — inspect diagnostics</source>
-        <translation>Runtime error — inspect diagnostics</translation>
+        <source>Runtime error - inspect diagnostics</source>
+        <translation>Runtime error - inspect diagnostics</translation>
     </message>
     <message>
         <location line="+0" />
@@ -7234,6 +7235,16 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
 </context>
 <context>
     <name>GpuMemoryCard</name>
+    <message><source>Actual game protection: not verified. Saved profile and running boosters do not establish protection.</source><translation>Actual game protection: not verified. Saved profile and running boosters do not establish protection.</translation></message>
+    <message><source>Actual game protection: verified by current process evidence (%1)</source><translation>Actual game protection: verified by current process evidence (%1)</translation></message>
+    <message><source>Back up original and reconcile to Off (Polkit)</source><translation>Back up original and reconcile to Off (Polkit)</translation></message>
+    <message><source>Global On is blocked by a legacy Setup journal. Review legacy Setup below; per-game and Smart switches cannot repair host cleanup. Do not delete the journal.</source><translation>Global On is blocked by a legacy Setup journal. Review legacy Setup below; per-game and Smart switches cannot repair host cleanup. Do not delete the journal.</translation></message>
+    <message><source>Host boosters - system: %1 · user: %2. Running services are not proof of game protection.</source><translation>Host boosters - system: %1 · user: %2. Running services are not proof of game protection.</translation></message>
+    <message><source>Host helper: %1. Update only after closing all games; original helper is backed up. Old per-game copied wrappers must be regenerated from this application.</source><translation>Host helper: %1. Update only after closing all games; original helper is backed up. Old per-game copied wrappers must be regenerated from this application.</translation></message>
+    <message><source>I closed all games and Wine/Proton launchers, reviewed every listed change, and confirm that only GameOpti owns these two boosters and parent limits; no other manager depends on them.</source><translation>I closed all games and Wine/Proton launchers, reviewed every listed change, and confirm that only GameOpti owns these two boosters and parent limits; no other manager depends on them.</translation></message>
+    <message><source>Refresh Flatpak runner wrapper</source><translation>Refresh Flatpak runner wrapper</translation></message>
+    <message><source>Review legacy Setup (Polkit)</source><translation>Review legacy Setup (Polkit)</translation></message>
+    <message><source>Update host helper (Polkit)</source><translation>Update host helper (Polkit)</translation></message>
     <message>
         <location filename="../qml/pages/details/GpuMemoryCard.qml" line="+55" />
         <source>The GPU-memory operation could not be started</source>
@@ -7531,8 +7542,8 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
     <message>
         <location line="+8" />
-        <source>Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as —; GPU budget and inaccessible driver errors are not invented.</source>
-        <translation>Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as —; GPU budget and inaccessible driver errors are not invented.</translation>
+        <source>Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as -; GPU budget and inaccessible driver errors are not invented.</source>
+        <translation>Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as -; GPU budget and inaccessible driver errors are not invented.</translation>
     </message>
     <message>
         <location line="+2" />
@@ -7544,7 +7555,62 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>The last GameOpti session was interrupted before it saved a final state. Its protection data is historical and does not describe the current game.</source>
         <translation>The last GameOpti session was interrupted before it saved a final state. Its protection data is historical and does not describe the current game.</translation>
     </message>
-</context>
+    <message>
+        <source>Smart GPU Scope - monitor protection throughout the session</source>
+        <translation>Smart GPU Scope - monitor protection throughout the session</translation>
+    </message>
+    <message>
+        <source>Smart GPU Scope: %1. Observes the game's scope and descendants; detects protection changes without overwriting another manager. It does not infer focus or guarantee reserved VRAM.</source>
+        <translation>Smart GPU Scope: %1. Observes the game's scope and descendants; detects protection changes without overwriting another manager. It does not infer focus or guarantee reserved VRAM.</translation>
+    </message>
+    <message>
+        <source>Enable GameOpti GPU Memory globally (Polkit)</source>
+        <translation>Enable GameOpti GPU Memory globally (Polkit)</translation>
+    </message>
+    <message>
+        <source>Global GPU Memory: %1 · Cleanup: %2</source>
+        <translation>Global GPU Memory: %1 · Cleanup: %2</translation>
+    </message>
+    <message>
+        <source>Global Off blocks new GameOpti protection and allocator changes. Cleanup waits for running sessions; games are not terminated. Per-game Off only changes this game's profile. Independent boosters are preserved. Smart remains an optional observer; global Off is not proof of an externally unprotected baseline.</source>
+        <translation>Global Off blocks new GameOpti protection and allocator changes. Cleanup waits for running sessions; games are not terminated. Per-game Off only changes this game's profile. Independent boosters are preserved. Smart remains an optional observer; global Off is not proof of an externally unprotected baseline.</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Off</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>On</translation>
+    </message>
+    <message>
+        <source>Prepare host and enable globally (Polkit)</source>
+        <translation>Prepare host and enable globally (Polkit)</translation>
+    </message>
+    <message>
+        <source>Retry global Off cleanup (Polkit)</source>
+        <translation>Retry global Off cleanup (Polkit)</translation>
+    </message>
+
+    <message><source>Balanced</source><translation>Balanced</translation></message>
+    <message><source>GPU memory observation: %1. CPU resource policies are independent of GPU Memory ON/OFF; no FPS or VRAM reservation guarantee.</source><translation>GPU memory observation: %1. CPU resource policies are independent of GPU Memory ON/OFF; no FPS or VRAM reservation guarantee.</translation></message>
+    <message><source>Monitor</source><translation>Monitor</translation></message>
+    <message><source>Performance</source><translation>Performance</translation></message>
+    <message><source>Resource controller: %1\nPolicies: %2\nReason: %3\nRestored: %4\nAqueous connected: %5\nLimitations: %6\nErrors: %7</source><translation>Resource controller: %1\nPolicies: %2\nReason: %3\nRestored: %4\nAqueous connected: %5\nLimitations: %6\nErrors: %7</translation></message>
+    <message><source>Smart GPU Scope - session resource controller</source><translation>Smart GPU Scope - session resource controller</translation></message>
+<message><source>Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as -; GPU budget and inaccessible driver errors are not invented.</source><translation>Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as -; GPU budget and inaccessible driver errors are not invented.</translation></message><message><source>Host boosters - system: %1 · user: %2. Running services are not proof of game protection.</source><translation>Host boosters - system: %1 · user: %2. Running services are not proof of game protection.</translation></message><message><source>Resource controller: %1
+Policies: %2
+Reason: %3
+Restored: %4
+Aqueous connected: %5
+Limitations: %6
+Errors: %7</source><translation>Resource controller: %1
+Policies: %2
+Reason: %3
+Restored: %4
+Aqueous connected: %5
+Limitations: %6
+Errors: %7</translation></message><message><source>Smart GPU Scope - session resource controller</source><translation>Smart GPU Scope - session resource controller</translation></message></context>
 <context>
     <name>GraphicsTab</name>
     <message>
@@ -16817,7 +16883,9 @@ Current: %2</translation>
         <source>Best Quality</source>
         <translation>Best Quality</translation>
     </message>
-</context>
+<message><source>Anchor</source><translation>Anchor</translation></message><message><source>Apply</source><translation>Apply</translation></message><message><source>Client buffer scaling</source><translation>Client buffer scaling</translation></message><message><source>Compiled runner is unsupported. Saved Gamescope settings or direct launch will be used.</source><translation>Compiled runner is unsupported. Saved Gamescope settings or direct launch will be used.</translation></message><message><source>Could not save scope</source><translation>Could not save scope</translation></message><message><source>Desktop scope</source><translation>Desktop scope</translation></message><message><source>Download Aqueous</source><translation>Download Aqueous</translation></message><message><source>Experimental native / Flatpak host-bridge integration. Matching uses Wayland app_id or XWayland WM_CLASS. Rule placement is not GPU-memory protection.</source><translation>Experimental native / Flatpak host-bridge integration. Matching uses Wayland app_id or XWayland WM_CLASS. Rule placement is not GPU-memory protection.</translation></message><message><source>Floating</source><translation>Floating</translation></message><message><source>Game</source><translation>Game</translation></message><message><source>Game-mode size (native or WxH)</source><translation>Game-mode size (native or WxH)</translation></message><message><source>HDR passthrough</source><translation>HDR passthrough</translation></message><message><source>Integer-ceil may use larger buffers and more GPU memory.</source><translation>Integer-ceil may use larger buffers and more GPU memory.</translation></message><message><source>Last scope measurement (before start / after exit):
+%1</source><translation>Last scope measurement (before start / after exit):
+%1</translation></message><message><source>Layout</source><translation>Layout</translation></message><message><source>Not installed</source><translation>Not installed</translation></message><message><source>Optional compositor for runner launches. Gamescope settings below remain independent.</source><translation>Optional compositor for runner launches. Gamescope settings below remain independent.</translation></message><message><source>Optional, for example DP-1. Missing outputs use normal placement.</source><translation>Optional, for example DP-1. Missing outputs use normal placement.</translation></message><message><source>Output connector</source><translation>Output connector</translation></message><message><source>Per-app support not verified; unavailable</source><translation>Per-app support not verified; unavailable</translation></message><message><source>Remove</source><translation>Remove</translation></message><message><source>Rules file: %1</source><translation>Rules file: %1</translation></message><message><source>Scope</source><translation>Scope</translation></message><message><source>Use the actual identifier reported by aqueousctl windows --json; matching is case-sensitive.</source><translation>Use the actual identifier reported by aqueousctl windows --json; matching is case-sensitive.</translation></message><message><source>Window app_id / WM_CLASS</source><translation>Window app_id / WM_CLASS</translation></message><message><source>Workspace (0 = default)</source><translation>Workspace (0 = default)</translation></message></context>
 <context>
     <name>OverviewTab</name>
     <message>

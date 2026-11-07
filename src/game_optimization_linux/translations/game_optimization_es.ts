@@ -1,4 +1,5 @@
-<?xml version='1.0' encoding='utf-8'?>
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE TS>
 <TS version="2.1" language="es_ES">
 <context>
     <name>ConfirmDialog</name>
@@ -838,7 +839,7 @@
     <message>
         <location line="+1" />
         <source>Proton Tweaks</source>
-        <translation>Proton Tweaks</translation>
+        <translation>Ajustes de Proton</translation>
     </message>
     <message>
         <location line="+17" />
@@ -6063,8 +6064,8 @@ Continúe solo después de revisar este riesgo.</translation>
     </message>
     <message>
         <location line="+3" />
-        <source>Runtime error — inspect diagnostics</source>
-        <translation>Error de ejecución — consulta el diagnóstico</translation>
+        <source>Runtime error - inspect diagnostics</source>
+        <translation>Error de ejecución - consulta el diagnóstico</translation>
     </message>
     <message>
         <location line="+0" />
@@ -7234,6 +7235,16 @@ Continúe solo después de revisar este riesgo.</translation>
 </context>
 <context>
     <name>GpuMemoryCard</name>
+    <message><source>Actual game protection: not verified. Saved profile and running boosters do not establish protection.</source><translation>Protección real del juego: no verificada. El perfil guardado y los servicios activos no demuestran protección.</translation></message>
+    <message><source>Actual game protection: verified by current process evidence (%1)</source><translation>Protección real del juego: verificada con datos actuales del proceso (%1)</translation></message>
+    <message><source>Back up original and reconcile to Off (Polkit)</source><translation>Guardar el original y conciliar al estado desactivado (Polkit)</translation></message>
+    <message><source>Global On is blocked by a legacy Setup journal. Review legacy Setup below; per-game and Smart switches cannot repair host cleanup. Do not delete the journal.</source><translation>Un registro antiguo de preparación bloquea la activación global. Revíselo abajo; los interruptores del juego y Smart no reparan la limpieza del anfitrión. No borre el registro.</translation></message>
+    <message><source>Host boosters - system: %1 · user: %2. Running services are not proof of game protection.</source><translation>Boosters del anfitrión - sistema: %1 · usuario: %2. Los servicios activos no demuestran protección del juego.</translation></message>
+    <message><source>Host helper: %1. Update only after closing all games; original helper is backed up. Old per-game copied wrappers must be regenerated from this application.</source><translation>Helper del anfitrión: %1. Actualice solo tras cerrar todos los juegos; se guarda una copia del original. Los wrappers antiguos de cada juego deben regenerarse desde esta aplicación.</translation></message>
+    <message><source>I closed all games and Wine/Proton launchers, reviewed every listed change, and confirm that only GameOpti owns these two boosters and parent limits; no other manager depends on them.</source><translation>He cerrado todos los juegos y lanzadores Wine/Proton, revisado cada cambio y confirmo que solo GameOpti gestiona estos dos boosters y límites superiores; ningún otro gestor depende de ellos.</translation></message>
+    <message><source>Refresh Flatpak runner wrapper</source><translation>Actualizar el wrapper de ejecución de Flatpak</translation></message>
+    <message><source>Review legacy Setup (Polkit)</source><translation>Revisar la preparación antigua (Polkit)</translation></message>
+    <message><source>Update host helper (Polkit)</source><translation>Actualizar el helper del anfitrión (Polkit)</translation></message>
     <message>
         <location filename="../qml/pages/details/GpuMemoryCard.qml" line="+55" />
         <source>The GPU-memory operation could not be started</source>
@@ -7531,8 +7542,8 @@ Continúe solo después de revisar este riesgo.</translation>
     </message>
     <message>
         <location line="+8" />
-        <source>Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as —; GPU budget and inaccessible driver errors are not invented.</source>
-        <translation>Los totales del dispositivo incluyen otras aplicaciones. La suma RSS puede contar páginas compartidas varias veces. Las métricas ausentes aparecen como —; no se inventan presupuestos GPU ni errores inaccesibles del controlador.</translation>
+        <source>Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as -; GPU budget and inaccessible driver errors are not invented.</source>
+        <translation>Los totales del dispositivo incluyen otras aplicaciones. La suma RSS puede contar páginas compartidas varias veces. Las métricas ausentes aparecen como -; no se inventan presupuestos GPU ni errores inaccesibles del controlador.</translation>
     </message>
     <message>
         <location line="+2" />
@@ -7544,7 +7555,62 @@ Continúe solo después de revisar este riesgo.</translation>
         <source>The last GameOpti session was interrupted before it saved a final state. Its protection data is historical and does not describe the current game.</source>
         <translation>La última sesión de GameOpti se interrumpió antes de guardar un estado final. Sus datos de protección son históricos y no describen el juego actual.</translation>
     </message>
-</context>
+    <message>
+        <source>Smart GPU Scope - monitor protection throughout the session</source>
+        <translation>Smart GPU Scope - supervisar la protección durante toda la sesión</translation>
+    </message>
+    <message>
+        <source>Smart GPU Scope: %1. Observes the game's scope and descendants; detects protection changes without overwriting another manager. It does not infer focus or guarantee reserved VRAM.</source>
+        <translation>Smart GPU Scope: %1. Observa el scope del juego y sus descendientes; detecta cambios sin sobrescribir otros gestores. No deduce el foco ni garantiza VRAM reservada.</translation>
+    </message>
+    <message>
+        <source>Enable GameOpti GPU Memory globally (Polkit)</source>
+        <translation>Activar GPU Memory de GameOpti globalmente (Polkit)</translation>
+    </message>
+    <message>
+        <source>Global GPU Memory: %1 · Cleanup: %2</source>
+        <translation>GPU Memory global: %1 · Limpieza: %2</translation>
+    </message>
+    <message>
+        <source>Global Off blocks new GameOpti protection and allocator changes. Cleanup waits for running sessions; games are not terminated. Per-game Off only changes this game's profile. Independent boosters are preserved. Smart remains an optional observer; global Off is not proof of an externally unprotected baseline.</source>
+        <translation>La desactivación global bloquea nueva protección y cambios del asignador de GameOpti. La limpieza espera a que terminen las sesiones; no cierra juegos. La desactivación por juego solo cambia su perfil. Se conservan los boosters independientes. Smart sigue siendo un observador opcional; la desactivación global no demuestra ausencia de protección externa.</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Desactivado</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Activado</translation>
+    </message>
+    <message>
+        <source>Prepare host and enable globally (Polkit)</source>
+        <translation>Preparar host y activar globalmente (Polkit)</translation>
+    </message>
+    <message>
+        <source>Retry global Off cleanup (Polkit)</source>
+        <translation>Reintentar limpieza de desactivación global (Polkit)</translation>
+    </message>
+
+    <message><source>Balanced</source><translation>Equilibrado</translation></message>
+    <message><source>GPU memory observation: %1. CPU resource policies are independent of GPU Memory ON/OFF; no FPS or VRAM reservation guarantee.</source><translation>Observación de memoria GPU: %1. Las políticas CPU son independientes de GPU Memory ON/OFF; sin garantía de FPS ni reserva de VRAM.</translation></message>
+    <message><source>Monitor</source><translation>Monitor</translation></message>
+    <message><source>Performance</source><translation>Rendimiento</translation></message>
+    <message><source>Resource controller: %1\nPolicies: %2\nReason: %3\nRestored: %4\nAqueous connected: %5\nLimitations: %6\nErrors: %7</source><translation>Controlador de recursos: %1\nPolíticas: %2\nMotivo: %3\nRestaurado: %4\nAqueous conectado: %5\nLimitaciones: %6\nErrores: %7</translation></message>
+    <message><source>Smart GPU Scope - session resource controller</source><translation>Smart GPU Scope - controlador de recursos de sesión</translation></message>
+<message><source>Resource controller: %1
+Policies: %2
+Reason: %3
+Restored: %4
+Aqueous connected: %5
+Limitations: %6
+Errors: %7</source><translation>Controlador de recursos: %1
+Políticas: %2
+Motivo: %3
+Restaurado: %4
+Aqueous conectado: %5
+Limitaciones: %6
+Errores: %7</translation></message></context>
 <context>
     <name>GraphicsTab</name>
     <message>
@@ -16816,7 +16882,9 @@ Current: %2</source>
         <source>Best Quality</source>
         <translation>Máxima calidad</translation>
     </message>
-</context>
+<message><source>Anchor</source><translation>Anclaje</translation></message><message><source>Apply</source><translation>Aplicar</translation></message><message><source>Client buffer scaling</source><translation>Escalado del búfer del cliente</translation></message><message><source>Compiled runner is unsupported. Saved Gamescope settings or direct launch will be used.</source><translation>El runner compilado no es compatible. Se usará la configuración guardada de Gamescope o el inicio directo.</translation></message><message><source>Could not save scope</source><translation>No se pudo guardar el ámbito</translation></message><message><source>Desktop scope</source><translation>Ámbito del escritorio</translation></message><message><source>Download Aqueous</source><translation>Descargar Aqueous</translation></message><message><source>Experimental native / Flatpak host-bridge integration. Matching uses Wayland app_id or XWayland WM_CLASS. Rule placement is not GPU-memory protection.</source><translation>Integración experimental nativa / mediante el puente del host Flatpak. La coincidencia usa app_id de Wayland o WM_CLASS de XWayland. Las reglas de posición no protegen la memoria GPU.</translation></message><message><source>Floating</source><translation>Flotante</translation></message><message><source>Game</source><translation>Juego</translation></message><message><source>Game-mode size (native or WxH)</source><translation>Tamaño en modo juego (nativo o AxH)</translation></message><message><source>HDR passthrough</source><translation>Paso directo de HDR</translation></message><message><source>Integer-ceil may use larger buffers and more GPU memory.</source><translation>Integer-ceil puede usar búferes más grandes y más memoria GPU.</translation></message><message><source>Last scope measurement (before start / after exit):
+%1</source><translation>Última medición del ámbito (antes de iniciar / después de salir):
+%1</translation></message><message><source>Layout</source><translation>Disposición</translation></message><message><source>Not installed</source><translation>No instalado</translation></message><message><source>Optional compositor for runner launches. Gamescope settings below remain independent.</source><translation>Compositor opcional para inicios con el runner. La configuración de Gamescope de abajo sigue siendo independiente.</translation></message><message><source>Optional, for example DP-1. Missing outputs use normal placement.</source><translation>Opcional, por ejemplo DP-1. Si falta la salida, se usa la posición normal.</translation></message><message><source>Output connector</source><translation>Conector de salida</translation></message><message><source>Per-app support not verified; unavailable</source><translation>Compatibilidad por aplicación sin verificar; no disponible</translation></message><message><source>Remove</source><translation>Eliminar</translation></message><message><source>Rules file: %1</source><translation>Archivo de reglas: %1</translation></message><message><source>Scope</source><translation>Ámbito</translation></message><message><source>Use the actual identifier reported by aqueousctl windows --json; matching is case-sensitive.</source><translation>Usa el identificador real de aqueousctl windows --json; se distingue entre mayúsculas y minúsculas.</translation></message><message><source>Window app_id / WM_CLASS</source><translation>app_id / WM_CLASS de la ventana</translation></message><message><source>Workspace (0 = default)</source><translation>Espacio de trabajo (0 = predeterminado)</translation></message></context>
 <context>
     <name>OverviewTab</name>
     <message>
@@ -17859,7 +17927,7 @@ Current: %2</source>
     <message>
         <location line="+28" />
         <source>Proton Tweaks</source>
-        <translation>Proton Tweaks</translation>
+        <translation>Ajustes de Proton</translation>
     </message>
 </context>
 <context>

@@ -400,16 +400,34 @@ class DlssEnablerService:
         rendered = update_ini_text(text, updates)
         if original.startswith("\ufeff"):
             rendered = "\ufeff" + rendered
-        updated_state = {**state, "configuration": configuration,
-                         "configuration_updated_at": datetime.now(UTC).isoformat()}
+        updated_state = {**state, "configuration": configuration}
         try:
             _atomic_write(ini, rendered)
+            updated_state["configuration_updated_at"] = datetime.now(UTC).isoformat()
+            updated_state["runtime_log_baseline"] = self._runtime_log_signature(
+                Path(state["install_dir"]) / "dlss-enabler.log"
+            )
             self._save_state(app_id, updated_state)
         except BaseException:
             _atomic_write(ini, original)
             raise
         state.update(updated_state)
         return configuration
+
+    @staticmethod
+    def _runtime_log_signature(path: Path) -> dict[str, int] | None:
+        try:
+            info = path.lstat()
+        except FileNotFoundError:
+            return None
+        return {
+            "device": info.st_dev,
+            "inode": info.st_ino,
+            "mode": info.st_mode,
+            "size": info.st_size,
+            "mtime_ns": info.st_mtime_ns,
+            "ctime_ns": info.st_ctime_ns,
+        }
 
     # -- journal ----------------------------------------------------------
     # ``done`` is advanced *before* a step runs and every undo is tolerant of
@@ -728,6 +746,7 @@ class DlssEnablerService:
             try:
                 text = log.read_text(encoding="utf-8", errors="replace")
                 modified = datetime.fromtimestamp(log.stat().st_mtime, UTC)
+                signature = self._runtime_log_signature(log)
                 activated = datetime.fromisoformat(str(
                     state.get("configuration_updated_at") or state.get("activated_at", "")
                 ))
@@ -735,8 +754,25 @@ class DlssEnablerService:
                 result["status"] = "unreadable"
             else:
                 result["modifiedAt"] = modified.isoformat()
-                if modified < activated or not text.strip() or text.startswith("This log is still empty"):
-                    result["status"] = "stale" if modified < activated else "not_run"
+                baseline = state.get("runtime_log_baseline")
+                signature_fields = {
+                    "device", "inode", "mode", "size", "mtime_ns", "ctime_ns",
+                }
+                baseline_valid = baseline is None or (
+                    isinstance(baseline, Mapping)
+                    and set(baseline) == signature_fields
+                    and all(type(value) is int for value in baseline.values())
+                )
+                # Filesystem mtimes can trail wall-clock timestamps; compare a snapshot
+                # captured when the configuration was written as well.
+                log_changed = (
+                    "runtime_log_baseline" in state
+                    and baseline_valid
+                    and signature != baseline
+                )
+                stale = modified < activated and not log_changed
+                if stale or not text.strip() or text.startswith("This log is still empty"):
+                    result["status"] = "stale" if stale else "not_run"
                 else:
                     lowered = text.casefold()
                     markers = (

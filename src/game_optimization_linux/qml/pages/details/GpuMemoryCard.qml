@@ -16,6 +16,8 @@ SurfaceCard {
     readonly property string gameId: String(gameData.id || "")
     property var statusData: ({})
     property bool priority: false
+    property bool smartScope: false
+    property string smartMode: "monitor"
     property string pressure: "default"
     property string region: ""
     property string api: "auto"
@@ -30,6 +32,8 @@ SurfaceCard {
     property string measurementMessage: ""
     property bool sameScene: false
     property var comparison: ({})
+    property bool recoveryApproved: false
+    readonly property var legacyReview: statusData.legacyReview || ({})
     property int padIndex: 0
     property var padFocusedItem: null
     readonly property var system: statusData.system || ({})
@@ -39,6 +43,8 @@ SurfaceCard {
     function loadEditor() {
         var p = statusData.profile || ({})
         priority = Boolean(p.priority); pressure = String(p.pressure || "default")
+        smartScope = Boolean(p.smartScope)
+        smartMode = String(p.smartMode || "monitor")
         api = String(p.api || "auto"); region = String(p.region || regions[0] || "")
         loaded = true; dirty = false
         loadedProfile = JSON.stringify(p)
@@ -56,8 +62,8 @@ SurfaceCard {
         submittedRevision = saving ? revision : -1
         refresh(); awaiting = Number(statusData.operationId || 0)
     }
-    function reset() { priority = false; pressure = "default"; api = "auto"; touch() }
-    function metric(value, units) { return value === undefined || value === null || !isFinite(Number(value)) ? "—" : Number(value).toFixed(1) + " " + units }
+    function reset() { priority = false; smartScope = false; smartMode = "monitor"; pressure = "default"; api = "auto"; touch() }
+    function metric(value, units) { return value === undefined || value === null || !isFinite(Number(value)) ? "-" : Number(value).toFixed(1) + " " + units }
     function runtimeLine(p) {
         var group = (p.chain || [])[0] || ({})
         var key = region || Object.keys(p.regions || ({}))[0] || ""
@@ -88,27 +94,87 @@ SurfaceCard {
         }
     }
     Component.onCompleted: refresh()
-    onGameIdChanged: { loaded = false; loadedProfile = ""; statusData = ({}); priority = false; pressure = "default"; region = ""; api = "auto"; dirty = false; awaiting = 0; error = ""; sameScene = false; comparison = ({}); refresh() }
+    onGameIdChanged: { loaded = false; loadedProfile = ""; statusData = ({}); priority = false; smartScope = false; pressure = "default"; region = ""; api = "auto"; dirty = false; awaiting = 0; error = ""; sameScene = false; comparison = ({}); refresh() }
     Timer { interval: 1500; repeat: true; running: card.visible; onTriggered: card.refresh() }
     contentItem: ColumnLayout {
         spacing: 10
         Label { Layout.fillWidth: true; text: qsTr("GPU memory"); color: App.Theme.text; font.pixelSize: card.couchMode ? 28 : 20; font.bold: true }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
             text: qsTr("Protect the game's GPU allocations under memory pressure. This does not increase physical VRAM or reduce texture quality.") }
+        AppSwitch {
+            objectName: "gpuMemoryGlobalSwitch"
+            property string gpuAction: "switch"
+            textPixelSize: card.controlTextSize
+            Layout.fillWidth: true
+            text: qsTr("Enable GameOpti GPU Memory globally (Polkit)")
+            checked: Boolean((card.statusData.globalGpuMemory || {}).enabled)
+            enabled: !Boolean(card.statusData.busy) && Boolean(card.statusData.success) && !Boolean(card.system.legacySetup)
+            onClicked: card.operation(card.controller.setGpuMemoryGlobal(card.gameId, checked), false)
+        }
+        Label {
+            objectName: "gpuMemoryGlobalStatus"
+            Layout.fillWidth: true
+            wrapMode: Text.WordWrap
+            color: App.Theme.textSecondary
+            text: qsTr("Global GPU Memory: %1 · Cleanup: %2").arg(
+                (card.statusData.globalGpuMemory || {}).enabled ? qsTr("On") : qsTr("Off")).arg(
+                String((card.statusData.globalGpuMemory || {}).cleanupState || "unknown"))
+                + "\n" + String((card.statusData.globalGpuMemory || {}).error || "")
+        }
+        Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textMuted
+            text: qsTr("Global Off blocks new GameOpti protection and allocator changes. Cleanup waits for running sessions; games are not terminated. Per-game Off only changes this game's profile. Independent boosters are preserved. Smart remains an optional observer; global Off is not proof of an externally unprotected baseline.") }
+        AppButton {
+            objectName: "gpuMemoryCleanupRetry"
+            property string gpuAction: "button"
+            textPixelSize: card.controlTextSize
+            text: qsTr("Retry global Off cleanup (Polkit)")
+            visible: !(card.statusData.globalGpuMemory || {}).enabled
+            enabled: !card.statusData.busy
+            onClicked: card.operation(card.controller.setGpuMemoryGlobal(card.gameId, false), false)
+        }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
             visible: Boolean((card.system.gpus || []).length)
             text: (card.system.gpus || []).map(function(g) { return String(g.name || g.vendor || "") + " · "
-                + (g.vramTotal ? (g.vramTotal / 1073741824).toFixed(2) + " GiB" : "—")
+                + (g.vramTotal ? (g.vramTotal / 1073741824).toFixed(2) + " GiB" : "-")
                 + (String(g.type || "").indexOf("INTEGRATED") >= 0 ? " · " + qsTr("Shared-memory GPU") : "") }).join("\n") }
-        Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: card.statusData.ready ? App.Theme.success : App.Theme.warning
-            text: !card.statusData.success ? qsTr("Checking system readiness…") : card.statusData.ready ? qsTr("System ready · dmemcg-booster is running") : qsTr("System preparation required for GameOpti protection") }
+        Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
+            text: qsTr("Host boosters - system: %1 · user: %2. Running services are not proof of game protection.")
+                .arg(String((card.system.systemBooster || {}).active || "unknown"))
+                .arg(String((card.system.userBooster || {}).active || "unknown")) }
+        Label { objectName: "gpuActualProtection"; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
+            text: Boolean(card.statusData.runtimeProtectionVerified)
+                ? qsTr("Actual game protection: verified by current process evidence (%1)").arg(String(card.statusData.protectionOrigin || "unknown"))
+                : qsTr("Actual game protection: not verified. Saved profile and running boosters do not establish protection.") }
+        Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.warning
+            visible: Boolean(card.system.legacySetup)
+            text: qsTr("Global On is blocked by a legacy Setup journal. Review legacy Setup below; per-game and Smart switches cannot repair host cleanup. Do not delete the journal.") }
+        AppButton { objectName: "gpuLegacyReview"; text: qsTr("Review legacy Setup (Polkit)")
+            visible: Boolean(card.system.legacySetup) || card.system.setupJournalState === "review_required"; enabled: !Boolean(card.statusData.busy)
+            onClicked: { card.recoveryApproved = false; card.operation(card.controller.gpuMemoryRecovery(card.gameId, {action: "review"}), false) } }
+        Label { Layout.fillWidth: true; wrapMode: Text.WrapAnywhere; color: App.Theme.warning
+            visible: Boolean(card.legacyReview.token)
+            text: String(card.legacyReview.warning || "") + "\n" + JSON.stringify(card.legacyReview, null, 2) }
+        CheckBox { objectName: "gpuLegacyApproval"; Layout.fillWidth: true
+            visible: Boolean(card.legacyReview.token)
+            text: qsTr("I closed all games and Wine/Proton launchers, reviewed every listed change, and confirm that only GameOpti owns these two boosters and parent limits; no other manager depends on them.")
+            checked: card.recoveryApproved; onToggled: card.recoveryApproved = checked }
+        AppButton { objectName: "gpuLegacyReconcile"; text: qsTr("Back up original and reconcile to Off (Polkit)")
+            visible: Boolean(card.legacyReview.token)
+            enabled: card.recoveryApproved && !Boolean(card.statusData.busy) && !(card.legacyReview.blockers || []).length
+            onClicked: card.operation(card.controller.gpuMemoryRecovery(card.gameId,
+                {action: "reconcile", approved: card.recoveryApproved, token: card.legacyReview.token}), false) }
+        Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
+            text: qsTr("Host helper: %1. Update only after closing all games; original helper is backed up. Old per-game copied wrappers must be regenerated from this application.")
+                .arg(String((card.system.components || {}).rootHelper || "unknown")) }
+        AppButton { text: qsTr("Update host helper (Polkit)"); enabled: !Boolean(card.statusData.busy)
+            onClicked: card.operation(card.controller.gpuMemoryRecovery(card.gameId, {action: "update-helper"}), false) }
         Label { objectName: "gpuSavedProfile"; Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
             visible: card.loaded
             text: ((card.statusData.profile || {}).priority ? qsTr("Saved GameOpti protection: On") : qsTr("Saved GameOpti protection: Off"))
                 + (card.dirty ? " · " + qsTr("Unsaved editor changes") : "") }
         Label { Layout.fillWidth: true; wrapMode: Text.WrapAnywhere; color: App.Theme.textMuted
             visible: card.expanded
-            text: qsTr("Running kernel: %1 · memory regions: %2").arg(String(card.system.kernel || "—")).arg(card.regions.join(", ") || "—") }
+            text: qsTr("Running kernel: %1 · memory regions: %2").arg(String(card.system.kernel || "-")).arg(card.regions.join(", ") || "-") }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
             visible: card.expanded
             text: card.system.ttmProtectionEvidence === "cachyos-backport-btf"
@@ -119,7 +185,7 @@ SurfaceCard {
             text: qsTr("The running driver exposes no dmem region. Protection needs a supported kernel and GPU driver plus dmemcg-booster; GameOpti will not install experimental kernels or drivers.") }
         Flow {
             Layout.fillWidth: true; spacing: 8
-            AppButton { property string gpuAction: "button"; textPixelSize: card.controlTextSize; text: qsTr("Prepare host (Polkit)"); enabled: !card.statusData.busy && !card.statusData.ready
+            AppButton { property string gpuAction: "button"; textPixelSize: card.controlTextSize; text: qsTr("Prepare host and enable globally (Polkit)"); enabled: !Boolean(card.statusData.busy) && !Boolean(card.system.legacySetup)
                 onClicked: card.operation(card.controller.setupGpuMemory(card.gameId), false) }
             AppButton { property string gpuAction: "button"; textPixelSize: card.controlTextSize; text: qsTr("Restore GameOpti system setup"); enabled: !card.statusData.busy && Boolean(card.system.managedSetup)
                 visible: card.expanded
@@ -134,6 +200,43 @@ SurfaceCard {
         AppSwitch { objectName: "gpuPrioritySwitch"; property string gpuAction: "switch"; textPixelSize: card.controlTextSize; Layout.fillWidth: true; text: qsTr("Protect this game's GPU memory"); checked: card.priority
             enabled: !card.statusData.busy && (card.statusData.ready || card.priority)
             onClicked: { card.priority = checked; card.touch() } }
+        AppSwitch {
+            objectName: "smartGpuScopeSwitch"
+            property string gpuAction: "switch"
+            Layout.fillWidth: true
+            text: qsTr("Smart GPU Scope - session resource controller")
+            checked: card.smartScope
+            enabled: !card.statusData.busy
+            onClicked: { card.smartScope = checked; card.touch() }
+        }
+        AppComboBox {
+            objectName: "smartResourceMode"
+            Layout.fillWidth: true
+            model: card.system.resourceControlAvailable ? [qsTr("Monitor"), qsTr("Balanced"), qsTr("Performance")] : [qsTr("Monitor")]
+            currentIndex: Math.max(0, ["monitor", "balanced", "performance"].indexOf(card.smartMode))
+            enabled: card.smartScope && !card.statusData.busy
+            onActivated: function(index) { card.smartMode = ["monitor", "balanced", "performance"][index]; card.touch() }
+        }
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            color: App.Theme.textSecondary
+            text: qsTr("GPU memory observation: %1. CPU resource policies are independent of GPU Memory ON/OFF; no FPS or VRAM reservation guarantee.").arg(String((card.statusData.smartScope || {}).state || "not_configured"))
+        }
+        Label {
+            Layout.fillWidth: true
+            wrapMode: Text.Wrap
+            color: App.Theme.textSecondary
+            property var resource: (card.statusData.smartScope || {}).resourceController || ({})
+            text: qsTr("Resource controller: %1\nPolicies: %2\nReason: %3\nRestored: %4\nAqueous connected: %5\nLimitations: %6\nErrors: %7")
+                .arg(String(resource.mode || "not running"))
+                .arg(JSON.stringify(resource.activePolicies || ({})))
+                .arg(String(resource.reason || "-"))
+                .arg(String(resource.restored === true))
+                .arg(String(resource.aqueousConnected === true))
+                .arg((resource.unsupported || []).join("; "))
+                .arg((resource.errors || []).concat(resource.conflicts || []).join("; "))
+        }
         AppButton { property string gpuAction: "button"; textPixelSize: card.controlTextSize; Layout.fillWidth: true; text: qsTr("Advanced controls and measurements")
             checkable: true; checked: card.expanded; onClicked: card.expanded = checked }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textMuted
@@ -152,7 +255,7 @@ SurfaceCard {
             onActivated: function(index) { card.api = card.apiValues[index]; card.touch() } }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textMuted
             visible: card.expanded
-            text: qsTr("Detected: %1 · vkd3d: %2").arg(String(card.statusData.detectedApi || "—")).arg(String((card.statusData.tool || {}).version || qsTr("not established by an actual launch"))) }
+            text: qsTr("Detected: %1 · vkd3d: %2").arg(String(card.statusData.detectedApi || "-")).arg(String((card.statusData.tool || {}).version || qsTr("not established by an actual launch"))) }
         Label { text: qsTr("Memory-pressure profile (separate from protection)"); color: App.Theme.text; Layout.fillWidth: true; wrapMode: Text.WordWrap; visible: card.expanded }
         AppComboBox { property string gpuAction: "combo"; Layout.fillWidth: true
             textPixelSize: card.controlTextSize
@@ -170,7 +273,7 @@ SurfaceCard {
                 : qsTr("UPLOAD profile unavailable: a discrete GPU with a large visible VRAM BAR was not verified. Shared-memory GPUs keep the default allocator.") }
         Flow { Layout.fillWidth: true; spacing: 8
             AppButton { property string gpuAction: "button"; textPixelSize: card.controlTextSize; text: qsTr("Apply for next launch"); kind: "primary"; enabled: card.loaded && !card.statusData.busy
-                onClicked: card.operation(card.controller.applyGpuMemory(card.gameId, {priority: card.priority, pressure: card.pressure, region: card.region, api: card.api}), true) }
+                onClicked: card.operation(card.controller.applyGpuMemory(card.gameId, {priority: card.priority, smartScope: card.smartScope, smartMode: card.smartMode, pressure: card.pressure, region: card.region, api: card.api}), true) }
             AppButton { property string gpuAction: "button"; textPixelSize: card.controlTextSize; text: qsTr("Reset editor to defaults"); enabled: !card.statusData.busy; onClicked: card.reset() }
         }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textSecondary
@@ -243,14 +346,14 @@ SurfaceCard {
                         .arg(card.metric(memory.peakRssSum === null ? null : memory.peakRssSum / 1048576, ""))
                     + "\n" + String(sample.summaryPath || "")
                     + "\n" + qsTr("Sampled frametime spikes: %1 · RAM PSI full: %2 µs · GPU errors: %3")
-                        .arg(sample.sampledHitches ? String(sample.sampledHitches.spikes) : "—")
-                        .arg(memory.fullPsiTotalEnd !== undefined && memory.fullPsiTotalEnd !== null ? String(memory.fullPsiTotalEnd - memory.fullPsiTotalStart) : "—")
-                        .arg(memory.kernelGpuErrors === undefined || memory.kernelGpuErrors === null ? "—" : String(memory.kernelGpuErrors.length))
+                        .arg(sample.sampledHitches ? String(sample.sampledHitches.spikes) : "-")
+                        .arg(memory.fullPsiTotalEnd !== undefined && memory.fullPsiTotalEnd !== null ? String(memory.fullPsiTotalEnd - memory.fullPsiTotalStart) : "-")
+                        .arg(memory.kernelGpuErrors === undefined || memory.kernelGpuErrors === null ? "-" : String(memory.kernelGpuErrors.length))
             }
         }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textMuted
             visible: card.expanded
-            text: qsTr("Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as —; GPU budget and inaccessible driver errors are not invented.") }
+            text: qsTr("Device totals include other applications. Summed RSS can count shared pages more than once. Missing metrics are shown as -; GPU budget and inaccessible driver errors are not invented.") }
         Label { Layout.fillWidth: true; wrapMode: Text.WordWrap; color: App.Theme.textMuted; visible: card.expanded
             text: qsTr("Spikes count logged samples above max(50 ms, 2× median); they are not a count of every rendered frame. RAM PSI is system-wide. Kernel errors cover the recording interval and may come from other applications.") }
     }

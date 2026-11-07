@@ -141,6 +141,10 @@ SurfaceCard {
                         id: gameStatus
                         objectName: "gridCardStatus"
                         Layout.alignment: Qt.AlignTop
+                        Layout.preferredWidth: Math.min(implicitWidth, card.width - 44)
+                        Layout.maximumWidth: Math.max(0, card.width - 44)
+                        Layout.minimumWidth: 0
+                        clip: true
                         visible: String(card.value(["status"], "ready")).toLowerCase() !== "ready"
                         text: card.value(["status", "lastTaskStatus", "last_task_status"], qsTr("Ready"))
                         status: text
@@ -215,18 +219,17 @@ SurfaceCard {
                     spacing: 8
 
                     Rectangle {
+                        objectName: "gridCardAvailabilityWarning"
+                        visible: !card.libraryAvailable() || !card.available()
                         Layout.preferredWidth: 30
                         Layout.preferredHeight: 30
                         radius: 9
-                        color: card.libraryAvailable()
-                               ? (card.available() ? App.Theme.successSoft : App.Theme.dangerSoft)
-                               : App.Theme.warningSoft
+                        color: card.libraryAvailable() ? App.Theme.dangerSoft : App.Theme.warningSoft
 
                         Label {
                             anchors.centerIn: parent
-                            text: !card.libraryAvailable() ? "!" : card.available() ? "✓" : "×"
-                            color: !card.libraryAvailable() ? App.Theme.warning
-                                   : card.available() ? App.Theme.success : App.Theme.danger
+                            text: !card.libraryAvailable() ? "!" : "×"
+                            color: !card.libraryAvailable() ? App.Theme.warning : App.Theme.danger
                             font.pixelSize: 14
                             font.weight: Font.Bold
                         }

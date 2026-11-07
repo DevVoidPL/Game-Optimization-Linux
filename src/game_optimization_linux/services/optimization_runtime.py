@@ -635,7 +635,7 @@ class OptimizationLaunchPlanner:
         if post_processing_environment:
             reasons.append("Per-game post-processing is configured; loading and effects require runtime verification")
         for key, value in (gpu_memory_environment or {}).items():
-            if key != "VKD3D_CONFIG" or "\0" in value:
+            if key not in {"VKD3D_CONFIG", "GAMEOPTI_GPU_MEMORY_VKD3D_ORIGINAL"} or "\0" in value:
                 raise ValueError("Invalid GPU-memory launch environment")
             environment[key] = value
             environment_sources[key] = "gpu_memory"

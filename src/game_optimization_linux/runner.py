@@ -31,6 +31,7 @@ from .services.host_service import HostServiceClient
 from .services.host_bootstrap import host_home_directory
 from .services.performance_session import BaselineSessionRepository
 from .services.gpu_memory import pressure_environment, launch_prefix as gpu_memory_prefix
+from .services import aqueous
 
 
 _STEAM_ENV_FILE = "GAME_OPTIMIZATION_STEAM_ENV_FILE"
@@ -639,6 +640,22 @@ def main(
         )
         profiles = repository or GameOptimizationProfileRepository()
         profile = profiles.load(app_id)
+        # Optional Desktop sidecar; legacy profiles retain their existing behavior.
+        # The host bridge uses a different interpreter/runtime: never inject a
+        # sandbox Python path or assume the host has our new module installed.
+        scope = {"active": False, "scope": "legacy"}
+        scope_warning = ""
+        try:
+            if not os.environ.get("FLATPAK_ID") or host_launch_directory is not None:
+                profile, scope, scope_warning = aqueous.select_scope(profile, root=profiles.root)
+            else:
+                saved_scope = aqueous.load_profile(app_id, root=profiles.root)
+                if saved_scope["scope"] == "aqueous":
+                    scope_warning = "Aqueous nested launch is not yet supported by the Flatpak host bridge; using saved Gamescope settings or direct launch"
+        except (OSError, ValueError) as error:
+            scope_warning = f"Optional scope profile ignored: {error}"
+        if scope_warning:
+            print(f"game-optimization-run: warning: {scope_warning}", file=sys.stderr)
         mango_profiles = mangohud_repository or MangoHudProfileRepository(profiles.root)
         mangohud_profile = mango_profiles.load(app_id)
         mangohud_activation_owner = (
@@ -734,6 +751,7 @@ def main(
             # Steam games run inside the Steam Linux Runtime container.
             gamemode_preload_client=True,
         )
+        plan = aqueous.wrap_plan(plan, scope, app_id, root=profiles.root)
         print(
             f"game-optimization-run: LaunchPlan AppID={app_id} Steam command: "
             f"{shlex.join(plan.steam_command)}",
@@ -782,6 +800,7 @@ def main(
                 *([optiscaler_warning] if optiscaler_warning else []),
                 *([proton_warning] if proton_warning else []),
                 *([custom_warning] if custom_warning else []),
+                *([scope_warning] if scope_warning else []),
             ],
             "fpsLimitOwner": plan.fps_limit_owner,
             "fpsLimit": plan.fps_limit or 0,

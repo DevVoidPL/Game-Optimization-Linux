@@ -112,11 +112,13 @@ Rectangle {
                 delegate: Button {
                     id: navButton
                     required property var modelData
+                    objectName: "sidebarNavigation-" + modelData.page
 
                     Layout.fillWidth: true
                     Layout.preferredHeight: 46
                     padding: 0
                     focusPolicy: Qt.StrongFocus
+                    hoverEnabled: true
                     Accessible.name: modelData.label
                     ToolTip.visible: sidebar.collapsed && hovered
                     ToolTip.text: modelData.label
@@ -127,15 +129,14 @@ Rectangle {
                         spacing: 12
 
                         UiIcon {
+                            objectName: "sidebarNavigationIcon-" + navButton.modelData.page
                             Layout.preferredWidth: 46
                             Layout.preferredHeight: 22
                             source: navButton.modelData.icon
                             sourceSize.width: 22
                             sourceSize.height: 22
-                            tintEnabled: !App.Theme.dark
-                            tintColor: sidebar.isSelected(navButton.modelData.page)
-                                       ? App.Theme.accent : App.Theme.textSecondary
-                            opacity: sidebar.isSelected(navButton.modelData.page)
+                            // Neutral SVG variants follow the theme without shader tinting.
+                            opacity: sidebar.isSelected(navButton.modelData.page) || navButton.hovered
                                      ? 1.0 : (App.Theme.dark ? 0.72 : 0.88)
                         }
 
