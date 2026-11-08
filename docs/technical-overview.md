@@ -1,4 +1,4 @@
-# GameOpti 2.2.0 — Technical Overview
+# GameOpti 2.2.0 Technical Overview Information 
 
 This document describes the implementation and integrations in the GameOpti 2.2.0 code line. It is intended for people who want to understand how the application works, what it changes, which upstream tools it uses, and where the relevant implementation lives.
 
@@ -388,14 +388,3 @@ GameOpti does not bypass anti-cheat. Compatibility warnings are not a mechanism 
 | Post-processing | `services/post_processing.py`, `services/post_processing_artifacts.py`, `services/post_processing_catalog.py` |
 | Aqueous | `services/aqueous.py` |
 | Flatpak build and release packaging | `flatpak/README.md`, `flatpak/` |
-
-## 12. Related documentation
-
-- [Architecture and launch flow](architecture.md)
-- [GPU-memory management](gpu-memory.md)
-- [Frame generation](frame-generation.md)
-- [MangoHud editor](mangohud.md)
-- [Post-processing](post-processing.md)
-- [Proton tweaks](tweaks.md)
-- [Flatpak build instructions](../flatpak/README.md)
-- [Project roadmap](../ROADMAP.md)
