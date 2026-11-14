@@ -5,7 +5,7 @@
 <h1 align="center">GameOpti 2.3.0-beta</h1>
 
 <p align="center">
-  A beta release for Linux; not a stable release.<br>
+  Beta version for Linux.<br>
   Manage your Linux games, per-game settings, graphics tools and performance measurements.<br>
   Couch Edition for a controller and TV, Desktop Edition for mouse and keyboard.
 </p>
@@ -45,10 +45,9 @@ Project updates, demonstrations and release news are on [YouTube](https://www.yo
 
 ## Features
 
-GameOpti has its own per-game launch handling, performance analysis, Deep
-Compression and resource-management features. It also manages several external
-graphics and monitoring tools, each with its own requirements and
-compatibility limits.
+GameOpti handles per-game launching, performance analysis, Deep Compression
+and resource management. It also manages external graphics and monitoring
+tools, each with its own requirements and compatibility limits.
 
 | | What it does |
 | --- | --- |
@@ -205,16 +204,15 @@ renaming it requires an explicit update of that command.
 
 ### Arch / AUR
 
-AUR publication is a separate step. This release does not provide an AUR
-installation command. The release source archive is intended for the later
-reviewed native package recipe.
+The native Arch package is being prepared for AUR. It is not published yet;
+the release source archive is available for building it.
 
 ## Future development
 
 [GameOpti LXB](https://github.com/DevVoidPL/GameOpti-LXB) is a separate project
 for controller and TV use, with LineXinBar integration planned. Work on the
 main GameOpti application continues alongside it. See the [roadmap](ROADMAP.md)
-for current work and later ideas.
+for current work and future plans.
 
 ## Source layout
 

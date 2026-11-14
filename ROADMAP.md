@@ -20,7 +20,7 @@ See the [README](README.md#features) for features and requirements, and the
 
 ## Current work
 
-- Collect beta feedback across more GPUs, distributions and game configurations.
+- Collect feedback from beta testing on more GPUs, distributions and games.
 - Prepare the native Arch/AUR recipe after approval of the GitHub release source.
 - Fix reported bugs and improve Desktop and Couch layouts.
 - Check graphics tools together across Steam, Heroic, Lutris and their Flatpak runtimes.
