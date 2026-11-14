@@ -62,7 +62,9 @@ Button {
                 title: card.title
                 launcher: card.launcher.length ? card.launcher : "Steam"
                 artworkSource: card.artworkSource
-                artworkFillMode: Image.PreserveAspectCrop
+                artworkFillMode: artworkAspectRatio > (width / Math.max(1, height)) * 0.75
+                                 && artworkAspectRatio < (width / Math.max(1, height)) * 1.25
+                                 ? Image.PreserveAspectCrop : Image.PreserveAspectFit
                 cornerRadius: card.cardRadius
             }
             // Title plate: always dark because it sits on imagery.

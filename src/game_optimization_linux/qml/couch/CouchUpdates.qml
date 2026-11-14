@@ -31,6 +31,7 @@ FocusScope {
     property var summaryData: controller && controller.updatesSummary
                               ? controller.updatesSummary : ({})
     property var pendingPlan: ({})
+    property bool clearingHistory: false
     // 0 list, 1 filters, 2 bottom navigation.
     property int focusZone: 0
     property int selectedAction: 0
@@ -587,6 +588,7 @@ FocusScope {
             return false
         confirmationOverlay.visible = false
         pendingPlan = ({})
+        clearingHistory = false
         confirmSelection = 0
         if (navigation)
             navigation.closeModal()
@@ -594,6 +596,12 @@ FocusScope {
     }
 
     function confirmPlan() {
+        if (clearingHistory) {
+            var cleared = controller && controller.clearFinishedUpdates
+                    ? Number(controller.clearFinishedUpdates()) : 0
+            closeConfirmation()
+            return cleared > 0
+        }
         var planId = String(planValue(pendingPlan, ["planId", "plan_id"], ""))
         var started = planId.length > 0 && controller && controller.startCompression
                 ? Boolean(controller.startCompression(planId)) : false
@@ -667,6 +675,16 @@ FocusScope {
         else if (action === "NextSection" || action === "PageRight") action = "PageDown"
         if (confirmationOpen) {
             handleConfirmationAction(action)
+            return
+        }
+        if (action === "SecondaryAction" && controller && controller.clearFinishedUpdates) {
+            closeActions()
+            pendingPlan = ({})
+            clearingHistory = true
+            confirmSelection = 0
+            confirmationOverlay.visible = true
+            if (navigation) navigation.openModal("updates-history", "cancel")
+            restoreActiveFocus()
             return
         }
         if (actionsOpen) {
@@ -792,6 +810,7 @@ FocusScope {
             Label {
                 Layout.fillWidth: true
                 text: qsTr("Changed game files are re-analyzed before compression. Games are not downloaded here.")
+                      + " · " + qsTr("Y: Clear finished history")
                 color: App.Theme.textSecondary
                 font.pixelSize: 18 * page.fitScale
                 elide: Text.ElideRight
@@ -1266,7 +1285,7 @@ FocusScope {
 
             Label {
                 Layout.fillWidth: true
-                text: qsTr("Confirm compression")
+                text: page.clearingHistory ? qsTr("Clear finished history?") : qsTr("Confirm compression")
                 color: App.Theme.text
                 font.pixelSize: 44 * page.couchScale
                 font.weight: Font.Bold
@@ -1276,6 +1295,7 @@ FocusScope {
 
             Label {
                 Layout.fillWidth: true
+                visible: !page.clearingHistory
                 text: String(page.planValue(page.pendingPlan, [
                     "gameName", "game_name"
                 ], qsTr("Unknown game")))
@@ -1287,6 +1307,7 @@ FocusScope {
             }
 
             GridLayout {
+                visible: !page.clearingHistory
                 Layout.alignment: Qt.AlignHCenter
                 columns: 3
                 rowSpacing: 10 * page.couchScale
@@ -1348,6 +1369,8 @@ FocusScope {
             Label {
                 Layout.fillWidth: true
                 text: {
+                    if (page.clearingHistory)
+                        return qsTr("Hide finished results and errors. Active work and game files are kept.")
                     var warnings = page.planValue(page.pendingPlan,
                                                   ["warnings"], [])
                     if (warnings && warnings.length > 0)
@@ -1400,8 +1423,8 @@ FocusScope {
                     implicitWidth: 300 * page.couchScale
                     iconSource: App.UiIcons.couchGlyphCompress
                     iconLightSource: App.UiIcons.couchGlyphCompressOnLight
-                    text: qsTr("Start compression")
-                    subtitle: qsTr("Use the verified plan")
+                    text: page.clearingHistory ? qsTr("Clear finished history") : qsTr("Start compression")
+                    subtitle: page.clearingHistory ? qsTr("Keep active work and game files") : qsTr("Use the verified plan")
                     focus: page.confirmationOpen && page.confirmSelection === 1
                     onClicked: page.confirmPlan()
                 }

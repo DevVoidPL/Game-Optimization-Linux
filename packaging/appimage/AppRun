@@ -1,0 +1,17 @@
+#!/bin/sh
+# Keep loader paths private: host games must not inherit our Python/Qt libs.
+set -eu
+APPDIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P)
+export APPDIR
+unset PYTHONHOME PYTHONPATH LD_LIBRARY_PATH LD_PRELOAD QT_PLUGIN_PATH QML2_IMPORT_PATH QML_IMPORT_PATH
+module=game_optimization_linux
+if [ "${1-}" = --runner ]; then
+    module=game_optimization_linux.runner
+    shift
+elif [ "${1-}" = --appid ]; then
+    # Saved Steam Launch Options use the same --appid protocol as the native
+    # runner. Point directly at this image, not a coinstalled Flatpak wrapper.
+    module=game_optimization_linux.runner
+fi
+exec /lib64/ld-linux-x86-64.so.2 --library-path "$APPDIR/usr/lib" \
+    "$APPDIR/usr/bin/python3" -I -B -m "$module" "$@"

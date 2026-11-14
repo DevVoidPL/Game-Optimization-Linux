@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import hashlib
 import logging
 import os
+import re
 from pathlib import Path
 import shlex
 import shutil
@@ -21,6 +23,85 @@ from .host_bootstrap import default_runner_path
 
 DEFAULT_RUNNER_PATH = default_runner_path()
 logger = logging.getLogger(__name__)
+
+
+def is_gameopti_appimage(executable: str) -> bool:
+    """Read known shipped entry points, never execute an untrusted image.
+
+    This is format recognition, not a signature or a guarantee that arbitrary
+    image contents are safe. Unknown builds fail closed. File identity is part
+    of the cache key so replacing an image or retargeting a symlink invalidates it.
+    """
+    path = Path(executable)
+    try:
+        if not path.is_absolute() or not path.is_file() or not os.access(path, os.X_OK):
+            return False
+        path = path.resolve(strict=True)
+        info = path.stat()
+        return _known_appimage(str(path), info.st_dev, info.st_ino, info.st_size,
+                               info.st_mtime_ns, info.st_ctime_ns)
+    except (OSError, ValueError):
+        return False
+
+
+@lru_cache(maxsize=64)
+def _known_appimage(filename: str, *identity: int) -> bool:
+    from .archive_reader import BUNDLED_7ZIP_HELPER
+
+    try:
+        with Path(filename).open("rb") as stream:
+            header = stream.read(11)
+        if not header.startswith(b"\x7fELF") or header[8:11] != b"AI\x02":
+            return False
+        candidates = [BUNDLED_7ZIP_HELPER]
+        if os.environ.get("APPDIR"):
+            candidates.append(Path(os.environ["APPDIR"]) / "usr/libexec/game-optimization-7zz")
+        candidates.extend(Path(p) for name in ("7zz", "7z") if (p := shutil.which(name)))
+        helper = next((p for p in candidates if p.is_file() and os.access(p, os.X_OK)), None)
+        if helper is None:
+            return False
+        # Hashes of the reviewed 2.3.0-beta AppRun and runner, including the
+        # already distributed candidate. Do not infer identity from a filename.
+        members = {
+            "AppRun": "131264b5f5db17fa51a1568b1374498b5b0c3722f983d573063f6a3660117d83",
+            "usr/lib/python3.13/site-packages/game_optimization_linux/runner.py":
+                "dc3eafe1a3a9cff8bd50b1fe3df9bf25038b950a491b37b3bf5912fbbb08691a",
+        }
+        for member, expected in members.items():
+            listing = subprocess.run([str(helper), "l", "-slt", filename, member],
+                                     capture_output=True, timeout=5, check=False)
+            text = listing.stdout.decode("utf-8", "replace")
+            if listing.returncode or text.count(f"Path = {member}\n") != 1:
+                return False
+            entry = text.split(f"Path = {member}\n", 1)[1]
+            size = re.search(r"^Size = (\d+)$", entry, re.MULTILINE)
+            if size is None or int(size[1]) > 128 * 1024:
+                return False
+            result = subprocess.run([str(helper), "x", "-so", filename, member],
+                                    capture_output=True, timeout=5, check=False)
+            if result.returncode or hashlib.sha256(result.stdout).hexdigest() != expected:
+                return False
+        return True
+    except (OSError, subprocess.SubprocessError):
+        return False
+
+
+def _safe_appimage_prefix(tokens: list[str]) -> bool:
+    """Only unambiguous environment and known wrappers before the image."""
+    remaining = list(tokens)
+    while remaining:
+        token = remaining.pop(0)
+        if re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", token):
+            continue
+        if Path(token).name in {"env", "gamemoderun", "mangohud", "prime-run", "obs-gamecapture", "game-performance"}:
+            continue
+        if token == "--dlsym" and tokens and Path(tokens[0]).name == "mangohud":
+            continue
+        if Path(token).name == "gamescope" and "--" in remaining:
+            remaining = remaining[remaining.index("--") + 1:]
+            continue
+        return False
+    return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -233,6 +314,34 @@ class RunnerIntegration:
             return _LaunchOptionParse(False, reason="invalid_launch_options_quoting")
         if not tokens:
             return _LaunchOptionParse(False, reason="launch_options_empty")
+        # AppImage is also a runner: AppRun dispatches --appid to runner.main.
+        # The path may belong to a previous release or have been pasted manually.
+        images = [i for i, token in enumerate(tokens[:-1])
+                  if tokens[i + 1] == "--appid" and is_gameopti_appimage(token)]
+        if images:
+            index = images[0]
+            executable = tokens[index]
+            valid = (len(images) == 1 and _safe_appimage_prefix(tokens[:index])
+                     and not any(c in value for c in (";", "|", "&", "`", "\n", "\r", "$", "<", ">", "\\"))
+                     and value.count("%command%") == 1
+                     and tokens[index + 1:index + 5] == ["--appid", app_id, "--", "%command%"]
+                     and tokens.count("--appid") == 1)
+            return _LaunchOptionParse(valid, executable=executable,
+                                      app_id=tokens[index + 2] if index + 2 < len(tokens) else "",
+                                      separator_found="--" in tokens,
+                                      command_placeholder_found="%command%" in tokens,
+                                      reason="configured" if valid else "unsupported_appimage_command")
+        # LXB integration preserves user environment assignments and wrappers.
+        # Recognize the inner runner without confusing wrapper '--' separators.
+        runners = [i for i, token in enumerate(tokens) if Path(token).name == "game-optimization-run"]
+        if len(runners) == 1 and runners[0] > 0:
+            prefix = tokens[:runners[0]]
+            has_shell = any(c in value for c in (";", "|", "&", "`", "\n", "\r", "$", "<", ">"))
+            allowed = {"env", "gamemoderun", "mangohud", "gamescope", "prime-run", "obs-gamecapture", "game-performance"}
+            while prefix and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*=.*", prefix[0]):
+                prefix = prefix[1:]
+            if not has_shell and (not prefix or Path(prefix[0]).name in allowed):
+                tokens = tokens[runners[0]:]
         executable = tokens[0]
         separator_found = "--" in tokens
         command_placeholder_found = "%command%" in tokens

@@ -7,6 +7,7 @@ import hashlib
 import os
 from pathlib import Path
 import pwd
+import shutil
 import stat
 import tempfile
 from typing import Mapping
@@ -53,6 +54,14 @@ def host_home_directory(
 def default_runner_path(
     environment: Mapping[str, str] | None = None,
 ) -> Path:
+    values = os.environ if environment is None else environment
+    if not values.get("FLATPAK_ID"):
+        image = Path(values.get("APPIMAGE", ""))
+        if image.is_absolute() and image.is_file() and os.access(image, os.X_OK):
+            return image
+        installed = shutil.which("game-optimization-run", path=values.get("PATH"))
+        if installed:
+            return Path(installed)
     return host_home_directory(environment) / HOST_COMPONENT_DIRECTORY / "game-optimization-run"
 
 

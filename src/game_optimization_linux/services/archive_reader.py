@@ -256,6 +256,11 @@ class SevenZipArchiveReader(ArchiveReader):
         helper = BUNDLED_7ZIP_HELPER
         if helper.is_file() and os.access(helper, os.X_OK):
             return helper
+        appdir = os.environ.get("APPDIR", "")
+        if appdir and Path(appdir).is_absolute():
+            helper = Path(appdir) / "usr/libexec/game-optimization-7zz"
+            if helper.is_file() and os.access(helper, os.X_OK):
+                return helper
         for name in SYSTEM_7ZIP_CANDIDATES:
             found = shutil.which(name)
             if found:

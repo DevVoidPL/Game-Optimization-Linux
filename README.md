@@ -2,16 +2,17 @@
   <img src="src/game_optimization_linux/assets/branding/game-optimization-linux-app-icon.svg" width="96" alt="GameOpti">
 </p>
 
-<h1 align="center">GameOpti 2.2.0</h1>
+<h1 align="center">GameOpti 2.3.0-beta</h1>
 
 <p align="center">
+  A beta release for Linux; not a stable release.<br>
   Manage your Linux games, per-game settings, graphics tools and performance measurements.<br>
   Couch Edition for a controller and TV, Desktop Edition for mouse and keyboard.
 </p>
 
 <p align="center">
-  <a href="ROADMAP.md"><img src="https://img.shields.io/badge/2.2.0-Beta-22c69a?style=for-the-badge" alt="2.2.0 Beta"></a>
-  <a href="https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta"><img src="https://img.shields.io/badge/Download-2.2.0-2563eb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download GameOpti 2.2.0"></a>
+  <a href="docs/release-notes-2.3.0-beta.md"><img src="https://img.shields.io/badge/2.3.0--beta-Pre--release-22c69a?style=for-the-badge" alt="2.3.0-beta pre-release"></a>
+  <a href="https://github.com/DevLukaszNowak/Game-Optimization-Linux/releases/tag/v2.3.0-beta"><img src="https://img.shields.io/badge/Download-2.3.0_Beta-2563eb?style=for-the-badge&amp;logo=linux&amp;logoColor=white" alt="Download GameOpti 2.3.0 Beta"></a>
   <a href="https://www.youtube.com/@Void_Developer_PL"><img src="https://img.shields.io/badge/YouTube-Project_updates-ff0033?style=for-the-badge&amp;logo=youtube&amp;logoColor=white" alt="Project updates on YouTube"></a>
 </p>
 
@@ -20,53 +21,54 @@
   <a href="#couch-edition-and-desktop-edition">Editions</a> ·
   <a href="#interface">Interface</a> ·
   <a href="#download-and-install">Download</a> ·
-  <a href="#documentation">Documentation</a> ·
-  <a href="#support-gameopti">Support the project</a>
+  <a href="#documentation">Documentation</a>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/beta-2-library-dark.png" width="960" alt="GameOpti dark library interface with sample games">
 </p>
 
-I started GameOpti for my own Linux gaming setup. I wanted one place to manage
-my games, their launch settings and the tools I use with them. The project has
-grown since then, but that is still the main idea: keep settings per game and
-make it easier to see what a change actually does.
+I started GameOpti to manage my own Linux games, launch settings and tools in
+one place. It keeps settings per game and helps me check what a change does.
 
-GameOpti 2.2.0 Beta is available from [GitHub Releases](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta).
-The project is still in active development, so compatibility depends on the
-game, launcher, hardware, drivers and installed components. Screenshots below
-show the current interface; some views use sample data.
+GameOpti 2.3.0 Beta fixes AppImage startup on Wayland, simplifies OptiScaler
+management and restores missing Couch controls. It also improves Steam Launch
+Options, Heroic/Lutris integration and game artwork. See the
+[release notes](docs/release-notes-2.3.0-beta.md) for changes and limitations.
+
+Compatibility depends on the game, launcher, hardware, drivers and installed
+components. This beta has not been tested on every GPU or distribution. The
+screenshots show earlier interface previews; some views use sample data.
 
 Report problems through [GitHub Issues](https://github.com/DevVoidPL/Game-Optimization-Linux/issues).
-Project updates and demonstrations are on [YouTube](https://www.youtube.com/@Void_Developer_PL).
+Project updates, demonstrations and release news are on [YouTube](https://www.youtube.com/@Void_Developer_PL).
 
 ## Features
 
 GameOpti has its own per-game launch handling, performance analysis, Deep
 Compression and resource-management features. It also manages several external
-graphics and monitoring tools. Those tools keep their own requirements and
+graphics and monitoring tools, each with its own requirements and
 compatibility limits.
 
 | | What it does |
 | --- | --- |
-| 🎮 **Game library and launchers** | Finds games from Steam, Heroic and Lutris, including native and Flatpak installations. You can also add games manually. Library artwork, source filters and launcher backups are included. |
-| ⚙️ **Per-game profiles and launching** | Keeps launch settings for each game instead of applying the same setup everywhere. GameOpti has its own Steam runner and can apply settings to Heroic and Lutris through their launch configuration. Profiles cover GameMode, display settings, resolution scaling, window modes and FPS limits. |
-| 🧠 **Smart GPU Scope** | Monitors resource pressure during a game session using Linux pressure and cgroup information. When CPU pressure stays high, it can adjust CPU weights for the isolated game and background processes you have opted in to. It tracks its own changes so they can be handled safely afterwards. This is not a custom GPU scheduler and it does not create extra VRAM. |
-| 🧩 **GPU memory protection** | On supported systems, GameOpti uses Linux `dmem.low` to give a game's GPU-memory allocations priority. This needs compatible kernel, driver and hardware support. It does not add physical VRAM or reduce a game's memory requirements. |
-| 🧹 **Deep Compression** | Analyses a game for files that may not be needed, such as unused language data, language-specific audio, old logs, caches, temporary files and installer leftovers. The analysis checks what can be handled safely; protected or uncertain files are not offered as ordinary cleanup targets. Selected files are moved to quarantine first, so you can test the game and restore them or remove the quarantine afterwards. Deep Compression does not require Btrfs. |
-| 💾 **Btrfs compression** | Uses Btrfs zstd compression for game folders on Btrfs. GameOpti helps compare compression levels, measure storage before and after, track jobs and handle updates. This is separate from Deep Compression: it changes how files are stored, rather than deciding which game files can be removed. A separate deep-recompression operation is available for eligible Btrfs files. |
-| 📈 **Performance measurements** | Lets you record a baseline, test a change and compare the results in the same game and scene. Measurements include FPS, 1% lows, frame times, power and memory where the required data is available. You can keep the change or go back to the previous setup. Results depend on the game and system; GameOpti does not promise an FPS increase for every title. |
-| 🖥️ **Gamescope and Aqueous** | Supports Gamescope and Aqueous as optional compositor choices for runner launches. Their settings are kept separate from the rest of the per-game profile. |
-| ✨ **Upscaling and FSR** | Manages OptiScaler installation, configuration, repair and restoration. Available FSR modes and variants include FSR 4 INT8 Lite and compatible community variants, subject to their own hardware and version requirements. |
-| 🧩 **DLSS Enabler** | Provides a separate per-game backend with configuration and diagnostics. Switching between DLSS Enabler and OptiScaler/Lite is explicit and reversible. |
-| 🎞️ **Frame generation** | Per-game backend selection for **Off / lsfg-vk / MAKO Renderer / afmf-linux**, with separate settings, on-demand component setup and compatibility checks. |
-| 🎨 **Post-processing** | Manages vkBasalt and ReShade presets, effects, effect order, parameters, shortcuts and per-game restoration. |
-| 📊 **MangoHud** | Per-game configuration with a custom layout, colours, metric selection, placement, preview, FPS limiting and performance logging. |
-| 🛠️ **Proton tweaks** | Per-game compatibility options applied through the launcher that starts the game. |
-| 🛋️ **Interface** | Desktop Mode is available in both editions. Couch Edition also has a full-screen controller interface, controller settings and automatic switching to Couch Mode. Light and dark themes; English, Polish and Spanish translations. |
+| Game library and launchers | Finds games from Steam, Heroic and Lutris, including native and Flatpak installations. You can also add games manually. Includes library artwork, source filters and launcher backups. |
+| Per-game profiles and launching | Keeps launch settings for each game instead of applying the same setup everywhere. GameOpti has its own Steam runner and can apply settings to Heroic and Lutris through their launch configuration. Profiles cover GameMode, display settings, resolution scaling, window modes and FPS limits. |
+| Smart GPU Scope | Monitors resource pressure during a game session using Linux pressure and cgroup information. When CPU pressure stays high, it can adjust CPU weights for the isolated game and background processes you have opted in to. It tracks its own changes so they can be handled safely afterwards. This is not a custom GPU scheduler and it does not create extra VRAM. |
+| GPU memory protection | On supported systems, GameOpti uses Linux `dmem.low` to give a game's GPU-memory allocations priority. This needs compatible kernel, driver and hardware support. It does not add physical VRAM or reduce a game's memory requirements. |
+| Deep Compression | Analyses a game for files that may not be needed, such as unused language data, language-specific audio, old logs, caches, temporary files and installer leftovers. The analysis checks what can be handled safely; protected or uncertain files are not offered as ordinary cleanup targets. Selected files are moved to quarantine first, so you can test the game and restore them or remove the quarantine afterwards. Deep Compression does not require Btrfs. |
+| Btrfs compression | Uses Btrfs zstd compression for game folders on Btrfs. GameOpti helps compare compression levels, measure storage before and after, track jobs and handle updates. This is separate from Deep Compression: it changes how files are stored, rather than deciding which game files can be removed. A separate deep-recompression operation is available for eligible Btrfs files. |
+| Performance measurements | Lets you record a baseline, test a change and compare the results in the same game and scene. Measurements include FPS, 1% lows, frame times, power and memory where the required data is available. You can keep the change or go back to the previous setup. Results depend on the game and system; GameOpti does not promise an FPS increase for every title. |
+| Gamescope and Aqueous | Supports Gamescope and Aqueous as optional compositor choices for runner launches. Their settings are kept separate from the rest of the per-game profile. |
+| Upscaling and FSR | Manages OptiScaler installation, configuration, repair and restoration. Available FSR modes and variants include FSR 4 INT8 Lite and compatible community variants, subject to their own hardware and version requirements. |
+| DLSS Enabler | Provides a separate per-game backend with configuration and diagnostics. Switching between DLSS Enabler and OptiScaler/Lite is explicit and reversible. |
+| Frame generation | Select Off / lsfg-vk / MAKO Renderer / afmf-linux per game, with separate settings, on-demand component setup and compatibility checks. |
+| Post-processing | Manages vkBasalt and ReShade presets, effects, effect order, parameters, shortcuts and per-game restoration. |
+| MangoHud | Per-game configuration with a custom layout, colours, metric selection, placement, preview, FPS limiting and performance logging. |
+| Proton tweaks | Per-game compatibility options applied through the launcher that starts the game. |
+| Interface | Desktop Mode is available in both editions. Couch Edition also has a full-screen controller interface, controller settings and automatic switching to Couch Mode. Light and dark themes; English, Polish and Spanish translations. |
 
-A few requirements are worth checking before using these features:
+Check these requirements before using the tools:
 
 - Btrfs compression and deep recompression need the game files to be on Btrfs. Deep Compression does not.
 - GPU-memory protection requires compatible `dmem` support from the kernel and hardware/driver stack.
@@ -76,9 +78,15 @@ A few requirements are worth checking before using these features:
 
 ## Couch Edition and Desktop Edition
 
-GameOpti 2.2.0 is available as two Flatpak editions. They use the same App ID
-and user data, so you can switch editions without losing your profiles. Install
-only the edition you plan to use.
+Both Flatpak editions use the Qt/QML frontend. Desktop provides the classic
+mouse-and-keyboard interface. Couch includes Desktop and the full-screen
+controller interface. The portable AppImage includes both modes.
+
+The Flatpak editions share App ID `io.github.DevVoidPL.GameOptimizationLinux`
+and user data. They replace each other within one installation; they are not
+independent applications. Choose one edition and keep the same user or system
+installation scope. Beta and stable branches also share data. Back up your
+profiles, or use a separate Linux account to test without touching them.
 
 | | Couch Edition | Desktop Edition |
 | --- | --- | --- |
@@ -88,15 +96,14 @@ only the edition you plan to use.
 | Controller settings | ✓ | — |
 | Library, launchers, graphics, storage, MangoHud and measurements | ✓ | ✓ |
 
-Choose Couch Edition for a living-room or handheld setup. Choose Desktop Edition
-if you use a mouse and keyboard and do not need Couch Mode.
+Couch Edition suits a living-room or handheld setup. Desktop Edition is for
+mouse and keyboard use without Couch Mode.
 
 ## Interface
 
-The game pages keep launch settings, Deep Compression, Btrfs tools, graphics
-options, MangoHud and performance measurements together. Each section has its
-own settings and status, so it is easier to see which component is being used
-and what can be restored.
+Each game page has sections for launch settings, Deep Compression, Btrfs tools,
+graphics, MangoHud and performance measurements. Separate settings and status
+indicators show which components are in use and what you can restore.
 
 <table>
   <tr>
@@ -126,8 +133,12 @@ Couch preview uses demo data. [Screenshot notes](docs/screenshots/README.md).*
 
 ## Download and install
 
-GameOpti is distributed through [GitHub Releases](https://github.com/DevVoidPL/Game-Optimization-Linux/releases/tag/v2.2.0-Beta),
+GameOpti is distributed through [GitHub Releases](https://github.com/DevLukaszNowak/Game-Optimization-Linux/releases/tag/v2.3.0-beta),
 not Flathub. Flathub provides the runtime used by the Flatpak builds.
+
+Download your chosen package and `SHA256SUMS` into the same directory, then
+verify it before installing. See the [installation guide](docs/install-2.3.0-beta.md)
+for updates, edition switching and checksum commands.
 
 ### Flatpak
 
@@ -137,29 +148,31 @@ Add the Flathub remote if it is not already configured:
 flatpak remote-add --user --if-not-exists flathub https://dl.flathub.org/repo/flathub.flatpakrepo
 ```
 
-Download one of the 2.2.0 bundles from the release page, then install the
-edition you chose. The filenames are:
+Download one bundle from the release page and install the edition you chose:
 
 ```bash
 # Couch Edition
-flatpak install --user ./Game-Optimization-Linux-2.2.0-couch-edition-x86_64.flatpak
+flatpak install --user --reinstall ./GameOpti-2.3.0-beta-couch-x86_64.flatpak
 
 # Desktop Edition
-flatpak install --user ./GameOpti-2.2.0-desktop-edition-x86_64.flatpak
+flatpak install --user --reinstall ./GameOpti-2.3.0-beta-desktop-x86_64.flatpak
 ```
 
 Start GameOpti with:
 
 ```bash
-flatpak run io.github.DevVoidPL.GameOptimizationLinux
+flatpak run --user io.github.DevVoidPL.GameOptimizationLinux//beta --desktop
 ```
 
-For Steam profiles, install the user-level host runner:
+For an existing system-wide installation, use `--system` instead of `--user`
+in the install and run commands. Do not create a second installation just to
+switch editions.
 
-```bash
-flatpak run --command=game-optimization-install-runner \
-  io.github.DevVoidPL.GameOptimizationLinux
-```
+For Steam, open a game's **Steam connection** panel. Apply requires
+confirmation and may ask Steam to close before changing that game's Launch
+Options. Existing arguments and known wrappers are preserved; ambiguous
+commands are left for manual configuration. Saving a GameOpti profile alone
+does not edit Steam Launch Options.
 
 Heroic and Lutris use **Apply to launcher** and their existing launch
 configuration. Tools must be available in the environment that runs the game,
@@ -167,7 +180,8 @@ including launcher Flatpaks.
 
 To update, install the newer bundle over the existing one with the reinstall
 option. To switch editions, install the other bundle; your application settings
-are retained. To remove the Flatpak version, use:
+are retained. Back them up before changing versions. Do not use `--delete-data`
+when switching or removing only the beta. To remove the user Flatpak, use:
 
 ```bash
 flatpak uninstall --user io.github.DevVoidPL.GameOptimizationLinux
@@ -175,13 +189,25 @@ flatpak uninstall --user io.github.DevVoidPL.GameOptimizationLinux
 
 ### AppImage
 
-The 2.2.0 release also includes an AppImage build. Download it from the release
-page, make it executable and run it:
+Download the portable AppImage from the release page, make it executable and
+run it:
 
 ```bash
-chmod +x ./GameOpti-2.2.0-x86_64.AppImage
-./GameOpti-2.2.0-x86_64.AppImage
+chmod +x ./GameOpti-2.3.0-beta-x86_64.AppImage
+./GameOpti-2.3.0-beta-x86_64.AppImage
 ```
+
+The tested baseline is Ubuntu 22.04 userspace with **glibc 2.35**. Use glibc
+2.35 or newer with compatible host graphics and C++ libraries; this is not a
+guarantee for every distribution. Wayland and X11/XWayland startup were checked.
+Keep the image at a stable path if Steam Launch Options point to it. Moving or
+renaming it requires an explicit update of that command.
+
+### Arch / AUR
+
+AUR publication is a separate step. This release does not provide an AUR
+installation command. The release source archive is intended for the later
+reviewed native package recipe.
 
 ## Future development
 
@@ -195,17 +221,20 @@ for current work and later ideas.
 | Path | Contents |
 | --- | --- |
 | `src/game_optimization_linux/` | Application code, QML interface, translations and artwork. |
-| `src/game_optimization_linux/gtk_frontend/` | GTK4/libadwaita frontend used by the Desktop Edition. |
+| `src/game_optimization_linux/qml/` | Qt/QML frontend used by both editions. |
 | `data/` | Desktop entry, AppStream metadata and installation assets. |
 | `flatpak/` | Build manifests and packaging tools for the Couch and Desktop editions. |
 | `libexec/` | Helper programs installed with the application. |
 | `scripts/` | Asset build scripts and the runner installer. |
+| `packaging/appimage/` | AppImage builder and baseline instructions. |
 | `docs/` | Feature guides and screenshots. |
 | `.github/workflows/` | GitHub automation. |
 
 ## Documentation
 
 - [Release status and plans](ROADMAP.md)
+- [2.3.0 Beta release notes](docs/release-notes-2.3.0-beta.md)
+- [Install and switch editions](docs/install-2.3.0-beta.md)
 - [Architecture and launch flow](docs/architecture.md)
 - [Previous release notes: 2.1](docs/release-notes-2.1.md)
 - [Build the Flatpak](flatpak/README.md)
@@ -218,21 +247,9 @@ python -m venv .venv
 .venv/bin/game-optimization-linux --desktop
 ```
 
-Found a problem? [Open an issue](https://github.com/DevVoidPL/Game-Optimization-Linux/issues)
-with the application version, steps to reproduce it and **Copy system info**
+[Open an issue](https://github.com/DevVoidPL/Game-Optimization-Linux/issues)
+with the application version, steps to reproduce the problem and **Copy system info**
 from GameOpti. Remove personal data from any attached logs or screenshots.
-
-## Support GameOpti
-
-GameOpti is free and open source. Donations are optional and help with development and testing.
-
-<p align="center">
-  <a href="https://buymeacoffee.com/voiddeveloperpl"><img src="https://img.shields.io/badge/Buy_Me_a_Coffee-Support_GameOpti-ffdd00?style=for-the-badge&amp;logo=buymeacoffee&amp;logoColor=black" alt="Support GameOpti on Buy Me a Coffee"></a>
-  <a href="https://www.paypal.com/paypalme/GameOptimation"><img src="https://img.shields.io/badge/PayPal-Support_GameOpti-0070ba?style=for-the-badge&amp;logo=paypal&amp;logoColor=white" alt="Support GameOpti with PayPal"></a>
-</p>
-
-Follow **[Void_Developer_PL on YouTube](https://www.youtube.com/@Void_Developer_PL)**
-for project updates, demonstrations and release news.
 
 ## Credits and license
 

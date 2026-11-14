@@ -9,6 +9,7 @@ from typing import Iterable
 
 from game_optimization_linux.models import Game
 from game_optimization_linux.providers.steam import SteamArtworkPaths, find_local_steam_artwork
+from game_optimization_linux.providers.artwork import best_local_image
 
 
 LOGGER = logging.getLogger(__name__)
@@ -35,10 +36,8 @@ class ResolvedGameArtwork:
 class GameArtworkResolver:
     """Resolve artwork without requiring the game's install directory.
 
-    The resolver intentionally checks paths already stored with the cached game
-    before looking in Steam's independent ``appcache/librarycache``.  This makes
-    the same result available to Games, Tasks and Updates while an external
-    library is disconnected.
+    Cached paths remain usable while an external library is disconnected.
+    A refresh also upgrades those paths when Steam has a higher-resolution image.
     """
 
     def __init__(self) -> None:
@@ -90,11 +89,21 @@ class GameArtworkResolver:
         legacy = _existing_file(Path(game.cover_asset)) if game.cover_asset else None
         local = SteamArtworkPaths()
         app_id = str(game.steam_app_id or "").strip()
-        if app_id and (portrait is None or header is None or fallback is None):
+        if app_id:
             local = find_local_steam_artwork(app_id, roots)
+            if local.portrait_artwork_path is not None:
+                portrait = best_local_image(path for path in (portrait, local.portrait_artwork_path) if path is not None)
+            if local.header_artwork_path is not None:
+                header = best_local_image(path for path in (header, local.header_artwork_path) if path is not None)
 
-        portrait_source = "cached_game" if portrait is not None else ""
-        header_source = "cached_game" if header is not None else ""
+        portrait_source = (
+            "steam_artwork_cache" if portrait is not None and portrait == local.portrait_artwork_path
+            else "cached_game" if portrait is not None else ""
+        )
+        header_source = (
+            "steam_artwork_cache" if header is not None and header == local.header_artwork_path
+            else "cached_game" if header is not None else ""
+        )
         fallback_source = "cached_game" if fallback is not None else ""
         if fallback is None and legacy is not None:
             fallback = legacy

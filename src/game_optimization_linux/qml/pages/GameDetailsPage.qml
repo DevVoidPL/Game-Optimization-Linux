@@ -121,7 +121,7 @@ Item {
             GameCover {
                 id: headerArtwork
                 objectName: "detailsGameArtwork"
-                Layout.preferredWidth: page.width < 980 ? 168 : 252
+                Layout.preferredWidth: page.width < 980 ? 280 : 420
                 Layout.preferredHeight: Layout.preferredWidth / (artworkAspectRatio >= 1.4 ? artworkAspectRatio : 16 / 9)
                 gameId: page.gameId
                 diagnosticViewKind: "details"
@@ -136,6 +136,7 @@ Item {
                     "cover"
                 ], "")
                 artworkFillMode: Image.PreserveAspectFit
+                wideBackdrop: true
 
                 // Cover only the four corner cutouts. Unlike an offscreen shader
                 // mask, this also renders with Qt's software backend.

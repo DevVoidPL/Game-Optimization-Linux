@@ -255,6 +255,15 @@ def game_to_qml(
     portrait_artwork_url = _local_asset_url(portrait_artwork_path)
     header_artwork_url = _local_asset_url(header_artwork_path)
     fallback_artwork_url = _local_asset_url(fallback_artwork_path)
+    icon_artwork_url = ""
+    from ..providers.artwork import image_dimensions
+    def small_icon(path):
+        width, height = image_dimensions(Path(path)) if path else (0, 0)
+        return width > 0 and height > 0 and max(width, height) < 128
+    if small_icon(fallback_artwork_path):
+        icon_artwork_url, fallback_artwork_url = fallback_artwork_url, ""
+    if small_icon(legacy_artwork_path):
+        icon_artwork_url, legacy_artwork_url = icon_artwork_url or legacy_artwork_url, ""
     preferred_artwork_url = (
         portrait_artwork_url
         or header_artwork_url
@@ -428,6 +437,7 @@ def game_to_qml(
         "effectiveArtworkUrl": preferred_artwork_url,
         "effective_artwork_url": preferred_artwork_url,
         "coverAsset": legacy_artwork_path,
+        "iconArtworkUrl": icon_artwork_url,
         "portraitArtwork": portrait_artwork_url,
         "portraitArtworkUrl": portrait_artwork_url,
         "portraitArtworkPath": portrait_artwork_path,

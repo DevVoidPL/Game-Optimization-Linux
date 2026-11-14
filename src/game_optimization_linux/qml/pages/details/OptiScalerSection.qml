@@ -29,6 +29,18 @@ SurfaceCard {
     property bool antiCheatConfirmed: false
     property bool showLocalArchive: false
     property bool showAdvanced: false
+    readonly property var activeOperation: {
+        var tasks = controller ? (controller.activeTasks || []) : []
+        for (var i = 0; i < tasks.length; ++i) {
+            if (String(tasks[i].gameId) === gameId && String(tasks[i].operation) === "OptiScaler")
+                return tasks[i]
+        }
+        return ({})
+    }
+    readonly property bool operationBusy: Boolean(activeOperation.id)
+    readonly property var installationBlockers: (statusData.installationBlockers || []).filter(function(message) {
+        return !antiCheatConfirmed || String(message).indexOf("Anti-cheat") < 0
+    })
     property string releaseChannel: "stable"
     property string backend: "optiscaler"
     property string fsr4Mode: "automatic"
@@ -72,7 +84,8 @@ SurfaceCard {
     readonly property var executableCandidates: statusData.executableCandidates || []
     readonly property var executableLabels: executableCandidates.map(function(item) { return String(item.label || item.relativePath || "") })
     readonly property var executableValues: executableCandidates.map(function(item) { return String(item.relativePath || "") })
-    readonly property string displayState: Boolean(planData.requiresConflictConfirmation) || conflictPending
+    readonly property string displayState: operationBusy ? "busy"
+                                                   : Boolean(planData.requiresConflictConfirmation) || conflictPending
                                                    ? "conflict"
                                                    : String(statusData.installationState || "") === "inconsistent"
                                                    ? "inconsistent"
@@ -85,6 +98,9 @@ SurfaceCard {
     padding: 18
 
     function stateLabel(state) {
+        if (state === "busy") return App.I18n.message(String(activeOperation.stage || qsTr("Working")))
+        if (state === "unmanaged") return qsTr("Existing files — not managed by this installation")
+        if (state === "unavailable") return qsTr("Game directory unavailable")
         if (state === "installed") return qsTr("Installed")
         if (state === "update_available") return qsTr("Update available")
         if (state === "error") return qsTr("Error")
@@ -334,6 +350,8 @@ SurfaceCard {
             errorMessage = qsTr("Choose the main game executable first")
             return false
         }
+        if (operationBusy || installationBlockers.length > 0)
+            return false
         lastAction = "install"
         var accepted = controller.startOptiScalerInstall(
                     gameId, selectedExecutable, injectionDll, onlineOperation(),
@@ -359,7 +377,7 @@ SurfaceCard {
     }
 
     function onlineOperation() {
-        if (String(statusData.installationState || "") === "corrupt") return "repair"
+        if (["corrupt", "partial"].indexOf(String(statusData.installationState || "")) >= 0) return "repair"
         if (String(statusData.onlineState || "") === "update_available") return "update"
         if (Boolean(statusData.installed)) return "reinstall"
         return "install"
@@ -500,8 +518,9 @@ SurfaceCard {
                         color: App.Theme.text
                     }
 
-                    Label { text: qsTr("Zmień kanał"); color: App.Theme.textMuted }
+                    Label { visible: section.showAdvanced; text: qsTr("Zmień kanał"); color: App.Theme.textMuted }
                     AppComboBox {
+                        visible: section.showAdvanced
                         Layout.preferredWidth: 220
                         Layout.alignment: Qt.AlignLeft | Qt.AlignVCenter
                         model: [qsTr("Stable"), qsTr("Nightly (eksperymentalny)")]
@@ -517,6 +536,7 @@ SurfaceCard {
                     spacing: 8
 
                     AppButton {
+                        visible: section.showAdvanced
                         text: qsTr("Sprawdź aktualizacje")
                         iconSource: App.UiIcons.actionRefresh
                         kind: "secondary"
@@ -527,25 +547,86 @@ SurfaceCard {
                     AppButton {
                         objectName: "installOptiScalerOnlineButton"
                         text: section.installLabel()
+                        visible: !section.statusData.installed || section.statusData.onlineState === "update_available"
+                                 || section.displayState === "corrupt" || section.displayState === "partial" || section.showAdvanced
+                        busy: section.operationBusy
                         iconSource: App.UiIcons.actionInstallScaler
                         kind: "primary"
                         enabled: Boolean(section.controller && section.controller.startOptiScalerInstall)
+                                 && !section.operationBusy && !section.statusData.loading
+                                 && section.selectedExecutable.length > 0
+                                 && section.installationBlockers.length === 0
+                                 && !section.conflictPending
                         onClicked: section.installFromInternet("")
                     }
 
                     AppButton {
+                        visible: section.installationBlockers.length > 0
+                        text: qsTr("Refresh")
+                        iconSource: App.UiIcons.actionRefresh
+                        kind: "secondary"
+                        enabled: !section.operationBusy && !section.statusData.refreshing
+                        onClicked: section.scheduleStatus(true)
+                    }
+                    AppButton {
+                        visible: section.operationBusy && Boolean(section.activeOperation.cancellable)
+                        text: qsTr("Cancel")
+                        kind: "secondary"
+                        enabled: Boolean(section.controller && section.controller.cancelTask)
+                        onClicked: section.controller.cancelTask(String(section.activeOperation.id))
+                    }
+                    AppButton {
+                        visible: ["partial", "restore_required"].indexOf(String(section.statusData.installationState || "")) >= 0
+                        text: qsTr("Restore previous files")
+                        kind: "secondary"
+                        enabled: !section.operationBusy && (section.statusData.replacedFiles || []).length > 0
+                        onClicked: removeDialog.ask(qsTr("Restore previous files?"), qsTr("Backed-up files will replace the matching Game Optimization-managed OptiScaler files after hash verification."), qsTr("Restore"), true, "restore")
+                    }
+                    AppButton {
                         text: qsTr("Usuń")
                         iconSource: App.UiIcons.actionRemove
                         kind: "danger"
-                        enabled: Boolean(section.controller && section.controller.removeOptiScaler) && section.removeAvailable()
+                        visible: section.removeAvailable()
+                        enabled: Boolean(section.controller && section.controller.removeOptiScaler) && !section.operationBusy
                         onClicked: removeDialog.ask(qsTr("Remove OptiScaler?"), qsTr("GOL-created files will be removed and verified original game files will be restored. Unknown modified binaries are preserved and block removal for review."), qsTr("Remove"), true, "remove")
                     }
+                }
+
+                ProgressBar {
+                    objectName: "optiscalerProgress"
+                    Layout.fillWidth: true
+                    visible: section.operationBusy
+                    from: 0
+                    to: 1
+                    value: Number(section.activeOperation.progress || 0)
+                }
+                Label {
+                    Layout.fillWidth: true
+                    visible: section.operationBusy
+                    text: App.I18n.message(String(section.activeOperation.stage || ""))
+                    color: App.Theme.textSecondary
+                    wrapMode: Text.WordWrap
+                }
+                Label {
+                    Layout.fillWidth: true
+                    visible: section.installationBlockers.length > 0
+                    text: section.installationBlockers.map(function(message) { return App.I18n.message(String(message)) }).join("\n")
+                    color: App.Theme.warning
+                    wrapMode: Text.WordWrap
+                }
+                Label {
+                    Layout.fillWidth: true
+                    visible: section.displayState === "installed" && !section.operationBusy
+                    text: qsTr("OptiScaler is installed for this game")
+                    color: App.Theme.accent
+                    wrapMode: Text.WordWrap
                 }
             }
         }
 
         Rectangle {
             id: fsrCard
+            visible: section.showAdvanced
             Layout.fillWidth: true
             implicitHeight: fsrCardContent.implicitHeight + 24
             radius: App.Theme.radiusMedium
@@ -642,7 +723,7 @@ SurfaceCard {
 
         SettingRow {
             Layout.fillWidth: true
-            visible: Boolean(section.statusData.optipatcher)
+            visible: section.showAdvanced && Boolean(section.statusData.optipatcher)
             title: qsTr("OptiPatcher")
             description: qsTr("Stan dodatku ASI jest odczytywany z zarządzanego manifestu. Kompatybilność pozostaje nieznana, dopóki upstream nie poda pasującego wpisu dla tej gry lub wersji.")
             ColumnLayout {
@@ -751,6 +832,14 @@ SurfaceCard {
 
         Label {
             Layout.fillWidth: true
+            visible: (section.statusData.detectedFiles || []).length > 0 || Boolean(section.statusData.accessError)
+            text: section.statusData.accessError || qsTr("Existing files are preserved. They may belong to the game, a manual installation or another GameOpti edition. Replacement requires explicit confirmation: %1").arg((section.statusData.detectedFiles || []).join(", "))
+            color: App.Theme.warning
+            wrapMode: Text.WordWrap
+        }
+
+        Label {
+            Layout.fillWidth: true
             visible: String(section.statusData.executableStatus || "") === "ambiguous"
             text: qsTr("The executable result is ambiguous. Choose the main game executable before installation.")
             color: App.Theme.warning
@@ -820,16 +909,13 @@ SurfaceCard {
             SettingRow {
                 Layout.fillWidth: true
                 title: qsTr("Backend runtime")
-                description: qsTr("Tylko jeden backend proxy może być aktywny dla danej gry. DLSS Enabler działa tylko w trybie wykrywania, dopóki instalator nie zostanie zweryfikowany.")
+                description: qsTr("Only one proxy backend can be active for this game.")
                 AppComboBox {
+                    objectName: "optiscalerBackendSelector"
                     Layout.preferredWidth: 220
-                    model: [qsTr("Wyłączone"), qsTr("OptiScaler"), qsTr("DLSS Enabler (tylko wykrywanie)")]
-                    currentIndex: backend === "none" ? 0 : backend === "dlss_enabler" ? 2 : 1
+                    model: [qsTr("Wyłączone"), qsTr("OptiScaler")]
+                    currentIndex: backend === "none" ? 0 : backend === "optiscaler" ? 1 : -1
                     onActivated: function(index) {
-                        if (index === 2) {
-                            errorMessage = qsTr("DLSS Enabler jest wykrywany tylko w trybie obserwacji; nie zmieniono plików.")
-                            return
-                        }
                         section.selectBackend(index === 0 ? "none" : "optiscaler")
                     }
                 }
@@ -900,6 +986,7 @@ SurfaceCard {
 
         SettingRow {
             Layout.fillWidth: true
+            visible: section.showAdvanced
             title: qsTr("Oficjalne wydanie OptiScaler")
             description: qsTr("Wersja dostępna: %1 | Wersja zainstalowana: %2")
                          .arg(String(section.statusData.availableVersion || qsTr("Unknown")))
@@ -1032,6 +1119,7 @@ SurfaceCard {
         }
 
         AppSwitch {
+            visible: section.showAdvanced
             text: qsTr("Show local archive fallback")
             checked: section.showLocalArchive
             onToggled: section.showLocalArchive = checked
@@ -1039,7 +1127,7 @@ SurfaceCard {
 
         SettingRow {
             Layout.fillWidth: true
-            visible: section.showLocalArchive
+            visible: section.showAdvanced && section.showLocalArchive
             title: qsTr("Local OptiScaler archive")
             description: section.archiveUrl || qsTr("Choose an OptiScaler archive")
             RowLayout {
@@ -1115,7 +1203,7 @@ SurfaceCard {
         }
 
         AppSwitch {
-            visible: (section.planData.blockers || []).join(" ").indexOf("Anti-cheat") >= 0
+            visible: (section.statusData.installationBlockers || []).concat(section.planData.blockers || []).join(" ").indexOf("Anti-cheat") >= 0
                      || (section.planData.warnings || []).join(" ").indexOf("anti-cheat") >= 0
             text: qsTr("I understand the anti-cheat risk and want to prepare this installation manually")
             checked: section.antiCheatConfirmed
@@ -1218,12 +1306,13 @@ SurfaceCard {
 
         ColumnLayout {
             Layout.fillWidth: true
+            visible: section.showAdvanced
             spacing: 8
             RowLayout {
                 Layout.fillWidth: true
                 AppButton {
                     objectName: "installOptiScalerButton"
-                    visible: Boolean(section.statusData.installed) || section.showLocalArchive
+                    visible: section.showLocalArchive
                     text: Boolean(section.planData.officialRelease) ? section.installLabel() : qsTr("Install OptiScaler")
                     iconSource: App.UiIcons.actionInstall
                     enabled: Boolean(section.planData.canInstall)
@@ -1238,8 +1327,6 @@ SurfaceCard {
                 AppButton { text: qsTr("Open directory"); iconSource: App.UiIcons.fileFolder; kind: "secondary"; enabled: Boolean(section.statusData.installDirectory); onClicked: section.controller.openOptiScalerDirectory(section.gameId) }
                 AppButton { text: qsTr("Show manifest"); iconSource: App.UiIcons.fileFile; kind: "secondary"; enabled: Boolean(section.statusData.manifestPath); onClicked: section.controller.openOptiScalerManifest(section.gameId) }
                 Item { Layout.fillWidth: true }
-                AppButton { text: qsTr("Remove OptiScaler"); iconSource: App.UiIcons.actionRemove; kind: "danger"; enabled: section.removeAvailable(); onClicked: removeDialog.ask(qsTr("Remove OptiScaler?"), qsTr("GOL-created files will be removed and verified original game files will be restored. Unknown modified binaries are preserved and block removal for review."), qsTr("Remove"), true, "remove") }
-                AppButton { text: qsTr("Restore previous files"); iconSource: App.UiIcons.actionRestore; kind: "secondary"; enabled: ["partial", "restore_required"].indexOf(String(section.statusData.installationState || "")) >= 0 && (section.statusData.replacedFiles || []).length > 0; onClicked: removeDialog.ask(qsTr("Restore previous files?"), qsTr("Backed-up files will replace the matching Game Optimization-managed OptiScaler files after hash verification."), qsTr("Restore"), true, "restore") }
             }
         }
 
@@ -1318,5 +1405,6 @@ SurfaceCard {
     }
 
     onGameIdChanged: { selectedExecutable = ""; planData = ({}); antiCheatConfirmed = false; dismissedOperationConflict = ""; scheduleStatus(false) }
-    Component.onCompleted: scheduleStatus(false)
+    onVisibleChanged: if (visible) scheduleStatus(true)
+    Component.onCompleted: scheduleStatus(true)
 }

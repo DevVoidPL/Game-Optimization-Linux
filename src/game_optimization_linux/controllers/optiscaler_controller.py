@@ -4,6 +4,8 @@ from collections.abc import Callable, Mapping
 from concurrent.futures import Future
 from datetime import UTC, datetime
 import logging
+import fcntl
+import os
 from pathlib import Path
 from queue import Empty
 import re
@@ -107,6 +109,8 @@ class OptiScalerController:
     @staticmethod
     def _snapshot_state(result: Mapping[str, Any]) -> str:
         state = str(result.get("installationState", "")).casefold()
+        if state in {"unmanaged", "conflict", "unavailable", "inconsistent"}:
+            return state
         if state == "installed":
             if str(result.get("manifestError", "")).strip():
                 return "partial"
@@ -266,9 +270,9 @@ class OptiScalerController:
             error_text = "Failed to refresh OptiScaler status: no diagnostic was returned"
         return self._status_failure_snapshot(str(game_id), error_text)
 
-    def _timed_build_optiscaler_status(self, game_id: str) -> dict[str, Any]:
+    def _timed_build_optiscaler_status(self, game_id: str, local_only: bool = False) -> dict[str, Any]:
         started = perf_counter()
-        result = self._build_optiscaler_status(game_id)
+        result = self._build_optiscaler_status(game_id, local_only=local_only)
         elapsed_ms = (perf_counter() - started) * 1000.0
         if elapsed_ms >= 50.0:
             logger.debug(
@@ -299,7 +303,7 @@ class OptiScalerController:
             if executor is None:
                 return self.getOptiScalerStatus(key)
             generation = self._status_generation.get(key, 0)
-            future = executor.submit(self._timed_build_optiscaler_status, key)
+            future = executor.submit(self._timed_build_optiscaler_status, key, True)
             self._status_jobs[key] = (future, key, generation)
         if cached is not None:
             result = dict(cached)
@@ -379,7 +383,7 @@ class OptiScalerController:
             if callable(emit):
                 emit(game_id, result)
 
-    def _build_optiscaler_status(self, game_id: str) -> dict[str, Any]:
+    def _build_optiscaler_status(self, game_id: str, *, local_only: bool = False) -> dict[str, Any]:
         game = self._app._resolve_game(game_id, show_error=False)
         if game is None:
             return {"success": False, "error": "Select an available Steam game first"}
@@ -393,12 +397,23 @@ class OptiScalerController:
                     or "Failed to refresh OptiScaler status: service returned no diagnostic",
                 }
             channel = str(result.get("channel") or "stable")
-            release = self._cached_optiscaler_release(channel)
+            app_id = self._app._optiscaler_service.game_key(game)
+            try:
+                release = self._cached_optiscaler_release(channel) if local_only else self._app._optiscaler_release_client.latest_release(
+                    channel=channel, force_refresh=False, allow_stale_cache=True
+                )
+                if not local_only:
+                    self._app._optiscaler_online_errors.pop(app_id, None)
+            except OptiScalerOnlineError as error:
+                release = self._cached_optiscaler_release(channel)
+                self._app._optiscaler_online_errors[app_id] = friendly_online_error(
+                    error, datetime.now(UTC).timestamp()
+                )
+            result["installationBlockers"] = self._app._optiscaler_service.installation_blockers(game)
             cached_archive = (
                 self._app._cached_optiscaler_archive(release)
                 if release is not None else None
             )
-            app_id = self._app._optiscaler_service.game_key(game)
             installed_version = str(result.get("installedVersion", "")).strip()
             available_version = release.version if release is not None else ""
             installation_state = str(
@@ -619,6 +634,11 @@ class OptiScalerController:
                 if cancelled.is_set():
                     raise OptiScalerCancelled("OptiScaler operation was cancelled")
 
+            blockers = self._app._optiscaler_service.installation_blockers(
+                game, str(executable or ""), allow_anticheat_risk=bool(allow_anticheat_risk)
+            )
+            if blockers:
+                raise OptiScalerError("; ".join(blockers))
             try:
                 progress("Checking official release", 0.04)
                 release = client.latest_release(
@@ -627,14 +647,12 @@ class OptiScalerController:
                 check()
 
                 def downloaded(done: int, total: int) -> None:
+                    check()
                     fraction = (done / total) if total > 0 else 0.0
                     progress("Downloading official release", 0.06 + 0.44 * min(1.0, fraction))
 
                 progress("Downloading official release", 0.06)
-                try:
-                    archive = client.ensure_archive(release, progress=downloaded)
-                except TypeError:
-                    archive = client.ensure_archive(release)
+                archive = client.ensure_archive(release, progress=downloaded)
                 self._app._optiscaler_online_errors.pop(app_id, None)
             except OptiScalerOnlineError as error:
                 message = friendly_online_error(error, datetime.now(UTC).timestamp())
@@ -669,10 +687,9 @@ class OptiScalerController:
                 lambda stage, value: progress(stage, 0.7 + 0.2 * value),
             )
             progress("Verifying installation", 0.93)
-            try:
-                self._app._optiscaler_service.verify(game)
-            except OptiScalerError as error:
-                logger.warning("Post-install OptiScaler verification failed: %s", error)
+            verification = self._app._optiscaler_service.verify(game)
+            if verification.state != "verified":
+                raise OptiScalerError(verification.summary)
             return profile
 
         self._operation_conflicts.pop(str(game_id), None)
@@ -1293,8 +1310,15 @@ class OptiScalerController:
             if load_profile(game.profile_key, self._app._post_processing_service.root).get("backend") == "reshade":
                 self._app._emit_toast("Turn Off ReShade before changing the upscaler loader", "warning")
                 return False
+        def same_directory(stored_game_id: str) -> bool:
+            other = self._app._resolve_game(stored_game_id, show_error=False)
+            return stored_game_id == game.id or (
+                other is not None
+                and other.install_path.resolve() == game.install_path.resolve()
+            )
+
         if any(
-            stored_game_id == game.id and not future.done()
+            same_directory(stored_game_id) and not future.done()
             for future, _cancel, stored_game_id in self._app._optiscaler_jobs.values()
         ):
             self._app._emit_toast("An OptiScaler task for this game is already active", "warning")
@@ -1314,6 +1338,21 @@ class OptiScalerController:
                 )
                 return False
         task_id = f"optiscaler-{action.casefold()}-{uuid4().hex}"
+        # Lock the directory inode, not an edition-specific config file. This
+        # also serialises AppImage and Flatpak against the same host directory
+        # without creating or changing any file in the game.
+        directory_fd = None
+        try:
+            directory_fd = os.open(game.install_path.resolve(strict=True), os.O_RDONLY | os.O_DIRECTORY)
+            fcntl.flock(directory_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError as error:
+            if directory_fd is not None:
+                os.close(directory_fd)
+            self._app._emit_toast(
+                "The game directory is inaccessible or another OptiScaler operation holds its lock: " + str(error),
+                "warning",
+            )
+            return False
         cancel_event = Event()
         timestamp = datetime.now(UTC).isoformat()
         self._app._operational_tasks[task_id] = self._app._operational_task(
@@ -1327,12 +1366,19 @@ class OptiScalerController:
             created_at=timestamp,
         )
         self._app._operational_tasks[task_id]["cancellable"] = True
+        self._app._operational_tasks[task_id]["pausable"] = False
         self._app._operational_tasks[task_id]["stage"] = "Queued"
 
         def report(stage: str, value: float) -> None:
             self._app._optiscaler_events.put((task_id, str(stage), float(value)))
 
-        future = self._app._optiscaler_executor.submit(operation, cancel_event, report)
+        try:
+            future = self._app._optiscaler_executor.submit(operation, cancel_event, report)
+        except Exception:
+            os.close(directory_fd)
+            self._app._operational_tasks.pop(task_id, None)
+            raise
+        future.add_done_callback(lambda _future: os.close(directory_fd))
         self._app._optiscaler_jobs[task_id] = (future, cancel_event, game.id)
         if context:
             self._operation_contexts[task_id] = dict(context)
@@ -1443,10 +1489,10 @@ class OptiScalerController:
             except Empty:
                 break
             task = self._app._operational_tasks.get(task_id)
-            if task is None:
+            if task is None or task_id not in self._app._optiscaler_jobs:
                 continue
             task["status"] = "running"
-            task["stage"] = stage
+            task["stage"] = "Cancelling" if self._app._optiscaler_jobs[task_id][1].is_set() else stage
             task["progress"] = min(1.0, max(0.0, progress))
             task["progressPercent"] = task["progress"] * 100.0
             task["updatedAt"] = datetime.now(UTC).isoformat()

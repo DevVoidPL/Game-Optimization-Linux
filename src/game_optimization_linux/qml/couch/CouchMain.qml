@@ -19,6 +19,7 @@ FocusScope {
     readonly property bool pageModalOpen: homePage.contextMenuOpen
                                           || libraryPage.keyboardOpen
                                           || detailsPage.confirmationOpen
+                                          || detailsPage.editorOverlayOpen
                                           || detailsPage.mangoHudOverlayOpen
                                           || detailsPage.optimizationOverlayOpen
                                           || detailsPage.gameModeOverlayOpen
@@ -67,6 +68,8 @@ FocusScope {
             libraryPage.closeKeyboard()
         else if (detailsPage.confirmationOpen)
             detailsPage.closeConfirmation()
+        else if (detailsPage.editorOverlayOpen)
+            detailsPage.closeEditorOverlay()
         else if (detailsPage.mangoHudOverlayOpen)
             detailsPage.closeMangoHudOverlay()
         else if (detailsPage.optimizationOverlayOpen)
@@ -307,6 +310,7 @@ FocusScope {
     CouchTopBar {
         id: topBar
         visible: !systemMenu.visible && !homePage.contextMenuOpen
+                 && !detailsPage.editorOverlayOpen
                  && !detailsPage.confirmationOpen && !detailsPage.mangoHudOverlayOpen
                  && !detailsPage.optimizationOverlayOpen
                  && !detailsPage.gameModeOverlayOpen && !detailsPage.gamescopeOverlayOpen

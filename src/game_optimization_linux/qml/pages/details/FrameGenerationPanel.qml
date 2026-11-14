@@ -132,9 +132,11 @@ ScrollView {
         if (blockers.indexOf(value) >= 0 || value === String(component.error || "")) return ""
         return message(value)
     }
-    function run(action) {
+    function run(action, extra) {
         confirmation = ""
         var payload = {backend: backend, api: api, settings: settings, internalFgOff: internalFgOff, path: dllPath}
+        if (extra && extra.confirmEmptySteamOptions === true)
+            payload.confirmEmptySteamOptions = true
         if (controller && controller.frameGenerationAction && controller.frameGenerationAction(gameId, action, payload)) {
             submittedRevision = revision; submittedAction = action
             var result = controller.frameGenerationStatus(gameId) || ({})
@@ -341,10 +343,11 @@ ScrollView {
                 Label { Layout.fillWidth: true; text: (panel.statusData.runner || {}).configured === true ? qsTr("Runner configured. Apply saves settings for the next launch.") : qsTr("Runner not confirmed. Set it up before starting the game."); color: App.Theme.textSecondary; wrapMode: Text.WordWrap; font.pixelSize: panel.bodySize }
                 Flow { Layout.fillWidth: true; spacing: 8
                     AppButton { width: Math.min(implicitWidth, panel.availableWidth - 32); objectName: "fgRecheck"; property string fgActionType: "button"; text: qsTr("Recheck requirements"); textPixelSize: panel.bodySize; kind: "secondary"; enabled: !panel.statusData.busy && !panel.statusData.checking; onClicked: panel.recheck() }
-                    AppButton { width: Math.min(implicitWidth, panel.availableWidth - 32); objectName: "fgRunnerSetup"; property string fgActionType: "button"; text: (panel.statusData.runner || {}).configured === true ? qsTr("Repair runner setup") : qsTr("Set up runner"); textPixelSize: panel.bodySize; kind: "secondary"; enabled: !panel.statusData.busy; onClicked: panel.ask("setup-runner") }
+                    AppButton { width: Math.min(implicitWidth, panel.availableWidth - 32); objectName: "fgRunnerSetup"; property string fgActionType: "button"; text: (panel.statusData.runner || {}).configured === true ? qsTr("Repair runner setup") : qsTr("Set up runner"); textPixelSize: panel.bodySize; kind: "secondary"; enabled: !panel.statusData.busy && String(panel.gameData.launcher || "") !== "Steam"; onClicked: panel.ask("setup-runner") }
                     AppButton { width: Math.min(implicitWidth, panel.availableWidth - 32); visible: Boolean((panel.statusData.steamUpdate || {}).blocked); property string fgActionType: "button"; text: qsTr("Open Steam downloads"); textPixelSize: panel.bodySize; kind: "secondary"; onClicked: Qt.openUrlExternally("steam://open/downloads") }
                 }
                 Label { visible: Boolean(panel.statusData.checking); Layout.fillWidth: true; text: qsTr("Checking…"); color: App.Theme.textMuted; font.pixelSize: panel.couchMode ? 18 : App.Theme.fontCaption }
+                Label { visible: String(panel.gameData.launcher || "") === "Steam"; Layout.fillWidth: true; text: qsTr("Use Steam Library > Properties > General > Launch Options. Preserve existing arguments.") + "\n" + String((panel.statusData.runner || {}).command || ""); color: App.Theme.textSecondary; wrapMode: Text.WordWrap; font.pixelSize: panel.bodySize }
             }
         }
         SurfaceCard {

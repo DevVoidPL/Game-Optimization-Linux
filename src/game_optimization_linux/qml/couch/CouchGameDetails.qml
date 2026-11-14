@@ -36,8 +36,26 @@ FocusScope {
     property var pendingPlan: ({})
     property var launchDetailsItem: null
     property bool confirmationOpen: false
+    property bool steamConnectionOpen: false
     property string confirmationKind: ""
     property int confirmationChoice: 0
+    readonly property bool executablePickerOpen: executablePicker.opened
+    readonly property bool editorOverlayOpen: executablePickerOpen || deepStorageOverlayOpen
+        || steamConnectionOpen
+        || postProcessingOverlayOpen || frameGenerationOverlayOpen || gpuMemoryOverlayOpen
+        || measuredOverlayOpen || customLaunchOverlayOpen || tweaksOverlayOpen
+    function closeEditorOverlay() {
+        steamConnectionOpen = false
+        if (executablePicker.opened) { executablePicker.close(); executablePicker.cancelled() }
+        deepStorageOverlayOpen = false
+        postProcessingOverlayOpen = false
+        frameGenerationOverlayOpen = false
+        gpuMemoryOverlayOpen = false
+        measuredOverlayOpen = false
+        customLaunchOverlayOpen = false
+        tweaksOverlayOpen = false
+        if (navigation) navigation.closeModal()
+    }
     // Exact compsize measurement asks for a password (Polkit) and needs a
     // keyboard. Couch never starts it on its own: only this explicit action.
     readonly property var compressionCapabilities: controller && controller.systemInfo
@@ -57,6 +75,7 @@ FocusScope {
     property bool mangoHudOverlayOpen: false
     property bool postProcessingOverlayOpen: false
     property bool frameGenerationOverlayOpen: false
+    property bool deepStorageOverlayOpen: false
     property int mangoHudRow: 0
     property var mangoHudProfile: ({})
     property string mangoHudPreset: "disabled"
@@ -82,7 +101,13 @@ FocusScope {
     // for the same set of files).
     property string optiScalerDismissedConflict: ""
     readonly property var optiScalerConflict: optiScalerData.operationConflict || ({})
-    readonly property bool optiScalerBusy: optiScalerData.loading === true || optiScalerData.refreshing === true
+    readonly property var optiScalerTask: {
+        var tasks = controller ? (controller.activeTasks || []) : []
+        for (var i = 0; i < tasks.length; ++i)
+            if (String(tasks[i].gameId) === String(game.id) && tasks[i].operation === "OptiScaler") return tasks[i]
+        return ({})
+    }
+    readonly property bool optiScalerBusy: Boolean(optiScalerTask.id) || optiScalerData.loading === true || optiScalerData.refreshing === true
     readonly property string optiScalerErrorText: App.I18n.message(String(
             optiScalerData.error || optiScalerData.onlineError
             || optiScalerData.refreshError || optiScalerData.operationError || ""))
@@ -105,10 +130,9 @@ FocusScope {
     ]
     readonly property var profileNames: ["Fast", "Balanced", "Maximum", "Auto"]
     readonly property var actionModel: actionsForTab()
-    readonly property bool launcherIntegrationSupported: {
-        var launcher = String(value(["launcher"], ""))
-        return launcher !== "Heroic" && launcher !== "Lutris"
-    }
+    // Launcher support and tool availability are separate. Heroic/Lutris use
+    // the same backend profiles and reversible wrapper integration as Desktop.
+    readonly property bool launcherIntegrationSupported: true
     signal backRequested()
 
     function loadedImplicitHeight(loadedItem) {
@@ -132,7 +156,17 @@ FocusScope {
         Qt.callLater(function() {
             if (!page.visible)
                 return
-            var item = page.measuredOverlayOpen
+            var item = executablePicker.opened
+                    ? executablePicker.padFocusedItem
+                    : page.steamConnectionOpen
+                    ? steamConnectionPanel
+                    : page.deepStorageOverlayOpen
+                    ? deepStorageEditor.padFocusedItem
+                    : page.postProcessingOverlayOpen
+                    ? postProcessingPanel.padFocusedItem
+                    : page.frameGenerationOverlayOpen
+                    ? frameGenerationPanel.padFocusedItem
+                    : page.measuredOverlayOpen
                     ? (measuredPanel.padFocusedItem || measuredPanel)
                     : page.customLaunchOverlayOpen
                     ? (customLaunchEditor.padFocusedItem || customLaunchEditor)
@@ -293,10 +327,12 @@ FocusScope {
             { "id": "measured-optimization", "icon": App.UiIcons.couchGlyphOptimization, "iconOnLight": App.UiIcons.couchGlyphOptimizationOnLight, "symbol": "◎", "title": qsTr("Measured optimization"), "subtitle": qsTr("Baseline, one change, comparison"), "enabled": true },
             { "id": "gamemode", "icon": App.UiIcons.couchGlyphGamemode, "iconOnLight": App.UiIcons.couchGlyphGamemodeOnLight, "symbol": "⚡", "title": "GameMode: " + (gameModeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
             { "id": "gamescope", "icon": App.UiIcons.couchGlyphGamescope, "iconOnLight": App.UiIcons.couchGlyphGamescopeOnLight, "symbol": "▣", "title": "Gamescope: " + (gamescopeEnabled ? qsTr("On") : qsTr("Off")), "enabled": true },
-            { "id": "mangohud-profile", "icon": App.UiIcons.couchGlyphMangohud, "iconOnLight": App.UiIcons.couchGlyphMangohudOnLight, "symbol": "◉", "title": qsTr("MangoHud"), "subtitle": mangoHudPresetLabel(), "enabled": true }
+            { "id": "mangohud-profile", "icon": App.UiIcons.couchGlyphMangohud, "iconOnLight": App.UiIcons.couchGlyphMangohudOnLight, "symbol": "◉", "title": qsTr("MangoHud"), "subtitle": mangoHudPresetLabel(), "enabled": true },
+            { "id": "gpu-memory", "icon": App.UiIcons.couchGlyphTune, "title": qsTr("GPU memory"), "subtitle": qsTr("Protection, allocator and measurements"), "enabled": true }
         ]
     }
     function optiScalerRefreshSubtitle() {
+        if (optiScalerTask.id) return App.I18n.message(String(optiScalerTask.stage || ""))
         if (optiScalerBusy)
             return qsTr("Checking the official release…")
         if (optiScalerErrorText.length > 0)
@@ -305,6 +341,9 @@ FocusScope {
     }
     function optiScalerActions() {
         var actions = []
+        if (optiScalerTask.id) return [{id: "optiscaler-cancel", title: qsTr("Cancel"),
+            subtitle: App.I18n.message(String(optiScalerTask.stage || "")),
+            enabled: optiScalerTask.cancellable === true}]
         var installed = optiScalerData.installed === true
         var needsPackage = !installed
                 || String(optiScalerData.onlineState || "") === "update_available"
@@ -315,6 +354,9 @@ FocusScope {
             return actions
         }
         var couchEnabler = optiScalerData.dlssEnabler || ({})
+        actions.push({ "id": "optiscaler-executable", "icon": App.UiIcons.couchGlyphTune, "iconOnLight": App.UiIcons.couchGlyphTuneOnLight,
+            "title": qsTr("Main executable"), "subtitle": optiScalerExecutable() || qsTr("Not detected"),
+            "enabled": !optiScalerBusy })
         var enablerPhase = String(couchEnabler.phase || "inactive")
         if (enablerPhase !== "inactive") {
             var enablerState = String(couchEnabler.statusState || "switch_interrupted")
@@ -373,14 +415,17 @@ FocusScope {
     function actionsForTab() {
         if (selectedTab === 0) return [
             { "id": "launch", "icon": App.UiIcons.couchGlyphLaunch, "iconOnLight": App.UiIcons.couchGlyphLaunchOnLight, "symbol": "▶", "title": launchPending ? qsTr("Launching…") : qsTr("Launch"), "subtitle": boolValue(["launchAllowed"], false) ? qsTr("Start the selected game") : String(value(["availabilityStatus", "status"], qsTr("Game is unavailable"))), "enabled": boolValue(["launchAllowed"], false) && !launchPending },
-            { "id": "updates", "icon": App.UiIcons.couchGlyphUpdates, "iconOnLight": App.UiIcons.couchGlyphUpdatesOnLight, "symbol": "↓", "title": qsTr("Updates"), "subtitle": qsTr("Review detected changes"), "enabled": true }
+            { "id": "updates", "icon": App.UiIcons.couchGlyphUpdates, "iconOnLight": App.UiIcons.couchGlyphUpdatesOnLight, "symbol": "↓", "title": qsTr("Updates"), "subtitle": qsTr("Review detected changes"), "enabled": true },
+            { "id": "steam-connection", "icon": App.UiIcons.couchGlyphTune, "title": qsTr("Steam connection"), "subtitle": qsTr("Apply or restore Steam Launch Options"), "enabled": String(game.launcher || "") === "Steam" }
         ]
         if (selectedTab === 1) return [
             { "id": "analyze", "icon": App.UiIcons.couchGlyphAnalyze, "iconOnLight": App.UiIcons.couchGlyphAnalyzeOnLight, "symbol": "⌕", "title": qsTr("Analyze"), "subtitle": boolValue(["analysisAllowed"], false) ? qsTr("Inspect the current game") : qsTr("Unavailable for this game"), "enabled": boolValue(["analysisAllowed"], false) },
             { "id": "verify", "icon": App.UiIcons.couchGlyphVerifyCompression, "iconOnLight": App.UiIcons.couchGlyphVerifyCompressionOnLight, "symbol": "✓", "title": qsTr("Verify compression"), "subtitle": boolValue(["analysisAllowed"], false) ? qsTr("Read-only measurement") : qsTr("Unavailable for this game"), "enabled": boolValue(["analysisAllowed"], false) },
             { "id": "exact-measure", "icon": App.UiIcons.couchGlyphVerifyCompression, "iconOnLight": App.UiIcons.couchGlyphVerifyCompressionOnLight, "symbol": "⚿", "title": qsTr("Exact measurement (requires password and keyboard)"), "subtitle": !page.exactMeasurementInstalled ? qsTr("The optional measurement component is not installed") : !page.gameOnBtrfs || !boolValue(["analysisAllowed"], false) ? qsTr("Unavailable for this game") : qsTr("Runs compsize only after you confirm; the system asks for your password"), "enabled": page.exactMeasurementInstalled && page.gameOnBtrfs && boolValue(["analysisAllowed"], false) },
             { "id": "profile", "icon": App.UiIcons.couchGlyphCompressionProfile, "iconOnLight": App.UiIcons.couchGlyphCompressionProfileOnLight, "symbol": "◈", "title": qsTr("Profile: %1").arg(selectedProfile), "subtitle": boolValue(["analysisProfilesUnlocked"], false) ? qsTr("Choose a planned profile") : qsTr("Analyze the game first"), "enabled": boolValue(["analysisProfilesUnlocked"], false) },
-            { "id": "compress", "icon": App.UiIcons.couchGlyphCompress, "iconOnLight": App.UiIcons.couchGlyphCompressOnLight, "symbol": "↓", "title": qsTr("Start compression"), "subtitle": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) ? qsTr("Review the verified plan") : qsTr("A verified Btrfs plan is required"), "enabled": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) }
+            { "id": "compress", "icon": App.UiIcons.couchGlyphCompress, "iconOnLight": App.UiIcons.couchGlyphCompressOnLight, "symbol": "↓", "title": qsTr("Start compression"), "subtitle": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) ? qsTr("Review the verified plan") : qsTr("A verified Btrfs plan is required"), "enabled": boolValue(["analysisProfilesUnlocked"], false) && boolValue(["compressionAvailable"], false) },
+            { "id": "deep-analysis", "icon": App.UiIcons.couchGlyphAnalyze, "title": qsTr("Deep analysis"), "subtitle": qsTr("Languages, files and reversible quarantine"), "enabled": boolValue(["analysisAllowed"], false) },
+            { "id": "recompression", "icon": App.UiIcons.couchGlyphCompress, "title": qsTr("Recompression"), "subtitle": qsTr("Analyze and select file types"), "enabled": boolValue(["analysisAllowed"], false) }
         ]
         if ((selectedTab === 2 || selectedTab === 3) && !launcherIntegrationSupported) return [{
                 "id": "unavailable", "icon": App.UiIcons.couchGlyphInfo, "iconOnLight": App.UiIcons.couchGlyphInfoOnLight, "symbol": "i",
@@ -404,8 +449,6 @@ FocusScope {
     // States come only from the loaded per-game data; "Preview" marks features
     // that are saved but not yet applied when the game launches.
     function featureInfo(id) {
-        if (!launcherIntegrationSupported)
-            return { "tone": "unavailable", "state": qsTr("Unavailable"), "detail": qsTr("Not supported for this launcher"), "preview": false }
         if (id === "gamemode" || id === "gamescope") {
             var tool = optimizationData ? optimizationData[id] : null
             if (!tool)
@@ -419,6 +462,8 @@ FocusScope {
                      "detail": on ? activationText(launchActivation.state) : "", "preview": on && !applied }
         }
         if (id === "mangohud") {
+            if (mangoHudProfile.available === undefined)
+                return { "tone": "neutral", "state": qsTr("Unknown"), "detail": qsTr("Status not loaded"), "preview": false }
             if (mangoHudProfile.available !== true)
                 return { "tone": "unavailable", "state": qsTr("Unavailable"),
                          "detail": App.I18n.message(String(mangoHudProfile.availabilityMessage || "")), "preview": false }
@@ -651,8 +696,8 @@ FocusScope {
         if (!launcherIntegrationSupported) { optimizationData = ({}); return }
         if (!controller || !controller.getOptimizationProfile || !game.id) return
         var result = controller.getOptimizationProfile(String(game.id)) || ({})
-        if (!result.success) return
         optimizationData = result
+        if (!result.success) return
         optimizationProfile = String(result.preset || "automatic")
         optimizationCategory = String(result.gameCategory || "unknown")
         fpsLimit = Number(result.targetFps || 60)
@@ -665,11 +710,22 @@ FocusScope {
         if (!optimizationDisplayId && optimizationDisplays.length)
             optimizationDisplayId = String(optimizationDisplays[0].id || "")
     }
-    function loadOptiScalerStatus() {
+    function optiScalerInstallationLabel() {
+        if (optiScalerTask.id) return App.I18n.message(String(optiScalerTask.stage || qsTr("Working")))
+        var state = String(optiScalerData.installationState || "unknown")
+        if (state === "unmanaged") return qsTr("Existing files — not managed by this installation")
+        if (state === "conflict") return qsTr("Conflict with existing files")
+        if (state === "unavailable") return qsTr("Game directory unavailable")
+        if (state === "partial" || state === "inconsistent" || state === "corrupt") return qsTr("Incomplete or changed installation")
+        if (optiScalerData.installed === true) return qsTr("Installed")
+        if (optiScalerData.loading || state === "unknown") return qsTr("Checking…")
+        return qsTr("Not installed")
+    }
+    function loadOptiScalerStatus(force) {
         if (!launcherIntegrationSupported) { optiScalerData = ({}); return }
         if (!controller || !game.id) return
         var result = controller.requestOptiScalerStatus
-                ? controller.requestOptiScalerStatus(String(game.id), false) || ({})
+                ? controller.requestOptiScalerStatus(String(game.id), Boolean(force)) || ({})
                 : controller.getOptiScalerStatus(String(game.id)) || ({})
         applyOptiScalerStatus(result)
     }
@@ -1501,6 +1557,28 @@ FocusScope {
                 || !actionModel[selectedAction].enabled || !controller)
             return "error"
         var id = actionModel[selectedAction].id
+        if (id === "steam-connection") {
+            steamConnectionOpen = true
+            steamConnectionPanel.refresh()
+            if (navigation) navigation.openModal("steam-connection", "apply")
+            restoreActiveFocus()
+            return "open"
+        }
+        if (id === "deep-analysis" || id === "recompression") {
+            deepStorageOverlayOpen = true
+            deepStorageEditor.recompressionMode = id === "recompression"
+            deepStorageEditor.refresh()
+            if (navigation) navigation.openModal("deep-storage", id)
+            deepStorageEditor.handlePadAction("Focus")
+            return "open"
+        }
+        if (id === "gpu-memory") {
+            gpuMemoryOverlayOpen = true
+            if (navigation) navigation.openModal("gpuMemory", id)
+            gpuMemoryCard.refresh()
+            gpuMemoryCard.handlePadAction("Focus")
+            return "open"
+        }
         if (id === "launch") {
             var launched = Boolean(controller.launchGame(String(game.id || "")))
             launchPending = launched
@@ -1567,6 +1645,8 @@ FocusScope {
         }
         if (id === "optiscaler-refresh")
             return refreshCouchOptiScaler() ? "confirm" : "error"
+        if (id === "optiscaler-cancel")
+            return controller && controller.cancelTask && controller.cancelTask(String(optiScalerTask.id || "")) ? "confirm" : "error"
         if (id === "optiscaler-retry-status") {
             if (controller && controller.requestOptiScalerStatus)
                 applyOptiScalerStatus(controller.requestOptiScalerStatus(String(game.id || ""), true) || ({}))
@@ -1574,6 +1654,12 @@ FocusScope {
         }
         if (id === "optiscaler-install")
             return openOptiScalerConfirmation(optiScalerOperation()) ? "open" : "error"
+        if (id === "optiscaler-executable") {
+            executablePicker.open()
+            if (navigation) navigation.openModal("executable", "")
+            restoreActiveFocus()
+            return "open"
+        }
         if (id === "optiscaler-configure")
             return configureCouchOptiScaler() ? "adjust" : "error"
         if (id === "optiscaler-fsr-variant")
@@ -1625,8 +1711,26 @@ FocusScope {
         return "error"
     }
     function handleAction(action) {
+        if (steamConnectionOpen) {
+            if (!steamConnectionPanel.handlePadAction(action)) {
+                steamConnectionOpen = false
+                if (navigation) navigation.closeModal()
+                restoreActiveFocus()
+            }
+            return
+        }
+        if (executablePicker.opened) { executablePicker.handlePadAction(action); return }
         if (mangoHudKeyboard.opened) { mangoHudKeyboard.handleAction(action); return }
         if (customLaunchKeyboard.opened) { customLaunchKeyboard.handleAction(action); return }
+
+        if (deepStorageOverlayOpen) {
+            if (!deepStorageEditor.handlePadAction(action) && action === "Back") {
+                deepStorageOverlayOpen = false
+                if (navigation) navigation.closeModal()
+                restoreActiveFocus()
+            }
+            return
+        }
 
         if (measuredOverlayOpen) {
             if (action === "Back" && !measuredPanel.handlePadAction("Back")) {
@@ -1669,44 +1773,39 @@ FocusScope {
             } else {
                 tweaksEditor.handlePadAction(action)
                 var focusItem=tweaksEditor.padFocusedItem
-                if (focusItem && tweaksScroll.contentItem) {
+                var tweaksFlick = tweaksScroll.contentItem as Flickable
+                if (focusItem && tweaksFlick) {
                     var focusY=focusItem.mapToItem(tweaksEditor,0,0).y
-                    tweaksScroll.contentItem.contentY=Math.max(0,Math.min(tweaksScroll.contentItem.contentHeight-tweaksScroll.height,focusY-tweaksScroll.height/3))
+                    tweaksFlick.contentY=Math.max(0,Math.min(tweaksFlick.contentHeight-tweaksScroll.height,focusY-tweaksScroll.height/3))
                 }
             }
             return
         }
         if (gpuMemoryOverlayOpen) {
-            if (action === "Back") {
+            if (action === "Back" && !gpuMemoryCard.handlePadAction(action)) {
                 gpuMemoryOverlayOpen = false
                 if (navigation) navigation.closeModal()
                 restoreActiveFocus()
-            } else {
+            } else if (action !== "Back") {
                 gpuMemoryCard.handlePadAction(action)
-                var item = gpuMemoryCard.padFocusedItem
-                if (item && gpuMemoryScroll.contentItem) {
-                    var y = item.mapToItem(gpuMemoryCard, 0, 0).y
-                    gpuMemoryScroll.contentItem.contentY = Math.max(0, y - gpuMemoryScroll.height / 3)
-                }
             }
             return
         }
         if (frameGenerationOverlayOpen) {
-            if (action === "Back") {
+            if (!frameGenerationPanel.handlePadAction(action) && action === "Back") {
                 frameGenerationOverlayOpen = false
                 if (navigation) navigation.closeModal()
                 restoreActiveFocus()
                 return
             }
-            frameGenerationPanel.handlePadAction(action)
             return "move"
         }
         if (postProcessingOverlayOpen) {
-            if (action === "Back") {
+            if (!postProcessingPanel.handlePadAction(action) && action === "Back") {
                 postProcessingOverlayOpen = false
                 if (navigation) navigation.closeModal()
                 restoreActiveFocus()
-            } else postProcessingPanel.handlePadAction(action)
+            }
             return
         }
         if (action === "ContextMenu" || action === "Search") action = "MoreActions"
@@ -1858,7 +1957,7 @@ FocusScope {
     onSelectedTabChanged: Qt.callLater(ensureAction)
     focus: visible
     Component.onCompleted: { applyDefaultProfile(); loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); restoreActiveFocus() }
-    onVisibleChanged: if (visible) { loadMangoHudProfile(); restoreActiveFocus() }
+    onVisibleChanged: if (visible) { loadMangoHudProfile(); loadOptiScalerStatus(true); restoreActiveFocus() }
     onGameChanged: {
         if (mangoHudKeyboard && mangoHudKeyboard.opened) mangoHudKeyboard.close(false)
         if (customLaunchKeyboard && customLaunchKeyboard.opened) customLaunchKeyboard.close(false)
@@ -1867,13 +1966,25 @@ FocusScope {
         var gameId = String(game && game.id ? game.id : "")
         if (gameId !== profileGameId) {
             profileGameId = gameId
+            if (navigation && (deepStorageOverlayOpen || postProcessingOverlayOpen
+                               || frameGenerationOverlayOpen || gpuMemoryOverlayOpen
+                               || confirmationOpen || executablePicker.opened))
+                navigation.closeModal()
+            confirmationOpen = false
+            confirmationKind = ""
+            confirmationChoice = 0
+            deepStorageOverlayOpen = false
+            postProcessingOverlayOpen = false
+            frameGenerationOverlayOpen = false
+            gpuMemoryOverlayOpen = false
             tweaksOverlayOpen = false
             customLaunchOverlayOpen = false
             measuredOverlayOpen = false
             profileChosenByUser = false
             applyDefaultProfile()
+            focusArea = 0; headerIndex = 0
         }
-        focusArea = 0; headerIndex = 0; loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); Qt.callLater(ensureHeaderCard)
+        loadMangoHudProfile(); loadOptimizationProfile(); loadOptiScalerStatus(); loadProtonTweaks(); Qt.callLater(ensureHeaderCard)
     }
     property string profileGameId: ""
 
@@ -2425,7 +2536,7 @@ FocusScope {
                     Label {
                         id: optiScalerStateLabel
                         anchors.centerIn: parent
-                        text: page.optiScalerData.installed === true ? qsTr("Installed") : qsTr("Not installed")
+                        text: page.optiScalerInstallationLabel()
                         color: page.optiScalerData.installed === true ? App.Theme.success : App.Theme.textSecondary
                         font.pixelSize: 15 * page.couchScale
                         font.weight: Font.Bold
@@ -2463,12 +2574,12 @@ FocusScope {
             anchors.fill: parent
             Label { Layout.fillWidth: true; color: App.Theme.text; wrapMode: Text.WordWrap
                 text: qsTr("D-pad: choose / adjust · A: confirm · B: close") }
-            Details.FrameGenerationPanel {
+            CouchFrameGenerationEditor {
                 id: frameGenerationPanel
                 Layout.fillWidth: true; Layout.fillHeight: true
                 controller: page.controller
                 gameData: page.game
-                couchMode: true
+                couchScale: page.couchScale
                 onOptiScalerRequested: {
                     page.frameGenerationOverlayOpen = false
                     if (page.navigation) page.navigation.closeModal()
@@ -2481,6 +2592,23 @@ FocusScope {
             }
             CouchButton { Layout.fillWidth: true; couchScale: page.couchScale; text: qsTr("Close")
                 onClicked: page.handleAction("Back") }
+        }
+    }
+
+    CouchOverlayFrame {
+        anchors.fill: parent
+        z: 215
+        visible: page.steamConnectionOpen
+        couchScale: page.couchScale
+        maximumWidth: 940 * page.couchScale
+        preferredHeight: 620 * page.couchScale
+        SteamConnectionPanel {
+            id: steamConnectionPanel
+            objectName: "couchSteamConnection"
+            anchors.fill: parent
+            controller: page.controller
+            gameId: page.steamConnectionOpen ? String(page.game.id || "") : ""
+            couchMode: true
         }
     }
 
@@ -2622,17 +2750,12 @@ FocusScope {
         couchScale: page.couchScale
         maximumWidth: 1100 * page.couchScale
         preferredHeight: 900 * page.couchScale
-        ScrollView {
-            id: gpuMemoryScroll
+        CouchGpuMemoryEditor {
+            id: gpuMemoryCard
             anchors.fill: parent
-            contentWidth: availableWidth
-            Details.GpuMemoryCard {
-                id: gpuMemoryCard
-                couchMode: true
-                width: gpuMemoryScroll.availableWidth
-                controller: page.controller
-                gameData: page.game
-            }
+            controller: page.controller
+            gameData: page.game
+            couchScale: page.couchScale
         }
     }
 
@@ -2647,11 +2770,12 @@ FocusScope {
             anchors.fill: parent
             Label { Layout.fillWidth: true; color: App.Theme.text; wrapMode: Text.WordWrap
                 text: qsTr("D-pad: choose / adjust · A: confirm · B: close") }
-            Details.PostProcessingPanel {
+            CouchPostProcessingEditor {
                 id: postProcessingPanel
                 Layout.fillWidth: true; Layout.fillHeight: true
                 controller: page.controller
                 gameData: page.game
+                couchScale: page.couchScale
             }
             CouchButton { Layout.fillWidth: true; couchScale: page.couchScale; text: qsTr("Close")
                 onClicked: page.handleAction("Back") }
@@ -2683,6 +2807,22 @@ FocusScope {
                     mangoHudKeyboard.open(String(field.text), heading)
                 }
             }
+        }
+    }
+
+    CouchOverlayFrame {
+        anchors.fill: parent
+        z: 218
+        visible: page.deepStorageOverlayOpen
+        couchScale: page.couchScale
+        maximumWidth: 1100 * page.couchScale
+        preferredHeight: 900 * page.couchScale
+        CouchDeepStorageEditor {
+            id: deepStorageEditor
+            anchors.fill: parent
+            controller: page.controller
+            gameData: page.game
+            couchScale: page.couchScale
         }
     }
 
@@ -2736,6 +2876,28 @@ FocusScope {
 
     CouchOverlayFrame {
         anchors.fill: parent
+        z: 220
+        visible: executablePicker.opened
+        couchScale: page.couchScale
+        maximumWidth: 1200 * page.couchScale
+        preferredHeight: 900 * page.couchScale
+        CouchExecutablePicker {
+            id: executablePicker; anchors.fill: parent
+            controller: page.controller; gameId: String(page.game.id || ""); couchScale: page.couchScale
+            onSelected: {
+                page.loadOptiScalerStatus()
+                if (page.navigation) page.navigation.closeModal()
+                page.restoreActiveFocus()
+            }
+            onCancelled: {
+                if (page.navigation) page.navigation.closeModal()
+                page.restoreActiveFocus()
+            }
+        }
+    }
+
+    CouchOverlayFrame {
+        anchors.fill: parent
         z: 200
         visible: page.confirmationOpen
         couchScale: page.couchScale
@@ -2748,6 +2910,7 @@ FocusScope {
                 anchors.fill: parent; spacing: 14 * page.couchScale
                 Label { Layout.fillWidth: true; text: page.confirmationTitle(); color: App.Theme.text; font.pixelSize: 29 * page.couchScale; font.weight: Font.Bold; wrapMode: Text.WordWrap }
                 Label { objectName: "couchConfirmationDescription"; Layout.fillWidth: true; text: page.confirmationDescription(); color: App.Theme.textSecondary; font.pixelSize: 16 * page.couchScale; wrapMode: Text.WordWrap }
+                Label { Layout.fillWidth: true; text: qsTr("D-pad: choose / adjust · A: confirm · B: back"); color: App.Theme.textMuted; font.pixelSize: 16 * page.couchScale; wrapMode: Text.WordWrap }
                 Label { Layout.fillWidth: true; visible: page.confirmationKind === "compression"; text: page.pendingPlan && page.pendingPlan.warnings && page.pendingPlan.warnings.length ? String(page.pendingPlan.warnings[0]) : qsTr("The estimate does not guarantee the same change in free disk space."); color: App.Theme.warning; font.pixelSize: 15 * page.couchScale; wrapMode: Text.WordWrap }
                 Item { Layout.fillHeight: true }
                 RowLayout {

@@ -473,6 +473,8 @@ class LibraryController:
         from ..providers.steam import SteamGameProvider
         from ..services.directory_size import DirectorySizeScanner
         from ..config import LOCAL_EXECUTABLE_CHOICES_FILE
+        from ..config import CACHE_DIR
+        from ..services.steam_artwork import SteamArtworkCache
 
         if self._app._filesystem_provider is None:
             self._app._filesystem_provider = LinuxFilesystemProvider()
@@ -481,6 +483,7 @@ class LibraryController:
         steam = SteamGameProvider(
             self._app._filesystem_provider,
             additional_roots=self._app._settings_model.steam_installation_directories,
+            artwork_cache=SteamArtworkCache(CACHE_DIR / "steam-artwork-v1"),
         )
         local = LocalGameProvider(
             self._app._filesystem_provider,

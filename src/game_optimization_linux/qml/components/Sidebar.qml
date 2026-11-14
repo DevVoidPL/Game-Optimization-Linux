@@ -31,7 +31,6 @@ Rectangle {
           "count": Math.max(0, sidebar.updatesPendingCount) },
         { "page": "tasks", "label": qsTr("Tasks"), "icon": App.UiIcons.sidebarTasks },
         { "page": "system", "label": qsTr("System"), "icon": App.UiIcons.sidebarSystem },
-        { "page": "donate", "label": qsTr("Donate"), "icon": App.UiIcons.sidebarDonate },
         { "page": "settings", "label": qsTr("Settings"), "icon": App.UiIcons.sidebarSettings }
     ]
 

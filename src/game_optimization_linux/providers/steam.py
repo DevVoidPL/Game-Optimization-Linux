@@ -24,6 +24,7 @@ from game_optimization_linux.models.game import Game
 from game_optimization_linux.models.system import FilesystemInfo
 
 from .base import FilesystemProvider, GameProvider
+from .artwork import best_local_image, image_dimensions
 from .keyvalues import (
     KVValue,
     VDFParseError,
@@ -132,8 +133,8 @@ def find_local_steam_artwork(
     """Return shape-specific local Steam artwork without network access.
 
     The function looks only at files associated with ``app_id`` and tolerates
-    both the flat and per-AppID cache layouts used by Steam. It performs only
-    inexpensive directory metadata checks so a large library stays responsive.
+    both the flat and per-AppID cache layouts used by Steam. Cached image-header
+    reads select the highest resolution without decoding full pixel data.
     """
 
     normalized_app_id = str(app_id).strip()
@@ -199,7 +200,15 @@ def find_local_steam_artwork(
                         continue
                     if not is_file:
                         continue
+                    if "blur" in name or "logo" in name:
+                        continue
                     kind = _artwork_kind(name)
+                    if kind == "fallback":
+                        width, height = image_dimensions(entry)
+                        if width >= 200 and height >= 300 and 0.5 <= width / height <= 0.85:
+                            kind = "portrait"
+                        elif width >= 460 and height >= 150 and 1.8 <= width / height <= 4:
+                            kind = "header"
                     candidates[kind].append((100, name, entry))
             except OSError:
                 continue
@@ -208,8 +217,7 @@ def find_local_steam_artwork(
         matches = candidates[kind]
         if not matches:
             return None
-        selected = min(matches, key=lambda item: (item[0], item[1]))[2]
-        return _resolved_artwork(selected)
+        return best_local_image(item[2] for item in sorted(matches, key=lambda item: (item[0], item[1])))
 
     return SteamArtworkPaths(
         portrait_artwork_path=best("portrait"),
@@ -342,6 +350,7 @@ class SteamGameProvider(GameProvider):
         *,
         additional_roots: Iterable[str | Path] = (),
         home: str | Path | None = None,
+        artwork_cache=None,
     ) -> None:
         self._filesystem_provider = filesystem_provider
         if roots is None:
@@ -353,6 +362,7 @@ class SteamGameProvider(GameProvider):
         self._manual_games: dict[str, Game] = {}
         self._last_report = ScanReport.empty()
         self._lock = RLock()
+        self._artwork_cache = artwork_cache
 
     @staticmethod
     def standard_roots(home: str | Path | None = None) -> tuple[Path, ...]:
@@ -788,6 +798,9 @@ class SteamGameProvider(GameProvider):
             self._record_path_error(install_path, error, stats)
         filesystem = self._inspect_filesystem(install_path, stats)
         artwork = find_local_steam_artwork(app_id, stats.steam_roots or ())
+        if self._artwork_cache is not None:
+            # Provider scans run on the library worker, never on the QML thread.
+            artwork = self._artwork_cache.resolve(app_id, artwork)
         return Game(
             id=f"steam-{app_id}",
             steam_app_id=app_id,

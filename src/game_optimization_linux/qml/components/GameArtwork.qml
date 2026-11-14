@@ -20,15 +20,14 @@ Item {
     property color accentA: paletteFor(title, 0)
     property color accentB: paletteFor(title, 1)
     property bool compact: false
+    property bool wideBackdrop: false
     property string diagnosticViewKind: "unknown"
     property bool diagnosticGridViewIsCurrentItem: false
     property string diagnosticDelegateState: "active"
     property string lastDiagnosticSignature: ""
     property bool shuttingDown: false
     readonly property int requestedPixelWidth: Math.min(1200, Math.max(64, Math.ceil(width * Screen.devicePixelRatio)))
-    readonly property real artworkAspectRatio: pendingReady && pendingImage.implicitHeight > 0
-        ? pendingImage.implicitWidth / pendingImage.implicitHeight
-        : currentReady && currentImage.implicitHeight > 0 ? currentImage.implicitWidth / currentImage.implicitHeight : 16 / 9
+    property real artworkAspectRatio: 16 / 9
     readonly property bool diagnosticLoggingEnabled:
         typeof gameOptimizationDebugArtwork !== "undefined"
         && gameOptimizationDebugArtwork === true
@@ -232,6 +231,8 @@ Item {
             logArtworkChange("stale_candidate_ready_ignored", pendingImage)
             return
         }
+        if (pendingImage.implicitHeight > 0)
+            artworkAspectRatio = pendingImage.implicitWidth / pendingImage.implicitHeight
         pendingAccepted = true
         committedRequestId = requestToken
         committedGameId = requestedGameId
@@ -396,6 +397,26 @@ Item {
         }
 
         Image {
+            id: backdropImage
+            anchors.fill: parent
+            source: artworkRoot.wideBackdrop ? artworkRoot.actualImageSource : ""
+            sourceSize.width: 128
+            fillMode: Image.PreserveAspectCrop
+            asynchronous: true
+            cache: true
+            visible: false
+        }
+        MultiEffect {
+            anchors.fill: parent
+            source: backdropImage
+            visible: artworkRoot.wideBackdrop && artworkRoot.artworkReady
+            blurEnabled: true
+            blur: 0.8
+            brightness: -0.35
+            autoPaddingEnabled: false
+        }
+
+        Image {
             id: currentImage
             objectName: "gameArtworkImage"
             property int requestId: 0
@@ -413,10 +434,13 @@ Item {
             onSourceChanged: artworkRoot.logArtworkChange(
                                  "current_source_changed", currentImage)
             onStatusChanged: {
-                artworkRoot.finishCommit(
-                            currentImage.requestId,
-                            currentImage.requestGameId,
-                            String(currentImage.source))
+                var token = currentImage.requestId
+                var requestedGame = currentImage.requestGameId
+                var requestedSource = String(currentImage.source)
+                Qt.callLater(function() {
+                    if (artworkRoot && !artworkRoot.shuttingDown)
+                        artworkRoot.finishCommit(token, requestedGame, requestedSource)
+                })
                 artworkRoot.logArtworkChange(
                             "current_status_changed", currentImage)
             }
@@ -440,12 +464,18 @@ Item {
             onSourceChanged: artworkRoot.logArtworkChange(
                                  "candidate_source_changed", pendingImage)
             onStatusChanged: {
-                if (status === Image.Ready)
-                    artworkRoot.acceptPendingImage(
-                                pendingImage.requestId,
-                                pendingImage.requestGameId,
-                                String(pendingImage.source))
-                else if (status === Image.Error)
+                if (status === Image.Ready) {
+                    if (implicitHeight > 0 && artworkRoot.requestMatches(
+                            requestId, requestGameId, String(source)))
+                        artworkRoot.artworkAspectRatio = implicitWidth / implicitHeight
+                    var token = pendingImage.requestId
+                    var requestedGame = pendingImage.requestGameId
+                    var requestedSource = String(pendingImage.source)
+                    Qt.callLater(function() {
+                        if (artworkRoot && !artworkRoot.shuttingDown)
+                            artworkRoot.acceptPendingImage(token, requestedGame, requestedSource)
+                    })
+                } else if (status === Image.Error)
                     artworkRoot.rejectPendingImage(
                                 pendingImage.requestId,
                                 pendingImage.requestGameId,
@@ -493,11 +523,11 @@ Item {
             anchors.right: parent.right
             anchors.bottom: parent.bottom
             anchors.margins: 12
-            text: artworkRoot.launcher.toUpperCase()
+            text: artworkRoot.title
             color: "#CCFFFFFF"
-            font.pixelSize: 9
+            font.pixelSize: App.Theme.fontCaption
             font.weight: Font.Bold
-            font.letterSpacing: 1.4
+            horizontalAlignment: Text.AlignHCenter
             elide: Text.ElideRight
         }
 

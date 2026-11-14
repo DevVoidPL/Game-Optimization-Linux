@@ -2566,6 +2566,11 @@ Item {
                             AppButton { text: qsTr("Test runner"); kind: "secondary"; onClicked: if (tab.controller && tab.controller.testGameOptimizationRunner) tab.controller.testGameOptimizationRunner(tab.gameId) }
                         }
                         Label { Layout.fillWidth: true; visible: tab.showSteamInstructions; text: qsTr("Steam → Properties → General → Launch Options"); color: App.Theme.textMuted; wrapMode: Text.WordWrap }
+                        SteamConnectionPanel {
+                            Layout.fillWidth: true
+                            controller: tab.controller
+                            gameId: tab.gameId
+                        }
                     }
                 }
 

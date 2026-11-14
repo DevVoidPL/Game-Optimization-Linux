@@ -35,14 +35,3 @@ a game comes from (Valve "Steam Brand Guidelines and Logos", Steamworks docs).
 The full-colour icon is used on both themes. It replaces the previous
 monochrome `couch/launchers/steam*.png` silhouettes, which rendered as a washed
 out light-grey disc on dark covers and plates.
-
-## PayPal
-
-`paypal.png` (128 × 128) is the PayPal monogram from the official PayPal
-Newsroom media kit (`PayPal-Monogram-Logo-2024.zip`,
-<https://newsroom.paypal-corp.com/media-resources>, file
-`Monogram/PayPal-Monogram-FullColor-RGB.png`, SHA-256
-`defb3ea3cd1f5ac2548c92ed55d4b6a250691f580eb6583fd6300440d6afeb9e`). The
-source was trimmed of transparent padding and downscaled proportionally into a
-128 px canvas; colours are unchanged. It is shown untinted beside the PayPal
-donation button only. PayPal and the PayPal logo are trademarks of PayPal, Inc.

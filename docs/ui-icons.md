@@ -36,7 +36,7 @@ MangoHud, OptiScaler wordmark) is never generated; see `assets/ui-icons/brands/`
   out. Library offline: the same gamepad opened by a wide 45° gap.
 - Tasks: clipboard; Updates: badge with an upward arrow; Check updates: the
   badge with a magnifier handle; System: processor die; Settings: gear;
-  Advanced / Tune: three sliders; Donate: heart.
+  Advanced / Tune: three sliders.
 - Analyze: magnifier with a bar chart; Verify: shield with a check; Measure:
   slanted notched ruler; Exact measurement: reticle; Scan: viewfinder with beam.
 - Compression: two arrows squeezing a core bar. Verify compression /

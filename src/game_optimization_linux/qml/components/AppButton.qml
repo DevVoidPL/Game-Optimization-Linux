@@ -42,7 +42,7 @@ Button {
 
     // Icon and label are centred together as one group. A bare RowLayout with a
     // fill-width label would pin the icon to the left edge and centre only the
-    // text (visible on wide buttons such as the PayPal donation button).
+    // text on wide buttons.
     contentItem: Item {
         implicitWidth: contentRow.implicitWidth
         implicitHeight: contentRow.implicitHeight

@@ -397,9 +397,10 @@ class OptiScalerService:
             raise OptiScalerCancelled("OptiScaler operation was cancelled")
 
     @staticmethod
-    def _hash_stream(handle: BinaryIO) -> str:
+    def _hash_stream(handle: BinaryIO, *, cancel_event: Event | None = None) -> str:
         digest = sha256()
         while True:
+            OptiScalerService._check_cancel(cancel_event)
             chunk = handle.read(1024 * 1024)
             if not chunk:
                 break
@@ -407,9 +408,9 @@ class OptiScalerService:
         return digest.hexdigest()
 
     @staticmethod
-    def _hash_file(path: Path) -> str:
+    def _hash_file(path: Path, *, cancel_event: Event | None = None) -> str:
         with path.open("rb") as handle:
-            return OptiScalerService._hash_stream(handle)
+            return OptiScalerService._hash_stream(handle, cancel_event=cancel_event)
 
     def _archive_payload(
         self, archive_path: Path, injection_dll: str
@@ -856,6 +857,33 @@ class OptiScalerService:
             raise OptiScalerError("OptiScaler manifest does not match this game")
         return raw
 
+    def installation_blockers(
+        self, game: Game, executable: str = "", *, allow_anticheat_risk: bool = False
+    ) -> list[str]:
+        blockers: list[str] = []
+        try:
+            root = self._canonical_game_root(game)
+            profile = self.profile_repository.load(self.game_key(game))
+            candidate, _ = self._selected_candidate(
+                game, self.executable_resolver, executable or profile.executable
+            )
+            if not candidate.wine:
+                blockers.append("OptiScaler requires a Windows game executable running through Wine or Proton")
+            target = self._target(root, candidate.relative_path).parent
+            if game.is_writable is False or not os.access(target, os.W_OK | os.X_OK):
+                blockers.append("The game directory is not writable. In Flatpak, grant access to this game library, then try again")
+            if not game.library_available:
+                blockers.append("The game library is unavailable")
+            if self._steam_write_blocked(game):
+                blockers.append("A Steam update is currently active")
+            if (game.has_anticheat or self._anti_cheat_markers(root)) and not allow_anticheat_risk:
+                blockers.append("Anti-cheat files were detected; automatic installation is blocked")
+            if self._process_detector(root):
+                blockers.append("The game is currently running")
+        except (OptiScalerError, OSError) as error:
+            blockers.append(str(error) or "Game compatibility could not be verified")
+        return blockers
+
     def plan(
         self,
         game: Game,
@@ -874,6 +902,8 @@ class OptiScalerService:
         candidate, confidence = self._selected_candidate(
             game, self.executable_resolver, selected_path
         )
+        if not candidate.wine:
+            raise OptiScalerError("OptiScaler requires a Windows game executable running through Wine or Proton")
         exe_path = self._target(root, candidate.relative_path)
         if not exe_path.is_file():
             raise OptiScalerError("selected executable is unavailable")
@@ -2377,16 +2407,17 @@ class OptiScalerService:
         # deliberately allowed to drift; executable payloads are not.
         actions: list[dict[str, Any]] = []
         emit("Checking removal safety", 0.08)
-        for item in created:
+        for index, item in enumerate(created):
             self._check_cancel(cancel_event)
             relative = str(item.get("relative_path", ""))
+            emit(f"Checking removal safety: {relative}", 0.08 + 0.32 * index / max(1, len(created) + len(replacements)))
             target = self._target(install_root, relative)
             exists = target.exists() or target.is_symlink()
             if exists and (target.is_symlink() or not target.is_file()):
                 raise OptiScalerConflictError(
                     f"managed path is not a regular file and was not removed: {relative}"
                 )
-            observed_hash = self._hash_file(target) if exists else ""
+            observed_hash = self._hash_file(target, cancel_event=cancel_event) if exists else ""
             expected_hash = str(item.get("after_sha256", ""))
             mutable = _is_mutable_configuration(relative)
             if exists and observed_hash != expected_hash and not mutable:
@@ -2413,16 +2444,17 @@ class OptiScalerService:
                     ),
                 }
             )
-        for item in replacements:
+        for index, item in enumerate(replacements):
             self._check_cancel(cancel_event)
             relative = str(item.get("relative_path", ""))
+            emit(f"Checking removal safety: {relative}", 0.08 + 0.32 * (len(created) + index) / max(1, len(created) + len(replacements)))
             target = self._target(install_root, relative)
             exists = target.exists() or target.is_symlink()
             if exists and (target.is_symlink() or not target.is_file()):
                 raise OptiScalerConflictError(
                     f"managed path is not a regular file and was not restored: {relative}"
                 )
-            observed_hash = self._hash_file(target) if exists else ""
+            observed_hash = self._hash_file(target, cancel_event=cancel_event) if exists else ""
             expected_hash = str(item.get("after_sha256", ""))
             mutable = _is_mutable_configuration(relative)
             backup_relative = str(item.get("backup_relative_path", relative))
@@ -2684,6 +2716,19 @@ class OptiScalerService:
         except OptiScalerError as error:
             return {"success": False, "error": str(error)}
         profile = self.profile_repository.load(game_key)
+        try:
+            game_root = self._canonical_game_root(game)
+            # is_dir alone does not establish read/search access (Flatpak).
+            with os.scandir(game_root) as entries:
+                next(entries, None)
+            if not os.access(game_root, os.R_OK | os.X_OK):
+                raise OSError("game directory is not readable")
+        except (OSError, OptiScalerError) as error:
+            return {"success": True, "appId": game_key,
+                    "installationState": "unavailable", "installed": None,
+                    "accessError": "The game directory is unavailable or not accessible. In Flatpak, grant access to this library: " + str(error),
+                    "ownership": {"state": "unavailable", "canRemove": False},
+                    "installationBlockers": ["The game directory is unavailable or not accessible"]}
         resolution = self.executable_resolver.resolve(game, profile.executable)
         selected = resolution.selected
         manifest: dict[str, Any] = {}
@@ -2864,6 +2909,46 @@ class OptiScalerService:
             for item in installed_files
             if isinstance(item, Mapping)
         )
+        # Read live evidence as well as the edition-local manifest. Never adopt
+        # files or another edition's backups implicitly, and never infer
+        # ownership merely from a DLL's name.
+        live_state = profile.installation_state
+        missing_files: list[str] = []
+        detected_files: list[str] = []
+        access_error = ""
+        if active_install and manifest and location["state"] == "current":
+            for item in installed_files:
+                if isinstance(item, Mapping):
+                    relative = str(item.get("relative_path", ""))
+                    if relative and not self._target(Path(location["currentDirectory"]), relative).is_file():
+                        missing_files.append(relative)
+            if missing_files:
+                live_state = "partial"
+        elif not active_install:
+            directories = {game_root}
+            for candidate in resolution.candidates:
+                directories.add(self._target(game_root, candidate.relative_path).parent)
+            names = {"optiscaler.ini", "optiscaler.dll", "amd_fidelityfx_dx12.dll",
+                     "amd_fidelityfx_upscaler_dx12.dll", *OPTISCALER_PROXY_DLLS}
+            for directory in directories:
+                try:
+                    for entry in directory.iterdir():
+                        if entry.name.casefold() in names and entry.is_file():
+                            detected_files.append(str(entry.relative_to(game_root)))
+                except OSError as error:
+                    access_error = str(error)
+            if detected_files:
+                live_state = "unmanaged" if any(Path(p).name.casefold() in {"optiscaler.ini", "optiscaler.dll"} for p in detected_files) else "conflict"
+            elif access_error:
+                live_state = "unavailable"
+        ownership = self.ownership_status(profile, manifest) if manifest else {
+            "state": "not_installed", "canRemove": False, "removeBlocker": manifest_error,
+            "owner": "absent", "ownerName": "", "leftoverFiles": [], "proxy": profile.injection_dll, "liveHash": ""}
+        if detected_files:
+            ownership.update(state=live_state, canRemove=False,
+                             removeBlocker="Existing files are not managed by this installation; they are preserved")
+        if active_install and ownership["state"] == "modified" and ownership.get("owner") == "foreign":
+            live_state = "inconsistent"
         data.update(
             {
                 "success": True,
@@ -2872,17 +2957,21 @@ class OptiScalerService:
                     "inconsistent"
                     if location["state"] in {"inconsistent", "unavailable"}
                     and active_install
-                    else profile.installation_state
+                    else live_state
                 ),
+                "missingFiles": missing_files,
+                "detectedFiles": sorted(set(detected_files)),
+                "accessError": access_error,
+                "statusSource": "local_manifest_and_live_files" if active_install else "live_files",
                 "installLocation": location,
-                "ownership": self.ownership_status(profile, manifest) if manifest else
-                             {"state": "not_installed", "canRemove": False, "removeBlocker": manifest_error,
-                              "owner": "absent", "ownerName": "", "leftoverFiles": [], "proxy": profile.injection_dll, "liveHash": ""},
+                "ownership": ownership,
                 "installed": bool(
                     profile.enabled
                     and profile.manifest_id
                     and profile.installation_state
                     in {"installed", "partial"}
+                    and not missing_files
+                    and (bool(manifest_error) or location["state"] == "current")
                 ),
                 # A removed installation has no current version; the last one
                 # is kept separately so the UI never shows both states.

@@ -335,16 +335,6 @@ def d_settings() -> list[Shape]:
     return [gear(12, 12, 10, 7.6, teeth=8, hole=3.4)]
 
 
-def d_donate() -> list[Shape]:
-    pts = []
-    for i in range(72):
-        t = math.radians(i * 5)
-        x = 16 * math.sin(t) ** 3
-        y = -(13 * math.cos(t) - 5 * math.cos(2 * t) - 2 * math.cos(3 * t) - math.cos(4 * t))
-        pts.append((12 + x * 0.56, 11.2 + y * 0.56))
-    return [Shape(pts)]
-
-
 # -- action family ------------------------------------------------------------
 
 def d_analyze() -> list[Shape]:
@@ -623,7 +613,6 @@ DESKTOP: dict[str, tuple[str, str, object]] = {
     "sidebar-system": ("sidebar", "System", d_system),
     "sidebar-settings": ("sidebar", "Settings", d_settings),
 
-    "sidebar-donate": ("sidebar", "Donate", d_donate),
     "action-analyze": ("action", "Analyze", d_analyze),
     "action-verify": ("action", "Verify", d_verify),
     "action-measure": ("action", "Measure", d_measure),

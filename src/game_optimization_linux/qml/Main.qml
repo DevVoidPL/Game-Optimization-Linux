@@ -102,7 +102,6 @@ ApplicationWindow {
         updatesLoader.active = false
         tasksLoader.active = false
         systemLoader.active = false
-        donateLoader.active = false
         settingsLoader.active = false
         detailsLoader.active = false
         couchLoader.active = false
@@ -129,8 +128,6 @@ ApplicationWindow {
             return Qt.resolvedUrl("pages/TasksPage.qml")
         if (pageName === "system")
             return Qt.resolvedUrl("pages/SystemPage.qml")
-        if (pageName === "donate")
-            return Qt.resolvedUrl("pages/DonatePage.qml")
         if (pageName === "settings")
             return Qt.resolvedUrl("pages/SettingsPage.qml")
         if (pageName === "gameDetails" || pageName === "game" || pageName === "details")
@@ -145,12 +142,10 @@ ApplicationWindow {
             return 2
         if (pageName === "system")
             return 3
-        if (pageName === "donate")
-            return 4
         if (pageName === "settings")
-            return 5
+            return 4
         if (pageName === "gameDetails" || pageName === "game" || pageName === "details")
-            return 6
+            return 5
         return 0
     }
 
@@ -160,7 +155,6 @@ ApplicationWindow {
             updatesLoader,
             tasksLoader,
             systemLoader,
-            donateLoader,
             settingsLoader,
             detailsLoader
         ]
@@ -248,14 +242,6 @@ ApplicationWindow {
                     objectName: "systemPageLoader"
                     asynchronous: false
                     source: Qt.resolvedUrl("pages/SystemPage.qml")
-                    onLoaded: if (item && item.hasOwnProperty("controller")) item.controller = window.controller
-                }
-
-                Loader {
-                    id: donateLoader
-                    objectName: "donatePageLoader"
-                    asynchronous: false
-                    source: Qt.resolvedUrl("pages/DonatePage.qml")
                     onLoaded: if (item && item.hasOwnProperty("controller")) item.controller = window.controller
                 }
 

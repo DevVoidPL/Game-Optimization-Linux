@@ -85,7 +85,16 @@ class FrameGenerationController:
             url = QUrl(str(values.get("path", "")))
             path = url.toLocalFile() if url.isLocalFile() else str(values.get("path", ""))
             return self.service.validate_dll(game, backend, path)
+        elif action == "setup-empty-steam":
+            if game.launcher.value != "Steam" or game.launcher_variant == "flatpak":
+                raise ValueError("This setup supports native Steam only; launcher sandbox access must be configured separately")
+            if values.get("confirmEmptySteamOptions") is not True:
+                raise ValueError("Explicit confirmation is required before changing empty Steam Launch Options")
+            from ..services.frame_generation_runner_setup import configure_empty_steam
+            configure_empty_steam(game, self.service.host, self.service.root)
         elif action in {"setup-runner", "restore-runner"}:
+            if action == "setup-runner" and game.launcher.value == "Steam":
+                raise ValueError("Use Steam Library > Properties > General > Launch Options; automatic Steam configuration writes are disabled")
             self.service.post._safe(game, self.service.post.executable(game))
             from ..services.frame_generation_access import prepare
             if game.launcher_variant == "flatpak":

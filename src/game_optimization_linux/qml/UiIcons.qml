@@ -48,9 +48,6 @@ QtObject {
     readonly property url sidebarSystem: Theme.dark
         ? Qt.resolvedUrl("../assets/ui-icons/sidebar-system.svg")
         : Qt.resolvedUrl("../assets/ui-icons/sidebar-system-on-light.svg")
-    readonly property url sidebarDonate: Theme.dark
-        ? Qt.resolvedUrl("../assets/ui-icons/sidebar-donate.svg")
-        : Qt.resolvedUrl("../assets/ui-icons/sidebar-donate-on-light.svg")
     readonly property url sidebarSettings: Theme.dark
         ? Qt.resolvedUrl("../assets/ui-icons/sidebar-settings.svg")
         : Qt.resolvedUrl("../assets/ui-icons/sidebar-settings-on-light.svg")
@@ -161,8 +158,6 @@ QtObject {
     readonly property url brandOptiScaler: Theme.dark
         ? Qt.resolvedUrl("../assets/ui-icons/brands/optiscaler.png")
         : Qt.resolvedUrl("../assets/ui-icons/brands/optiscaler-on-light.png")
-    // PayPal monogram (official newsroom asset, full colour on both themes).
-    readonly property url brandPayPal: Qt.resolvedUrl("../assets/ui-icons/brands/paypal.png")
 
     // GameOpti Couch Mode icon set. Fixed two-tone SVGs are used so
     // the mint/base palette remains consistent in both light and dark themes.

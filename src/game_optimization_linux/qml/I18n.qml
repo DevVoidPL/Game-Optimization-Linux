@@ -300,6 +300,9 @@ QtObject {
     }
 
     function message(value) {
+        var progressText = text(value)
+        if (progressText.indexOf("Checking removal safety: ") === 0)
+            return qsTr("Checking removal safety: %1").arg(progressText.substring(25))
         var original = text(value)
         var match
         switch (original) {
@@ -528,6 +531,20 @@ QtObject {
             return qsTr("The game directory is not writable. In Flatpak, grant access to this Steam library, then try again")
         case "game directory is unavailable":
             return qsTr("game directory is unavailable")
+        case "OptiScaler requires a Windows game executable running through Wine or Proton":
+            return qsTr("OptiScaler requires a Windows game executable running through Wine or Proton")
+        case "The game directory is not writable. In Flatpak, grant access to this game library, then try again":
+            return qsTr("The game directory is not writable. In Flatpak, grant access to this game library, then try again")
+        case "Anti-cheat files were detected; automatic installation is blocked":
+            return qsTr("Anti-cheat files were detected; automatic installation is blocked")
+        case "Checking official release": return qsTr("Checking official release")
+        case "Downloading official release": return qsTr("Downloading official release")
+        case "Checking removal safety": return qsTr("Checking removal safety")
+        case "Cancelling": return qsTr("Cancelling")
+        case "Verifying and extracting release": return qsTr("Verifying and extracting release")
+        case "Verifying installation": return qsTr("Verifying installation")
+        case "Creating backups": return qsTr("Creating backups")
+        case "Installing files": return qsTr("Installing files")
         case "A game file or directory is not accessible":
             return qsTr("A game file or directory is not accessible")
         case "Checking OptiScaler took too long":

@@ -177,7 +177,6 @@ _VALID_PAGES = {
     "games",
     "updates",
     "tasks",
-    "donate",
     "system",
     "settings",
     "gameDetails",
@@ -645,6 +644,8 @@ class AppController(QObject):
             DATA_DIR / "games" / "optimization-changes"
         )
         self._runner_integration = runner_integration or RunnerIntegration()
+        from .steam_integration_controller import SteamIntegrationController
+        self._steam_integration_controller = SteamIntegrationController(self)
         self._optimization_launch_planner = OptimizationLaunchPlanner()
         self._optiscaler_service = optiscaler_service or OptiScalerService(
             executable_resolver=self._mangohud_launch_integration.executable_resolver
@@ -2142,6 +2143,14 @@ class AppController(QObject):
         return self._optimization_controller.syncLauncherMangoHudConfig(game_id)
 
     @Slot(str, result="QVariantMap")
+    def steamIntegrationStatus(self, game_id: str) -> dict[str, Any]:
+        return self._steam_integration_controller.status(game_id)
+
+    @Slot(str, str, bool, result=bool)
+    def changeSteamIntegration(self, game_id: str, action: str, confirmed: bool) -> bool:
+        return self._steam_integration_controller.submit(game_id, action, confirmed)
+
+    @Slot(str, result="QVariantMap")
     def getLauncherIntegration(self, game_id: str) -> dict[str, Any]:
         return self._optimization_controller.getLauncherIntegration(game_id)
 
@@ -2461,6 +2470,9 @@ class AppController(QObject):
 
     @Slot()
     def shutdown(self) -> None:
+        steam_integration = getattr(self, "_steam_integration_controller", None)
+        if steam_integration is not None:
+            steam_integration.shutdown()
         gpu_memory = getattr(self, "_gpu_memory_controller", None)
         if gpu_memory is not None:
             gpu_memory.shutdown()
@@ -3527,7 +3539,6 @@ class AppController(QObject):
             "games": "games",
             "updates": "updates",
             "tasks": "tasks",
-            "donate": "donate",
             "system": "system",
             "settings": "settings",
             "gamedetails": "gameDetails",

@@ -573,7 +573,7 @@ class CompressionController:
             domain_tasks = list(self._app._task_service.list_tasks())
             service_tasks = [task_to_qml(task) for task in domain_tasks]
             updated = self._app._bounded_task_rows(
-                service_tasks + list(self._app._operational_tasks.values())
+                service_tasks + [dict(task) for task in self._app._operational_tasks.values()]
             )
         except KeyboardInterrupt:
             self._app._task_poll_active = False
@@ -747,9 +747,15 @@ class CompressionController:
             task = self._app._operational_tasks.get(str(task_id))
             if task is not None:
                 task["stage"] = "Cancelling"
+                task["cancellable"] = False
                 task["updatedAt"] = datetime.now(UTC).isoformat()
             self._app._reload_tasks()
             return True
+        operational = self._app._operational_tasks.get(str(task_id))
+        if operational is not None:
+            # A click can arrive after the worker completed but before QML
+            # received the terminal snapshot. Never forward it to analysis.
+            return action == "cancel" and str(operational.get("status", "")) in _TERMINAL_STATUSES
         operation = getattr(self._app._task_service, action)
         try:
             task = operation(task_id)

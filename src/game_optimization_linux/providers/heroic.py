@@ -15,11 +15,11 @@ from urllib.parse import urlencode, quote
 from game_optimization_linux.models import Game, Launcher, SizeScanStatus
 
 from .base import FilesystemProvider, GameProvider
+from .artwork import best_local_image
 from .discovery import (
     LauncherRootDiagnostic,
     LauncherScanReport,
     ScanReportBuilder,
-    first_existing_file,
     inspect_install_path,
 )
 
@@ -405,7 +405,7 @@ class HeroicGameProvider(GameProvider):
             for name in safe_names
             for suffix in _IMAGE_SUFFIXES
         ]
-        return first_existing_file(candidates)
+        return best_local_image(candidates)
 
     def update_game_sizes(
         self,

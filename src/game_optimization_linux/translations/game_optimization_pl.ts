@@ -1708,6 +1708,42 @@
         <source>Current configuration</source>
         <translation>Bieżąca konfiguracja</translation>
     </message>
+<message>
+        <source>Protection, allocator and measurements</source>
+        <translation>Ochrona, alokator i pomiary</translation>
+    </message>
+    <message>
+        <source>Deep analysis</source>
+        <translation>Dogłębna analiza</translation>
+    </message>
+    <message>
+        <source>Languages, files and reversible quarantine</source>
+        <translation>Języki, pliki i odwracalna kwarantanna</translation>
+    </message>
+    <message>
+        <source>Recompression</source>
+        <translation>Rekompresja</translation>
+    </message>
+    <message>
+        <source>Analyze and select file types</source>
+        <translation>Przeanalizuj i wybierz typy plików</translation>
+    </message>
+    <message>
+        <source>Main executable</source>
+        <translation>Główny plik wykonywalny</translation>
+    </message>
+    <message>
+        <source>D-pad: choose / adjust · A: confirm · B: back</source>
+        <translation>Krzyżak: wybór / regulacja · A: potwierdź · B: wróć</translation>
+    </message>
+    <message>
+        <source>Steam connection</source>
+        <translation>Połączenie ze Steam</translation>
+    </message>
+    <message>
+        <source>Apply or restore Steam Launch Options</source>
+        <translation>Zastosuj lub przywróć opcje uruchamiania Steam</translation>
+    </message>
 </context>
 <context>
     <name>CouchHints</name>
@@ -3611,6 +3647,26 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Your games</source>
         <translation>Twoje gry</translation>
     </message>
+<message>
+    <source>Y: Clear finished history</source>
+    <translation>Y: Wyczyść zakończoną historię</translation>
+</message>
+<message>
+    <source>Clear finished history?</source>
+    <translation>Wyczyścić zakończoną historię?</translation>
+</message>
+<message>
+    <source>Hide finished results and errors. Active work and game files are kept.</source>
+    <translation>Ukryj zakończone wyniki i błędy. Aktywne zadania i pliki gier pozostaną bez zmian.</translation>
+</message>
+<message>
+    <source>Clear finished history</source>
+    <translation>Wyczyść zakończoną historię</translation>
+</message>
+<message>
+    <source>Keep active work and game files</source>
+    <translation>Zachowaj aktywne zadania i pliki gier</translation>
+</message>
 </context>
 <context>
     <name>CustomLaunchSection</name>
@@ -5735,44 +5791,6 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
     </message>
 </context>
 <context>
-    <name>DonatePage</name>
-    <message>
-        <location filename="../qml/pages/DonatePage.qml" line="+29" />
-        <source>Wesprzyj GameOpti</source>
-        <translation>Wesprzyj GameOpti</translation>
-    </message>
-    <message>
-        <location line="+16" />
-        <source>GameOpti tworzę z pasji do Linuksa i gier. Chcę rozwijać program tak, aby był coraz lepszym narzędziem dla graczy korzystających z Linuxa.</source>
-        <translation>GameOpti tworzę z pasji do Linuksa i gier. Chcę rozwijać program tak, aby był coraz lepszym narzędziem dla graczy korzystających z Linuxa.</translation>
-    </message>
-    <message>
-        <location line="+8" />
-        <source>Sam rozwój projektu wymaga jednak czasu oraz korzystania z różnych narzędzi i usług, które pomagają mi tworzyć, testować i rozwijać GameOpti.</source>
-        <translation>Sam rozwój projektu wymaga jednak czasu oraz korzystania z różnych narzędzi i usług, które pomagają mi tworzyć, testować i rozwijać GameOpti.</translation>
-    </message>
-    <message>
-        <location line="+8" />
-        <source>Jeżeli GameOpti jest dla Ciebie przydatny i chciałbyś wesprzeć jego dalszy rozwój, możesz zrobić to dobrowolnie poprzez jedną z poniższych opcji. Każde wsparcie naprawdę pomaga :)</source>
-        <translation>Jeżeli GameOpti jest dla Ciebie przydatny i chciałbyś wesprzeć jego dalszy rozwój, możesz zrobić to dobrowolnie poprzez jedną z poniższych opcji. Każde wsparcie naprawdę pomaga :)</translation>
-    </message>
-    <message>
-        <location line="+14" />
-        <source>☕ Buy Me a Coffee</source>
-        <translation>☕ Buy Me a Coffee</translation>
-    </message>
-    <message>
-        <location line="+7" />
-        <source>PayPal</source>
-        <translation>PayPal</translation>
-    </message>
-    <message>
-        <location line="+10" />
-        <source>Wsparcie jest całkowicie dobrowolne. GameOpti pozostanie darmowym projektem.</source>
-        <translation>Wsparcie jest całkowicie dobrowolne. GameOpti pozostanie darmowym projektem.</translation>
-    </message>
-</context>
-<context>
     <name>EmptyState</name>
     <message>
         <location filename="../qml/components/EmptyState.qml" line="+10" />
@@ -6528,6 +6546,10 @@ Kontynuuj dopiero po zapoznaniu się z ryzykiem.</translation>
         <source>Already installed: %1. Nothing to download; use Apply below to use it for this game.</source>
         <translation>Już zainstalowany: %1. Nie trzeba niczego pobierać; użyj Zastosuj poniżej, aby włączyć go dla tej gry.</translation>
     </message>
+<message>
+    <source>Use Steam Library &gt; Properties &gt; General &gt; Launch Options. Preserve existing arguments.</source>
+    <translation>Otwórz Steam: Biblioteka &gt; Właściwości &gt; Ogólne &gt; Opcje uruchamiania. Zachowaj istniejące argumenty.</translation>
+</message>
 </context>
 <context>
     <name>GameArtwork</name>
@@ -10051,6 +10073,42 @@ Błędy: %7</translation></message></context>
     <message>
         <source>Game library scan failed: %1</source>
         <translation>Skanowanie bibliotek gier nie powiodło się: %1</translation>
+    </message>
+    <message>
+        <source>OptiScaler requires a Windows game executable running through Wine or Proton</source>
+        <translation>OptiScaler wymaga pliku wykonywalnego gry Windows uruchamianej przez Wine lub Proton</translation>
+    </message>
+    <message>
+        <source>The game directory is not writable. In Flatpak, grant access to this game library, then try again</source>
+        <translation>Brak uprawnień do zapisu w katalogu gry. We Flatpaku nadaj dostęp do tej biblioteki gier i spróbuj ponownie</translation>
+    </message>
+    <message>
+        <source>Anti-cheat files were detected; automatic installation is blocked</source>
+        <translation>Wykryto pliki anti-cheat; automatyczna instalacja jest zablokowana</translation>
+    </message>
+    <message>
+        <source>Checking official release</source>
+        <translation>Sprawdzanie oficjalnego wydania</translation>
+    </message>
+    <message>
+        <source>Downloading official release</source>
+        <translation>Pobieranie oficjalnego wydania</translation>
+    </message>
+    <message>
+        <source>Verifying and extracting release</source>
+        <translation>Weryfikacja i rozpakowywanie wydania</translation>
+    </message>
+    <message>
+        <source>Verifying installation</source>
+        <translation>Weryfikacja instalacji</translation>
+    </message>
+    <message>
+        <source>Creating backups</source>
+        <translation>Tworzenie kopii zapasowych</translation>
+    </message>
+    <message>
+        <source>Installing files</source>
+        <translation>Instalowanie plików</translation>
     </message>
 </context>
 <context>
@@ -14675,6 +14733,14 @@ Obecnie: %2</translation>
         <source>Shared loader</source>
         <translation>Wspólny loader</translation>
     </message>
+    <message>
+        <source>OptiScaler is installed for this game</source>
+        <translation>OptiScaler jest zainstalowany dla tej gry</translation>
+    </message>
+    <message>
+        <source>Only one proxy backend can be active for this game.</source>
+        <translation>Dla tej gry może być aktywny tylko jeden backend proxy.</translation>
+    </message>
 </context>
 <context>
     <name>OptiScalerSummaryCard</name>
@@ -18586,11 +18652,6 @@ Obecnie: %2</translation>
     </message>
     <message>
         <location line="+1" />
-        <source>Donate</source>
-        <translation>Wesprzyj</translation>
-    </message>
-    <message>
-        <location line="+1" />
         <source>Settings</source>
         <translation>Ustawienia</translation>
     </message>
@@ -20527,6 +20588,839 @@ Przetworzone zostaną tylko pliki ujęte w zweryfikowanym planie.</translation>
         <location line="-377" />
         <source>Application updates will be delivered later through Flatpak or the system package manager.</source>
         <translation>Aktualizacje aplikacji będą później dostarczane przez Flatpak lub systemowy menedżer pakietów.</translation>
+    </message>
+</context>
+<context>
+    <name>CouchGpuMemoryEditor</name>
+    <message>
+        <source>Cancel</source>
+        <translation>Anuluj</translation>
+    </message>
+    <message>
+        <source>Confirm</source>
+        <translation>Zatwierdź</translation>
+    </message>
+    <message>
+        <source>Host setup uses system authentication (Polkit); a password and keyboard may be needed. Restore removes only GameOpti setup, keeping packages and independent services.</source>
+        <translation>Konfiguracja hosta używa uwierzytelniania systemowego (Polkit); może być potrzebne hasło i klawiatura. Przywracanie usuwa tylko konfigurację GameOpti, zachowując pakiety i niezależne usługi.</translation>
+    </message>
+    <message>
+        <source>Protect this game's GPU memory</source>
+        <translation>Chroń pamięć GPU tej gry</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Włączone</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Wyłączone</translation>
+    </message>
+    <message>
+        <source>Protection needs a supported driver, dmem region and host setup. Restart the game after Apply; this is not proof of a performance benefit.</source>
+        <translation>Ochrona wymaga zgodnego sterownika, regionu dmem i konfiguracji hosta. Uruchom grę ponownie po Zastosuj; samo ustawienie nie dowodzi poprawy wydajności.</translation>
+    </message>
+    <message>
+        <source>Prepare host (Polkit)</source>
+        <translation>Przygotuj host (Polkit)</translation>
+    </message>
+    <message>
+        <source>Advanced controls and measurements</source>
+        <translation>Ustawienia zaawansowane i pomiary</translation>
+    </message>
+    <message>
+        <source>Memory region</source>
+        <translation>Region pamięci</translation>
+    </message>
+    <message>
+        <source>Not available</source>
+        <translation>Niedostępne</translation>
+    </message>
+    <message>
+        <source>Graphics path</source>
+        <translation>Ścieżka graficzna</translation>
+    </message>
+    <message>
+        <source>Memory-pressure profile</source>
+        <translation>Profil presji pamięci</translation>
+    </message>
+    <message>
+        <source>D3D12 UPLOAD in system memory may reduce VRAM usage but slow GPU access. Requires verified vkd3d, discrete GPU and ReBAR. Default allocator remains unchanged.</source>
+        <translation>D3D12 UPLOAD w pamięci systemowej może zmniejszyć zużycie VRAM, ale spowolnić dostęp GPU. Wymaga potwierdzonego vkd3d, oddzielnej karty i ReBAR. Domyślny alokator pozostaje bez zmian.</translation>
+    </message>
+    <message>
+        <source>Same scene, duration and graphics settings</source>
+        <translation>Ta sama scena, czas i ustawienia grafiki</translation>
+    </message>
+    <message>
+        <source>Yes</source>
+        <translation>Tak</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Nie</translation>
+    </message>
+    <message>
+        <source>Compare GPU-memory recordings</source>
+        <translation>Porównaj nagrania pamięci GPU</translation>
+    </message>
+    <message>
+        <source>Compare Off and On using Baseline / Comparison recordings. Lower VRAM alone is not evidence of improvement.</source>
+        <translation>Porównaj Wył. i Wł. w nagraniach bazowym i porównawczym. Samo niższe zużycie VRAM nie dowodzi poprawy.</translation>
+    </message>
+    <message>
+        <source>Restore GameOpti system setup</source>
+        <translation>Przywróć zmiany systemowe GameOpti</translation>
+    </message>
+    <message>
+        <source>Apply for next launch</source>
+        <translation>Zastosuj przy następnym uruchomieniu</translation>
+    </message>
+    <message>
+        <source>Reset editor to defaults</source>
+        <translation>Przywróć domyślne w edytorze</translation>
+    </message>
+    <message>
+        <source>Refresh diagnostics</source>
+        <translation>Odśwież diagnostykę</translation>
+    </message>
+    <message>
+        <source>Review GPU-memory setup</source>
+        <translation>Sprawdź konfigurację pamięci GPU</translation>
+    </message>
+    <message>
+        <source>GPU memory</source>
+        <translation>Pamięć GPU</translation>
+    </message>
+    <message>
+        <source>Unsaved changes</source>
+        <translation>Niezapisane zmiany</translation>
+    </message>
+    <message>
+        <source>Saved settings</source>
+        <translation>Zapisane ustawienia</translation>
+    </message>
+    <message>
+        <source>Runtime protection verified</source>
+        <translation>Ochrona podczas działania potwierdzona</translation>
+    </message>
+    <message>
+        <source>Runtime protection not verified</source>
+        <translation>Ochrona podczas działania niepotwierdzona</translation>
+    </message>
+    <message>
+        <source>Measured improvement in this pair; repeat the test</source>
+        <translation>Zmierzona poprawa w tej parze; powtórz test</translation>
+    </message>
+    <message>
+        <source>Measured benefit not verified</source>
+        <translation>Korzyść pomiarowa niepotwierdzona</translation>
+    </message>
+</context>
+<context>
+    <name>CouchDeepStorageEditor</name>
+    <message>
+        <source>Cancel</source>
+        <translation>Anuluj</translation>
+    </message>
+    <message>
+        <source>Confirm</source>
+        <translation>Zatwierdź</translation>
+    </message>
+    <message>
+        <source>Btrfs extents will be rebuilt. This operation cannot be undone from the application. Shared extents are skipped.</source>
+        <translation>Ekstenty Btrfs zostaną przebudowane. Tej operacji nie można cofnąć w aplikacji. Współdzielone ekstenty są pomijane.</translation>
+    </message>
+    <message>
+        <source>Only selected groups are moved to reversible quarantine. Start and check the game before permanently removing the quarantine.</source>
+        <translation>Tylko zaznaczone grupy trafią do odwracalnej kwarantanny. Uruchom i sprawdź grę przed trwałym usunięciem kwarantanny.</translation>
+    </message>
+    <message>
+        <source>Storage tools</source>
+        <translation>Narzędzia dyskowe</translation>
+    </message>
+    <message>
+        <source>Recompression</source>
+        <translation>Rekompresja</translation>
+    </message>
+    <message>
+        <source>Deep analysis</source>
+        <translation>Dogłębna analiza</translation>
+    </message>
+    <message>
+        <source>Compression profile</source>
+        <translation>Profil kompresji</translation>
+    </message>
+    <message>
+        <source>Analyze compressibility</source>
+        <translation>Przeanalizuj kompresowalność</translation>
+    </message>
+    <message>
+        <source>Requires Btrfs and a local btrfs-progs that can check shared extents per file.</source>
+        <translation>Wymaga Btrfs i lokalnego btrfs-progs z kontrolą współdzielonych ekstentów poszczególnych plików.</translation>
+    </message>
+    <message>
+        <source>Selected</source>
+        <translation>Wybrany</translation>
+    </message>
+    <message>
+        <source>Not selected</source>
+        <translation>Nie wybrano</translation>
+    </message>
+    <message>
+        <source>Estimated saving: %1 - %2. The result depends on the data.</source>
+        <translation>Szacowana oszczędność: %1 - %2. Wynik zależy od danych.</translation>
+    </message>
+    <message>
+        <source>Select recommended</source>
+        <translation>Zaznacz rekomendowane</translation>
+    </message>
+    <message>
+        <source>Clear selection</source>
+        <translation>Wyczyść wybór</translation>
+    </message>
+    <message>
+        <source>Recompress selected files</source>
+        <translation>Rekompresuj zaznaczone pliki</translation>
+    </message>
+    <message>
+        <source>Read-only analysis. Nothing is selected or removed automatically.</source>
+        <translation>Analiza tylko do odczytu. Nic nie jest zaznaczane ani usuwane automatycznie.</translation>
+    </message>
+    <message>
+        <source>Cancel analysis</source>
+        <translation>Anuluj analizę</translation>
+    </message>
+    <message>
+        <source>Storage measurements</source>
+        <translation>Pomiary miejsca na dysku</translation>
+    </message>
+    <message>
+        <source>Logical: %1 · allocated estimate: %2</source>
+        <translation>Logiczny: %1 · szacunek przydziału: %2</translation>
+    </message>
+    <message>
+        <source>Actual compressed size: %1</source>
+        <translation>Rzeczywisty rozmiar po kompresji: %1</translation>
+    </message>
+    <message>
+        <source>Actual compressed size not measured. Allocated blocks are only an estimate.</source>
+        <translation>Nie zmierzono rzeczywistego rozmiaru po kompresji. Przydzielone bloki to tylko szacunek.</translation>
+    </message>
+    <message>
+        <source>Potential and protected data</source>
+        <translation>Potencjał i chronione dane</translation>
+    </message>
+    <message>
+        <source>Quarantine: %1 · protected: %2</source>
+        <translation>Kwarantanna: %1 · chronione: %2</translation>
+    </message>
+    <message>
+        <source>Btrfs eligible: %1. Savings depend on the data; nothing is removed automatically.</source>
+        <translation>Do kompresji Btrfs: %1. Oszczędności zależą od danych; nic nie jest usuwane automatycznie.</translation>
+    </message>
+    <message>
+        <source>Analysis warning</source>
+        <translation>Ostrzeżenie analizy</translation>
+    </message>
+    <message>
+        <source>Target language</source>
+        <translation>Docelowy język</translation>
+    </message>
+    <message>
+        <source>Safety filter</source>
+        <translation>Filtr bezpieczeństwa</translation>
+    </message>
+    <message>
+        <source>Select all safe</source>
+        <translation>Zaznacz wszystkie bezpieczne</translation>
+    </message>
+    <message>
+        <source>Move selection to quarantine</source>
+        <translation>Przenieś zaznaczenie do kwarantanny</translation>
+    </message>
+    <message>
+        <source>Cancel cleanup</source>
+        <translation>Anuluj porządkowanie</translation>
+    </message>
+    <message>
+        <source>Start the game and check</source>
+        <translation>Uruchom grę i sprawdź</translation>
+    </message>
+    <message>
+        <source>Restore quarantine</source>
+        <translation>Przywróć pliki z kwarantanny</translation>
+    </message>
+    <message>
+        <source>Delete quarantine and free space</source>
+        <translation>Usuń kwarantannę i zwolnij miejsce</translation>
+    </message>
+    <message>
+        <source>Permanent deletion requires typing the confirmation word. Keep the quarantine until you have tested the game.</source>
+        <translation>Trwałe usunięcie wymaga wpisania słowa potwierdzenia. Zachowaj kwarantannę do sprawdzenia gry.</translation>
+    </message>
+    <message>
+        <source>Type DELETE to permanently remove quarantine</source>
+        <translation>Wpisz DELETE, aby trwale usunąć kwarantannę</translation>
+    </message>
+    <message>
+        <source>Export JSON report</source>
+        <translation>Eksportuj raport JSON</translation>
+    </message>
+    <message>
+        <source>Report file path</source>
+        <translation>Ścieżka pliku raportu</translation>
+    </message>
+    <message>
+        <source>Global Steam leftover</source>
+        <translation>Pozostałość globalna Steam</translation>
+    </message>
+    <message>
+        <source>Refresh</source>
+        <translation>Odśwież</translation>
+    </message>
+    <message>
+        <source>Review storage operation</source>
+        <translation>Sprawdź operację na plikach</translation>
+    </message>
+    <message>
+        <source>Working…</source>
+        <translation>Przetwarzanie…</translation>
+    </message>
+    <message>
+        <source>Btrfs recompression available</source>
+        <translation>Rekompresja Btrfs dostępna</translation>
+    </message>
+    <message>
+        <source>Recompression unavailable on this filesystem or host</source>
+        <translation>Rekompresja niedostępna na tym systemie plików lub hoście</translation>
+    </message>
+    <message>
+        <source>Analyzing: %1 files</source>
+        <translation>Analizowanie: %1 plików</translation>
+    </message>
+    <message>
+        <source>Analysis complete</source>
+        <translation>Analiza zakończona</translation>
+    </message>
+    <message>
+        <source>Analysis cancelled</source>
+        <translation>Anulowano analizę</translation>
+    </message>
+    <message>
+        <source>Ready for analysis</source>
+        <translation>Gotowe do analizy</translation>
+    </message>
+    <message>
+        <source>Game files changed. Analyze again before applying a plan.</source>
+        <translation>Pliki gry zmieniły się. Powtórz analizę przed zastosowaniem planu.</translation>
+    </message>
+</context>
+<context>
+    <name>CouchFrameGenerationEditor</name>
+    <message>
+        <source>Cancel</source>
+        <translation>Anuluj</translation>
+    </message>
+    <message>
+        <source>Confirm</source>
+        <translation>Zatwierdź</translation>
+    </message>
+    <message>
+        <source>Download the shared component from its official source. Installation does not activate any game.</source>
+        <translation>Pobierz współdzielony komponent z oficjalnego źródła. Instalacja nie aktywuje go dla żadnej gry.</translation>
+    </message>
+    <message>
+        <source>Remove the shared component. Games selecting it will need reinstallation or Off. Purchased files are kept.</source>
+        <translation>Usuń współdzielony komponent. Gry, które go wybrały, wymagają ponownej instalacji lub wyłączenia. Zakupione pliki są zachowywane.</translation>
+    </message>
+    <message>
+        <source>Close the launcher first. Runner setup preserves existing arguments with a reversible backup and can grant the launcher Flatpak access to the component and game configuration.</source>
+        <translation>Najpierw zamknij launcher. Konfiguracja runnera zachowuje argumenty i kopię do przywrócenia; może nadać launcherowi Flatpak dostęp do komponentu i konfiguracji gry.</translation>
+    </message>
+    <message>
+        <source>Frame generator</source>
+        <translation>Generator klatek</translation>
+    </message>
+    <message>
+        <source>Select a generator, resolve requirements, then Apply. Selecting alone does not change the saved launch profile.</source>
+        <translation>Wybierz generator, spełnij wymagania i zastosuj. Sam wybór nie zmienia zapisanego profilu uruchamiania.</translation>
+    </message>
+    <message>
+        <source>Graphics path</source>
+        <translation>Ścieżka graficzna</translation>
+    </message>
+    <message>
+        <source>Update / reinstall</source>
+        <translation>Aktualizuj / zainstaluj ponownie</translation>
+    </message>
+    <message>
+        <source>Download and install</source>
+        <translation>Pobierz i zainstaluj</translation>
+    </message>
+    <message>
+        <source>Lossless Scaling file</source>
+        <translation>Plik Lossless Scaling</translation>
+    </message>
+    <message>
+        <source>Not found</source>
+        <translation>Nie znaleziono</translation>
+    </message>
+    <message>
+        <source>Requires separately purchased Lossless Scaling: lsfg-vk.dll from the lsfg-vk Steam branch.</source>
+        <translation>Wymaga osobno zakupionego Lossless Scaling: lsfg-vk.dll z gałęzi lsfg-vk w Steam.</translation>
+    </message>
+    <message>
+        <source>Requires separately purchased Lossless Scaling: Lossless.dll from the public release.</source>
+        <translation>Wymaga osobno zakupionego Lossless Scaling: Lossless.dll z publicznego wydania.</translation>
+    </message>
+    <message>
+        <source>Discovered files</source>
+        <translation>Wykryte pliki</translation>
+    </message>
+    <message>
+        <source>Validate models</source>
+        <translation>Sprawdź modele</translation>
+    </message>
+    <message>
+        <source>File validation is not proof of generated frames.</source>
+        <translation>Weryfikacja plików nie dowodzi generowania klatek.</translation>
+    </message>
+    <message>
+        <source>In-game frame generation is disabled</source>
+        <translation>Generowanie klatek w grze jest wyłączone</translation>
+    </message>
+    <message>
+        <source>Yes</source>
+        <translation>Tak</translation>
+    </message>
+    <message>
+        <source>No</source>
+        <translation>Nie</translation>
+    </message>
+    <message>
+        <source>Open OptiScaler</source>
+        <translation>Otwórz OptiScaler</translation>
+    </message>
+    <message>
+        <source>afmf-linux conflicts with OptiScaler. Nothing is removed automatically.</source>
+        <translation>afmf-linux koliduje z OptiScalerem. Nic nie jest usuwane automatycznie.</translation>
+    </message>
+    <message>
+        <source>Advanced settings</source>
+        <translation>Ustawienia zaawansowane</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Włączone</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Wyłączone</translation>
+    </message>
+    <message>
+        <source>Reset editor to defaults</source>
+        <translation>Przywróć domyślne w edytorze</translation>
+    </message>
+    <message>
+        <source>Apply for next launch</source>
+        <translation>Zastosuj przy następnym uruchomieniu</translation>
+    </message>
+    <message>
+        <source>Restart the game. Runtime loading and generated frames need separate verification.</source>
+        <translation>Uruchom grę ponownie. Załadowanie warstwy i generowanie klatek wymagają osobnej weryfikacji.</translation>
+    </message>
+    <message>
+        <source>Set up runner</source>
+        <translation>Skonfiguruj runner</translation>
+    </message>
+    <message>
+        <source>Runtime diagnostics</source>
+        <translation>Diagnostyka działania</translation>
+    </message>
+    <message>
+        <source>Layer loaded</source>
+        <translation>Warstwa załadowana</translation>
+    </message>
+    <message>
+        <source>Runtime not verified</source>
+        <translation>Działanie niepotwierdzone</translation>
+    </message>
+    <message>
+        <source>Runtime PIDs: %1</source>
+        <translation>PID-y wykonania: %1</translation>
+    </message>
+    <message>
+        <source>Steam update blocks Apply</source>
+        <translation>Aktualizacja Steam blokuje zastosowanie</translation>
+    </message>
+    <message>
+        <source>Finish or pause the update in Steam, then refresh requirements.</source>
+        <translation>Zakończ lub wstrzymaj aktualizację w Steam, następnie odśwież wymagania.</translation>
+    </message>
+    <message>
+        <source>Restore runner settings</source>
+        <translation>Przywróć ustawienia runnera</translation>
+    </message>
+    <message>
+        <source>Remove component</source>
+        <translation>Usuń komponent</translation>
+    </message>
+    <message>
+        <source>Cancel download</source>
+        <translation>Anuluj pobieranie</translation>
+    </message>
+    <message>
+        <source>Refresh diagnostics</source>
+        <translation>Odśwież diagnostykę</translation>
+    </message>
+    <message>
+        <source>Review frame-generation changes</source>
+        <translation>Sprawdź zmiany generowania klatek</translation>
+    </message>
+    <message>
+        <source>Frame generation</source>
+        <translation>Generowanie klatek</translation>
+    </message>
+    <message>
+        <source>Unsaved changes</source>
+        <translation>Niezapisane zmiany</translation>
+    </message>
+    <message>
+        <source>Saved settings</source>
+        <translation>Zapisane ustawienia</translation>
+    </message>
+    <message>
+        <source>Working…</source>
+        <translation>Przetwarzanie…</translation>
+    </message>
+    <message>
+        <source>Generated frames confirmed in session log</source>
+        <translation>Generowanie klatek potwierdzone w logu sesji</translation>
+    </message>
+    <message>
+        <source>Generated frames not verified</source>
+        <translation>Generowanie klatek niepotwierdzone</translation>
+    </message>
+    <message>
+        <source>GPU requirements not verified</source>
+        <translation>Wymagania GPU niepotwierdzone</translation>
+    </message>
+    <message>
+        <source>Launching environment not ready; set up the runner</source>
+        <translation>Środowisko uruchomieniowe niegotowe; skonfiguruj runner</translation>
+    </message>
+    <message>
+        <source>Main executable</source>
+        <translation>Główny plik wykonywalny</translation>
+    </message>
+    <message>
+        <source>Not detected</source>
+        <translation>Nie wykryto</translation>
+    </message>
+<message>
+    <source>Use Steam Library &gt; Properties &gt; General &gt; Launch Options. Preserve existing arguments.</source>
+    <translation>Otwórz Steam: Biblioteka &gt; Właściwości &gt; Ogólne &gt; Opcje uruchamiania. Zachowaj istniejące argumenty.</translation>
+</message>
+</context>
+<context>
+    <name>CouchPostProcessingEditor</name>
+    <message>
+        <source>Cancel</source>
+        <translation>Anuluj</translation>
+    </message>
+    <message>
+        <source>Confirm</source>
+        <translation>Zatwierdź</translation>
+    </message>
+    <message>
+        <source>Close the game first. Existing files are backed up. Use offline games only; injection may conflict with anti-cheat.</source>
+        <translation>Najpierw zamknij grę. Istniejące pliki są zabezpieczane kopią. Używaj tylko offline; wstrzykiwanie może kolidować z anti-cheat.</translation>
+    </message>
+    <message>
+        <source>Backend</source>
+        <translation>Backend</translation>
+    </message>
+    <message>
+        <source>Optional image effects, not an FPS optimisation. Use one backend per game.</source>
+        <translation>Opcjonalne efekty obrazu, nie optymalizacja FPS. Używaj jednego backendu na grę.</translation>
+    </message>
+    <message>
+        <source>Graphics path</source>
+        <translation>Ścieżka graficzna</translation>
+    </message>
+    <message>
+        <source>Choose the API used by the game if automatic detection is inconclusive.</source>
+        <translation>Wybierz API używane przez grę, jeśli automatyczne wykrywanie nie daje pewnego wyniku.</translation>
+    </message>
+    <message>
+        <source>Main executable</source>
+        <translation>Główny plik wykonywalny</translation>
+    </message>
+    <message>
+        <source>Not detected</source>
+        <translation>Nie wykryto</translation>
+    </message>
+    <message>
+        <source>Effect toggle</source>
+        <translation>Skrót przełączania efektów</translation>
+    </message>
+    <message>
+        <source>Neutral</source>
+        <translation>Neutralny</translation>
+    </message>
+    <message>
+        <source>Gentle colour</source>
+        <translation>Delikatne kolory</translation>
+    </message>
+    <message>
+        <source>AA + light sharpening</source>
+        <translation>AA + lekkie wyostrzanie</translation>
+    </message>
+    <message>
+        <source>On</source>
+        <translation>Włączone</translation>
+    </message>
+    <message>
+        <source>Off</source>
+        <translation>Wyłączone</translation>
+    </message>
+    <message>
+        <source>Effect order</source>
+        <translation>Kolejność efektów</translation>
+    </message>
+    <message>
+        <source>Reset effect</source>
+        <translation>Przywróć parametry efektu</translation>
+    </message>
+    <message>
+        <source>Import ReShade preset</source>
+        <translation>Importuj preset ReShade</translation>
+    </message>
+    <message>
+        <source>Select LUT</source>
+        <translation>Wybierz LUT</translation>
+    </message>
+    <message>
+        <source>Enter a local file path with the on-screen keyboard.</source>
+        <translation>Wpisz ścieżkę lokalnego pliku klawiaturą ekranową.</translation>
+    </message>
+    <message>
+        <source>Local file path</source>
+        <translation>Ścieżka lokalnego pliku</translation>
+    </message>
+    <message>
+        <source>Restore defaults</source>
+        <translation>Przywróć domyślne</translation>
+    </message>
+    <message>
+        <source>Install / apply</source>
+        <translation>Zainstaluj / zastosuj</translation>
+    </message>
+    <message>
+        <source>Saves for the next game launch. Effects and runtime loading are verified separately.</source>
+        <translation>Zapisuje dla następnego uruchomienia gry. Efekty i załadowanie integracji są weryfikowane osobno.</translation>
+    </message>
+    <message>
+        <source>Remove integration</source>
+        <translation>Usuń integrację</translation>
+    </message>
+    <message>
+        <source>Runtime diagnostics</source>
+        <translation>Diagnostyka działania</translation>
+    </message>
+    <message>
+        <source>Runtime loaded · effects not verified</source>
+        <translation>Załadowano w grze · efekty niezweryfikowane</translation>
+    </message>
+    <message>
+        <source>Runtime not verified</source>
+        <translation>Działanie niepotwierdzone</translation>
+    </message>
+    <message>
+        <source>Anti-cheat detected</source>
+        <translation>Wykryto anti-cheat</translation>
+    </message>
+    <message>
+        <source>Single-player/offline only. Do not enter online modes with these modifications.</source>
+        <translation>Tylko dla jednego gracza/offline. Nie wchodź do trybów online z tymi modyfikacjami.</translation>
+    </message>
+    <message>
+        <source>Apply launcher profile</source>
+        <translation>Zastosuj profil launchera</translation>
+    </message>
+    <message>
+        <source>Refresh diagnostics</source>
+        <translation>Odśwież diagnostykę</translation>
+    </message>
+    <message>
+        <source>Review post-processing changes</source>
+        <translation>Sprawdź zmiany przetwarzania obrazu</translation>
+    </message>
+    <message>
+        <source>Post-processing</source>
+        <translation>Efekty obrazu</translation>
+    </message>
+    <message>
+        <source>Unsaved changes</source>
+        <translation>Niezapisane zmiany</translation>
+    </message>
+    <message>
+        <source>Saved settings</source>
+        <translation>Zapisane ustawienia</translation>
+    </message>
+    <message>
+        <source>Working…</source>
+        <translation>Przetwarzanie…</translation>
+    </message>
+</context>
+<context>
+    <name>CouchOptionList</name>
+    <message>
+        <source>D-pad: choose / adjust · A: confirm · B: back</source>
+        <translation>Krzyżak: wybór / regulacja · A: potwierdź · B: wróć</translation>
+    </message>
+</context>
+<context>
+    <name>CouchExecutablePicker</name>
+    <message>
+        <source>Enter executable path</source>
+        <translation>Wpisz ścieżkę pliku wykonywalnego</translation>
+    </message>
+    <message>
+        <source>Enter the main game executable, relative to the game folder.</source>
+        <translation>Podaj główny plik wykonywalny gry, względem katalogu gry.</translation>
+    </message>
+    <message>
+        <source>Main executable</source>
+        <translation>Główny plik wykonywalny</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Anuluj</translation>
+    </message>
+    <message>
+        <source>Choose the main game executable</source>
+        <translation>Wybierz główny plik wykonywalny gry</translation>
+    </message>
+</context>
+<context>
+    <name>OptiScalerSection</name>
+    <message>
+        <source>Existing files are preserved. They may belong to the game, a manual installation or another GameOpti edition. Replacement requires explicit confirmation: %1</source>
+        <translation>Istniejące pliki zostaną zachowane. Mogą należeć do gry, ręcznej instalacji lub innej edycji GameOpti. Zastąpienie wymaga wyraźnego potwierdzenia: %1</translation>
+    </message>
+    <message>
+        <source>Existing files — not managed by this installation</source>
+        <translation>Istniejące pliki — niezarządzane przez tę instalację</translation>
+    </message>
+    <message>
+        <source>Game directory unavailable</source>
+        <translation>Katalog gry niedostępny</translation>
+    </message>
+    <message>
+        <source>Working</source>
+        <translation>Operacja w toku</translation>
+    </message>
+</context>
+<context>
+    <name>CouchGameDetails</name>
+    <message>
+        <source>Conflict with existing files</source>
+        <translation>Konflikt z istniejącymi plikami</translation>
+    </message>
+    <message>
+        <source>Existing files — not managed by this installation</source>
+        <translation>Istniejące pliki — niezarządzane przez tę instalację</translation>
+    </message>
+    <message>
+        <source>Game directory unavailable</source>
+        <translation>Katalog gry niedostępny</translation>
+    </message>
+    <message>
+        <source>Incomplete or changed installation</source>
+        <translation>Instalacja niepełna lub zmieniona</translation>
+    </message>
+    <message>
+        <source>Working</source>
+        <translation>Operacja w toku</translation>
+    </message>
+</context>
+<context>
+    <name>CouchFrameGenerationEditor</name>
+    <message>
+        <source>Close Steam completely. This writes only an already empty Launch Options field for this game, with a full backup. Existing commands are never replaced. This is an offline file edit, not a Steam API.</source>
+        <translation>Całkowicie zamknij Steam. Operacja uzupełni tylko istniejące puste pole opcji uruchamiania tej gry i utworzy pełną kopię zapasową. Nie zastąpi istniejących komend. To edycja pliku przy wyłączonym Steam, nie API Steam.</translation>
+    </message>
+    <message>
+        <source>Controller-only setup after closing Steam. Refuses any existing command; keeps a full backup. AppImage must remain at its current path.</source>
+        <translation>Konfiguracja kontrolerem po zamknięciu Steam. Istniejąca komenda blokuje zapis; zachowywana jest pełna kopia. AppImage musi pozostać w obecnej lokalizacji.</translation>
+    </message>
+    <message>
+        <source>Set up empty Steam Launch Options</source>
+        <translation>Uzupełnij puste opcje uruchamiania Steam</translation>
+    </message>
+</context>
+<context>
+    <name>I18n</name>
+    <message>
+        <source>Cancelling</source>
+        <translation>Anulowanie</translation>
+    </message>
+    <message>
+        <source>Checking removal safety</source>
+        <translation>Sprawdzanie bezpieczeństwa usuwania</translation>
+    </message>
+    <message>
+        <source>Checking removal safety: %1</source>
+        <translation>Sprawdzanie bezpieczeństwa usuwania: %1</translation>
+    </message>
+</context>
+<context>
+    <name>SteamConnectionPanel</name>
+    <message>
+        <source>Checking or updating Steam…</source>
+        <translation>Sprawdzanie lub aktualizowanie Steam…</translation>
+    </message>
+    <message>
+        <source>Previous Steam Launch Options restored</source>
+        <translation>Przywrócono poprzednie opcje uruchamiania Steam</translation>
+    </message>
+    <message>
+        <source>Steam Launch Options applied and verified</source>
+        <translation>Zastosowano i zweryfikowano opcje uruchamiania Steam</translation>
+    </message>
+    <message>
+        <source>Steam is configured to use the GameOpti runner</source>
+        <translation>Steam jest skonfigurowany do używania runnera GameOpti</translation>
+    </message>
+    <message>
+        <source>No recognized GameOpti runner in Steam Launch Options</source>
+        <translation>Nie rozpoznano runnera GameOpti w opcjach uruchamiania Steam</translation>
+    </message>
+    <message>
+        <source>Steam connection</source>
+        <translation>Połączenie ze Steam</translation>
+    </message>
+    <message>
+        <source>GameOpti will ask Steam to close, then change only this game's Launch Options with a backup. Your arguments and wrappers stay. Running games or downloads block the change. Steam stays closed afterwards; start it again when ready. Continue?</source>
+        <translation>GameOpti poprosi Steam o zamknięcie, a następnie zmieni tylko opcje uruchamiania tej gry, zachowując kopię zapasową. Twoje argumenty i wrappery pozostaną. Uruchomione gry lub pobieranie blokują zmianę. Steam pozostanie zamknięty; uruchom go ponownie, gdy będziesz gotowy. Kontynuować?</translation>
+    </message>
+    <message>
+        <source>Confirm</source>
+        <translation>Potwierdź</translation>
+    </message>
+    <message>
+        <source>Apply to Steam</source>
+        <translation>Zastosuj w Steam</translation>
+    </message>
+    <message>
+        <source>Cancel</source>
+        <translation>Anuluj</translation>
+    </message>
+    <message>
+        <source>Restore</source>
+        <translation>Przywróć</translation>
     </message>
 </context>
 </TS>

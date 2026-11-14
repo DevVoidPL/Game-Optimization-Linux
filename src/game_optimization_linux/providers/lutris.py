@@ -17,11 +17,11 @@ import yaml
 from game_optimization_linux.models import Game, Launcher, SizeScanStatus
 
 from .base import FilesystemProvider, GameProvider
+from .artwork import best_local_image
 from .discovery import (
     LauncherRootDiagnostic,
     LauncherScanReport,
     ScanReportBuilder,
-    first_existing_file,
     inspect_install_path,
 )
 
@@ -399,19 +399,19 @@ class LutrisGameProvider(GameProvider):
         root: LutrisRoot, slug: str, launcher_id: str
     ) -> tuple[Path | None, Path | None, Path | None]:
         names = tuple(dict.fromkeys(value for value in (slug, launcher_id) if value))
-        portrait = first_existing_file(
+        portrait = best_local_image(
             root.data_dir / "coverart" / f"{name}{suffix}"
             for name in names
             for suffix in _IMAGE_SUFFIXES
         )
-        header = first_existing_file(
+        header = best_local_image(
             root.data_dir / "banners" / f"{name}{suffix}"
             for name in names
             for suffix in _IMAGE_SUFFIXES
         )
-        icon_root = root.data_dir.parent / "icons" / "hicolor" / "128x128" / "apps"
-        fallback = first_existing_file(
-            icon_root / f"lutris_{name}{suffix}"
+        fallback = best_local_image(
+            root.data_dir.parent / "icons" / "hicolor" / resolution / "apps" / f"lutris_{name}{suffix}"
+            for resolution in ("512x512", "256x256", "128x128", "64x64")
             for name in names
             for suffix in _IMAGE_SUFFIXES
         )

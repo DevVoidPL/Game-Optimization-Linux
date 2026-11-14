@@ -88,14 +88,15 @@ SurfaceCard {
                 launcher: card.value(["launcher", "provider"], qsTr("Library"))
                 diagnosticViewKind: "grid"
                 artworkSource: card.value([
-                    "effectiveArtworkUrl",
                     "portraitArtwork",
                     "portraitArtworkUrl",
+                    "effectiveArtworkUrl",
                     "headerArtwork",
                     "fallbackArtwork",
                     "cover"
                 ], "")
-                artworkFillMode: Image.PreserveAspectCrop
+                artworkFillMode: artworkAspectRatio > 0.55 && artworkAspectRatio < 0.8
+                                 ? Image.PreserveAspectCrop : Image.PreserveAspectFit
                 // Top corners follow the card; the cover sits flush on the
                 // information section below, so its bottom edge stays square.
                 cornerRadius: App.Theme.radiusLarge

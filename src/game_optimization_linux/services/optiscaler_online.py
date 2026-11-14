@@ -877,6 +877,8 @@ class OptiScalerReleaseClient:
                 "OptiScaler release archive exceeds the download size limit"
             )
         archive_path, record_path = self._archive_paths(release)
+        if progress is not None:
+            progress(0, int(release.asset.size))
         cached = self._cached_archive(release, archive_path, record_path)
         if cached is not None:
             return cached
@@ -900,6 +902,8 @@ class OptiScalerReleaseClient:
             ) as output:
                 temporary_path = Path(output.name)
                 for attempt in range(3):
+                    if progress is not None:
+                        progress(0, int(release.asset.size))
                     output.seek(0)
                     output.truncate()
                     digest = sha256()
@@ -931,6 +935,8 @@ class OptiScalerReleaseClient:
                                     "OptiScaler archive redirected outside official GitHub asset hosting"
                                 )
                             while True:
+                                if progress is not None:
+                                    progress(downloaded, int(release.asset.size))
                                 chunk = response.read(DOWNLOAD_CHUNK_SIZE)
                                 if not chunk:
                                     break
@@ -949,6 +955,8 @@ class OptiScalerReleaseClient:
                             f"OptiScaler archive download returned HTTP {error.code}"
                         ) from error
                     except (URLError, TimeoutError, ConnectionError, OSError) as error:
+                        if progress is not None:
+                            progress(downloaded, int(release.asset.size))
                         if attempt == 2:
                             raise OptiScalerDownloadError(
                                 "could not download the official OptiScaler archive "
